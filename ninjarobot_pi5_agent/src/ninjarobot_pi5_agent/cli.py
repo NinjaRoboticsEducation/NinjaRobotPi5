@@ -20,11 +20,15 @@ from ninjarobot_pi5_ide import (
     ActionRequest,
     ActionResult,
     ActionStatus,
+    BuzzerDevice,
+    BuzzerStopAdapter,
+    BuzzerToneAdapter,
     CapabilityDescriptor,
     CapabilityRegistry,
     ExecutionEngine,
     HealthReport,
     ResourceHealth,
+    ResourceScheduler,
     RiskLevel,
     VL53L0XDistanceAdapter,
     load_robot_config,
@@ -138,6 +142,50 @@ def build_parser() -> argparse.ArgumentParser:
         "--idempotency-key",
         help="Explicit idempotency key for a single read.",
     )
+
+    buzzer_parser = subcommands.add_parser(
+        "buzzer",
+        help="Exercise bounded GPIO27 buzzer capabilities.",
+    )
+    buzzer_subcommands = buzzer_parser.add_subparsers(
+        dest="buzzer_command",
+        required=True,
+    )
+    buzzer_health_parser = buzzer_subcommands.add_parser(
+        "health",
+        help="Check simulated or real GPIO27 readiness without making sound.",
+    )
+    _add_backend_options(buzzer_health_parser)
+    buzzer_play_parser = buzzer_subcommands.add_parser(
+        "play",
+        help="Play a simulated tone unless --real is supplied explicitly.",
+    )
+    _add_backend_options(buzzer_play_parser)
+    _add_action_identity_options(buzzer_play_parser)
+    buzzer_play_parser.add_argument(
+        "--frequency",
+        type=int,
+        required=True,
+        help="Tone frequency in hertz, from 20 through 20000.",
+    )
+    buzzer_play_parser.add_argument(
+        "--duration",
+        type=float,
+        default=0.2,
+        help="Tone duration in seconds, from 0.05 through 2.0.",
+    )
+    buzzer_play_parser.add_argument(
+        "--volume",
+        type=int,
+        default=32,
+        help="Bounded volume from 1 through 128; 32 is the quiet default.",
+    )
+    buzzer_stop_parser = buzzer_subcommands.add_parser(
+        "stop",
+        help="Request emergency buzzer silence; simulated unless --real is supplied.",
+    )
+    _add_backend_options(buzzer_stop_parser)
+    _add_action_identity_options(buzzer_stop_parser)
     return parser
 
 
@@ -157,6 +205,11 @@ def _add_backend_options(parser: argparse.ArgumentParser) -> None:
         default="data/phase2-actions.sqlite3",
         help="SQLite action-ledger path (a local database file).",
     )
+
+
+def _add_action_identity_options(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--action-id", help="Optional explicit action identifier.")
+    parser.add_argument("--idempotency-key", help="Optional duplicate-protection key.")
 
 
 def _schema_bundle() -> dict[str, dict[str, Any]]:
@@ -216,6 +269,35 @@ class _SimulatedDistanceSensor:
         return None
 
 
+class _SimulatedBuzzerDriver:
+    """Hardware-free buzzer driver used by default CLI commands."""
+
+    def __init__(self) -> None:
+        self._initialized = False
+        self._volume = 32
+
+    @property
+    def is_initialized(self) -> bool:
+        return self._initialized
+
+    @property
+    def volume(self) -> int:
+        return self._volume
+
+    @volume.setter
+    def volume(self, value: int) -> None:
+        self._volume = value
+
+    def initialize(self) -> None:
+        self._initialized = True
+
+    def play_sound(self, frequency: int, duration: float) -> None:
+        del frequency, duration
+
+    def off(self) -> None:
+        self._initialized = False
+
+
 def _build_distance_engine(
     *,
     real: bool,
@@ -239,12 +321,97 @@ def _build_distance_engine(
 
 
 async def _list_capabilities() -> tuple[CapabilityDescriptor, ...]:
+    buzzer = BuzzerDevice()
     engine = ExecutionEngine(
-        CapabilityRegistry([VL53L0XDistanceAdapter()]),
+        CapabilityRegistry(
+            [
+                BuzzerToneAdapter(buzzer),
+                BuzzerStopAdapter(buzzer),
+                VL53L0XDistanceAdapter(),
+            ]
+        ),
         ActionLedger(":memory:"),
     )
     try:
         return await engine.capabilities()
+    finally:
+        await engine.close()
+
+
+def _build_buzzer_engine(
+    *,
+    real: bool,
+    config_path: str,
+    ledger_path: str,
+) -> ExecutionEngine:
+    if real:
+        config = load_robot_config(config_path)
+        device = BuzzerDevice(pin=config.hardware.buzzer.gpio)
+    else:
+        simulated_driver = _SimulatedBuzzerDriver()
+        device = BuzzerDevice(
+            pin=27,
+            driver_factory=lambda _pin, _volume: simulated_driver,
+            simulated=True,
+        )
+    return ExecutionEngine(
+        CapabilityRegistry(
+            [
+                BuzzerToneAdapter(device),
+                BuzzerStopAdapter(device),
+            ]
+        ),
+        ActionLedger(Path(ledger_path)),
+        scheduler=ResourceScheduler(max_concurrency=2, max_queue_size=4),
+    )
+
+
+async def _run_buzzer_health(
+    *,
+    real: bool,
+    config_path: str,
+    ledger_path: str,
+) -> HealthReport:
+    engine = _build_buzzer_engine(
+        real=real,
+        config_path=config_path,
+        ledger_path=ledger_path,
+    )
+    try:
+        return await engine.health()
+    finally:
+        await engine.close()
+
+
+async def _run_buzzer_action(
+    *,
+    capability: str,
+    arguments: dict[str, Any],
+    real: bool,
+    config_path: str,
+    ledger_path: str,
+    action_id: str | None,
+    idempotency_key: str | None,
+) -> ActionResult:
+    generated = uuid.uuid4().hex
+    current_action_id = action_id or f"buzzer-{generated}"
+    current_key = idempotency_key or f"buzzer-key-{generated}"
+    engine = _build_buzzer_engine(
+        real=real,
+        config_path=config_path,
+        ledger_path=ledger_path,
+    )
+    try:
+        return await engine.execute(
+            ActionRequest(
+                action_id=current_action_id,
+                capability=capability,
+                arguments=arguments,
+                requested_by="manual-cli",
+                session_id="manual-buzzer-test",
+                idempotency_key=current_key,
+            )
+        )
     finally:
         await engine.close()
 
@@ -395,6 +562,40 @@ def main(argv: Sequence[str] | None = None) -> int:
                     )
                 )
             return 0 if all(result.status is ActionStatus.SUCCEEDED for result in results) else 1
+        if args.command == "buzzer" and args.buzzer_command == "health":
+            health = asyncio.run(
+                _run_buzzer_health(
+                    real=args.real,
+                    config_path=args.config,
+                    ledger_path=args.ledger,
+                )
+            )
+            print(health.model_dump_json(indent=2))
+            return 0 if health.status is ResourceHealth.READY else 1
+        if args.command == "buzzer" and args.buzzer_command in {"play", "stop"}:
+            capability = "buzzer.play_tone" if args.buzzer_command == "play" else "buzzer.stop"
+            arguments = (
+                {
+                    "frequency_hz": args.frequency,
+                    "duration_seconds": args.duration,
+                    "volume": args.volume,
+                }
+                if args.buzzer_command == "play"
+                else {}
+            )
+            result = asyncio.run(
+                _run_buzzer_action(
+                    capability=capability,
+                    arguments=arguments,
+                    real=args.real,
+                    config_path=args.config,
+                    ledger_path=args.ledger,
+                    action_id=args.action_id,
+                    idempotency_key=args.idempotency_key,
+                )
+            )
+            print(result.model_dump_json(indent=2))
+            return 0 if result.status is ActionStatus.SUCCEEDED else 1
     except (
         KeyError,
         OSError,

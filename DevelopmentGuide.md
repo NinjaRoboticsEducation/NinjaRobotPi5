@@ -176,6 +176,45 @@ That is rejected as a conflicting request. On restart, an action that was only
 queued is marked safe to retry. An action that was already running is recorded
 with an unknown outcome, so software cannot silently repeat it.
 
+## Phase 3.1 GPIO27 buzzer adapter
+
+`ninjarobot_pi5_ide.buzzer` owns the lazy `pi5buzzer` import and shares one
+device service between:
+
+- `buzzer.play_tone`, a low-risk bounded tone
+- `buzzer.stop`, an emergency silence action that does not wait for the
+  playback resource lock
+
+The play capability is intentionally non-idempotent: repeating a successful
+tone would produce sound twice. The action ledger therefore reports
+`retry_safety: unsafe` after success and returns the stored result if the same
+action ID is repeated. Cancellation and engine shutdown call the driver's
+`off()` method, which silences and releases GPIO27.
+
+Simulation is the default:
+
+```bash
+uv run --frozen ninjarobot_pi5_cli buzzer health \
+  --ledger /tmp/ninjarobot-phase31.sqlite3
+uv run --frozen ninjarobot_pi5_cli buzzer play \
+  --ledger /tmp/ninjarobot-phase31.sqlite3 \
+  --frequency 440 \
+  --duration 0.05 \
+  --volume 16
+uv run --frozen ninjarobot_pi5_cli buzzer stop \
+  --ledger /tmp/ninjarobot-phase31.sqlite3
+```
+
+Each result must contain `"simulated": true`. Real GPIO is opened only when the
+command includes `--real`; install the aggregate hardware extra first:
+
+```bash
+uv sync --frozen --extra hardware
+```
+
+Do not run a real tone until the buzzer voltage, current, and transistor-driver
+arrangement are recorded. Follow the Phase 3.1 validation report.
+
 ## Driver package validation commands
 
 ### Standalone README contract
@@ -275,6 +314,14 @@ test; the separate pre-Phase-1 live-Pi report is stored under `docs/validation/`
 - **A repeated action does not read again:** this is intentional when the same
   action ID or idempotency key is used. Generate a new ID and key for a new
   physical reading.
+- **A buzzer result says `simulated: true` and no sound occurs:** this is the
+  safe default. Use `--real` only after the electrical checklist is complete.
+- **Real buzzer health says unavailable:** confirm the root environment was
+  installed with `--extra hardware`, GPIO27 is not claimed by another process,
+  and the user can access GPIO.
+- **A tone is interrupted or the CLI is cancelled:** the adapter calls
+  `off()` before closing. Run `buzzer stop --real` if GPIO access remains
+  available, then disconnect buzzer power if silence cannot be confirmed.
 - **DFR0566 digital GPIO12/GPIO13 do not show a PWM alternate function:** add
   `dtparam=audio=off` and
   `dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4` to

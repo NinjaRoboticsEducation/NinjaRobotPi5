@@ -1,5 +1,42 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-26 — Phase 3.1 GPIO27 buzzer adapter
+
+### Summary
+
+- Added a shared buzzer device service with lazy `pi5buzzer` loading.
+- Added bounded `buzzer.play_tone` and emergency `buzzer.stop` capability
+  descriptors.
+- Limited tones to 20–20,000 hertz, 0.05–2 seconds, and volume 1–128.
+- Added cancellation-safe shutdown and an emergency stop path that does not
+  wait for the normal playback resource lock.
+- Added simulated and explicit-real CLI health, play, and stop commands.
+- Added `pi5buzzer[pi]` to the root hardware dependency group without changing
+  the managed library.
+- Corrected successful non-idempotent action results to report retry safety
+  `unsafe`.
+
+### Validation
+
+- All 56 V4 tests passed, including bounded arguments, unavailable GPIO,
+  cancellation, concurrent emergency stop, CLI simulation, and action-result
+  semantics.
+- All 449 managed-library tests and every package-local Ruff gate passed.
+- Root compilation, Ruff lint, Ruff format, strict mypy, CLI smoke, dependency
+  lock, and `git diff --check` passed.
+- Driver provenance remained at 222 files and 23 authorized repairs.
+
+### Raspberry Pi status
+
+No real GPIO or audible command was run during implementation. Simulation
+passes. Real GPIO27 sound validation is pending confirmation of the buzzer
+module voltage/current and whether a transistor driver is used.
+
+### Follow-up
+
+Complete the Phase 3.1 Pi checklist and review the result before beginning the
+ST7789V display adapter in Phase 3.2.
+
 ## 2026-07-26 — Phase 2 IDE core and VL53L0X reference adapter
 
 ### Summary
@@ -33,10 +70,12 @@
 
 ### Raspberry Pi status
 
-No physical hardware command was run during implementation. The real adapter
-path is ready for operator testing on I2C bus 1 at address `0x29`. The
-previously observed `8191 mm` sentinel remains an expected test failure until
-the physical sensor issue is corrected.
+No physical hardware command was run during implementation. Operator
+validation subsequently passed on I2C bus 1 at address `0x29`: all 10 requested
+actions succeeded, distances ranged from 48 mm to 149 mm, each raw value
+matched its normalized value, and no `8191 mm` sentinel appeared. The earlier
+physical failure is cleared, although its hardware root cause was not
+established.
 
 ### Follow-up
 

@@ -2,6 +2,7 @@
 
 from .adapters import CapabilityAdapter
 from .api import IDEClient
+from .buzzer import BuzzerDevice, BuzzerStopAdapter, BuzzerToneAdapter
 from .config import RobotConfig, load_robot_config
 from .distance import VL53L0XDistanceAdapter
 from .engine import ExecutionEngine
@@ -32,6 +33,9 @@ __all__ = [
     "CapabilityAdapter",
     "CapabilityDescriptor",
     "CapabilityRegistry",
+    "BuzzerDevice",
+    "BuzzerStopAdapter",
+    "BuzzerToneAdapter",
     "ErrorDetails",
     "ExecutionEngine",
     "HealthReport",

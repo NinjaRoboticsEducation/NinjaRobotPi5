@@ -47,8 +47,10 @@ def test_cli_rejects_non_object_json(capsys) -> None:
 def test_phase_two_capabilities_are_hardware_free(capsys) -> None:
     assert main(["capabilities"]) == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload[0]["name"] == "distance.read"
-    assert payload[0]["risk"] == "read_only"
+    capabilities = {item["name"]: item for item in payload}
+    assert capabilities["distance.read"]["risk"] == "read_only"
+    assert capabilities["buzzer.play_tone"]["risk"] == "low"
+    assert capabilities["buzzer.stop"]["risk"] == "emergency"
 
 
 def test_simulated_distance_health_and_read_are_persisted(tmp_path, capsys) -> None:
@@ -117,3 +119,80 @@ def test_distance_cli_rejects_unsafe_bounds(tmp_path, capsys) -> None:
         == 2
     )
     assert "--count must be between 1 and 100" in capsys.readouterr().err
+
+
+def test_simulated_buzzer_health_play_and_stop(tmp_path, capsys) -> None:
+    ledger = tmp_path / "buzzer.sqlite3"
+    assert main(["buzzer", "health", "--ledger", str(ledger)]) == 0
+    health = json.loads(capsys.readouterr().out)
+    assert health["status"] == "ready"
+
+    assert (
+        main(
+            [
+                "buzzer",
+                "play",
+                "--ledger",
+                str(ledger),
+                "--frequency",
+                "440",
+                "--duration",
+                "0.05",
+                "--volume",
+                "16",
+                "--action-id",
+                "buzzer-test-1",
+                "--idempotency-key",
+                "buzzer-key-1",
+            ]
+        )
+        == 0
+    )
+    played = json.loads(capsys.readouterr().out)
+    assert played["status"] == "succeeded"
+    assert played["retry_safety"] == "unsafe"
+    assert played["data"] == {
+        "frequency_hz": 440,
+        "duration_seconds": 0.05,
+        "volume": 16,
+        "interrupted": False,
+        "simulated": True,
+    }
+
+    assert (
+        main(
+            [
+                "buzzer",
+                "stop",
+                "--ledger",
+                str(ledger),
+                "--action-id",
+                "buzzer-stop-1",
+                "--idempotency-key",
+                "buzzer-stop-key-1",
+            ]
+        )
+        == 0
+    )
+    stopped = json.loads(capsys.readouterr().out)
+    assert stopped["status"] == "succeeded"
+    assert stopped["data"] == {"stopped": True, "simulated": True}
+
+
+def test_buzzer_cli_rejects_out_of_bounds_tone(tmp_path, capsys) -> None:
+    result = main(
+        [
+            "buzzer",
+            "play",
+            "--ledger",
+            str(tmp_path / "invalid-buzzer.sqlite3"),
+            "--frequency",
+            "440",
+            "--duration",
+            "10",
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert result == 1
+    assert payload["status"] == "failed"
+    assert payload["error"]["code"] == "INVALID_CAPABILITY_ARGUMENTS"

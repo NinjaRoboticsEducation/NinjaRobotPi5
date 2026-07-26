@@ -13,14 +13,27 @@ scheduler, resource locks, the SQLite action ledger, duplicate protection,
 deadlines, timeouts, cancellation, restart recovery, health reporting, the
 unified CLI, and the `distance.read` adapter.
 
-The automated implementation result is **PASS**. Physical Raspberry Pi testing
-is deliberately still unchecked below.
+The automated implementation result is **PASS**. The operator subsequently
+completed the Raspberry Pi checklist and reported **PASS**.
 
 - Root/V4 tests: 49 passed.
 - Strict mypy type checking: passed for 18 source files.
 - Compilation, Ruff lint, Ruff formatting, and `git diff --check`: passed.
 - Managed-library tests: 449 passed.
 - Driver provenance: 222 tracked files and 23 authorized repairs, unchanged.
+
+### Operator evidence
+
+Operator: `rogerchang`
+
+Result: **PASS**
+
+The real Phase 2 CLI completed 10 of 10 requested actions successfully on
+2026-07-26. Readings were `123`, `48`, `83`, `103`, `55`, `149`, `61`, `134`,
+`89`, and `95` mm. Every raw value matched the normalized distance, every
+result reported retry safety `safe`, and no `8191 mm` sentinel appeared.
+Individual reads completed in approximately 37 milliseconds. Millisecond means
+one thousandth of a second.
 
 ## 2. Safety notes
 
@@ -199,20 +212,20 @@ labels printed on the exact sensor breakout; do not guess whether its input is
 
 ## 8. Pass/fail checklist
 
-- [ ] Root environment installs with `uv sync --frozen`.
-- [ ] Hardware-free capability listing passes.
-- [ ] Simulated health reports ready.
-- [ ] Simulated distance result reports 250 mm and succeeded.
-- [ ] Repeating the same ID returns the original stored result.
-- [ ] `actions show` returns the durable record.
-- [ ] Raspberry Pi hardware extra installs.
-- [ ] I2C bus 1 shows address `29`.
-- [ ] Real adapter health reports ready.
-- [ ] One real distance is positive, below 8190, and physically plausible.
-- [ ] Ten repeated real distances respond to target movement.
-- [ ] A new process reinitializes and closes the sensor successfully.
-- [ ] `8191 mm`, if observed, is rejected rather than reported as success.
-- [ ] No actuator, display, camera, or microphone is operated.
+- [x] Root environment installs with `uv sync --frozen`.
+- [x] Hardware-free capability listing passes.
+- [x] Simulated health reports ready.
+- [x] Simulated distance result reports 250 mm and succeeded.
+- [x] Repeating the same ID returns the original stored result.
+- [x] `actions show` returns the durable record.
+- [x] Raspberry Pi hardware extra installs.
+- [x] I2C bus 1 shows address `29`.
+- [x] Real adapter health reports ready.
+- [x] One real distance is positive, below 8190, and physically plausible.
+- [x] Ten repeated real distances respond to target movement.
+- [x] A new process reinitializes and closes the sensor successfully.
+- [x] `8191 mm`, if observed, is rejected rather than reported as success.
+- [x] No actuator, display, camera, or microphone is operated.
 
 ## 9. Rollback steps
 

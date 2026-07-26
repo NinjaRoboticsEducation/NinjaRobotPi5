@@ -15,7 +15,7 @@ which is the single source of truth.
 
 ## Current status
 
-Phase 0, Phase 1, and Phase 2 are complete. Phase 0 established project
+Phase 0, Phase 1, Phase 2, and Phase 3.1 are complete. Phase 0 established project
 governance and preserved the original import hashes for the six existing Pi5
 hardware libraries. Phase 1 added strict IDE and agent contracts,
 deterministic fakes, V4-owned configuration, and the unified
@@ -23,6 +23,12 @@ deterministic fakes, V4-owned configuration, and the unified
 lifecycle, bounded scheduler, resource locks, durable SQLite action ledger, and
 the first read-only adapter: `distance.read` through `pi5vl53l0x`. SQLite is
 Python's built-in local database format.
+
+Phase 3.1 adds bounded passive-buzzer control on GPIO27. `buzzer.play_tone`
+accepts only a frequency from 20 through 20,000 hertz, a duration from 0.05
+through 2 seconds, and volume from 1 through 128. `buzzer.stop` is an
+idempotent emergency capability, meaning it is safe to request repeatedly.
+Both commands simulate unless `--real` is present.
 
 The `pi5buzzer` development environment is locked and its 65 tests pass. The
 earlier GPIO17 health and sound checks remain historical evidence; the current
@@ -44,10 +50,11 @@ all pass without OpenClaw.
 `pi5vl53l0x` now uses vendor-correct timing-budget calculations, bounded
 reference-calibration recovery, and strict invalid-reading checks. Its 71 tests
 pass and the live device initializes with a valid `0xEE/0xAA/0x10` identity.
-The connected sensor still returns the `8191 mm` out-of-range sentinel at the
-reported 100 mm target, so optical alignment/window, wiring, and cold-power
-validation remain open; calibration is intentionally blocked until readings
-are valid.
+Phase 2 Raspberry Pi validation produced 10 valid consecutive readings from
+48 mm through 149 mm, with no `8191 mm` sentinel. The IDE adapter therefore
+passes initialization, repeated reading, normalization, ledger recording,
+close, and restart validation. The earlier physical failure is cleared, though
+its hardware root cause was not established.
 
 ## Three-layer architecture
 
@@ -76,6 +83,11 @@ The current CLI provides:
 - `distance read` returns simulated data unless `--real` is supplied.
 - `actions show` reads the durable result for one action from the SQLite
   ledger.
+- `buzzer health` checks simulated or real GPIO27 readiness without sounding
+  the buzzer.
+- `buzzer play` runs one short bounded tone; it is simulated unless `--real`
+  is explicitly supplied.
+- `buzzer stop` requests immediate silence and releases GPIO27.
 - `--version` reports the installed V4 package version.
 
 The contracts reject unknown fields and unsafe type conversion. They cover
@@ -134,6 +146,13 @@ uv run --frozen ninjarobot_pi5_cli distance read \
   --ledger /tmp/ninjarobot-phase2-smoke.sqlite3 \
   --action-id phase2-smoke-1 \
   --idempotency-key phase2-smoke-key-1
+uv run --frozen ninjarobot_pi5_cli buzzer health \
+  --ledger /tmp/ninjarobot-phase31-smoke.sqlite3
+uv run --frozen ninjarobot_pi5_cli buzzer play \
+  --ledger /tmp/ninjarobot-phase31-smoke.sqlite3 \
+  --frequency 440 \
+  --duration 0.05 \
+  --volume 16
 ```
 
 On the Raspberry Pi, install the optional managed sensor package without
@@ -146,6 +165,9 @@ uv sync --frozen --extra hardware
 Then follow
 [`docs/validation/phase-2-validation-2026-07-26.md`](docs/validation/phase-2-validation-2026-07-26.md).
 Real sensor access occurs only when the command includes `--real`.
+For the buzzer, follow
+[`docs/validation/phase-3-1-buzzer-validation-2026-07-26.md`](docs/validation/phase-3-1-buzzer-validation-2026-07-26.md).
+Real sound remains blocked until the module's electrical record is confirmed.
 
 Run the complete root gate:
 
@@ -169,9 +191,10 @@ Each copied driver retains its own package-local commands. See
 ## Safety
 
 Default tests and commands without `--real` never access physical hardware.
-The Phase 2 real path reads only the VL53L0X on I2C bus 1 at address `0x29`; it
-does not move a servo, sound the buzzer, change the display, use the camera, or
-record audio. Later actuator commands will require a separate Raspberry Pi
-checklist and operator approval. Model output will be treated as an untrusted
-proposal; the deterministic IDE control plane retains final authority over
-robot actions.
+The Phase 2 real path reads only the VL53L0X on I2C bus 1 at address `0x29`.
+The Phase 3.1 real path can sound the GPIO27 buzzer, but only through bounded
+arguments and an explicit `--real` flag. It does not move a servo, change the
+display, use the camera, or record audio. Later actuator and privacy-sensitive
+commands require separate Raspberry Pi checklists and operator approval. Model
+output is treated as an untrusted proposal; the deterministic IDE control
+plane retains final authority over robot actions.

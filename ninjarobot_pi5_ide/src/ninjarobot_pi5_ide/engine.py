@@ -288,7 +288,9 @@ class ExecutionEngine:
                     data=data,
                     started_at=started_at,
                     finished_at=self._now(),
-                    retry_safety=RetrySafety.SAFE,
+                    retry_safety=(
+                        RetrySafety.SAFE if descriptor.idempotent else RetrySafety.UNSAFE
+                    ),
                 )
 
             try:

@@ -10,6 +10,7 @@ dependencies = [
 
 [project.optional-dependencies]
 hardware = [
+    "pi5buzzer[pi]",
     "pi5vl53l0x",
 ]
 
@@ -27,6 +28,7 @@ package = false
 [tool.uv.sources]
 ninjarobot-pi5-agent = { workspace = true }
 ninjarobot-pi5-ide = { workspace = true }
+pi5buzzer = { path = "pi5buzzer" }
 pi5vl53l0x = { path = "pi5vl53l0x" }
 
 [tool.uv.workspace]
