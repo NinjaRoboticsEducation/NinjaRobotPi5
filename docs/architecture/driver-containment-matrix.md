@@ -15,5 +15,6 @@ contain integration risks as follows.
 | `pi5vl53l0x` calibration | Offset restoration is not protected by `finally` | Distance calibration is disabled in V4 until an adapter-owned recovery transaction and Pi checklist exist | 2 |
 | `pi5disp` configuration | Copied JSON rotation differs from the required 90-degree orientation | V4 configuration passes rotation 90 explicitly; copied configuration remains untouched | 3 |
 | All drivers | Argument schemas and health semantics differ | Adapters expose strict capability schemas, reject unknown fields, normalize errors, and report health per capability | 1–3 |
-| `pi5mic` | Public exports include OpenClaw and Gemini-specific components | V4 imports only approved device-facing modules; no OpenClaw transport or presence controller is registered | 3 and 8 |
+| `pi5mic` | Package-root and core exports eagerly import historical OpenClaw, Gemini, wake-word, and listener components | Phase 3.5 bypasses those exports and loads only errors, models, audio backend, device discovery, and recorder modules into contained namespace packages; runtime tests reject every other `pi5mic` module | 3.5 and 8 |
+| `pi5mic` recording output | The standalone recorder always writes a WAV file | Phase 3.5 records into a private staging directory, deletes audio by default, confines explicit retention, uses permission `600`, and never overwrites | 3.5 |
 | `pi5servo` | Package and module versions differ | Record both values for diagnostics; do not rewrite either version | 3 |

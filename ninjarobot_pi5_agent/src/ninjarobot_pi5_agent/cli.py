@@ -9,9 +9,10 @@ import json
 import sqlite3
 import sys
 import uuid
+import wave
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ninjarobot_pi5_ide.testing import FakeIDEClient
 from pydantic import ValidationError
@@ -35,6 +36,10 @@ from ninjarobot_pi5_ide import (
     DisplayShowTextAdapter,
     ExecutionEngine,
     HealthReport,
+    MicrophoneBackend,
+    MicrophoneCaptureAdapter,
+    MicrophoneDevice,
+    MicrophoneStatusAdapter,
     ResourceHealth,
     ResourceScheduler,
     RiskLevel,
@@ -365,6 +370,52 @@ def build_parser() -> argparse.ArgumentParser:
         "--filename",
         help="Optional retained JPEG name; requires --retain and cannot contain a path.",
     )
+
+    microphone_parser = subcommands.add_parser(
+        "microphone",
+        help="Exercise privacy-bounded USB microphone capabilities.",
+    )
+    microphone_subcommands = microphone_parser.add_subparsers(
+        dest="microphone_command",
+        required=True,
+    )
+    microphone_health_parser = microphone_subcommands.add_parser(
+        "health",
+        help="Check dependencies and input-device readiness without recording audio.",
+    )
+    _add_backend_options(microphone_health_parser)
+    microphone_status_parser = microphone_subcommands.add_parser(
+        "status",
+        help="Report input devices, selected rate, and retention policy without recording.",
+    )
+    _add_backend_options(microphone_status_parser)
+    _add_action_identity_options(microphone_status_parser)
+    microphone_capture_parser = microphone_subcommands.add_parser(
+        "capture",
+        help="Record one simulated WAV clip unless --real is supplied explicitly.",
+    )
+    _add_backend_options(microphone_capture_parser)
+    _add_action_identity_options(microphone_capture_parser)
+    microphone_capture_parser.add_argument(
+        "--duration",
+        type=float,
+        default=3.0,
+        help="Recording duration in seconds; default 3, bounded by V4 configuration.",
+    )
+    microphone_capture_parser.add_argument(
+        "--confirm-microphone",
+        action="store_true",
+        help="Required with --real to confirm that people nearby consent to recording.",
+    )
+    microphone_capture_parser.add_argument(
+        "--retain",
+        action="store_true",
+        help="Keep the WAV file in the configured private media directory.",
+    )
+    microphone_capture_parser.add_argument(
+        "--filename",
+        help="Optional retained WAV name; requires --retain and cannot contain a path.",
+    )
     return parser
 
 
@@ -563,6 +614,74 @@ class _SimulatedCameraCapture:
         return _SimulatedCameraResult(output_path)
 
 
+class _SimulatedMicrophoneDeviceInfo:
+    """Small managed-driver-compatible simulated input-device record."""
+
+    index = 0
+    name = "Simulated USB Microphone"
+    max_input_channels = 1
+    default_samplerate = 16_000.0
+    hostapi = 0
+
+
+class _SimulatedMicrophoneClip:
+    """Small managed-driver-compatible simulated WAV result."""
+
+    def __init__(self, path: Path, duration_seconds: float, sample_rate: int) -> None:
+        self.path = path
+        self.duration_seconds = duration_seconds
+        self.sample_rate = sample_rate
+        self.channels = 1
+        self.frames = max(1, round(duration_seconds * sample_rate))
+        self.bytes_written = path.stat().st_size
+        self.overflowed = False
+
+
+class _SimulatedMicrophoneBackend:
+    """Generate bounded silence without importing or opening audio hardware."""
+
+    def __init__(self) -> None:
+        self._device = _SimulatedMicrophoneDeviceInfo()
+
+    def list_input_devices(self) -> list[_SimulatedMicrophoneDeviceInfo]:
+        return [self._device]
+
+    def resolve_input_settings(
+        self,
+        *,
+        selector: str,
+        sample_rate: int,
+        channels: int,
+    ) -> tuple[int, int, _SimulatedMicrophoneDeviceInfo, None]:
+        del selector
+        if channels != 1:
+            raise ValueError("simulated microphone supports mono audio only")
+        return self._device.index, sample_rate, self._device, None
+
+    def record_wav(
+        self,
+        output_path: Path,
+        *,
+        selector: str,
+        sample_rate: int,
+        channels: int,
+        duration_seconds: float,
+    ) -> _SimulatedMicrophoneClip:
+        del selector
+        frame_count = max(1, round(duration_seconds * sample_rate))
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with wave.open(str(output_path), "wb") as wav_file:
+            wav_file.setnchannels(channels)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(sample_rate)
+            wav_file.writeframes(b"\x00\x00" * frame_count * channels)
+        return _SimulatedMicrophoneClip(
+            output_path,
+            duration_seconds,
+            sample_rate,
+        )
+
+
 class _SimulatedServoCalibration:
     """Explicit safe calibration used only by the hardware-free CLI backend."""
 
@@ -639,6 +758,7 @@ async def _list_capabilities() -> tuple[CapabilityDescriptor, ...]:
     buzzer = BuzzerDevice()
     camera = CameraDevice()
     display = DisplayDevice()
+    microphone = MicrophoneDevice()
     servo = ServoDevice()
     engine = ExecutionEngine(
         CapabilityRegistry(
@@ -650,6 +770,8 @@ async def _list_capabilities() -> tuple[CapabilityDescriptor, ...]:
                 DisplayBrightnessAdapter(display),
                 DisplayClearAdapter(display),
                 DisplayShowTextAdapter(display),
+                MicrophoneCaptureAdapter(microphone),
+                MicrophoneStatusAdapter(microphone),
                 ServoMoveAdapter(servo),
                 ServoStatusAdapter(servo),
                 ServoStopAdapter(servo),
@@ -808,6 +930,45 @@ def _build_camera_engine(
             [
                 CameraCaptureAdapter(device),
                 CameraStatusAdapter(device),
+            ]
+        ),
+        ActionLedger(Path(ledger_path)),
+        scheduler=ResourceScheduler(max_concurrency=2, max_queue_size=4),
+    )
+
+
+def _build_microphone_engine(
+    *,
+    real: bool,
+    config_path: str,
+    ledger_path: str,
+) -> ExecutionEngine:
+    if real:
+        config = load_robot_config(config_path)
+        microphone_config = config.hardware.microphone
+        device = MicrophoneDevice(
+            enabled=microphone_config.enabled,
+            device_selector=microphone_config.device_selector,
+            sample_rate_hz=microphone_config.sample_rate_hz,
+            channels=microphone_config.channels,
+            max_capture_seconds=microphone_config.max_capture_seconds,
+            media_directory=microphone_config.media_directory,
+        )
+    else:
+        device = MicrophoneDevice(
+            device_selector="Simulated USB Microphone",
+            media_directory="data/simulated-microphone",
+            backend_factory=lambda: cast(
+                MicrophoneBackend,
+                _SimulatedMicrophoneBackend(),
+            ),
+            simulated=True,
+        )
+    return ExecutionEngine(
+        CapabilityRegistry(
+            [
+                MicrophoneCaptureAdapter(device),
+                MicrophoneStatusAdapter(device),
             ]
         ),
         ActionLedger(Path(ledger_path)),
@@ -1033,6 +1194,59 @@ async def _run_camera_action(
         await engine.close()
 
 
+async def _run_microphone_health(
+    *,
+    real: bool,
+    config_path: str,
+    ledger_path: str,
+) -> HealthReport:
+    engine = _build_microphone_engine(
+        real=real,
+        config_path=config_path,
+        ledger_path=ledger_path,
+    )
+    try:
+        return await engine.health()
+    finally:
+        await engine.close()
+
+
+async def _run_microphone_action(
+    *,
+    capability: str,
+    arguments: dict[str, Any],
+    real: bool,
+    config_path: str,
+    ledger_path: str,
+    action_id: str | None,
+    idempotency_key: str | None,
+    microphone_confirmed: bool,
+) -> ActionResult:
+    if real and capability == "microphone.capture" and not microphone_confirmed:
+        raise ValueError("real microphone capture requires --confirm-microphone")
+    generated = uuid.uuid4().hex
+    current_action_id = action_id or f"microphone-{generated}"
+    current_key = idempotency_key or f"microphone-key-{generated}"
+    engine = _build_microphone_engine(
+        real=real,
+        config_path=config_path,
+        ledger_path=ledger_path,
+    )
+    try:
+        return await engine.execute(
+            ActionRequest(
+                action_id=current_action_id,
+                capability=capability,
+                arguments=arguments,
+                requested_by="manual-cli",
+                session_id="manual-microphone-test",
+                idempotency_key=current_key,
+            )
+        )
+    finally:
+        await engine.close()
+
+
 async def _run_health(*, real: bool, config_path: str, ledger_path: str) -> HealthReport:
     engine = _build_distance_engine(
         real=real,
@@ -1126,7 +1340,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 f"brightness={config.hardware.display.brightness}%, "
                 f"camera={config.hardware.camera.width}x"
                 f"{config.hardware.camera.height}/"
-                f"{config.hardware.camera.autofocus_mode}"
+                f"{config.hardware.camera.autofocus_mode}, "
+                f"microphone={config.hardware.microphone.device_selector}/"
+                f"{config.hardware.microphone.sample_rate_hz}Hz"
             )
             return 0
         if args.command == "contracts" and args.contracts_command == "schema":
@@ -1339,6 +1555,47 @@ def main(argv: Sequence[str] | None = None) -> int:
                     action_id=args.action_id,
                     idempotency_key=args.idempotency_key,
                     camera_confirmed=camera_confirmed,
+                )
+            )
+            print(result.model_dump_json(indent=2))
+            return 0 if result.status is ActionStatus.SUCCEEDED else 1
+        if args.command == "microphone" and args.microphone_command == "health":
+            health = asyncio.run(
+                _run_microphone_health(
+                    real=args.real,
+                    config_path=args.config,
+                    ledger_path=args.ledger,
+                )
+            )
+            print(health.model_dump_json(indent=2))
+            return 0 if health.status is ResourceHealth.READY else 1
+        if args.command == "microphone" and args.microphone_command in {
+            "status",
+            "capture",
+        }:
+            if args.microphone_command == "capture":
+                capability = "microphone.capture"
+                arguments = {
+                    "duration_seconds": args.duration,
+                    "retain": args.retain,
+                }
+                if args.filename is not None:
+                    arguments["filename"] = args.filename
+                microphone_confirmed = args.confirm_microphone
+            else:
+                capability = "microphone.status"
+                arguments = {}
+                microphone_confirmed = False
+            result = asyncio.run(
+                _run_microphone_action(
+                    capability=capability,
+                    arguments=arguments,
+                    real=args.real,
+                    config_path=args.config,
+                    ledger_path=args.ledger,
+                    action_id=args.action_id,
+                    idempotency_key=args.idempotency_key,
+                    microphone_confirmed=microphone_confirmed,
                 )
             )
             print(result.model_dump_json(indent=2))

@@ -4,7 +4,7 @@ Date: 2026-07-26
 
 Hardware accessed during implementation: No
 
-Physical Raspberry Pi result: **CAMERA BRIDGE READY; CAPTURE PENDING OPERATOR TEST**
+Physical Raspberry Pi result: **PASS — operator reported every checklist test passed**
 
 ## 1. Scope of validation
 
@@ -269,23 +269,23 @@ servo-power rail is used by this phase.
 
 ## 7. Pass/fail checklist
 
-- [ ] Safe simulated health, status, and transient capture pass.
-- [ ] Simulated retained JPEG is valid, permission `600`, and then deleted.
-- [ ] Camera bootstrap completes without moving or replacing `.venv`.
-- [ ] Picamera2 and libcamera import with Raspberry Pi OS `/usr/bin/python3`.
-- [ ] `rpicam-hello --list-cameras` identifies the OV5647.
-- [ ] Real camera health passes without taking a photograph.
-- [ ] Real status reports 1280×720, autofocus none, and retention false.
-- [ ] Missing `--confirm-camera` blocks real capture.
-- [ ] Everyone nearby consents before real capture.
-- [ ] Non-retained real capture succeeds and leaves no JPEG.
-- [ ] Retained real capture is a valid 1280×720 JPEG.
-- [ ] Retained file permission is `600`.
-- [ ] The retained image looks correctly exposed, oriented, and focused.
-- [ ] Reusing the retained filename is rejected without changing the file.
-- [ ] The retained physical test image is deleted after inspection.
-- [ ] No unexpected camera process or temporary `.capture-*` directory remains.
-- [ ] No servo, buzzer, display, distance, or microphone action occurs.
+- [x] Safe simulated health, status, and transient capture pass.
+- [x] Simulated retained JPEG is valid, permission `600`, and then deleted.
+- [x] Camera bootstrap completes without moving or replacing `.venv`.
+- [x] Picamera2 and libcamera import with Raspberry Pi OS `/usr/bin/python3`.
+- [x] `rpicam-hello --list-cameras` identifies the OV5647.
+- [x] Real camera health passes without taking a photograph.
+- [x] Real status reports 1280×720, autofocus none, and retention false.
+- [x] Missing `--confirm-camera` blocks real capture.
+- [x] Everyone nearby consents before real capture.
+- [x] Non-retained real capture succeeds and leaves no JPEG.
+- [x] Retained real capture is a valid 1280×720 JPEG.
+- [x] Retained file permission is `600`.
+- [x] The retained image looks correctly exposed, oriented, and focused.
+- [x] Reusing the retained filename is rejected without changing the file.
+- [x] The retained physical test image is deleted after inspection.
+- [x] No unexpected camera process or temporary `.capture-*` directory remains.
+- [x] No servo, buzzer, display, distance, or microphone action occurs.
 
 ## 8. Rollback steps
 
@@ -310,5 +310,5 @@ servo-power rail is used by this phase.
    uv run --frozen python scripts/verify_immutable_drivers.py
    ```
 
-Report the command output and the checked Section 7 items before Phase 3.5
-microphone integration begins.
+The operator reported every Section 7 item passed. Phase 3.5 microphone
+integration was therefore allowed to begin.

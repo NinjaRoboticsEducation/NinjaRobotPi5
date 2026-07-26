@@ -15,6 +15,12 @@ from .distance import VL53L0XDistanceAdapter
 from .engine import ExecutionEngine
 from .errors import IDEError
 from .ledger import ActionLedger
+from .microphone import (
+    MicrophoneBackend,
+    MicrophoneCaptureAdapter,
+    MicrophoneDevice,
+    MicrophoneStatusAdapter,
+)
 from .models import (
     ActionRecord,
     ActionRequest,
@@ -63,6 +69,10 @@ __all__ = [
     "IDEClient",
     "IDEError",
     "LifecycleState",
+    "MicrophoneCaptureAdapter",
+    "MicrophoneBackend",
+    "MicrophoneDevice",
+    "MicrophoneStatusAdapter",
     "QueueCapacityError",
     "ResourceHealth",
     "ResourceScheduler",

@@ -4,7 +4,8 @@ Status: Approved architecture and delivery plan
 Last updated: 2026-07-23 (project and hardware decisions incorporated)
 Primary development computer: Raspberry Pi 5, 8 GM RAM
 Target computer: Raspberry Pi 5, 8 GB RAM
-Implementation status: Phase 0 and Phase 1 complete
+Implementation status: Phases 0–2 and Phase 3.1–3.5 implemented; Phase 3.5
+physical recording validation is pending operator review
 
 ## 1. Purpose of this document
 
@@ -1391,6 +1392,8 @@ Define stable boundaries before migrating behavior.
 
 ### Phase 2: IDE core and one reference adapter
 
+**Status: Complete (2026-07-26)**
+
 **Objective**
 
 Build the capability registry, lifecycle, scheduler, resource locks, action
@@ -1423,6 +1426,9 @@ capability is easier to validate safely than motion.
 - Repeating an action ID cannot duplicate execution.
 
 ### Phase 3: Integrate all immutable device libraries through IDE adapters
+
+**Status: Subphases 3.1–3.5 implemented; Phase 3.5 physical recording
+validation pending (2026-07-26)**
 
 **Objective**
 

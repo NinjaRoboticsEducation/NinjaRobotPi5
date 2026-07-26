@@ -15,7 +15,7 @@ which is the single source of truth.
 
 ## Current status
 
-Phase 0, Phase 1, Phase 2, and Phase 3.1 through Phase 3.4 are implemented.
+Phase 0, Phase 1, Phase 2, and Phase 3.1 through Phase 3.5 are implemented.
 Phase 0 established project governance and preserved the
 original import hashes for the six existing Pi5 hardware libraries. Phase 1
 added strict IDE and agent contracts, deterministic fakes, V4-owned
@@ -57,6 +57,16 @@ non-idempotent, meaning repeating it would take another photograph. Real
 capture requires `--real` and `--confirm-camera`. Images are deleted by
 default; `--retain` explicitly saves an owner-only JPEG inside the configured
 private media directory. JPEG is the compressed image-file format used here.
+The operator reports that the complete Phase 3.4 physical checklist passes.
+
+Phase 3.5 adds `microphone.status` and `microphone.capture` through one
+serialized USB microphone service. Status discovers and validates the selected
+input without recording. Capture is privacy-sensitive, bounded to the
+configured maximum, and requires `--real --confirm-microphone` for physical
+audio. WAV files are deleted by default; `--retain` saves one owner-only file
+inside `~/.local/share/ninjarobot_pi5/microphone`. WAV is an uncompressed audio
+file format. Transcription, wake-word listening, Gemini, and historical
+OpenClaw integrations are not Phase 3.5 features.
 
 The `pi5buzzer` development environment is locked and its 65 tests pass. The
 earlier GPIO17 health and sound checks remain historical evidence; the current
@@ -106,8 +116,8 @@ The current CLI provides:
   valid contract data.
 - `dry-run` executes against a deterministic fake IDE and labels the result
   `"simulated": true`.
-- `capabilities` lists all implemented distance, buzzer, display, servo, and
-  camera capabilities without opening hardware.
+- `capabilities` lists all implemented distance, buzzer, display, servo,
+  camera, and microphone capabilities without opening hardware.
 - `health` checks a simulated sensor unless `--real` is supplied.
 - `distance read` returns simulated data unless `--real` is supplied.
 - `actions show` reads the durable result for one action from the SQLite
@@ -139,6 +149,13 @@ The current CLI provides:
 - `camera capture` takes one simulated image unless `--real` and
   `--confirm-camera` are supplied. It retains no image unless `--retain` is
   also supplied.
+- `microphone health` checks PortAudio and input-device readiness without
+  recording. PortAudio is the operating-system audio library used by Python.
+- `microphone status` lists the selected and available input devices, including
+  requested and actually supported sample rates, without recording.
+- `microphone capture` records one simulated WAV unless `--real` and
+  `--confirm-microphone` are supplied. It retains no audio unless `--retain`
+  is also supplied.
 - `--version` reports the installed V4 package version.
 
 The contracts reject unknown fields and unsafe type conversion. They cover
@@ -236,6 +253,13 @@ uv run --frozen ninjarobot_pi5_cli camera status \
   --ledger /tmp/ninjarobot-phase34-smoke.sqlite3
 uv run --frozen ninjarobot_pi5_cli camera capture \
   --ledger /tmp/ninjarobot-phase34-smoke.sqlite3
+uv run --frozen ninjarobot_pi5_cli microphone health \
+  --ledger /tmp/ninjarobot-phase35-smoke.sqlite3
+uv run --frozen ninjarobot_pi5_cli microphone status \
+  --ledger /tmp/ninjarobot-phase35-smoke.sqlite3
+uv run --frozen ninjarobot_pi5_cli microphone capture \
+  --ledger /tmp/ninjarobot-phase35-smoke.sqlite3 \
+  --duration 0.25
 ```
 
 On the Raspberry Pi, install the optional managed hardware packages without
@@ -272,6 +296,9 @@ The operator reports that checklist as passed, without an attached transcript.
 For camera integration, follow
 [`docs/validation/phase-3-4-camera-validation-2026-07-26.md`](docs/validation/phase-3-4-camera-validation-2026-07-26.md).
 Real capture requires consent from everyone nearby.
+For microphone integration, follow
+[`docs/validation/phase-3-5-microphone-validation-2026-07-26.md`](docs/validation/phase-3-5-microphone-validation-2026-07-26.md).
+Real recording also requires consent from everyone nearby.
 
 Run the complete root gate:
 
@@ -306,5 +333,9 @@ one calibrated endpoint, and guarded by explicit confirmation. The Phase 3.4
 camera path is classified as `privacy`, requires explicit real-capture
 confirmation, and deletes media unless retention is requested. Phase 3.4 does
 not perform face recognition, video, streaming, or agent-controlled capture.
+The Phase 3.5 microphone path is also classified as `privacy`, requires
+explicit real-recording confirmation, and deletes audio unless retention is
+requested. It performs no transcription, wake-word detection, cloud request,
+or agent handoff.
 Model output is treated as an untrusted proposal; the
 deterministic IDE control plane retains final authority over robot actions.

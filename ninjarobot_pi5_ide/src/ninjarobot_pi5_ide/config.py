@@ -130,8 +130,11 @@ class MicrophoneConfig(ConfigModel):
     """Initial privacy-safe USB microphone profile."""
 
     enabled: bool = True
+    device_selector: NonEmptyText = "USB PnP Sound Device"
     sample_rate_hz: Annotated[int, Field(ge=8_000, le=192_000)] = 16_000
     channels: Literal[1] = 1
+    max_capture_seconds: Annotated[float, Field(ge=1, le=30)] = 10.0
+    media_directory: NonEmptyText = "~/.local/share/ninjarobot_pi5/microphone"
     retain_audio_by_default: Literal[False] = False
 
 

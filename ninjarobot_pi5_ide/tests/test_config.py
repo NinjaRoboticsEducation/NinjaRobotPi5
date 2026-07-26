@@ -39,7 +39,11 @@ def test_example_configuration_matches_confirmed_wiring() -> None:
     assert config.hardware.camera.autofocus_mode == "none"
     assert config.hardware.camera.media_directory == "~/.local/share/ninjarobot_pi5/camera"
     assert config.hardware.camera.retain_media_by_default is False
+    assert config.hardware.microphone.device_selector == "USB PnP Sound Device"
     assert config.hardware.microphone.sample_rate_hz == 16_000
+    assert config.hardware.microphone.channels == 1
+    assert config.hardware.microphone.max_capture_seconds == 10.0
+    assert config.hardware.microphone.media_directory == "~/.local/share/ninjarobot_pi5/microphone"
     assert config.hardware.microphone.retain_audio_by_default is False
     assert config.providers["ollama"].api_key_env is None
 
@@ -92,6 +96,18 @@ def test_configuration_keeps_default_camera_retention_disabled() -> None:
     payload = load_robot_config(EXAMPLE).model_dump()
     payload["hardware"]["camera"]["autofocus_mode"] = "tracking"
     with pytest.raises(ValidationError, match="Input should be"):
+        RobotConfig.model_validate(payload)
+
+
+def test_configuration_bounds_microphone_capture_and_retention() -> None:
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["hardware"]["microphone"]["retain_audio_by_default"] = True
+    with pytest.raises(ValidationError, match="Input should be False"):
+        RobotConfig.model_validate(payload)
+
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["hardware"]["microphone"]["max_capture_seconds"] = 60.0
+    with pytest.raises(ValidationError, match="less than or equal to 30"):
         RobotConfig.model_validate(payload)
 
 

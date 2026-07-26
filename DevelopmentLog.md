@@ -1,5 +1,73 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-26 — Phase 3.5 privacy-bounded microphone adapter
+
+### Summary
+
+- Added `microphone.status`, a read-only capability that discovers and
+  validates the selected USB input without recording audio.
+- Added `microphone.capture`, a confirmation-required privacy capability for
+  one bounded mono WAV recording.
+- Kept simulation as the default and required both `--real` and
+  `--confirm-microphone` for physical recording.
+- Enforced default non-retention. Explicit retention saves only owner-readable
+  files inside the configured private microphone directory.
+- Added duration bounds, safe filename validation, directory confinement,
+  no-overwrite behavior, secure staging, SHA-256 metadata, and cleanup after
+  success, failure, timeout, or cancellation.
+- Serialized the `microphone` resource and preserved durable non-idempotent
+  action replay.
+- Added the managed `pi5mic` package to the root hardware dependency group
+  without changing any managed driver file.
+- Added a V4-owned device-only loader that bypasses `pi5mic` package exports
+  and loads only errors, models, audio backend, device discovery, and recorder
+  modules.
+- Kept transcription, Gemini, wake-word detection, listener state, transport,
+  presence, and OpenClaw outside the Phase 3.5 runtime.
+- Recorded the operator-reported Phase 3.4 camera checklist as PASS.
+
+### Files and documentation
+
+- Added `ninjarobot_pi5_ide/.../microphone.py` and its focused tests.
+- Extended the unified CLI, V4 configuration, root hardware dependency lock,
+  capability listing, and CLI tests.
+- Updated README, InstallationGuide, DevelopmentGuide, this log, hardware
+  profile, and managed-driver containment matrix.
+- Added the Phase 3.5 Raspberry Pi validation report with separate simulation,
+  interface, privacy-sensitive recording, expected-result, checklist, and
+  rollback sections.
+
+### Validation
+
+- All 109 V4 tests passed.
+- All 36 focused microphone, configuration, and CLI tests passed.
+- Strict mypy passed for 23 V4 source files.
+- Root compilation, Ruff lint, Ruff formatting, dependency lock, and diff
+  validation passed.
+- All 449 managed-library tests passed. The only warning was the inherited
+  Python `audioop` deprecation in `pi5mic`.
+- Root and all six managed libraries passed Ruff lint and format checks.
+- Driver provenance remained at 222 tracked files and 23 authorized repairs.
+- Runtime containment loaded exactly seven approved `pi5mic` namespace/module
+  names and no historical or voice-processing module.
+
+### Raspberry Pi status
+
+Safe interface validation is PASS. ALSA identifies `USB PnP Sound Device` at
+card 0/device 0. Real V4 health reports both microphone capabilities ready,
+and status selects that device without recording. The device rejects the
+requested 16 kHz input and the managed driver safely selects 44.1 kHz; V4
+reports both values and the fallback warning.
+
+No real recording was made during implementation. The physical transient and
+retained WAV checklist remains pending because it requires consent from
+everyone nearby.
+
+### Follow-up
+
+Run and review the Phase 3.5 Raspberry Pi checklist. Do not begin Phase 4
+integrated robot behaviors until the microphone result is reviewed.
+
 ## 2026-07-26 — Phase 3.4 camera interpreter-bridge correction
 
 ### Summary
@@ -89,14 +157,13 @@ system Python imports Picamera2, while the root Python 3.11 environment does
 not. The correction above now handles that verified environment boundary
 without altering `pi5camera`.
 
-The physical Phase 3.4 checklist remains pending. Real capture requires consent
-from everyone nearby. Media is deleted by default, and the one retained visual
-test image should be removed after inspection.
+The operator reports that every physical Phase 3.4 checklist item passed,
+including transient and retained capture, owner-only file permissions,
+no-overwrite behavior, visual inspection, cleanup, and device isolation.
 
 ### Follow-up
 
-Run and review the Phase 3.4 Raspberry Pi checklist. Do not begin Phase 3.5
-microphone integration until the camera result is reviewed.
+Proceed to the approved Phase 3.5 microphone integration.
 
 ## 2026-07-26 — Phase 3.3 six-servo mixed-backend adapter
 

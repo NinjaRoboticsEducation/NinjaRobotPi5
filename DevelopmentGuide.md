@@ -434,6 +434,75 @@ from everyone nearby plus both `--real` and `--confirm-camera`. Images are
 deleted by default. Follow the Phase 3.4 validation report before retaining
 one physical test image.
 
+## Phase 3.5 microphone adapter
+
+Phase 3.5 exposes only the approved device-facing portions of `pi5mic`:
+input-device discovery, supported-rate resolution, and bounded WAV recording.
+It deliberately excludes transcription, Gemini, wake-word detection,
+always-on listening, transport, presence, and every OpenClaw module.
+
+The managed package root historically re-exports some excluded components.
+The V4 loader therefore locates the managed source and loads only these exact
+modules under contained namespace packages:
+
+```text
+pi5mic.errors
+pi5mic.models
+pi5mic.core.audio_backend
+pi5mic.core.devices
+pi5mic.core.recorder
+```
+
+A namespace package here means a package boundary created without executing
+the managed package's top-level `__init__.py`. Tests inspect `sys.modules`,
+Python's table of loaded modules, and fail if any other `pi5mic` module enters
+the V4 process.
+
+Two capabilities share the exclusive `microphone` resource:
+
+- `microphone.status` discovers inputs and validates the selected device and
+  rate without recording
+- `microphone.capture` records one bounded WAV, requires privacy confirmation
+  on real hardware, and is non-idempotent
+
+The checked-in profile is:
+
+```toml
+[hardware.microphone]
+enabled = true
+device_selector = "USB PnP Sound Device"
+sample_rate_hz = 16000
+channels = 1
+max_capture_seconds = 10.0
+media_directory = "~/.local/share/ninjarobot_pi5/microphone"
+retain_audio_by_default = false
+```
+
+The current USB device rejects 16 kHz and accepts 44.1 kHz. The managed driver
+selects the supported rate and V4 returns both requested and actual values.
+This preserves the intended profile while keeping the physical result honest.
+
+Every recording uses a private `.capture-*` staging directory. Successful
+audio is hashed, retained only after an explicit request, and removed in a
+`finally` cleanup after success, failure, timeout, or cancellation. Retained
+files use permission `600` and cannot escape the configured directory or
+replace an existing file.
+
+Simulation never imports `pi5mic` or opens PortAudio:
+
+```bash
+uv run --frozen ninjarobot_pi5_cli microphone health \
+  --ledger /tmp/ninjarobot-phase35.sqlite3
+uv run --frozen ninjarobot_pi5_cli microphone status \
+  --ledger /tmp/ninjarobot-phase35.sqlite3
+uv run --frozen ninjarobot_pi5_cli microphone capture \
+  --ledger /tmp/ninjarobot-phase35.sqlite3 \
+  --duration 0.25
+```
+
+Real health and status query the USB interface but do not record. Follow the
+Phase 3.5 report before adding `--real --confirm-microphone`.
+
 ## Driver package validation commands
 
 ### Standalone README contract
@@ -606,6 +675,13 @@ test; the separate pre-Phase-1 live-Pi report is stored under `docs/validation/`
   `portaudio19-dev`, then verify `pi5mic devices`. Local transcription requires
   a built `whisper-cli`, `ggml-base.bin`, and their paths registered in the
   selected mic config.
+- **V4 microphone status reports 44.1 kHz instead of 16 kHz:** the selected USB
+  device rejected 16 kHz and the managed driver selected its supported native
+  rate. This is expected when status remains ready. Inspect both
+  `requested_sample_rate_hz` and `actual_sample_rate_hz`.
+- **A real microphone capture requires `--confirm-microphone`:** tell everyone
+  nearby and obtain consent before adding the flag. Add `--retain` only when
+  the WAV must remain after the command.
 - **VL53L0X reference calibration retries once:** this is the bounded recovery
   path observed on the live revision-`0x10` device. A second timeout is a hard
   initialization failure; do not bypass calibration.

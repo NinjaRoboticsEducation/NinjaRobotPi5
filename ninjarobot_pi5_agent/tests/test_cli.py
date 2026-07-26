@@ -67,6 +67,10 @@ def test_phase_two_capabilities_are_hardware_free(capsys) -> None:
     assert capabilities["camera.capture"]["risk"] == "privacy"
     assert capabilities["camera.capture"]["resources"] == ["camera"]
     assert capabilities["camera.capture"]["confirmation_required"] is True
+    assert capabilities["microphone.status"]["risk"] == "read_only"
+    assert capabilities["microphone.capture"]["risk"] == "privacy"
+    assert capabilities["microphone.capture"]["resources"] == ["microphone"]
+    assert capabilities["microphone.capture"]["confirmation_required"] is True
 
 
 def test_simulated_distance_health_and_read_are_persisted(tmp_path, capsys) -> None:
@@ -274,6 +278,88 @@ def test_real_camera_capture_requires_explicit_confirmation(tmp_path, capsys) ->
 
     assert result == 2
     assert "real camera capture requires --confirm-camera" in capsys.readouterr().err
+
+
+def test_simulated_microphone_health_status_capture_and_retention(
+    tmp_path,
+    capsys,
+    monkeypatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    ledger = tmp_path / "microphone.sqlite3"
+    assert main(["microphone", "health", "--ledger", str(ledger)]) == 0
+    health = json.loads(capsys.readouterr().out)
+    assert health["status"] == "ready"
+
+    assert main(["microphone", "status", "--ledger", str(ledger)]) == 0
+    status = json.loads(capsys.readouterr().out)
+    assert status["status"] == "succeeded"
+    assert status["data"]["retain_audio_by_default"] is False
+    assert status["data"]["actual_sample_rate_hz"] == 16_000
+    assert status["data"]["simulated"] is True
+
+    assert (
+        main(
+            [
+                "microphone",
+                "capture",
+                "--ledger",
+                str(ledger),
+                "--duration",
+                "0.25",
+            ]
+        )
+        == 0
+    )
+    transient = json.loads(capsys.readouterr().out)
+    assert transient["status"] == "succeeded"
+    assert transient["retry_safety"] == "unsafe"
+    assert transient["data"]["retained"] is False
+    assert transient["data"]["path"] is None
+
+    assert (
+        main(
+            [
+                "microphone",
+                "capture",
+                "--ledger",
+                str(ledger),
+                "--duration",
+                "0.25",
+                "--retain",
+                "--filename",
+                "phase35-simulated.wav",
+            ]
+        )
+        == 0
+    )
+    retained = json.loads(capsys.readouterr().out)
+    assert retained["data"]["retained"] is True
+    retained_path = Path(retained["data"]["path"])
+    assert retained_path == tmp_path / "data" / "simulated-microphone" / "phase35-simulated.wav"
+    assert retained_path.is_file()
+
+
+def test_real_microphone_capture_requires_explicit_confirmation(
+    tmp_path,
+    capsys,
+) -> None:
+    result = main(
+        [
+            "microphone",
+            "capture",
+            "--real",
+            "--config",
+            str(EXAMPLE),
+            "--ledger",
+            str(tmp_path / "microphone.sqlite3"),
+            "--duration",
+            "1",
+        ]
+    )
+
+    assert result == 2
+    assert "real microphone capture requires --confirm-microphone" in capsys.readouterr().err
 
 
 def test_simulated_display_health_text_clear_and_brightness(tmp_path, capsys) -> None:

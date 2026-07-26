@@ -41,8 +41,11 @@ retain_media_by_default = false
 
 [hardware.microphone]
 enabled = true
+device_selector = "USB PnP Sound Device"
 sample_rate_hz = 16000
 channels = 1
+max_capture_seconds = 10.0
+media_directory = "~/.local/share/ninjarobot_pi5/microphone"
 retain_audio_by_default = false
 
 [agent]

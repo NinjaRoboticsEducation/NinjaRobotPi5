@@ -1,9 +1,9 @@
 # NinjaRobotPi5V4 Installation Guide
 
 NinjaRobotPi5V4 currently implements the deterministic IDE core, distance,
-buzzer, display, six-servo, and privacy-bounded still-camera adapters. Default
-commands use simulation. A real device is opened only when its command includes
-`--real`.
+buzzer, display, six-servo, privacy-bounded still-camera, and privacy-bounded
+USB microphone adapters. Default commands use simulation. A real device is
+opened only when its command includes `--real`.
 
 ## Requirements
 
@@ -21,6 +21,7 @@ For the current real-hardware profile:
 - I2C and SPI enabled through `sudo raspi-config`
 - GPIO12/GPIO13 hardware PWM overlay for the native servo endpoints
 - Raspberry Pi CSI camera supported by Picamera2
+- USB audio input plus PortAudio
 
 I2C is the two-wire device bus. SPI is the clocked display connection. PWM
 means pulse-width modulation, the timed signal used for servo control. CSI is
@@ -130,6 +131,40 @@ the managed camera operation.
 The current hardware should list an OV5647 camera. OV5647 is fixed-focus, so
 the V4 example uses `autofocus_mode = "none"`.
 
+## Microphone-capable Raspberry Pi environment
+
+Install PortAudio before the locked hardware environment. PortAudio is the
+native audio library used by Python's `sounddevice` package:
+
+```bash
+sudo apt update
+sudo apt install -y libportaudio2 portaudio19-dev
+uv sync --frozen --extra hardware
+```
+
+Confirm that Linux and V4 can see the USB input without recording:
+
+```bash
+arecord -l
+
+uv run --frozen --extra hardware ninjarobot_pi5_cli microphone health \
+  --real \
+  --config config/ninjarobot_pi5.toml.example \
+  --ledger /tmp/ninjarobot-phase35-install.sqlite3
+
+uv run --frozen --extra hardware ninjarobot_pi5_cli microphone status \
+  --real \
+  --config config/ninjarobot_pi5.toml.example \
+  --ledger /tmp/ninjarobot-phase35-install.sqlite3
+```
+
+The current USB microphone accepts 44.1 kHz rather than the requested 16 kHz.
+V4 reports that fallback explicitly; it is not an error. Hz means samples or
+cycles per second in this context.
+
+These commands do not record. Real recording requires informed consent and
+both `--real` and `--confirm-microphone`.
+
 ## Safe simulation checks
 
 These commands do not access physical hardware:
@@ -181,6 +216,10 @@ Use the phase-specific reports:
   [`docs/validation/phase-3-2-display-validation-2026-07-26.md`](docs/validation/phase-3-2-display-validation-2026-07-26.md)
 - servo:
   [`docs/validation/phase-3-3-servo-validation-2026-07-26.md`](docs/validation/phase-3-3-servo-validation-2026-07-26.md)
+- camera:
+  [`docs/validation/phase-3-4-camera-validation-2026-07-26.md`](docs/validation/phase-3-4-camera-validation-2026-07-26.md)
+- microphone:
+  [`docs/validation/phase-3-5-microphone-validation-2026-07-26.md`](docs/validation/phase-3-5-microphone-validation-2026-07-26.md)
 
 Never change wiring while powered. Keep the servo emergency power disconnect
 within reach during any actuator-moving test.
