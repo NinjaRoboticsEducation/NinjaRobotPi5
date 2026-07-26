@@ -157,7 +157,29 @@ uv run --frozen ninjarobot-ide-tool behavior simulate move_forward \
 ```
 
 Run `uv run --frozen ninjarobot-ide-tool` for the interactive menu. Simulation
-does not open GPIO, PWM, I2C, SPI, camera, or microphone hardware.
+does not open GPIO, PWM, I2C, SPI, camera, or microphone hardware. The
+interactive tool's normal behavior menus execute configured real hardware, so
+on a Raspberry Pi use:
+
+```bash
+uv run --frozen --extra hardware ninjarobot-ide-tool \
+  --config "$HOME/.config/ninjarobot_pi5/config.toml"
+```
+
+Choose Simulation inside the tool for a guaranteed hardware-free preview.
+Every submenu has Back, and `E` requests the Level 2 Emergency Stop from every
+menu.
+
+The Run Robot Behaviors menu provides 15 everyday animated faces, four wheel
+movements, and the Greeting, Celebrate, Emergency Stop, Resume Robot Movement,
+and Error Warning special workflows. The guided creator simulates a new action
+before it asks permission to save under
+`~/.config/ninjarobot_pi5/behaviors/`.
+
+For forward motion, three clear samples are required. A measured distance over
+100 mm or the exact raw VL53L0X value `8191` counts as clear; `8191` means no
+target is measurable in range. A null result caused by a communication error,
+timeout, disconnect, or stale reading does not count as clear.
 
 ## Camera-capable Raspberry Pi environment
 
@@ -294,6 +316,8 @@ Use the phase-specific reports:
   [`docs/validation/phase-3-5-microphone-validation-2026-07-26.md`](docs/validation/phase-3-5-microphone-validation-2026-07-26.md)
 - integrated Phase 4 behavior:
   [`docs/validation/phase-4-integrated-behavior-validation-2026-07-26.md`](docs/validation/phase-4-integrated-behavior-validation-2026-07-26.md)
+- Phase 4 animated-face and interactive-tool refinement:
+  [`docs/validation/phase-4-refinement-validation-2026-07-27.md`](docs/validation/phase-4-refinement-validation-2026-07-27.md)
 
 Never change wiring while powered. Keep the servo emergency power disconnect
 within reach during any actuator-moving test. The currently reported robot

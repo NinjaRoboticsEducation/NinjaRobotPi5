@@ -1,24 +1,24 @@
 {
   "schema_version": 1,
-  "name": "idle",
-  "description": "Show the animated waiting face while playing the idle tone.",
+  "name": "speaking",
+  "description": "Animate a speaking face while playing the speaking melody.",
   "category": "expression",
   "stages": [
     {
-      "name": "idle_face",
+      "name": "speaking_expression",
       "operations": [
         {
           "kind": "face",
-          "expression": "idle",
-          "background": "#000020",
+          "expression": "speaking",
+          "background": "#001830",
           "foreground": "#FFFFFF",
           "accent": "#00BFFF",
           "hold_seconds": 2.0
         },
         {
           "kind": "melody",
-          "melody": "idle",
-          "volume": 48
+          "melody": "speaking",
+          "volume": 56
         }
       ]
     }

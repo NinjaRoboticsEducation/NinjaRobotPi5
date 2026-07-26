@@ -8,17 +8,12 @@
       "name": "drive_backward",
       "operations": [
         {
-          "kind": "text",
-          "text": "MOVING BACKWARD\nREAR UNPROTECTED",
-          "font_size": 24,
-          "foreground": "#FFFFFF",
+          "kind": "face",
+          "expression": "warning",
           "background": "#402000",
+          "foreground": "#FFFFFF",
+          "accent": "#FFAA00",
           "hold_seconds": null
-        },
-        {
-          "kind": "melody",
-          "melody": "surprising",
-          "volume": 64
         },
         {
           "kind": "drive",

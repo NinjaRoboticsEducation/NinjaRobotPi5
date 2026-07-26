@@ -12,7 +12,15 @@ from typing import Any
 import click
 
 from .behavior_assets import BehaviorAssetRepository
-from .behavior_models import BehaviorDefinition, BehaviorStage, DriveOperation
+from .behavior_models import (
+    FACE_EXPRESSIONS,
+    MELODIES,
+    BehaviorDefinition,
+    BehaviorStage,
+    DriveOperation,
+    FaceOperation,
+    TextOperation,
+)
 from .config import RobotConfig
 from .config_import import (
     DEFAULT_USER_CONFIG,
@@ -21,6 +29,7 @@ from .config_import import (
     load_effective_config,
     save_robot_config,
 )
+from .interactive_tool import loop_final_face, run_interactive
 from .robot import RobotAssembly
 from .runtime_control import ActiveBehaviorRegistry
 from .safety import SafetyStateStore
@@ -48,7 +57,7 @@ class FriendlyGroup(click.Group):
     def invoke(self, context: click.Context) -> Any:
         try:
             return super().invoke(context)
-        except (click.ClickException, click.Abort):
+        except (click.ClickException, click.Abort, click.exceptions.Exit):
             raise
         except Exception as exc:
             raise click.ClickException(str(exc)) from exc
@@ -238,6 +247,12 @@ def behavior_simulate(tool: ToolContext, name: str, duration: float) -> None:
     show_default=True,
     help="Simulation-only duration for a continuous movement.",
 )
+@click.option(
+    "--loop",
+    "loop_face",
+    is_flag=True,
+    help="Keep the final face animated until Ctrl+C; real mode only.",
+)
 @click.pass_obj
 def behavior_run(
     tool: ToolContext,
@@ -245,10 +260,13 @@ def behavior_run(
     real: bool,
     confirm_motion: bool,
     duration: float,
+    loop_face: bool,
 ) -> None:
     """Run a behavior; simulation is the default and real motion needs confirmation."""
     config = tool.config()
     definition = _repository(config).load(name)
+    if loop_face:
+        definition = loop_final_face(definition)
     if not real:
         _echo_json(asyncio.run(_run_simulated(config, definition, duration)))
         return
@@ -288,12 +306,12 @@ def behavior_validate(asset_file: Path) -> None:
 @click.option("--description")
 @click.option(
     "--face",
-    type=click.Choice(["idle", "happy", "thinking", "success", "warning", "error"]),
+    type=click.Choice(list(FACE_EXPRESSIONS)),
 )
 @click.option("--text")
 @click.option(
     "--melody",
-    type=click.Choice(["happy", "sad", "exciting", "angry", "confusing", "idle", "surprising"]),
+    type=click.Choice(list(MELODIES)),
 )
 @click.option("--left-target", type=click.FloatRange(min=-90.0, max=90.0))
 @click.option("--right-target", type=click.FloatRange(min=-90.0, max=90.0))
@@ -342,6 +360,19 @@ def behavior_create(
         raise click.Abort()
     path = _repository(config).save_user(definition, overwrite=overwrite)
     _echo_json({"saved": True, "path": str(path), "name": definition.name})
+
+
+@behavior_group.command("delete")
+@click.argument("name")
+@click.option("--confirm", is_flag=True, help="Confirm deletion of the private behavior.")
+@click.pass_obj
+def behavior_delete(tool: ToolContext, name: str, confirm: bool) -> None:
+    """Delete one private user behavior; bundled defaults remain read-only."""
+    if not confirm:
+        raise click.UsageError("behavior delete requires --confirm")
+    repository = _repository(tool.config())
+    repository.delete_user(name)
+    _echo_json({"deleted": True, "name": name})
 
 
 @behavior_group.command("stop")
@@ -396,40 +427,12 @@ def system_resume(tool: ToolContext, confirm: bool) -> None:
 
 
 def _interactive_menu(tool: ToolContext) -> None:
-    click.echo("NinjaRobot IDE tool")
-    click.echo("Simulation is the default. Real movement always asks for confirmation.")
-    while True:
-        choice = click.prompt(
-            "Choose: [1] hardware status [2] behavior list [3] simulate "
-            "[4] create [5] full stop [q] quit",
-            type=click.Choice(["1", "2", "3", "4", "5", "q"], case_sensitive=False),
+    asyncio.run(
+        run_interactive(
+            tool.config(),
+            simulation_runner=_run_simulated,
         )
-        if choice == "q":
-            return
-        if choice == "1":
-            config = tool.config()
-            _echo_json(
-                {
-                    "servo_endpoints": config.hardware.servos.endpoints,
-                    "servo_roles": config.behaviors.servo_roles,
-                    "safety": SafetyStateStore(config.behaviors.safety_state_file).read(),
-                }
-            )
-        elif choice == "2":
-            for definition in _repository(tool.config()).list():
-                click.echo(f"- {definition.name}: {definition.description}")
-        elif choice == "3":
-            name = click.prompt("Behavior name")
-            definition = _repository(tool.config()).load(name)
-            _echo_json(asyncio.run(_run_simulated(tool.config(), definition, 2.0)))
-        elif choice == "4":
-            click.echo(
-                "Use 'ninjarobot-ide-tool behavior create --help' for the guided "
-                "one-stage creator or a complete JSON file."
-            )
-        elif choice == "5":
-            if click.confirm("Request a real full-system stop?", default=True):
-                _echo_json(asyncio.run(_full_stop_fresh(tool.config(), "operator_stop")))
+    )
 
 
 async def _real_health(config: RobotConfig) -> dict[str, Any]:
@@ -462,7 +465,7 @@ async def _run_real(
     robot = RobotAssembly(config=config, simulated=False)
     try:
         await robot.start()
-        return await robot.run_behavior(definition.name)
+        return await robot.run_definition(definition)
     finally:
         await robot.close()
 
@@ -549,13 +552,12 @@ def _bounded_simulation(
     definition: BehaviorDefinition,
     duration: float,
 ) -> BehaviorDefinition:
-    if not definition.contains_motion:
-        return definition
     stages: list[BehaviorStage] = []
     for stage in definition.stages:
         operations = tuple(
             operation.model_copy(update={"hold_seconds": duration})
-            if isinstance(operation, DriveOperation) and operation.hold_seconds is None
+            if isinstance(operation, (DriveOperation, FaceOperation, TextOperation))
+            and operation.hold_seconds is None
             else operation
             for operation in stage.operations
         )

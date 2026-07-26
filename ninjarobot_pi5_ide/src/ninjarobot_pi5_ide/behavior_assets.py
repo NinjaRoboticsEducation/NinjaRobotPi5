@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 import json
 import os
 import tempfile
@@ -47,6 +48,16 @@ class BehaviorAssetRepository:
         return [
             definition
             for definition in sorted(definitions.values(), key=lambda item: item.name)
+            if category == "all" or definition.category == category
+        ]
+
+    def list_user(self, category: str = "all") -> builtins.list[BehaviorDefinition]:
+        """Return only validated private user definitions in stable name order."""
+        if category not in {"all", "expression", "movement"}:
+            raise BehaviorAssetError("category must be all, expression, or movement")
+        return [
+            definition
+            for definition in sorted(self._user_definitions(), key=lambda item: item.name)
             if category == "all" or definition.category == category
         ]
 

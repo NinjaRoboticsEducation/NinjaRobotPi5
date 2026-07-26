@@ -6,12 +6,14 @@ import asyncio
 from typing import Any
 
 from .behavior_assets import BehaviorAssetRepository
+from .behavior_models import BehaviorDefinition
 from .behavior_runtime import BehaviorRunner, MelodyProvider, load_pi5buzzer_melody
 from .buzzer import BuzzerDevice, BuzzerFactory
 from .camera import CameraDevice, CameraFactory
 from .config import RobotConfig
 from .display import DisplayDevice, DisplayFactory
 from .distance import SensorFactory, VL53L0XDistanceAdapter
+from .face_renderer import render_emergency_stop
 from .microphone import MicrophoneBackendFactory, MicrophoneDevice
 from .models import ResourceHealth
 from .safety import (
@@ -135,13 +137,17 @@ class RobotAssembly:
 
     async def run_behavior(self, name: str) -> dict[str, Any]:
         """Load and run one validated expression behavior by safe name."""
+        return await self.run_definition(self.assets.load(name))
+
+    async def run_definition(self, definition: BehaviorDefinition) -> dict[str, Any]:
+        """Run one already-validated definition through the same safety boundary."""
         if self.system_safety.stopped:
             snapshot = self.safety_state.read()
             raise RuntimeError(
                 f"system is stopped ({snapshot.reason or 'local_stop'}); "
                 "resume or launch a fresh tool process"
             )
-        return await self.behaviors.run(self.assets.load(name))
+        return await self.behaviors.run(definition)
 
     async def health(self) -> dict[str, str]:
         """Return integrated expression component health."""
@@ -187,11 +193,11 @@ class RobotAssembly:
         await self.system_safety.full_stop("driver_failure", latch=True)
 
     async def _show_system_stopped(self) -> dict[str, Any]:
-        return await self.display.show_text(
-            text="SYSTEM STOPPED",
-            font_size=32,
-            foreground="#FFFFFF",
-            background="#600000",
+        width, height = await self.display.dimensions()
+        image = render_emergency_stop(width=width, height=height)
+        return await self.display.show_image(
+            image,
+            source="safety:emergency-stop",
         )
 
     async def _show_motion_warning(self, warning: str) -> dict[str, Any]:

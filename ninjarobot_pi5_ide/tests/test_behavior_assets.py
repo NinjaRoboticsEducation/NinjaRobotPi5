@@ -5,13 +5,20 @@ import stat
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
-
-from ninjarobot_pi5_ide import (
+from ninjarobot_pi5_ide.behavior_assets import (
     BehaviorAssetError,
     BehaviorAssetRepository,
-    BehaviorDefinition,
 )
+from ninjarobot_pi5_ide.behavior_models import FACE_EXPRESSIONS, BehaviorDefinition
+from pydantic import ValidationError
+
+MOVEMENT_NAMES = {
+    "celebrate",
+    "move_backward",
+    "move_forward",
+    "turn_left",
+    "turn_right",
+}
 
 
 def test_bundled_catalog_has_approved_names_and_motion_map(tmp_path: Path) -> None:
@@ -19,25 +26,65 @@ def test_bundled_catalog_has_approved_names_and_motion_map(tmp_path: Path) -> No
 
     definitions = repository.list()
 
-    assert [item.name for item in definitions] == [
-        "error",
-        "greeting",
-        "happy",
-        "idle",
+    assert {item.name for item in definitions} == {
+        *FACE_EXPRESSIONS,
+        "celebrate",
+        "error_warning",
         "move_backward",
         "move_forward",
-        "success",
-        "thinking",
         "turn_left",
         "turn_right",
-        "warning",
-    ]
+    }
+    assert {item.name for item in definitions if item.category == "movement"} == MOVEMENT_NAMES
+    assert "emergency_stop" not in {item.name for item in definitions}
+
     forward = repository.load("move_forward")
     drive = next(
         operation for operation in forward.stages[0].operations if operation.kind == "drive"
     )
     assert drive.targets == {"left_motor": 45.0, "right_motor": -45.0}
-    assert forward.required_resources == ("buzzer", "display", "distance_sensor", "servo_bus")
+    assert forward.required_resources == ("display", "distance_sensor", "servo_bus")
+
+
+def test_expression_catalog_combines_faces_and_matching_melodies(
+    tmp_path: Path,
+) -> None:
+    repository = BehaviorAssetRepository(tmp_path / "behaviors")
+
+    for name in FACE_EXPRESSIONS:
+        definition = repository.load(name)
+        kinds = {operation.kind for stage in definition.stages for operation in stage.operations}
+        assert definition.category == "expression"
+        assert "face" in kinds
+        assert "melody" in kinds
+        assert "drive" not in kinds
+
+
+def test_normal_movement_catalog_has_a_face_and_drive_but_no_buzzer(
+    tmp_path: Path,
+) -> None:
+    repository = BehaviorAssetRepository(tmp_path / "behaviors")
+
+    for name in ("move_forward", "move_backward", "turn_left", "turn_right"):
+        definition = repository.load(name)
+        kinds = {operation.kind for stage in definition.stages for operation in stage.operations}
+        assert definition.category == "movement"
+        assert kinds == {"face", "drive"}
+
+
+def test_special_behaviors_have_explicit_safe_semantics(tmp_path: Path) -> None:
+    repository = BehaviorAssetRepository(tmp_path / "behaviors")
+
+    celebrate = repository.load("celebrate")
+    celebrate_kinds = {
+        operation.kind for stage in celebrate.stages for operation in stage.operations
+    }
+    assert celebrate.category == "movement"
+    assert celebrate_kinds == {"drive", "face", "melody"}
+
+    error_warning = repository.load("error_warning")
+    assert error_warning.category == "expression"
+    assert not error_warning.contains_motion
 
 
 def test_greeting_stages_are_sequential_and_second_stage_is_concurrent(
@@ -46,13 +93,14 @@ def test_greeting_stages_are_sequential_and_second_stage_is_concurrent(
     greeting = BehaviorAssetRepository(tmp_path / "behaviors").load("greeting")
 
     assert [stage.name for stage in greeting.stages] == [
-        "happy_face",
-        "greeting_text_and_sound",
+        "greeting_face_and_sound",
+        "greeting_text",
     ]
-    assert [operation.kind for operation in greeting.stages[1].operations] == [
-        "text",
+    assert [operation.kind for operation in greeting.stages[0].operations] == [
+        "face",
         "melody",
     ]
+    assert [operation.kind for operation in greeting.stages[1].operations] == ["text"]
 
 
 @pytest.mark.parametrize("name", ["../../secret", "/tmp/secret", "BadName", "bad.name"])
@@ -90,6 +138,8 @@ def test_user_behavior_round_trip_is_private_and_no_overwrite(tmp_path: Path) ->
 
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
     assert repository.load("my_smile") == definition
+    assert repository.list_user() == [definition]
+    assert repository.list_user("movement") == []
     with pytest.raises(BehaviorAssetError, match="already exists"):
         repository.save_user(definition)
     repository.delete_user("my_smile")

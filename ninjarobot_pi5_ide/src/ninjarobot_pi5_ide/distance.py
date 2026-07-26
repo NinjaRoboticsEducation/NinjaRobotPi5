@@ -186,6 +186,16 @@ class VL53L0XDistanceAdapter:
             or isinstance(timestamp, bool)
         ):
             raise self._invalid_reading(distance, raw_value, valid)
+        if raw_value == 8191:
+            raise self._error(
+                code="DEVICE_OUT_OF_RANGE",
+                message="The VL53L0X did not detect a target within measurable range.",
+                technical_detail=(
+                    f"distance_mm={distance!r}, raw_value=8191, "
+                    f"is_valid={valid!r}; this is the sensor's clear-space sentinel."
+                ),
+                definitely_not_executed=False,
+            )
         if valid is not True or not 0 < distance < 8190 or not 0 < raw_value < 8190:
             raise self._invalid_reading(distance, raw_value, valid)
         return {

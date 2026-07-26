@@ -17,6 +17,7 @@ from typing import Any, Protocol
 
 from .behavior_models import DriveOperation
 from .config import BehaviorConfig
+from .errors import IDEError
 from .servo import ServoDevice
 
 
@@ -367,6 +368,11 @@ class MotionController:
                 while clear_count < self._config.clear_readings_before_motion:
                     try:
                         reading = await self._distance.execute({})
+                    except IDEError as exc:
+                        if exc.details.code == "DEVICE_OUT_OF_RANGE":
+                            clear_count += 1
+                        else:
+                            clear_count = 0
                     except Exception:
                         clear_count = 0
                     else:
@@ -388,6 +394,10 @@ class MotionController:
         while not self._stop_event.is_set():
             try:
                 reading = await self._distance.execute({})
+            except IDEError as exc:
+                below_count = 0
+                if exc.details.code != "DEVICE_OUT_OF_RANGE":
+                    await self._warn("distance reading unavailable; movement continues")
             except Exception:
                 below_count = 0
                 await self._warn("distance reading unavailable; movement continues")

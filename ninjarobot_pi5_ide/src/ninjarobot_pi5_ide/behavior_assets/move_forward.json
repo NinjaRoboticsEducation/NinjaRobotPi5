@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "name": "move_forward",
-  "description": "Drive forward continuously with a happy face, exciting melody, and front obstacle monitoring.",
+  "description": "Drive forward continuously with a happy face and front obstacle monitoring.",
   "category": "movement",
   "stages": [
     {
@@ -14,11 +14,6 @@
           "foreground": "#FFFFFF",
           "accent": "#00FF66",
           "hold_seconds": null
-        },
-        {
-          "kind": "melody",
-          "melody": "exciting",
-          "volume": 64
         },
         {
           "kind": "drive",

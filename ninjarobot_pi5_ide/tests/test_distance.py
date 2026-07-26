@@ -85,7 +85,7 @@ def test_valid_distance_lifecycle_and_health(tmp_path: Path) -> None:
     asyncio.run(exercise())
 
 
-def test_8191_sentinel_is_a_structured_failure(tmp_path: Path) -> None:
+def test_8191_sentinel_is_a_structured_out_of_range_result(tmp_path: Path) -> None:
     async def exercise() -> None:
         sensor = FakeSensor(
             {
@@ -106,9 +106,39 @@ def test_8191_sentinel_is_a_structured_failure(tmp_path: Path) -> None:
         assert result.status is ActionStatus.FAILED
         assert result.retry_safety is RetrySafety.SAFE
         assert result.error is not None
-        assert result.error.code == "DEVICE_INVALID_READING"
+        assert result.error.code == "DEVICE_OUT_OF_RANGE"
         assert result.error.definitely_not_executed is False
-        assert "8191 mm is a sensor sentinel" in (result.error.technical_detail or "")
+        assert "clear-space sentinel" in (result.error.technical_detail or "")
+        await engine.close()
+
+    asyncio.run(exercise())
+
+
+def test_raw_8191_is_out_of_range_even_when_offset_changes_distance(
+    tmp_path: Path,
+) -> None:
+    async def exercise() -> None:
+        sensor = FakeSensor(
+            {
+                "distance_mm": 8181,
+                "raw_value": 8191,
+                "is_valid": True,
+                "timestamp": 123.5,
+            }
+        )
+        adapter = VL53L0XDistanceAdapter(
+            sensor_factory=lambda _bus, _address: sensor,
+        )
+        engine = ExecutionEngine(
+            CapabilityRegistry([adapter]),
+            ActionLedger(tmp_path / "offset-sentinel.sqlite3"),
+        )
+
+        result = await engine.execute(request())
+
+        assert result.status is ActionStatus.FAILED
+        assert result.error is not None
+        assert result.error.code == "DEVICE_OUT_OF_RANGE"
         await engine.close()
 
     asyncio.run(exercise())

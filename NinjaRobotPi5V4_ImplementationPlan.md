@@ -1,7 +1,7 @@
 # NinjaRobotPi5V4 Implementation Plan
 
 Status: Approved architecture and delivery plan
-Last updated: 2026-07-26 (Phase 4 implementation and safety decisions incorporated)
+Last updated: 2026-07-27 (Phase 4 expression and IDE-tool refinements incorporated)
 Primary development computer: Raspberry Pi 5, 8 GM RAM
 Target computer: Raspberry Pi 5, 8 GB RAM
 Implementation status: Phases 0–4 implemented; Phase 4 physical validation is
@@ -1493,17 +1493,26 @@ historical runtime or OpenClaw code is imported.
 - Strict behavior, stage, display, melody, wait, and logical-drive schemas.
 - Read-only bundled assets plus owner-private confined user assets.
 - Sequential stages with concurrent operations inside each stage.
-- Procedural Pillow faces and existing `pi5buzzer` emotion melodies.
-- Default expressions: `idle`, `greeting`, `happy`, `thinking`, `success`,
-  `warning`, and `error`.
+- Twenty independently implemented, scalable, animated Pillow faces:
+  `idle`, `happy`, `laughing`, `sad`, `cry`, `angry`, `surprising`, `sleepy`,
+  `speaking`, `shy`, `scary`, `exciting`, `confusing`, `greeting`,
+  `listening`, `thinking`, `curious`, `success`, `warning`, and `error`.
+- Matching existing `pi5buzzer` emotion melodies. Normal movement behaviors
+  deliberately omit buzzer output.
 - Default movement commands: `move_forward`, `move_backward`, `turn_right`,
   and `turn_left`. `stop` remains a safety command rather than an asset.
+- Special combinations: bounded `greeting`, guarded `celebrate`, and
+  non-moving `error_warning`. Emergency Stop and Resume remain direct safety
+  operations rather than assets.
 - Default logical roles: GPIO12 left MG90D wheel motor and GPIO13 right MG90D
   wheel motor.
 - Exact motor targets: forward `+45/-45`, backward `-30/+30`, right
   `+45/+45`, and left `-45/-45`.
-- Front motion starts after three valid readings above 100 mm. Three
-  consecutive readings at or below 100 mm cause a Level 1 motion stop.
+- Front motion starts after three clear samples. A measured distance above
+  100 mm or the exact VL53L0X `8191` clear-space/out-of-range sentinel counts
+  as clear. Communication errors, timeouts, stale values, and generic null
+  results do not count as clear. Three consecutive measured readings at or
+  below 100 mm cause a Level 1 motion stop.
 - Invalid, missing, and stale readings warn without stopping an already-running
   movement, following the project owner's explicit decision.
 - Level 1 stops for obstacle, current undervoltage, and watchdog timeout.
@@ -1513,6 +1522,11 @@ historical runtime or OpenClaw code is imported.
 - Interactive and scriptable `ninjarobot-ide-tool` with hardware status,
   configuration discovery/import, behavior list/show/health/simulate/run,
   private action creation/validation, stop, and resume commands.
+- A Blessed-style interactive menu that directly executes selections, keeps
+  face animation alive until it is changed or stopped, provides Back from
+  every submenu, exposes a global Emergency Stop shortcut, reconstructs and
+  health-checks modules on Resume, and keeps advanced scriptable commands.
+- A persistent red Emergency Stop sign on the display until Resume or Quit.
 - Simulation preview and user confirmation before saving new actions. Future
   AI-proposed actions use the same approval boundary.
 
@@ -1536,9 +1550,12 @@ historical runtime or OpenClaw code is imported.
 
 **Implementation result**
 
-Complete in software on 2026-07-26. The full root suite passes with 154 tests,
-strict mypy, Ruff lint and formatting, and unchanged managed-driver
-provenance. Physical validation remains pending.
+The original Phase 4 physical checklist was reported passed by the operator.
+The 2026-07-27 refinement is complete in software. The full root suite passes
+with 213 tests, strict mypy, Ruff lint and formatting, and unchanged
+managed-driver provenance. The new 20-face, direct-menu, sentinel, emergency
+sign, and resume refinements require the ordered Raspberry Pi revalidation in
+`docs/validation/phase-4-refinement-validation-2026-07-27.md`.
 
 ### Phase 5: Agent core and Ollama adapter
 

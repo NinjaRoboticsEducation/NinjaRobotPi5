@@ -49,7 +49,7 @@ def test_list_show_and_configuration_only_status(tmp_path: Path) -> None:
 
     assert listed.exit_code == 0
     assert "move_forward" in [item["name"] for item in json.loads(listed.output)]
-    assert json.loads(shown.output)["stages"][1]["name"] == "greeting_text_and_sound"
+    assert json.loads(shown.output)["stages"][1]["name"] == "greeting_text"
     assert json.loads(health.output)["components"]["display"] == "ready"
     status_payload = json.loads(status.output)
     assert status_payload["mode"] == "configuration-only"
@@ -58,6 +58,14 @@ def test_list_show_and_configuration_only_status(tmp_path: Path) -> None:
         "right_motor": "gpio13",
     }
     assert status_payload["safety"]["motion_latched"] is False
+
+
+def test_help_exits_cleanly_without_becoming_a_friendly_error() -> None:
+    result = CliRunner().invoke(main, ["behavior", "run", "--help"])
+
+    assert result.exit_code == 0
+    assert result.output.startswith("Usage:")
+    assert "Error: 0" not in result.output
 
 
 def test_simulated_movement_is_bounded_and_uses_approved_targets(
@@ -146,6 +154,37 @@ def test_create_validates_previews_confirms_and_saves_private_asset(
     assert "simulation" not in saved.read_text(encoding="utf-8")
     shown = invoke(CliRunner(), config, "behavior", "show", "my_message")
     assert json.loads(shown.output)["description"] == "Show one private message."
+    refused = invoke(CliRunner(), config, "behavior", "delete", "my_message")
+    assert refused.exit_code == 2
+    deleted = invoke(
+        CliRunner(),
+        config,
+        "behavior",
+        "delete",
+        "my_message",
+        "--confirm",
+    )
+    assert deleted.exit_code == 0
+    assert not saved.exists()
+
+
+def test_scriptable_face_loop_is_bounded_in_simulation(tmp_path: Path) -> None:
+    result = invoke(
+        CliRunner(),
+        private_config(tmp_path),
+        "behavior",
+        "run",
+        "happy",
+        "--loop",
+        "--duration",
+        "0.1",
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    face = payload["stages"][0]["operations"][0]
+    assert face["kind"] == "face"
+    assert face["frames"] >= 2
 
 
 def test_validate_and_friendly_path_error(tmp_path: Path) -> None:
@@ -161,7 +200,44 @@ def test_interactive_menu_can_exit_without_hardware(tmp_path: Path) -> None:
     result = invoke(CliRunner(), private_config(tmp_path), input="q\n")
 
     assert result.exit_code == 0
-    assert "Simulation is the default" in result.output
+    assert "NinjaRobotPi5 Interactive Tool" in result.output
+    assert "Hardware Configurations" in result.output
+    assert "Run Robot Behaviors" in result.output
+    assert "Create Robot Behavior" in result.output
+    assert "Run User-Created Behaviors" in result.output
+    assert "Delete User-Created Behaviors" in result.output
+    assert "Simulation" in result.output
+    assert "EMERGENCY STOP" in result.output
+
+
+def test_interactive_submenus_explain_creation_simulation_and_support_back(
+    tmp_path: Path,
+) -> None:
+    result = invoke(
+        CliRunner(),
+        private_config(tmp_path),
+        input="3\nb\n6\nb\n2\n1\nb\nb\n7\n",
+    )
+
+    assert result.exit_code == 0
+    assert "nothing physical runs during the preview" in result.output
+    assert "fake display, buzzer, servo, and distance devices" in result.output
+    assert "Face Expressions" in result.output
+    assert result.output.count("B. Back") >= 4
+
+
+def test_interactive_hardware_page_is_configuration_only(tmp_path: Path) -> None:
+    result = invoke(
+        CliRunner(),
+        private_config(tmp_path),
+        input="1\n1\n\nb\n7\n",
+    )
+
+    assert result.exit_code == 0
+    assert "reads configuration only" in result.output
+    assert '"ninjarobot_pi5_ide": "0.1.0"' in result.output
+    assert '"left_motor": "gpio12"' in result.output
+    assert '"buzzer_gpio": 27' in result.output
 
 
 def test_motion_resume_requires_confirmation_and_clears_level_one(

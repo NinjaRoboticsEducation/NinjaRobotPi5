@@ -168,13 +168,32 @@ def test_expression_stages_run_in_order_and_stage_operations_overlap() -> None:
             "face",
             "text_and_sound",
         ]
-        assert len(display.frames) == 2
+        assert len(display.frames) >= 3
         assert display.frames[0].size == (320, 240)
         assert buzzer.play_calls == [(440, 0.01, 32), (660, 0.01, 32)]
         assert result["simulated"] is True
         await runner.close()
         assert display.closed == 1
         assert buzzer.off_calls >= 1
+
+    asyncio.run(exercise())
+
+
+def test_face_animation_updates_until_cancelled() -> None:
+    async def exercise() -> None:
+        runner, display, _buzzer = build_runner()
+        definition = expression_definition(hold_seconds=10.0)
+        task = asyncio.create_task(runner.run(definition))
+        for _ in range(200):
+            if len(display.frames) >= 3:
+                break
+            await asyncio.sleep(0.005)
+
+        assert len(display.frames) >= 3
+        assert display.frames[0].tobytes() != display.frames[1].tobytes()
+        await runner.stop()
+        assert task.cancelled()
+        await runner.close()
 
     asyncio.run(exercise())
 

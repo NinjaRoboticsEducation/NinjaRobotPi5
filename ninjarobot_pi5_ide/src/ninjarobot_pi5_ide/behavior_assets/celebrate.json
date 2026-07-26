@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "name": "celebrate",
+  "description": "Celebrate with an exciting melody, animated faces, and a short guarded wheel dance.",
+  "category": "movement",
+  "stages": [
+    {
+      "name": "celebrate_left",
+      "operations": [
+        {
+          "kind": "face",
+          "expression": "exciting",
+          "background": "#001828",
+          "foreground": "#FFFFFF",
+          "accent": "#00BFFF",
+          "hold_seconds": 0.4
+        },
+        {
+          "kind": "melody",
+          "melody": "exciting",
+          "volume": 64
+        },
+        {
+          "kind": "drive",
+          "targets": {
+            "left_motor": -30.0,
+            "right_motor": -30.0
+          },
+          "speed_mode": "S",
+          "obstacle_policy": "warn_only",
+          "hold_seconds": 0.4
+        }
+      ]
+    },
+    {
+      "name": "celebrate_right",
+      "operations": [
+        {
+          "kind": "face",
+          "expression": "success",
+          "background": "#003000",
+          "foreground": "#FFFFFF",
+          "accent": "#00FF66",
+          "hold_seconds": 0.4
+        },
+        {
+          "kind": "drive",
+          "targets": {
+            "left_motor": 30.0,
+            "right_motor": 30.0
+          },
+          "speed_mode": "S",
+          "obstacle_policy": "warn_only",
+          "hold_seconds": 0.4
+        }
+      ]
+    },
+    {
+      "name": "celebrate_finish",
+      "operations": [
+        {
+          "kind": "face",
+          "expression": "success",
+          "background": "#003000",
+          "foreground": "#FFFFFF",
+          "accent": "#00FF66",
+          "hold_seconds": 1.2
+        }
+      ]
+    }
+  ]
+}

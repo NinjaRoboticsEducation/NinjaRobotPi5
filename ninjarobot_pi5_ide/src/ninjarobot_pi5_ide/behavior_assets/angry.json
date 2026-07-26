@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "name": "angry",
+  "description": "Animate an angry face while playing the angry melody.",
+  "category": "expression",
+  "stages": [
+    {
+      "name": "angry_expression",
+      "operations": [
+        {
+          "kind": "face",
+          "expression": "angry",
+          "background": "#300000",
+          "foreground": "#FFFFFF",
+          "accent": "#FF3333",
+          "hold_seconds": 2.0
+        },
+        {
+          "kind": "melody",
+          "melody": "angry",
+          "volume": 64
+        }
+      ]
+    }
+  ]
+}

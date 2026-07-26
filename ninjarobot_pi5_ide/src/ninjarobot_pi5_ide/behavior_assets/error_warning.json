@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "name": "error_warning",
+  "description": "Show an error followed by a warning while playing the warning melodies.",
+  "category": "expression",
+  "stages": [
+    {
+      "name": "error_alert",
+      "operations": [
+        {
+          "kind": "face",
+          "expression": "error",
+          "background": "#400000",
+          "foreground": "#FFFFFF",
+          "accent": "#EF5350",
+          "hold_seconds": 1.0
+        },
+        {
+          "kind": "melody",
+          "melody": "sad",
+          "volume": 64
+        }
+      ]
+    },
+    {
+      "name": "warning_alert",
+      "operations": [
+        {
+          "kind": "face",
+          "expression": "warning",
+          "background": "#402000",
+          "foreground": "#FFFFFF",
+          "accent": "#FFD54F",
+          "hold_seconds": 1.0
+        },
+        {
+          "kind": "melody",
+          "melody": "surprising",
+          "volume": 64
+        }
+      ]
+    }
+  ]
+}

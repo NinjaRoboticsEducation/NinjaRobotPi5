@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "name": "idle",
-  "description": "Show the animated waiting face while playing the idle tone.",
+  "name": "sleepy",
+  "description": "Animate a sleepy face while playing the sleepy melody.",
   "category": "expression",
   "stages": [
     {
-      "name": "idle_face",
+      "name": "sleepy_expression",
       "operations": [
         {
           "kind": "face",
-          "expression": "idle",
-          "background": "#000020",
+          "expression": "sleepy",
+          "background": "#080818",
           "foreground": "#FFFFFF",
-          "accent": "#00BFFF",
+          "accent": "#7FDBFF",
           "hold_seconds": 2.0
         },
         {
           "kind": "melody",
-          "melody": "idle",
+          "melody": "sleepy",
           "volume": 48
         }
       ]

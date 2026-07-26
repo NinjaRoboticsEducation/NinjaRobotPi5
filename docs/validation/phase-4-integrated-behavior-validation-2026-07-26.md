@@ -1,6 +1,11 @@
 # Phase 4 Integrated Behavior Raspberry Pi Validation
 
-Status: software PASS; physical Raspberry Pi validation pending
+Status: software PASS; original physical checklist reported PASS by operator
+
+The 2026-07-27 animated-face, interactive-menu, clear-space sentinel, and
+Emergency Stop refinements are validated by
+[`phase-4-refinement-validation-2026-07-27.md`](phase-4-refinement-validation-2026-07-27.md).
+Use that newer checklist for current physical revalidation.
 
 ## 1. Scope
 
@@ -124,19 +129,18 @@ uv run --frozen ninjarobot-ide-tool \
 
 Expected:
 
-- the seven expressions and four movements are listed
-- greeting contains a happy-face stage followed by a text-and-melody stage
+- all 20 embedded face expressions, four movements, `celebrate`, and
+  `error_warning` are listed
+- greeting starts its face and Happy melody together, then shows its text
 - simulated display, buzzer, servo, and distance components report `ready`
 
 ### Step 4: Simulate every bundled behavior
 
 ```bash
-for action in idle greeting happy thinking success warning error; do
-  uv run --frozen ninjarobot-ide-tool \
-    --config "$PHASE4_CONFIG" behavior simulate "$action"
-done
-
-for action in move_forward move_backward turn_right turn_left; do
+for action in \
+  angry confusing cry curious error error_warning exciting greeting happy idle \
+  laughing listening sad scary shy sleepy speaking success surprising thinking \
+  warning celebrate move_forward move_backward turn_right turn_left; do
   uv run --frozen ninjarobot-ide-tool \
     --config "$PHASE4_CONFIG" behavior simulate "$action" \
     --duration 1
@@ -235,8 +239,9 @@ uv run --frozen --extra hardware ninjarobot-ide-tool \
 
 Expected:
 
-- greeting shows a happy face for about two seconds
-- `Nice to meet you` and the existing happy melody then begin together
+- greeting starts the animated Greeting face and existing Happy melody
+  together
+- `Nice to meet you` follows the face-and-melody stage
 - warning shows the warning face and plays the existing surprising melody
 - the wheels do not move
 
@@ -306,7 +311,7 @@ Expected:
 - both motors stop
 - the buzzer is silent
 - ranging, camera, and microphone services close
-- the display shows `SYSTEM STOPPED`
+- the display shows the red Emergency Stop sign and `SYSTEM STOPPED`
 - starting the tool again is allowed because operator stop is not a persistent
   driver-failure latch
 - Terminal A prints the Level 2 result with `"reason": "ctrl_c"` and
@@ -331,6 +336,10 @@ uv run --frozen --extra hardware ninjarobot-ide-tool \
 
 Expected: one or two low samples do not stop motion, but three consecutive low
 samples stop both motors. A second movement must report that motion is latched.
+
+For startup, an exact raw VL53L0X `8191` out-of-range sentinel now counts as
+silent clear space. A null caused by I2C communication failure, timeout,
+disconnect, or stale data does not count as clear and cannot start movement.
 
 Remove the target, verify clear space, and resume:
 
@@ -379,7 +388,8 @@ Phase 4 physically passes when:
 - all safe smoke and real interface probes pass
 - greeting timing and concurrent text/sound are visibly correct
 - each wheel direction matches the approved map
-- forward movement does not begin without three clear valid readings
+- forward movement does not begin without three clear samples; measured
+  values above 100 mm and exact raw `8191` out-of-range samples count as clear
 - three consecutive obstacle readings stop both motors
 - Level 1 blocks movement until confirmed resume
 - Ctrl+C or `behavior stop` performs full cleanup
@@ -396,7 +406,7 @@ evidence.
 - [ ] Immutable-driver verification passes before testing
 - [ ] Private configuration validates
 - [ ] Behavior list, show, and simulated health pass
-- [ ] All seven expressions simulate
+- [ ] All 20 embedded face expressions simulate
 - [ ] All four movements simulate with exact endpoint targets
 - [ ] Private action preview, save, no-overwrite, and show pass
 - [ ] I2C, SPI, GPIO12 PWM, and GPIO13 PWM checks pass
@@ -449,7 +459,8 @@ group_motion_enabled = false
 To remove a private test action:
 
 ```bash
-rm -- "$HOME/.config/ninjarobot_pi5/behaviors/my_success.json"
+uv run --frozen ninjarobot-ide-tool \
+  --config "$PHASE4_CONFIG" behavior delete my_success --confirm
 ```
 
 Power down before touching wiring:

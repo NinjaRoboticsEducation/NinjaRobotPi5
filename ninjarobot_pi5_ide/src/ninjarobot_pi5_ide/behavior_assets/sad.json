@@ -1,24 +1,24 @@
 {
   "schema_version": 1,
-  "name": "idle",
-  "description": "Show the animated waiting face while playing the idle tone.",
+  "name": "sad",
+  "description": "Animate a sad face while playing the sad melody.",
   "category": "expression",
   "stages": [
     {
-      "name": "idle_face",
+      "name": "sad_expression",
       "operations": [
         {
           "kind": "face",
-          "expression": "idle",
-          "background": "#000020",
+          "expression": "sad",
+          "background": "#101020",
           "foreground": "#FFFFFF",
-          "accent": "#00BFFF",
+          "accent": "#5DADE2",
           "hold_seconds": 2.0
         },
         {
           "kind": "melody",
-          "melody": "idle",
-          "volume": 48
+          "melody": "sad",
+          "volume": 56
         }
       ]
     }

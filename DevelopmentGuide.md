@@ -178,8 +178,9 @@ uv run --frozen ninjarobot_pi5_cli actions show \
 
 These commands are simulated unless `health` or `distance read` includes
 `--real`. The real path uses the configured I2C bus 1 and address `0x29`. It
-returns exit code 1 for a structured device failure, including the known
-`8191 mm` invalid sentinel.
+returns exit code 1 for a structured device result, including
+`DEVICE_OUT_OF_RANGE` for the known raw `8191` sentinel. It never reports
+`8191` as a real distance.
 
 Do not use the same idempotency key for different arguments or capabilities.
 That is rejected as a conflicting request. On restart, an action that was only
@@ -533,7 +534,11 @@ The main modules are:
   settings
 - `runtime_control.py`: owner-private active-process registration so a second
   CLI can request stop
-- `cli.py`: the interactive and scriptable `ninjarobot-ide-tool`
+- `interactive_tool.py`: Blessed-style direct-control menus, persistent
+  session ownership, guided creation, private catalog management, simulation,
+  Emergency Stop, and health-gated reconstruction on Resume
+- `cli.py`: scriptable `ninjarobot-ide-tool` commands and the interactive entry
+  point
 
 ### Behavior format
 
@@ -548,14 +553,26 @@ Bundled assets are package data and read-only. Private assets live in
 links are rejected, files use mode `0600`, writes are atomic, and existing
 assets are not overwritten unless the user explicitly requests it.
 
-The bundled catalog is:
+The embedded animated face catalog is:
 
-- expressions: `idle`, `greeting`, `happy`, `thinking`, `success`, `warning`,
-  and `error`
-- movements: `move_forward`, `move_backward`, `turn_left`, and `turn_right`
+- `idle`, `happy`, `laughing`, `sad`, `cry`, `angry`, `surprising`, `sleepy`
+- `speaking`, `shy`, `scary`, `exciting`, `confusing`, `greeting`, `listening`
+- `thinking`, `curious`, `success`, `warning`, and `error`
+
+Each renderer scales from the configured display dimensions and uses elapsed
+time to produce successive frames. A finite scriptable expression remains
+bounded. An interactive face changes its final face operation to an
+indefinite animation, lets the matching melody finish once, and continues
+rendering until another behavior replaces it, Emergency Stop is requested, or
+the tool exits.
+
+The normal movement catalog is `move_forward`, `move_backward`, `turn_left`,
+and `turn_right`. Normal movements combine a face and servo drive without a
+buzzer melody. `greeting`, `celebrate`, and `error_warning` are special
+combinations.
 
 `stop` is not an asset. It is a safety command that cannot be embedded or
-redefined by a private action.
+redefined by a private action. Resume is also a safety workflow, not an asset.
 
 ### Default motor and obstacle policy
 
@@ -580,16 +597,22 @@ Zero or the calibrated center represents neutral for these MG90D
 continuous-rotation motors. An emergency stop uses zero PWM pulse through the
 driver's `off` path rather than leaving a motion target active.
 
-Front-guarded motion requires three valid clear readings above 100 mm before
-the motors start. Three consecutive readings at or below 100 mm cause a Level
-1 stop. The threshold is configurable but the schema refuses values below
-50 mm. Backward movement uses warning-only monitoring because the sensor faces
+Front-guarded motion requires three clear samples before the motors start. A
+measured value above 100 mm is clear. The exact VL53L0X raw sentinel `8191` is
+also clear because it means no target is measurable in the sensor's range; the
+public distance capability still refuses to publish it as a real millimetre
+measurement. A generic null result, I2C communication error, timeout,
+disconnect, or stale result is not clear and resets the startup sequence.
+
+Three consecutive measured readings at or below 100 mm cause a Level 1 stop.
+The threshold is configurable but the schema refuses values below 50 mm.
+Backward movement uses warning-only monitoring because the sensor faces
 forward. Turns report that side and rear space is not protected.
 
 The owner explicitly selected warning-only behavior for missing, invalid, and
 stale readings during an already-running movement. Those samples break the
 three-reading sequence but do not stop the motors. A front-guarded action still
-cannot start until it receives the configured number of valid clear readings.
+cannot start until it receives the configured number of clear samples.
 
 ### Stop levels
 
@@ -606,10 +629,15 @@ uv run --frozen ninjarobot-ide-tool motion resume --confirm
 ```
 
 Level 2 stops servo movement and ranging, closes camera and microphone devices,
-silences the buzzer, and keeps the display long enough to show
-`SYSTEM STOPPED`. Ctrl+C, explicit behavior stop, shutdown cleanup, and driver
-failure use this path. Driver failure persists a system latch. Start a fresh
-CLI process and resume only after all safe health probes pass:
+silences the buzzer, and leaves a red octagonal Emergency Stop sign on the
+display. Ctrl+C, explicit behavior stop, shutdown cleanup, and driver failure
+use this path. Driver failure persists a system latch.
+
+The interactive Resume Robot Movement choice closes the stopped assembly,
+constructs fresh device boundaries, probes every configured module, clears
+both safety levels only when those probes pass, and starts the Idle face. It
+does not restart the behavior that was active before the stop. The scriptable
+equivalent starts a fresh process:
 
 ```bash
 uv run --frozen --extra hardware ninjarobot-ide-tool \
@@ -635,9 +663,26 @@ uv run --frozen ninjarobot-ide-tool behavior health
 uv run --frozen ninjarobot-ide-tool behavior simulate greeting
 uv run --frozen ninjarobot-ide-tool behavior simulate move_forward \
   --duration 2
+uv run --frozen ninjarobot-ide-tool behavior run happy \
+  --loop --duration 1
 ```
 
-Real expressions need `--real`. Real movement additionally needs valid
+The final command demonstrates that `--loop` remains bounded in simulation.
+For real interactive control, install the hardware extra and launch:
+
+```bash
+uv run --frozen --extra hardware ninjarobot-ide-tool \
+  --config "$HOME/.config/ninjarobot_pi5/config.toml"
+```
+
+The main interactive choices are Hardware Configurations, Run Robot Behaviors,
+Create Robot Behavior, Run User-Created Behaviors, Delete User-Created
+Behaviors, Simulation, and Quit. Every submenu has Back, and `E` requests
+Emergency Stop from every menu. Unlike the scriptable interface, normal
+interactive behavior choices execute on real configured hardware. The
+Simulation menu is the explicitly hardware-free interactive path.
+
+Real scriptable expressions need `--real`. Real movement additionally needs valid
 calibration, both private configuration gates, and `--confirm-motion`. The
 complete ordered manual procedure is in the Phase 4 validation report.
 
@@ -656,6 +701,14 @@ The tool validates and simulates the action before saving it. A complete
 multi-stage action can instead be supplied with `--from-file`. Any future
 AI-proposed action uses the same preview and confirmation path; it cannot save
 or physically run itself without user approval.
+
+Delete a private behavior without using the interactive menu:
+
+```bash
+uv run --frozen ninjarobot-ide-tool behavior delete my_success --confirm
+```
+
+Bundled assets refuse deletion.
 
 ## Driver package validation commands
 
@@ -748,11 +801,12 @@ test; the separate pre-Phase-1 live-Pi report is stored under `docs/validation/`
 - **The real command reports `DEVICE_UNAVAILABLE`:** install with
   `uv sync --frozen --extra hardware`, confirm I2C is enabled, and confirm
   address `0x29` appears on bus 1.
-- **The real command reports `DEVICE_INVALID_READING` and `8191`:** the
-  middleware is working correctly by rejecting the sensor's out-of-range
-  sentinel. Check sensor power, SDA/SCL wiring (the I2C data and clock wires),
-  optical window, target reflectivity, alignment, and cold power before
-  considering calibration.
+- **The real command reports `DEVICE_OUT_OF_RANGE` and raw `8191`:** the
+  middleware is working correctly by refusing to publish the out-of-range
+  sentinel as a real distance. In open space this can simply mean no target is
+  measurable. Integrated movement treats this exact structured result as
+  clear space. It does not treat unrelated null or communication failures as
+  clear.
 - **A repeated action does not read again:** this is intentional when the same
   action ID or idempotency key is used. Generate a new ID and key for a new
   physical reading.
@@ -802,8 +856,10 @@ test; the separate pre-Phase-1 live-Pi report is stored under `docs/validation/`
   inspect power, common ground, signal routing, and calibration. The current
   robot has no accessible cutoff, which is a known residual risk.
 - **Integrated movement says it did not receive clear readings:** keep the
-  front sensor aimed at open space beyond 100 mm and confirm it returns three
-  valid readings. The motors have not started.
+  front sensor aimed at open space. Three measured values above 100 mm or
+  three exact `DEVICE_OUT_OF_RANGE` results backed by raw `8191` permit
+  startup. A generic null, I2C error, timeout, disconnect, or stale sample does
+  not; repair that communication problem first. The motors have not started.
 - **Integrated movement says motion is latched:** remove the obstacle or solve
   the power/watchdog problem, then run
   `ninjarobot-ide-tool motion resume --confirm`.
@@ -811,7 +867,9 @@ test; the separate pre-Phase-1 live-Pi report is stored under `docs/validation/`
   latched. Start a fresh process and run
   `uv run --frozen --extra hardware ninjarobot-ide-tool system resume
   --confirm`. The command refuses to clear the latch when a required health
-  probe fails.
+  probe fails. In the interactive tool, choose Run Robot Behaviors, Special
+  Behaviors, then Resume Robot Movement. A failed probe leaves the Emergency
+  Stop sign active and never restarts the old movement.
 - **A second terminal cannot stop a behavior:** first run
   `ninjarobot-ide-tool behavior stop`. It validates the recorded process start
   token before sending Ctrl+C, which avoids signaling an unrelated process
@@ -879,10 +937,11 @@ test; the separate pre-Phase-1 live-Pi report is stored under `docs/validation/`
   path observed on the live revision-`0x10` device. A second timeout is a hard
   initialization failure; do not bypass calibration.
 - **VL53L0X appears at `0x29` but returns `8191 mm`:** communication is working,
-  but ranging is invalid. `get`, `test`, `status`, and `performance` now return
-  non-zero status for invalid samples, and calibration refuses to save an
-  offset. Remove protective film, clean the optical window, verify target
-  alignment and wiring, and cold-power-cycle before retrying.
+  and no target is currently measurable in range. The standalone `get`,
+  `test`, `status`, and `performance` commands return non-zero because `8191`
+  is not a real distance, and calibration refuses to save it as an offset.
+  Aim at a suitable target when testing distance accuracy or calibration. Open
+  space can legitimately continue to produce `8191`.
 - **A `pi5disp` setup or brightness command changes source-controlled config:**
   verify that the repaired driver is installed. Runtime state defaults to
   `~/.config/pi5disp/display.json`; set `PI5DISP_CONFIG` for an isolated test.

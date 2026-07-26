@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "name": "surprising",
+  "description": "Animate a surprised face while playing the surprising tone.",
+  "category": "expression",
+  "stages": [
+    {
+      "name": "surprising_expression",
+      "operations": [
+        {
+          "kind": "face",
+          "expression": "surprising",
+          "background": "#201030",
+          "foreground": "#FFFFFF",
+          "accent": "#FFD54F",
+          "hold_seconds": 2.0
+        },
+        {
+          "kind": "melody",
+          "melody": "surprising",
+          "volume": 64
+        }
+      ]
+    }
+  ]
+}

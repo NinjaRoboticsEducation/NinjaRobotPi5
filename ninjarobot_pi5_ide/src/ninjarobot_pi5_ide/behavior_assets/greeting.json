@@ -1,24 +1,29 @@
 {
   "schema_version": 1,
   "name": "greeting",
-  "description": "Show a happy face, then greet with text and the existing happy melody.",
+  "description": "Animate a greeting with the happy melody, then show the greeting text.",
   "category": "expression",
   "stages": [
     {
-      "name": "happy_face",
+      "name": "greeting_face_and_sound",
       "operations": [
         {
           "kind": "face",
-          "expression": "happy",
+          "expression": "greeting",
           "background": "#000040",
           "foreground": "#FFFFFF",
           "accent": "#FFD700",
           "hold_seconds": 2.0
+        },
+        {
+          "kind": "melody",
+          "melody": "happy",
+          "volume": 64
         }
       ]
     },
     {
-      "name": "greeting_text_and_sound",
+      "name": "greeting_text",
       "operations": [
         {
           "kind": "text",
@@ -27,11 +32,6 @@
           "foreground": "#FFFFFF",
           "background": "#000040",
           "hold_seconds": 2.0
-        },
-        {
-          "kind": "melody",
-          "melody": "happy",
-          "volume": 64
         }
       ]
     }

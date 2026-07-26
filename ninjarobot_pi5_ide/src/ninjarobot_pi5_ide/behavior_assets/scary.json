@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "name": "scary",
+  "description": "Animate a trembling scary face while playing the scary melody.",
+  "category": "expression",
+  "stages": [
+    {
+      "name": "scary_expression",
+      "operations": [
+        {
+          "kind": "face",
+          "expression": "scary",
+          "background": "#100010",
+          "foreground": "#FFFFFF",
+          "accent": "#EF5350",
+          "hold_seconds": 2.0
+        },
+        {
+          "kind": "melody",
+          "melody": "scary",
+          "volume": 64
+        }
+      ]
+    }
+  ]
+}

@@ -8,6 +8,8 @@ from typing import Any, cast
 
 import pytest
 from ninjarobot_pi5_ide.config import BehaviorConfig
+from ninjarobot_pi5_ide.errors import IDEError
+from ninjarobot_pi5_ide.models import ErrorDetails, RetrySafety
 
 from ninjarobot_pi5_ide import (
     DriveOperation,
@@ -77,6 +79,19 @@ class FakeDistance:
 
     async def close(self) -> None:
         self.close_calls += 1
+
+
+def out_of_range() -> IDEError:
+    return IDEError(
+        ErrorDetails(
+            code="DEVICE_OUT_OF_RANGE",
+            message="No target is in measurable range.",
+            technical_detail="raw_value=8191",
+            definitely_not_executed=False,
+            retry_safety=RetrySafety.SAFE,
+            capability="distance.read",
+        )
+    )
 
 
 class FakeClosable:
@@ -173,6 +188,34 @@ def test_forward_requires_clear_start_and_stops_after_three_low_readings(
             await motion.drive(drive_operation(), "move_forward")
         motion.resume(confirmed=True)
         assert state.read().motion_latched is False
+
+    asyncio.run(exercise())
+
+
+def test_out_of_range_samples_are_silent_clear_space(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        visible: list[str] = []
+
+        async def show_warning(message: str) -> None:
+            visible.append(message)
+
+        motion, servo, _distance, state = controller(
+            tmp_path,
+            readings=[out_of_range(), 250, out_of_range(), out_of_range()],
+            warning_handler=show_warning,
+        )
+        task = asyncio.create_task(motion.drive(drive_operation(), "move_forward"))
+        while not motion.active:
+            await asyncio.sleep(0.001)
+        await asyncio.sleep(0.06)
+
+        assert servo.move_calls == [({"gpio12": 45.0, "gpio13": -45.0}, "M")]
+        assert visible == []
+        assert state.read().motion_latched is False
+        await motion.stop_motion("operator_stop", latch=False)
+        result = await task
+        assert result["stop_reason"] == "operator_stop"
+        assert result["warnings"] == []
 
     asyncio.run(exercise())
 

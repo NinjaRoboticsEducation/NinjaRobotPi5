@@ -1,5 +1,81 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-27 — Phase 4 animated-face, distance, and IDE-tool refinement
+
+### Summary
+
+- Changed integrated movement safety so a measured value above 100 mm or the
+  exact VL53L0X raw `8191` out-of-range sentinel counts as silent clear space.
+  The public distance capability still reports `DEVICE_OUT_OF_RANGE` instead
+  of publishing `8191` as a real millimetre measurement. Generic null values,
+  I2C communication errors, timeouts, disconnects, and stale samples continue
+  to block guarded startup.
+- Independently implemented 20 scalable animated face renderers inside
+  `ninjarobot_pi5_ide`: Idle, Happy, Laughing, Sad, Cry, Angry, Surprising,
+  Sleepy, Speaking, Shy, Scary, Exciting, Confusing, Greeting, Listening,
+  Thinking, Curious, Success, Warning, and Error. The immutable historical
+  checkout remains unmodified and is neither imported nor packaged.
+- Expanded the read-only behavior catalog. Every face has a semantically
+  matched existing buzzer melody; normal movements combine face and drive
+  without buzzer sound. Added guarded Celebrate and non-moving Error Warning
+  combinations.
+- Made face rendering frame-based for its whole active lifetime. Interactive
+  faces loop until replaced, stopped, or the tool exits. Scriptable behavior
+  stays finite unless `--loop` is selected, and simulation always applies a
+  time bound.
+- Added a persistent red octagonal Emergency Stop screen. Level 2 still stops
+  servos and sensors and silences the buzzer. Interactive Resume reconstructs
+  stopped device boundaries, runs health checks, clears safety state only on
+  success, shows Idle, and never restarts the previous movement.
+- Replaced the original prompt-only IDE menu with a Blessed-style direct
+  control interface. It now has the approved seven main choices, nested face,
+  movement, and special menus, clear explanations, Back in every submenu, and
+  an Emergency Stop shortcut throughout.
+- Added guided creation, private behavior listing/running/deletion, and a
+  hardware-free simulation browser. Existing scriptable commands remain
+  available; `behavior delete --confirm` and final-face `behavior run --loop`
+  were added.
+- Fixed the friendly Click command group so a normal `--help` exit no longer
+  appears as `Error: 0`.
+
+### Hardware impact
+
+The implementation and automated validation did not initialize GPIO
+(general-purpose input/output), PWM (pulse-width modulation), I2C, SPI, motors,
+sensors, camera, microphone, display, or buzzer hardware. Physical behavior
+changes affect the next Raspberry Pi test: open-space `8191` samples can now
+complete the forward startup gate, faces animate continuously, interactive
+selections execute directly, and Emergency Stop displays the new sign.
+
+### Validation
+
+- Focused distance, safety, face, asset, runtime, and CLI tests pass.
+- The complete root suite passes with 213 tests.
+- Compilation, Ruff lint, Ruff format checking, strict mypy, dependency-lock
+  validation, and `git diff --check` pass.
+- Immutable-driver verification passes before and after every phase: 222
+  tracked files across six libraries match the baseline plus 25 authorized
+  repairs.
+- No managed `pi5*` file changed. Reference hashes for the inspected
+  historical expression files remained unchanged.
+- The 320×240 Emergency Stop frame was visually inspected.
+
+### Raspberry Pi status
+
+The operator previously reported the original Phase 4 checklist passed. The
+new behavior refinements are software-complete and await the ordered physical
+checklist in
+`docs/validation/phase-4-refinement-validation-2026-07-27.md`. Begin with
+simulation and non-moving checks. Keep both wheels raised and a second terminal
+ready before any actuator-moving test. Do not intentionally induce
+undervoltage, disconnect a powered sensor, or freeze the operating system.
+
+### Recommended next step
+
+Run the refinement checklist one section at a time, record the pass/fail boxes,
+and stop at the first unexpected movement, traceback, failed health probe, or
+managed-driver verification error.
+
 ## 2026-07-27 — Editable managed-driver installation repair
 
 ### Summary

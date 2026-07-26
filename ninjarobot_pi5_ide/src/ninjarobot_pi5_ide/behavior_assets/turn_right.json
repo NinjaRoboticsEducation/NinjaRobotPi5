@@ -8,17 +8,12 @@
       "name": "turn_right",
       "operations": [
         {
-          "kind": "text",
-          "text": "TURN RIGHT\nSIDE/REAR UNPROTECTED",
-          "font_size": 22,
-          "foreground": "#FFFFFF",
+          "kind": "face",
+          "expression": "curious",
           "background": "#202040",
+          "foreground": "#FFFFFF",
+          "accent": "#00BFFF",
           "hold_seconds": null
-        },
-        {
-          "kind": "melody",
-          "melody": "confusing",
-          "volume": 64
         },
         {
           "kind": "drive",

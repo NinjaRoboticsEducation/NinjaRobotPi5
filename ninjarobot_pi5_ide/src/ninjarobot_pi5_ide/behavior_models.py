@@ -26,16 +26,100 @@ ServoRole = Annotated[
     str,
     StringConstraints(min_length=1, max_length=64, pattern=r"^[a-z][a-z0-9_-]*$"),
 ]
-FaceName = Literal["idle", "happy", "thinking", "success", "warning", "error"]
+FaceName = Literal[
+    "idle",
+    "happy",
+    "laughing",
+    "sad",
+    "cry",
+    "angry",
+    "surprising",
+    "sleepy",
+    "speaking",
+    "shy",
+    "scary",
+    "exciting",
+    "confusing",
+    "greeting",
+    "listening",
+    "thinking",
+    "curious",
+    "success",
+    "warning",
+    "error",
+]
+FACE_EXPRESSIONS: tuple[FaceName, ...] = (
+    "idle",
+    "happy",
+    "laughing",
+    "sad",
+    "cry",
+    "angry",
+    "surprising",
+    "sleepy",
+    "speaking",
+    "shy",
+    "scary",
+    "exciting",
+    "confusing",
+    "greeting",
+    "listening",
+    "thinking",
+    "curious",
+    "success",
+    "warning",
+    "error",
+)
+FACE_ALIASES: dict[str, FaceName] = {
+    "embarrassing": "shy",
+    "embarrassed": "shy",
+    "excited": "exciting",
+    "surprised": "surprising",
+    "crying": "cry",
+}
 MelodyName = Literal[
     "happy",
     "sad",
     "exciting",
     "angry",
     "confusing",
+    "cry",
+    "embarrassing",
     "idle",
+    "laughing",
+    "scary",
+    "shy",
+    "sleepy",
+    "speaking",
     "surprising",
 ]
+MELODIES: tuple[MelodyName, ...] = (
+    "happy",
+    "sad",
+    "exciting",
+    "angry",
+    "confusing",
+    "cry",
+    "embarrassing",
+    "idle",
+    "laughing",
+    "scary",
+    "shy",
+    "sleepy",
+    "speaking",
+    "surprising",
+)
+
+
+def normalize_face_name(value: str) -> FaceName:
+    """Resolve a canonical embedded face name or a supported compatibility alias."""
+    normalized = value.strip().lower().replace(" ", "_")
+    alias = FACE_ALIASES.get(normalized)
+    if alias is not None:
+        return alias
+    if normalized not in FACE_EXPRESSIONS:
+        raise ValueError(f"unknown face expression: {value!r}")
+    return normalized
 
 
 class BehaviorModel(BaseModel):
@@ -53,6 +137,12 @@ class FaceOperation(BehaviorModel):
     foreground: Color = "#FFFFFF"
     accent: Color = "#00BFFF"
     hold_seconds: Annotated[float, Field(ge=0.05, le=60.0)] | None = None
+
+    @field_validator("expression", mode="before")
+    @classmethod
+    def normalize_expression(cls, value: object) -> object:
+        """Accept the documented face aliases while storing canonical names."""
+        return normalize_face_name(value) if isinstance(value, str) else value
 
 
 class TextOperation(BehaviorModel):

@@ -73,18 +73,29 @@ OpenClaw integrations are not Phase 3.5 features.
 
 Phase 4 adds validated integrated behaviors and the `ninjarobot-ide-tool`.
 Behavior stages run in order, while display, buzzer, and motor operations
-inside one stage begin together. The bundled expressions are `idle`,
-`greeting`, `happy`, `thinking`, `success`, `warning`, and `error`. The bundled
-movements are `move_forward`, `move_backward`, `turn_left`, and `turn_right`.
-`stop` is deliberately a safety command, not a reusable behavior asset.
+inside one stage begin together. V4 independently implements 20 animated
+faces: `idle`, `happy`, `laughing`, `sad`, `cry`, `angry`, `surprising`,
+`sleepy`, `speaking`, `shy`, `scary`, `exciting`, `confusing`, `greeting`,
+`listening`, `thinking`, `curious`, `success`, `warning`, and `error`. They
+match the intended historical expression meanings without importing, copying,
+or packaging the historical runtime. The bundled movements are
+`move_forward`, `move_backward`, `turn_left`, and `turn_right`. `celebrate`
+and `error_warning` provide special combinations. `stop` is deliberately a
+safety command, not a reusable behavior asset.
 
 The default logical mapping is `left_motor` to GPIO12 and `right_motor` to
-GPIO13. Front-guarded movement requires three clear VL53L0X readings before it
-starts. Three consecutive readings at or below 100 mm produce a Level 1 motion
-stop. Undervoltage and a frozen control-loop watchdog also stop both motors.
+GPIO13. Front-guarded movement requires three clear VL53L0X samples before it
+starts. A real measurement above 100 mm or the exact raw `8191` sentinel
+counts as clear; `8191` means no target is measurable in range. A null result
+caused by a communication error, timeout, disconnect, or stale sample does not
+count as clear. Three consecutive measured readings at or below 100 mm produce
+a Level 1 motion stop. Undervoltage and a frozen control-loop watchdog also
+stop both motors.
 Ctrl+C, normal tool shutdown, an explicit behavior stop, or a hardware-driver
 failure performs Level 2 cleanup: stop servos and ranging, close camera and
-microphone devices, silence the buzzer, and show `SYSTEM STOPPED`. Driver
+microphone devices, silence the buzzer, and show a red Emergency Stop sign.
+The interactive Resume operation reconstructs and health-checks stopped
+modules, then shows Idle; it never restarts the previous movement. Driver
 failure remains latched until an explicitly confirmed healthy resume.
 
 GPIO-backed devices release only the pins they own. This matters on Raspberry
@@ -184,11 +195,19 @@ The current CLI provides:
 
 The integrated `ninjarobot-ide-tool` additionally provides:
 
-- an interactive menu when run without a subcommand
+- a boxed interactive menu, styled consistently with the standalone Pi5
+  tools, when run without a subcommand
+- direct execution of selected built-in or private behaviors, a Back choice in
+  every submenu, and an Emergency Stop shortcut from every menu
+- 15 everyday face choices, four wheel movements, and Greeting, Celebrate,
+  Emergency Stop, Resume Robot Movement, and Error Warning special choices
+- a guided creator, private behavior runner/deleter, and a hardware-free
+  simulation browser with explanations in the interface
 - `hardware status` for configuration and optional safe real-device probes
 - `config discover` and preview-first `config import`
 - `behavior list`, `show`, `health`, `simulate`, `run`, `create`, `validate`,
-  and `stop`
+  `delete`, and `stop`
+- `behavior run NAME --loop` for a scriptable final-face loop
 - `motion resume --confirm` for a Level 1 latch
 - `system resume --confirm` for a driver-failure Level 2 latch
 
@@ -206,9 +225,12 @@ source.
 Phase 2 accepts an action ID only once. Repeating the same action ID and request
 returns the stored result without reading the sensor again. Timeouts,
 cancellation, full queues, expired deadlines, startup interruption, and
-unknown outcomes are recorded as structured failures. A reading of `8191 mm`
-is explicitly rejected because it is the VL53L0X out-of-range sentinel
-(special invalid value), not a real distance.
+unknown outcomes are recorded as structured failures. The public
+`distance.read` capability never reports `8191 mm` as a real distance: it
+returns the structured `DEVICE_OUT_OF_RANGE` result. The integrated movement
+safety layer interprets that exact structured result as silent clear space.
+Other null or failed readings remain communication faults and cannot satisfy
+the three-clear-sample startup gate.
 
 The nested `NinjaClawBot/` checkout is an excluded, read-only historical
 reference. It is not part of the V4 product or Git history.
@@ -338,8 +360,13 @@ uv run --frozen ninjarobot-ide-tool behavior simulate move_forward \
 Run the interactive menu with:
 
 ```bash
-uv run --frozen ninjarobot-ide-tool
+uv run --frozen --extra hardware ninjarobot-ide-tool \
+  --config "$HOME/.config/ninjarobot_pi5/config.toml"
 ```
+
+The interactive tool executes normal selections directly on configured
+hardware. Choose its Simulation menu when you want a guaranteed hardware-free
+preview. Scriptable commands still simulate unless `--real` is supplied.
 
 Real Picamera2 access additionally requires the Raspberry Pi OS camera
 packages. The safe bootstrap installs or checks those packages, keeps the
@@ -373,6 +400,9 @@ For microphone integration, follow
 Real recording also requires consent from everyone nearby.
 For Phase 4 integrated behaviors and movements, follow
 [`docs/validation/phase-4-integrated-behavior-validation-2026-07-26.md`](docs/validation/phase-4-integrated-behavior-validation-2026-07-26.md).
+For the refined 20-face catalog, direct interactive menus, `8191` startup
+handling, Emergency Stop sign, and Resume workflow, follow
+[`docs/validation/phase-4-refinement-validation-2026-07-27.md`](docs/validation/phase-4-refinement-validation-2026-07-27.md).
 
 Run the complete root gate:
 
@@ -419,7 +449,8 @@ stop keeps display, buzzer, and sensors available but blocks another movement
 until `motion resume --confirm`. A driver-failure Level 2 stop blocks all
 behaviors until `system resume --confirm` completes healthy probes. Invalid or
 stale distance readings warn without stopping a movement already in progress,
-as explicitly selected by the owner; guarded movement still cannot start
-without three valid clear readings.
+as explicitly selected by the owner. The exact `8191` out-of-range sentinel is
+silent clear space; a communication failure or generic null result still
+blocks guarded startup because it is not proof of clear space.
 Model output is treated as an untrusted proposal; the
 deterministic IDE control plane retains final authority over robot actions.

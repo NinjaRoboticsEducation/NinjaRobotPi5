@@ -1,23 +1,23 @@
 {
   "schema_version": 1,
-  "name": "idle",
-  "description": "Show the animated waiting face while playing the idle tone.",
+  "name": "shy",
+  "description": "Animate a shy blushing face while playing the shy melody.",
   "category": "expression",
   "stages": [
     {
-      "name": "idle_face",
+      "name": "shy_expression",
       "operations": [
         {
           "kind": "face",
-          "expression": "idle",
-          "background": "#000020",
+          "expression": "shy",
+          "background": "#200018",
           "foreground": "#FFFFFF",
-          "accent": "#00BFFF",
+          "accent": "#FF69B4",
           "hold_seconds": 2.0
         },
         {
           "kind": "melody",
-          "melody": "idle",
+          "melody": "shy",
           "volume": 48
         }
       ]

@@ -25,6 +25,7 @@ from .face_renderer import render_face
 Melody = tuple[tuple[int | None, float], ...]
 DriveHandler = Callable[[DriveOperation, str], Coroutine[Any, Any, dict[str, Any]]]
 FailureHandler = Callable[[Exception], Coroutine[Any, Any, Any]]
+ANIMATION_FRAME_INTERVAL_SECONDS = 1 / 12
 
 
 class MelodyProvider(Protocol):
@@ -212,20 +213,42 @@ class BehaviorRunner:
 
     async def _show_face(self, operation: FaceOperation) -> dict[str, Any]:
         width, height = await self._display.dimensions()
-        image = render_face(
-            operation.expression,
-            width=width,
-            height=height,
-            background=operation.background,
-            foreground=operation.foreground,
-            accent=operation.accent,
-        )
-        result = await self._display.show_image(
-            image,
-            source=f"face:{operation.expression}",
-        )
-        await _hold(operation.hold_seconds)
-        return {"kind": "face", "expression": operation.expression, **result}
+        loop = asyncio.get_running_loop()
+        started_at = loop.time()
+        deadline = None if operation.hold_seconds is None else started_at + operation.hold_seconds
+        frame_count = 0
+        result: dict[str, Any] = {}
+
+        while True:
+            elapsed = loop.time() - started_at
+            image = render_face(
+                operation.expression,
+                width=width,
+                height=height,
+                background=operation.background,
+                foreground=operation.foreground,
+                accent=operation.accent,
+                elapsed_seconds=elapsed,
+            )
+            result = await self._display.show_image(
+                image,
+                source=f"face:{operation.expression}",
+            )
+            frame_count += 1
+            if deadline is None:
+                await asyncio.sleep(ANIMATION_FRAME_INTERVAL_SECONDS)
+                continue
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                break
+            await asyncio.sleep(min(ANIMATION_FRAME_INTERVAL_SECONDS, remaining))
+
+        return {
+            "kind": "face",
+            "expression": operation.expression,
+            "frames": frame_count,
+            **result,
+        }
 
     async def _play_melody(self, operation: MelodyOperation) -> dict[str, Any]:
         melody = self._melody_provider(operation.melody)
