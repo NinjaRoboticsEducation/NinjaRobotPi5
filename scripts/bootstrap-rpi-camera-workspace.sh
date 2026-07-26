@@ -64,6 +64,8 @@ verify_environment() {
   fi
   (
     cd "${PROJECT_ROOT}"
+    uv run --frozen --extra hardware python \
+      scripts/verify_workspace_driver_sources.py
     uv run --frozen --extra hardware python scripts/verify_immutable_drivers.py
     uv run --frozen --extra hardware python -c \
       "import ninjarobot_pi5_ide, pi5camera; print('NinjaRobotPi5 environment passed')"

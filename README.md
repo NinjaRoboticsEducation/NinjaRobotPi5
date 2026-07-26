@@ -314,7 +314,15 @@ changing their source:
 
 ```bash
 uv sync --frozen --extra hardware
+uv run --frozen --extra hardware python \
+  scripts/verify_workspace_driver_sources.py
 ```
+
+The six managed `pi5*` libraries are editable path dependencies. Editable means
+the virtual environment executes the source in this checkout directly, so a
+pulled or locally authorized driver repair cannot be hidden by an older copied
+wheel in `.venv`. The verification command must report that all six packages
+resolve into this checkout.
 
 Start with integrated hardware-free checks:
 

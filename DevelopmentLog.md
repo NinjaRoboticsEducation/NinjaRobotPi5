@@ -1,5 +1,51 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-27 — Editable managed-driver installation repair
+
+### Summary
+
+- Changed all six root `pi5*` path dependencies from copied directory installs
+  to editable installs.
+- Added `scripts/verify_workspace_driver_sources.py`, which safely confirms
+  that Python resolves each managed package into this checkout without
+  importing or initializing hardware.
+- Added regression tests for both `pyproject.toml` and `uv.lock` so a managed
+  driver cannot silently return to non-editable installation.
+- Added the source-origin check to the Raspberry Pi camera bootstrap and the
+  Phase 4 installation gate.
+
+### Cause
+
+The repaired buzzer source was present in the Raspberry Pi test checkout, but
+its virtual environment still contained the previous non-editable wheel.
+Because the package version and package metadata were unchanged, an ordinary
+frozen synchronization did not rebuild the local dependency after only its
+Python source changed. Physical testing therefore executed the old global
+GPIO-cleanup implementation.
+
+### Hardware impact
+
+None. This repair changes only how the root environment links local packages.
+It does not initialize GPIO, PWM, I2C, SPI, motors, sensors, camera, microphone,
+display, or buzzer hardware.
+
+### Validation
+
+- Root compilation, Ruff lint, Ruff formatting, strict mypy, lock validation,
+  shell syntax validation, and all 156 tests pass.
+- Immutable-driver verification passes for 222 tracked files and 25 authorized
+  repairs.
+- The runtime-source verifier passes for all six managed libraries.
+- A clean temporary workspace created a new virtual environment from the
+  frozen lock, resolved every managed library into that copied checkout, and
+  executed the repaired pin-scoped buzzer source.
+
+### Raspberry Pi status
+
+Repeat the non-moving greeting cross-terminal stop only after the runtime-source
+verifier confirms that all six managed packages resolve into the fresh
+checkout. Do not resume motor tests until no destructor traceback appears.
+
 ## 2026-07-26 — Deterministic shared-GPIO shutdown repair
 
 ### Summary

@@ -150,7 +150,16 @@ Install the optional local VL53L0X package on the Raspberry Pi:
 
 ```bash
 uv sync --frozen --extra hardware
+uv run --frozen --extra hardware python \
+  scripts/verify_workspace_driver_sources.py
 ```
+
+All six managed `pi5*` packages use editable path sources in the root
+environment. This prevents an unchanged package version and `uv` build cache
+from leaving an old copied driver in `.venv` after a source repair. The
+workspace-source verifier uses Python's module discovery without initializing
+hardware and fails when any managed package resolves outside its matching
+`pi5*/src` directory.
 
 Run safe simulation and ledger checks:
 
@@ -817,6 +826,12 @@ test; the separate pre-Phase-1 live-Pi report is stored under `docs/validation/`
   non-moving expression stop before moving the wheels again. A normal
   cross-terminal stop ends with the Level 2 JSON, no cleanup errors, and
   `Aborted!`, with no Python traceback.
+- **A repaired `pi5*` source file is present but Python still runs an older
+  copy from `.venv`:** run `uv sync --frozen --extra hardware`, followed by
+  `uv run --frozen --extra hardware python
+  scripts/verify_workspace_driver_sources.py`. Current root dependencies are
+  editable, so the verifier must resolve every managed library into this
+  checkout. Do not continue physical testing if it reports a mismatch.
 - **Backward or turn output says an area is unprotected:** this is expected.
   The VL53L0X faces forward, so it cannot see behind or fully cover either
   side.

@@ -84,10 +84,16 @@ Install the ordinary managed hardware dependencies:
 
 ```bash
 uv sync --frozen --extra hardware
+uv run --frozen --extra hardware python \
+  scripts/verify_workspace_driver_sources.py
 ```
 
 An extra is an optional dependency group. The `hardware` extra installs the
-local managed libraries and their Raspberry Pi dependencies.
+local managed libraries and their Raspberry Pi dependencies. The managed
+libraries are installed as editable path dependencies, meaning Python executes
+their source from this checkout instead of a copied package under `.venv`.
+The verification command must report that all six managed libraries resolve
+into the current checkout before physical testing.
 
 ## Private integrated configuration
 

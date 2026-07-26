@@ -742,12 +742,12 @@ dev = [
 requires-dist = [
     { name = "ninjarobot-pi5-agent", editable = "ninjarobot_pi5_agent" },
     { name = "ninjarobot-pi5-ide", editable = "ninjarobot_pi5_ide" },
-    { name = "pi5buzzer", extras = ["pi"], marker = "extra == 'hardware'", directory = "pi5buzzer" },
-    { name = "pi5camera", marker = "extra == 'hardware'", directory = "pi5camera" },
-    { name = "pi5disp", extras = ["pi"], marker = "extra == 'hardware'", directory = "pi5disp" },
-    { name = "pi5mic", marker = "extra == 'hardware'", directory = "pi5mic" },
-    { name = "pi5servo", extras = ["pi"], marker = "extra == 'hardware'", directory = "pi5servo" },
-    { name = "pi5vl53l0x", marker = "extra == 'hardware'", directory = "pi5vl53l0x" },
+    { name = "pi5buzzer", extras = ["pi"], marker = "extra == 'hardware'", editable = "pi5buzzer" },
+    { name = "pi5camera", marker = "extra == 'hardware'", editable = "pi5camera" },
+    { name = "pi5disp", extras = ["pi"], marker = "extra == 'hardware'", editable = "pi5disp" },
+    { name = "pi5mic", marker = "extra == 'hardware'", editable = "pi5mic" },
+    { name = "pi5servo", extras = ["pi"], marker = "extra == 'hardware'", editable = "pi5servo" },
+    { name = "pi5vl53l0x", marker = "extra == 'hardware'", editable = "pi5vl53l0x" },
 ]
 provides-extras = ["hardware"]
 
@@ -895,7 +895,7 @@ wheels = [
 [[package]]
 name = "pi5buzzer"
 version = "0.1.0"
-source = { directory = "pi5buzzer" }
+source = { editable = "pi5buzzer" }
 dependencies = [
     { name = "click" },
 ]
@@ -918,7 +918,7 @@ provides-extras = ["pi", "ninjarobot", "dev"]
 [[package]]
 name = "pi5camera"
 version = "0.2.0"
-source = { directory = "pi5camera" }
+source = { editable = "pi5camera" }
 dependencies = [
     { name = "click" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
@@ -942,7 +942,7 @@ provides-extras = ["recognition", "dev"]
 [[package]]
 name = "pi5disp"
 version = "0.1.0"
-source = { directory = "pi5disp" }
+source = { editable = "pi5disp" }
 dependencies = [
     { name = "click" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
@@ -972,7 +972,7 @@ provides-extras = ["pi", "ninjarobot", "dev"]
 [[package]]
 name = "pi5mic"
 version = "0.1.0"
-source = { directory = "pi5mic" }
+source = { editable = "pi5mic" }
 dependencies = [
     { name = "audioop-lts", marker = "python_full_version >= '3.13'" },
     { name = "click" },
@@ -997,7 +997,7 @@ provides-extras = ["wakeword", "voiceinput", "dev"]
 [[package]]
 name = "pi5servo"
 version = "1.0.0"
-source = { directory = "pi5servo" }
+source = { editable = "pi5servo" }
 dependencies = [
     { name = "blessed" },
     { name = "click" },
@@ -1028,7 +1028,7 @@ provides-extras = ["pi", "dev"]
 [[package]]
 name = "pi5vl53l0x"
 version = "0.1.0"
-source = { directory = "pi5vl53l0x" }
+source = { editable = "pi5vl53l0x" }
 dependencies = [
     { name = "blessed" },
     { name = "click" },

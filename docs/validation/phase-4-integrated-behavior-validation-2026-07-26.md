@@ -53,11 +53,15 @@ From the project root:
 cd /home/rogerchang/NinjaRobotPi5
 uv sync --frozen --extra hardware
 
+uv run --frozen --extra hardware python \
+  scripts/verify_workspace_driver_sources.py
 uv run --frozen python scripts/verify_immutable_drivers.py
 uv run --frozen pytest -q
 ```
 
-Expected: driver verification says PASS and all tests pass.
+Expected: workspace-source verification confirms all six managed libraries
+execute from this checkout, immutable-driver verification says PASS, and all
+tests pass. Stop here if any package resolves to a copied file under `.venv`.
 
 ### Step 2: Create a private configuration
 
