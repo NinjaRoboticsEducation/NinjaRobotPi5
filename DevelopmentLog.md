@@ -1,5 +1,50 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-26 — Deterministic shared-GPIO shutdown repair
+
+### Summary
+
+- Repaired the managed `pi5buzzer` Raspberry Pi backend so cleanup releases
+  only the buzzer's configured GPIO pin instead of closing the process-wide
+  `rpi-lgpio` chip handle shared with the display.
+- Made tone waiting interruptible so Ctrl+C and cross-terminal behavior stop
+  finish the buzzer worker before releasing its PWM object.
+- Preserved all existing CLI commands, melodies, tone behavior, servo
+  functions, display functions, and two-level stop results.
+- Recorded both managed-driver changes in the authorized repair manifest.
+- Clarified the Phase 4 calibration path and cross-terminal stop expectations.
+
+### Cause
+
+The physical Phase 4 test stopped the robot successfully, but the buzzer PWM
+object's destructor ran after an unscoped `GPIO.cleanup()` had set the shared
+`rpi-lgpio` handle to `None`. Its second defensive stop then printed an ignored
+`TypeError`. The repair uses pin-scoped cleanup, which releases GPIO27 without
+invalidating other GPIO-backed devices.
+
+### Validation
+
+- Standalone buzzer driver tests: 31 passed.
+- Integrated buzzer, behavior-runtime, and safety tests: 22 passed.
+- Ruff lint and formatting pass for the repaired driver and regression tests.
+- Immutable-driver verification passes with 222 tracked files and 25
+  authorized repairs.
+- Root compile validation, Ruff lint, Ruff formatting, strict mypy, and all 154
+  root tests pass.
+- All 66 standalone `pi5buzzer` tests pass with its Ruff lint and formatting
+  checks.
+
+### Raspberry Pi status
+
+The reported cross-terminal stop reached Level 2 with no cleanup errors, but
+the destructor traceback makes that original run a documentation-level fail.
+Repeat the updated non-moving and raised-wheel stop checks with no traceback.
+
+### Follow-up
+
+Run the updated Phase 4 cross-terminal stop test and confirm Terminal A contains
+the Level 2 result and `Aborted!` but no `Exception ignored` or `TypeError`.
+
 ## 2026-07-26 — Phase 4.4 integrated IDE tool and Phase 4 completion
 
 ### Summary

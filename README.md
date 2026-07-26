@@ -87,7 +87,12 @@ failure performs Level 2 cleanup: stop servos and ranging, close camera and
 microphone devices, silence the buzzer, and show `SYSTEM STOPPED`. Driver
 failure remains latched until an explicitly confirmed healthy resume.
 
-The `pi5buzzer` development environment is locked and its 65 tests pass. The
+GPIO-backed devices release only the pins they own. This matters on Raspberry
+Pi 5 because the buzzer and display share one `rpi-lgpio` process connection;
+closing that connection globally while another PWM object still exists can
+produce a shutdown traceback even after the hardware has stopped.
+
+The `pi5buzzer` development environment is locked and its 66 tests pass. The
 earlier GPIO17 health and sound checks remain historical evidence; the current
 V4 GPIO27 validation has now passed every operator checklist item.
 Non-moving servo backends execute successfully. Display configuration now lives

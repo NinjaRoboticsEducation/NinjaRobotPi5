@@ -58,9 +58,10 @@ class FakeGPIOModule:
         self.events.append(("create_pwm", pin, frequency))
         return FakePWM(self, pin, frequency)
 
-    def cleanup(self):
-        self.events.append(("cleanup",))
-        self.active = False
+    def cleanup(self, pins=None):
+        self.events.append(("cleanup", pins))
+        if pins is None:
+            self.active = False
 
 
 class TestBuzzerInit:
@@ -227,6 +228,19 @@ class TestBuzzerOff:
         assert not buzzer.is_initialized
         assert not buzzer._worker_thread.is_alive()
 
+    def test_off_interrupts_long_tone_before_releasing_backend(self, buzzer):
+        buzzer.execute({"frequency": 440, "duration": 30.0})
+        deadline = time.monotonic() + 1.0
+        while not buzzer.pi.set_PWM_frequency.called and time.monotonic() < deadline:
+            time.sleep(0.01)
+
+        started = time.monotonic()
+        buzzer.off()
+
+        assert time.monotonic() - started < 1.0
+        assert not buzzer._worker_thread.is_alive()
+        buzzer.pi.release_pwm.assert_called_once_with(17)
+
     def test_off_releases_pwm_on_backend(self, buzzer):
         buzzer.off()
         buzzer.pi.release_pwm.assert_called_once_with(17)
@@ -271,9 +285,10 @@ class TestRPiGPIOPWMBackend:
         backend.stop()
 
         assert ("destructor_error", "TypeError") not in gpio_module.events
-        assert ("cleanup",) in gpio_module.events
+        assert ("cleanup", [17]) in gpio_module.events
+        assert gpio_module.active is True
         assert backend.connected is False
-        assert gpio_module.events.index(("stop", 17)) < gpio_module.events.index(("cleanup",))
+        assert gpio_module.events.index(("stop", 17)) < gpio_module.events.index(("cleanup", [17]))
 
     def test_stop_is_idempotent(self):
         from pi5buzzer.core.driver import RPiGPIOPWMBackend
@@ -286,4 +301,4 @@ class TestRPiGPIOPWMBackend:
         backend.stop()
         backend.stop()
 
-        assert gpio_module.events.count(("cleanup",)) == 1
+        assert gpio_module.events.count(("cleanup", [17])) == 1

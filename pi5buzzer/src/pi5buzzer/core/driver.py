@@ -125,13 +125,14 @@ class RPiGPIOPWMBackend:
         gc.collect()
 
     def stop(self) -> None:
-        """Stop all PWM objects and release GPIO resources."""
+        """Stop all PWM objects and release only this backend's GPIO pins."""
         while self._pwm_by_pin:
             pin = next(iter(self._pwm_by_pin))
             self.release_pwm(pin)
 
         if self._mode_configured:
-            self._gpio.cleanup()
+            if self._configured_pins:
+                self._gpio.cleanup(sorted(self._configured_pins))
             self._mode_configured = False
             self._configured_pins.clear()
 
@@ -302,8 +303,9 @@ class Buzzer(Actuator):
 
                 self.pi.set_PWM_frequency(self.pin, int(frequency))
                 self.pi.set_PWM_dutycycle(self.pin, self._volume)
-                time.sleep(max(0.0, duration))
-                self.pi.set_PWM_dutycycle(self.pin, 0)
+                interrupted = self._stop_event.wait(max(0.0, duration))
+                if not interrupted and self.pi is not None:
+                    self.pi.set_PWM_dutycycle(self.pin, 0)
             except queue.Empty:
                 continue
             except Exception as exc:

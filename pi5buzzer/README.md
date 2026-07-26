@@ -59,7 +59,7 @@ after you have obtained a complete copy of this `pi5buzzer` folder.
 | **Keyboard piano** | Lets you press keyboard keys to play notes |
 | **Settings manager** | Saves settings in a JSON (simple text settings file) file |
 | **CLI (command-line) commands** | Includes command-line tools for setup, sound playback, and settings work |
-| **Unit tested** | Includes 65 tests with mocked Pi 5 backend behavior |
+| **Unit tested** | Includes 66 tests with mocked Pi 5 backend behavior |
 
 ---
 

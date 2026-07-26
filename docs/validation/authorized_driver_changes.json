@@ -7,16 +7,16 @@
   "files": {
     "pi5buzzer/README.md": {
       "approved": {
-        "sha256": "bf17fb800f049fccabe333e4e0fc3b627e96deb7287c1dc4c891174302f5e500",
+        "sha256": "5d74e88b2a588632307a1af64505cb81ad9cc738f7ddf34fcb9d3a557766c24a",
         "size": 11971
       },
       "authorized_by": "project owner",
-      "authorized_on": "2026-07-25",
+      "authorized_on": "2026-07-26",
       "baseline": {
         "sha256": "a597351a8c39dd12e2365569a167cade946ba3215e81ee60f424103cafa9ccda",
         "size": 11550
       },
-      "reason": "Standalone installation, dependency, and CLI validation documentation"
+      "reason": "Standalone installation, dependency, and CLI validation documentation, with the validated regression-test count updated after the shared-GPIO shutdown repair."
     },
     "pi5buzzer/pyproject.toml": {
       "approved": {
@@ -31,6 +31,19 @@
       },
       "reason": "Pin and explicitly configure Ruff, and add a lockfile so fresh pi5buzzer development environments reproduce the validated lint toolchain."
     },
+    "pi5buzzer/src/pi5buzzer/core/driver.py": {
+      "approved": {
+        "sha256": "d60cf9624ea28784f72206f28b7928e041f60249d90494b91fe5969077d910a0",
+        "size": 10300
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-26",
+      "baseline": {
+        "sha256": "3f315d23d9536018b03283bb830bf604cc10a654ccc9647dea993c0875ff35ac",
+        "size": 10125
+      },
+      "reason": "Prevent shared rpi-lgpio chip-handle invalidation during integrated shutdown by using pin-scoped buzzer cleanup, and make long tone playback interruptible before PWM resources are released."
+    },
     "pi5buzzer/tests/test_config.py": {
       "approved": {
         "sha256": "28273ede8fd3af6f7b35865e224838863a913833d8c847a1acf8434da741afd8",
@@ -43,6 +56,19 @@
         "size": 6635
       },
       "reason": "Sort the config-test import so the package passes its now-explicit Ruff import-order rule."
+    },
+    "pi5buzzer/tests/test_driver.py": {
+      "approved": {
+        "sha256": "412e6c5b81a196f52bb7bc9f8833ebebfca80ce95bce4697a92477825fdd4c19",
+        "size": 9414
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-26",
+      "baseline": {
+        "sha256": "10e5e0adab94c5a4302ecc10b6e653ffc142bb9b0dd3860da8c7e379a33eaad2",
+        "size": 8799
+      },
+      "reason": "Regression coverage for pin-scoped GPIO cleanup, prompt interruption of long tones, idempotent shutdown, and absence of post-cleanup PWM destructor errors."
     },
     "pi5buzzer/uv.lock": {
       "approved": {

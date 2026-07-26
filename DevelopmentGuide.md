@@ -809,6 +809,14 @@ test; the separate pre-Phase-1 live-Pi report is stored under `docs/validation/`
   after a process identifier is reused. If no live behavior is registered, it
   safely initializes the servo and distance boundaries and requests direct
   cleanup.
+- **Terminal A prints `Exception ignored` or a `PWM.__del__` TypeError after
+  a stop:** this is not an expected successful result. The managed buzzer
+  backend must release only its configured GPIO pin and interrupt its playback
+  worker before cleanup. Confirm the workspace includes the 2026-07-26
+  pin-scoped cleanup repair, run immutable-driver verification, and repeat a
+  non-moving expression stop before moving the wheels again. A normal
+  cross-terminal stop ends with the Level 2 JSON, no cleanup errors, and
+  `Aborted!`, with no Python traceback.
 - **Backward or turn output says an area is unprotected:** this is expected.
   The VL53L0X faces forward, so it cannot see behind or fully cover either
   side.

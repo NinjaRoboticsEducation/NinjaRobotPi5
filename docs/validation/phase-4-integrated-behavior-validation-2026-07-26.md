@@ -194,7 +194,16 @@ uv run --directory pi5servo --frozen --extra pi \
 
 Expected: `gpio12` and `gpio13` both have explicit saved calibrations and a
 verified neutral center. If either is absent, stop here and use the standalone
-`pi5servo servo-tool --config ...` calibration flow before continuing.
+calibration tool with the same explicit file:
+
+```bash
+uv run --directory pi5servo --frozen --extra pi \
+  pi5servo servo-tool \
+  --config "$HOME/.config/pi5servo/servo.json"
+```
+
+Running `uv run pi5servo servo-tool` without `--config` stores `servo.json` in
+the current directory instead. It does not populate the private file above.
 
 ### Step 3: Run safe real health probes
 
@@ -296,6 +305,14 @@ Expected:
 - the display shows `SYSTEM STOPPED`
 - starting the tool again is allowed because operator stop is not a persistent
   driver-failure latch
+- Terminal A prints the Level 2 result with `"reason": "ctrl_c"` and
+  `"cleanup_errors": []`, followed by `Aborted!`
+- neither terminal prints `Exception ignored`, `TypeError`, or another Python
+  traceback
+
+`Aborted!` is normal here: it means Terminal B interrupted the foreground
+behavior. A PWM (pulse-width modulation) destructor traceback is not normal;
+record the complete output and stop physical validation if one appears.
 
 ### Step 4: Verify front-obstacle Level 1 stop
 
@@ -384,6 +401,7 @@ evidence.
 - [ ] Greeting face, text, and melody timing passes
 - [ ] Real movement refuses without `--confirm-motion`
 - [ ] Cross-terminal full stop passes
+- [ ] Cross-terminal stop produces no ignored exception or Python traceback
 - [ ] Three-reading front-obstacle stop passes
 - [ ] Level 1 confirmed resume passes
 - [ ] Backward warning and direction pass
