@@ -104,7 +104,8 @@ uv run --frozen ninjarobot_pi5_cli config validate \
 
 The example is authoritative V4 configuration, not a driver configuration. It
 records GPIO12/GPIO13 servos, GPIO27 buzzer, and the ST7789V display on
-DC4/RST5/BL6 with rotation 90° and brightness 75%.
+DC4/RST5/BL6 with rotation 90° and brightness 75%. It also records the
+fixed-focus OV5647 camera at 1280×720 with media retention disabled.
 
 Inspect schemas or exercise the fake IDE:
 
@@ -350,6 +351,83 @@ releases both backends during cleanup. It must not move a servo. Powered
 calibration and motion remain blocked until the complete electrical record and
 emergency disconnect are approved. Follow the Phase 3.3 validation report.
 
+## Phase 3.4 privacy-bounded camera adapter
+
+`ninjarobot_pi5_ide.camera` is the only V4 module that imports the managed
+`pi5camera` capture path. The agent package imports only the IDE classes.
+Phase 3.4 intentionally exposes still capture, not face recognition,
+enrollment, video, streaming, or autonomous camera use.
+
+Two capabilities share one `CameraDevice` and the `camera` resource:
+
+- `camera.status` is read-only and reports dependency readiness, resolution,
+  focus mode, and retention policy without taking a photograph
+- `camera.capture` is privacy-classified, confirmation-required,
+  non-idempotent, and cancellable
+
+Non-idempotent means that repeating the operation would take a second
+photograph. A successful capture therefore reports `retry_safety: unsafe`.
+Repeating the same action ID returns the durable first result without opening
+the camera again.
+
+The checked-in configuration uses:
+
+```toml
+[hardware.camera]
+enabled = true
+width = 1280
+height = 720
+warmup_seconds = 1.0
+autofocus_mode = "none"
+media_directory = "~/.local/share/ninjarobot_pi5/camera"
+retain_media_by_default = false
+```
+
+The `Literal[False]` configuration type prevents enabling implicit retention.
+The CLI can retain one image only through an explicit `--retain`. Retained
+names accept letters, numbers, underscores, and hyphens followed by `.jpg`.
+They cannot contain a directory path, cannot leave the configured media
+directory, and cannot replace an existing file.
+
+Every capture first uses a private `.capture-*` staging directory. The service
+hashes the JPEG, moves it into retained storage only when requested, and
+removes staging data in a `finally` cleanup. `finally` means cleanup runs
+whether the operation succeeds or raises an error. Cancellation and timeout
+wait for the worker thread to finish Picamera2 cleanup, then report the
+cancelled or unknown outcome without leaving a retained file.
+
+Simulation is the default and does not import Picamera2:
+
+```bash
+uv run --frozen ninjarobot_pi5_cli camera health \
+  --ledger /tmp/ninjarobot-phase34.sqlite3
+uv run --frozen ninjarobot_pi5_cli camera status \
+  --ledger /tmp/ninjarobot-phase34.sqlite3
+uv run --frozen ninjarobot_pi5_cli camera capture \
+  --ledger /tmp/ninjarobot-phase34.sqlite3
+```
+
+The Raspberry Pi OS Picamera2 package is tied to its system libcamera ABI. ABI
+means the low-level binary interface between compiled components. A downloaded
+Python environment normally cannot import it. Prepare the root environment
+with:
+
+```bash
+./scripts/bootstrap-rpi-camera-workspace.sh
+source .venv/bin/activate
+```
+
+The script moves an incompatible `.venv` to a timestamped recoverable backup,
+creates a new environment with `/usr/bin/python3` and
+`--system-site-packages`, then installs the frozen hardware dependency set.
+Use `--skip-apt` only when the Raspberry Pi OS camera packages are already
+installed.
+
+Real status does not take a photograph. Real capture requires informed consent
+from everyone nearby plus both `--real` and `--confirm-camera`. Images are
+deleted by default. Follow the Phase 3.4 validation report before retaining
+one physical test image.
+
 ## Driver package validation commands
 
 ### Standalone README contract
@@ -503,6 +581,14 @@ test; the separate pre-Phase-1 live-Pi report is stored under `docs/validation/`
   dedicated I2C PWM0–PWM3 sockets.
 - **Python 3.11 is missing:** install it through `uv python install 3.11`, then
   rerun `uv sync --dev`.
+- **Root camera health reports unavailable while `/usr/bin/python3` imports
+  Picamera2:** the root `.venv` cannot see Raspberry Pi OS packages. Run
+  `./scripts/bootstrap-rpi-camera-workspace.sh`, activate `.venv`, and retry.
+- **A real camera capture requires `--confirm-camera`:** tell everyone nearby
+  and obtain consent before adding the flag. Add `--retain` only when the
+  image must remain after the command.
+- **A retained camera name is rejected:** use a new name such as
+  `phase34-test.jpg`. Paths, spaces, extra dots, and overwriting are blocked.
 - **`pi5camera capture` reports Picamera2 missing:** verify the OS Picamera2
   package is installed, then run the package bootstrap. The environment must
   use `/usr/bin/python3`, `--system-site-packages`, and

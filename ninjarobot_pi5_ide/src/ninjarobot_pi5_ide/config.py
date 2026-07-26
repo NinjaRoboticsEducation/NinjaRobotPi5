@@ -120,6 +120,9 @@ class CameraConfig(ConfigModel):
     enabled: bool = True
     width: Annotated[int, Field(ge=1, le=7680)] = 1280
     height: Annotated[int, Field(ge=1, le=4320)] = 720
+    warmup_seconds: Annotated[float, Field(ge=0, le=10)] = 1.0
+    autofocus_mode: Literal["none", "manual", "auto", "continuous"] = "none"
+    media_directory: NonEmptyText = "~/.local/share/ninjarobot_pi5/camera"
     retain_media_by_default: Literal[False] = False
 
 

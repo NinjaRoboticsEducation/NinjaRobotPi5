@@ -34,6 +34,9 @@ vl53l0x_address = 41
 enabled = true
 width = 1280
 height = 720
+warmup_seconds = 1.0
+autofocus_mode = "none"
+media_directory = "~/.local/share/ninjarobot_pi5/camera"
 retain_media_by_default = false
 
 [hardware.microphone]

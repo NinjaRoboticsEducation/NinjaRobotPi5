@@ -3,6 +3,7 @@
 from .adapters import CapabilityAdapter
 from .api import IDEClient
 from .buzzer import BuzzerDevice, BuzzerStopAdapter, BuzzerToneAdapter
+from .camera import CameraCaptureAdapter, CameraDevice, CameraStatusAdapter
 from .config import RobotConfig, load_robot_config
 from .display import (
     DisplayBrightnessAdapter,
@@ -49,6 +50,9 @@ __all__ = [
     "BuzzerDevice",
     "BuzzerStopAdapter",
     "BuzzerToneAdapter",
+    "CameraCaptureAdapter",
+    "CameraDevice",
+    "CameraStatusAdapter",
     "DisplayBrightnessAdapter",
     "DisplayClearAdapter",
     "DisplayDevice",

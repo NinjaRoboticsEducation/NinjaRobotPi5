@@ -1,5 +1,58 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-26 — Phase 3.4 privacy-bounded camera adapter
+
+### Summary
+
+- Added `camera.status`, a read-only readiness and retention-policy capability
+  that never takes a photograph.
+- Added `camera.capture`, a confirmation-required privacy capability for one
+  1280×720 JPEG through the managed `pi5camera` capture path.
+- Kept simulation as the default and required both `--real` and
+  `--confirm-camera` for physical capture.
+- Enforced default non-retention through V4 configuration. Explicit
+  `--retain` saves only owner-readable files inside the configured private
+  camera directory.
+- Added filename validation, directory confinement, no-overwrite behavior,
+  secure staging, SHA-256 metadata, and cleanup after success, failure,
+  timeout, or cancellation.
+- Serialized camera ownership and waited for worker-thread cleanup before
+  returning a timeout or cancellation.
+- Added the managed `pi5camera` package to the root hardware dependency group
+  without changing any managed driver file.
+- Added a recoverable Raspberry Pi workspace bootstrap for the system-provided
+  Picamera2/libcamera Python environment.
+
+### Validation
+
+- All 92 V4 tests passed.
+- The 31 focused camera, configuration, and CLI tests passed.
+- Camera tests cover simulated status/capture, default non-retention, explicit
+  private retention, no overwrite, path traversal rejection, dependency
+  failure, failure cleanup, timeout cleanup, cancellation cleanup, and
+  serialized access.
+- All 449 managed-library tests passed. The only warning was the inherited
+  Python `audioop` deprecation in `pi5mic`.
+- Root compilation, Ruff lint, Ruff format, strict mypy for 22 source files,
+  dependency lock, CLI smoke, bootstrap syntax, and `git diff --check` passed.
+- Driver provenance remained at 222 files and 23 authorized repairs.
+
+### Raspberry Pi status
+
+No real camera command was run during implementation. The Raspberry Pi OS
+system Python imports Picamera2, while the pre-existing root Python 3.11
+environment does not. The new bootstrap addresses that verified environment
+boundary without altering `pi5camera`.
+
+The physical Phase 3.4 checklist remains pending. Real capture requires consent
+from everyone nearby. Media is deleted by default, and the one retained visual
+test image should be removed after inspection.
+
+### Follow-up
+
+Run and review the Phase 3.4 Raspberry Pi checklist. Do not begin Phase 3.5
+microphone integration until the camera result is reviewed.
+
 ## 2026-07-26 — Phase 3.3 six-servo mixed-backend adapter
 
 ### Summary
@@ -36,15 +89,15 @@
 ### Raspberry Pi status
 
 No PWM, I2C, servo pulse, calibration, or movement command was run during
-implementation. Non-moving interface checks may proceed with external servo
-power disconnected. Powered calibration and one-at-a-time movement remain
-blocked until the six-servo electrical record, calibrations, mechanical
-workspace, and emergency power disconnect are approved.
+implementation. The operator subsequently reported that all Phase 3.3 manual
+tests passed. No command transcript, electrical table, or measured values were
+attached to that report, so the validation document records an
+operator-reported pass without inventing detailed evidence.
 
 ### Follow-up
 
-Run and review the Phase 3.3 Raspberry Pi checklist. Do not begin camera Phase
-3.4 until that result is reviewed.
+The Phase 3.3 operator review is complete. Proceed with Phase 3.4 camera
+integration.
 
 ## 2026-07-26 — Phase 3.2 ST7789V display adapter
 

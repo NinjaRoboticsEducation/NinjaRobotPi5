@@ -15,8 +15,8 @@ which is the single source of truth.
 
 ## Current status
 
-Phase 0, Phase 1, Phase 2, Phase 3.1, Phase 3.2, and the software part of Phase
-3.3 are complete. Phase 0 established project governance and preserved the
+Phase 0, Phase 1, Phase 2, and Phase 3.1 through Phase 3.4 are implemented.
+Phase 0 established project governance and preserved the
 original import hashes for the six existing Pi5 hardware libraries. Phase 1
 added strict IDE and agent contracts, deterministic fakes, V4-owned
 configuration, and the unified `ninjarobot_pi5_cli`. Phase 2 added the IDE
@@ -45,8 +45,18 @@ GPIO12/GPIO13 use Raspberry Pi hardware PWM, while `hat_pwm1` through
 `hat_pwm4` use DFR0566 PWM0 through PWM3 over I2C. Real movement is disabled in
 the checked-in configuration and additionally requires `--real`,
 `--confirm-motion`, and a valid endpoint calibration. Group motion is not
-available. The Phase 3.3 software gate passes; powered servo validation remains
-blocked until the electrical record and calibrations are approved.
+available. The Phase 3.3 software gate passes. The operator reports that all
+Phase 3.3 manual tests pass; detailed command output and electrical values were
+not attached to that report, so the validation record preserves that
+distinction.
+
+Phase 3.4 adds `camera.status` and `camera.capture` through one serialized
+camera service. Status checks configuration and dependency readiness without
+taking a photograph. Capture is classified as privacy-sensitive and is
+non-idempotent, meaning repeating it would take another photograph. Real
+capture requires `--real` and `--confirm-camera`. Images are deleted by
+default; `--retain` explicitly saves an owner-only JPEG inside the configured
+private media directory. JPEG is the compressed image-file format used here.
 
 The `pi5buzzer` development environment is locked and its 65 tests pass. The
 earlier GPIO17 health and sound checks remain historical evidence; the current
@@ -94,8 +104,8 @@ The current CLI provides:
   valid contract data.
 - `dry-run` executes against a deterministic fake IDE and labels the result
   `"simulated": true`.
-- `capabilities` lists all implemented distance, buzzer, display, and servo
-  capabilities without opening hardware.
+- `capabilities` lists all implemented distance, buzzer, display, servo, and
+  camera capabilities without opening hardware.
 - `health` checks a simulated sensor unless `--real` is supplied.
 - `distance read` returns simulated data unless `--real` is supplied.
 - `actions show` reads the durable result for one action from the SQLite
@@ -120,6 +130,13 @@ The current CLI provides:
 - `servo move` moves exactly one calibrated endpoint. It is simulated unless
   `--real` is supplied, and real movement requires additional safety gates.
 - `servo stop` aborts movement and requests zero pulse for all six endpoints.
+- `camera health` checks Picamera2 and private-directory readiness without
+  taking a photograph.
+- `camera status` reports resolution, focus mode, and the default-off retention
+  policy without taking a photograph.
+- `camera capture` takes one simulated image unless `--real` and
+  `--confirm-camera` are supplied. It retains no image unless `--retain` is
+  also supplied.
 - `--version` reports the installed V4 package version.
 
 The contracts reject unknown fields and unsafe type conversion. They cover
@@ -152,6 +169,9 @@ until an accessible emergency disconnect is installed.
 The current V4-owned wiring record uses the passive buzzer on GPIO27 and the
 ST7789V display on SPI0 with DC GPIO4, reset GPIO5, and backlight GPIO6. The
 display is 240×320, rotated 90°, at 75% brightness.
+The observed CSI camera is an OV5647 used at 1280×720. CSI is the Raspberry
+Pi's flat camera connection. OV5647 is fixed-focus, so V4 uses autofocus mode
+`none`.
 
 ## Developer setup
 
@@ -208,6 +228,12 @@ uv run --frozen ninjarobot_pi5_cli servo move \
   --speed S
 uv run --frozen ninjarobot_pi5_cli servo stop \
   --ledger /tmp/ninjarobot-phase33-smoke.sqlite3
+uv run --frozen ninjarobot_pi5_cli camera health \
+  --ledger /tmp/ninjarobot-phase34-smoke.sqlite3
+uv run --frozen ninjarobot_pi5_cli camera status \
+  --ledger /tmp/ninjarobot-phase34-smoke.sqlite3
+uv run --frozen ninjarobot_pi5_cli camera capture \
+  --ledger /tmp/ninjarobot-phase34-smoke.sqlite3
 ```
 
 On the Raspberry Pi, install the optional managed hardware packages without
@@ -215,6 +241,15 @@ changing their source:
 
 ```bash
 uv sync --frozen --extra hardware
+```
+
+Real Picamera2 access additionally requires the Raspberry Pi OS Python
+environment. The safe bootstrap preserves an incompatible existing `.venv`
+before creating a system-site-enabled replacement:
+
+```bash
+./scripts/bootstrap-rpi-camera-workspace.sh
+source .venv/bin/activate
 ```
 
 Then follow
@@ -227,7 +262,10 @@ The operator reports that checklist as passed. For the display, follow
 The operator reports that checklist as passed. For the servo integration,
 follow
 [`docs/validation/phase-3-3-servo-validation-2026-07-26.md`](docs/validation/phase-3-3-servo-validation-2026-07-26.md).
-Do not run its actuator-moving section until the electrical record is approved.
+The operator reports that checklist as passed, without an attached transcript.
+For camera integration, follow
+[`docs/validation/phase-3-4-camera-validation-2026-07-26.md`](docs/validation/phase-3-4-camera-validation-2026-07-26.md).
+Real capture requires consent from everyone nearby.
 
 Run the complete root gate:
 
@@ -255,10 +293,12 @@ The Phase 2 real path reads only the VL53L0X on I2C bus 1 at address `0x29`.
 The Phase 3.1 real path can sound the GPIO27 buzzer, but only through bounded
 arguments and an explicit `--real` flag. The Phase 3.2 real path resets and
 writes the ST7789V and can energize its backlight at the configured 75%
-brightness. Neither phase moves a servo, uses the camera, or records audio.
+brightness.
 The Phase 3.3 real health/status path keeps all servo duties at zero. Its
 movement path is classified as `motion`, disabled by default, restricted to
-one calibrated endpoint, and guarded by explicit confirmation. Later
-privacy-sensitive commands require separate Raspberry Pi checklists and
-operator approval. Model output is treated as an untrusted proposal; the
+one calibrated endpoint, and guarded by explicit confirmation. The Phase 3.4
+camera path is classified as `privacy`, requires explicit real-capture
+confirmation, and deletes media unless retention is requested. Phase 3.4 does
+not perform face recognition, video, streaming, or agent-controlled capture.
+Model output is treated as an untrusted proposal; the
 deterministic IDE control plane retains final authority over robot actions.

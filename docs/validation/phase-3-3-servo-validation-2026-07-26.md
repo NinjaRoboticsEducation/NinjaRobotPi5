@@ -4,7 +4,12 @@ Date: 2026-07-26
 
 Hardware accessed during implementation: No
 
-Physical Raspberry Pi result: **PENDING OPERATOR TEST**
+Physical Raspberry Pi result: **OPERATOR-REPORTED PASS**
+
+The operator reported that all Phase 3.3 manual tests passed. No command
+transcript, completed electrical table, or measured values were attached to
+that report. The checklist below therefore remains the reusable procedure and
+does not invent item-by-item evidence.
 
 ## 1. Scope of validation
 
@@ -361,4 +366,5 @@ not test two servos together.
    uv run --frozen python scripts/verify_immutable_drivers.py
    ```
 
-Do not continue to camera Phase 3.4 until this checklist is reviewed.
+The operator review is complete. The detailed evidence fields remain available
+for a future audited rerun.

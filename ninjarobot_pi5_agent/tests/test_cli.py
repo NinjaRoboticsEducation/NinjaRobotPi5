@@ -63,6 +63,10 @@ def test_phase_two_capabilities_are_hardware_free(capsys) -> None:
     assert capabilities["servo.move"]["risk"] == "motion"
     assert capabilities["servo.move"]["confirmation_required"] is True
     assert capabilities["servo.stop"]["risk"] == "emergency"
+    assert capabilities["camera.status"]["risk"] == "read_only"
+    assert capabilities["camera.capture"]["risk"] == "privacy"
+    assert capabilities["camera.capture"]["resources"] == ["camera"]
+    assert capabilities["camera.capture"]["confirmation_required"] is True
 
 
 def test_simulated_distance_health_and_read_are_persisted(tmp_path, capsys) -> None:
@@ -208,6 +212,68 @@ def test_buzzer_cli_rejects_out_of_bounds_tone(tmp_path, capsys) -> None:
     assert result == 1
     assert payload["status"] == "failed"
     assert payload["error"]["code"] == "INVALID_CAPABILITY_ARGUMENTS"
+
+
+def test_simulated_camera_health_status_capture_and_retention(
+    tmp_path,
+    capsys,
+    monkeypatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    ledger = tmp_path / "camera.sqlite3"
+    assert main(["camera", "health", "--ledger", str(ledger)]) == 0
+    health = json.loads(capsys.readouterr().out)
+    assert health["status"] == "ready"
+
+    assert main(["camera", "status", "--ledger", str(ledger)]) == 0
+    status = json.loads(capsys.readouterr().out)
+    assert status["status"] == "succeeded"
+    assert status["data"]["retain_media_by_default"] is False
+    assert status["data"]["simulated"] is True
+
+    assert main(["camera", "capture", "--ledger", str(ledger)]) == 0
+    transient = json.loads(capsys.readouterr().out)
+    assert transient["status"] == "succeeded"
+    assert transient["retry_safety"] == "unsafe"
+    assert transient["data"]["retained"] is False
+    assert transient["data"]["path"] is None
+
+    assert (
+        main(
+            [
+                "camera",
+                "capture",
+                "--ledger",
+                str(ledger),
+                "--retain",
+                "--filename",
+                "phase34-simulated.jpg",
+            ]
+        )
+        == 0
+    )
+    retained = json.loads(capsys.readouterr().out)
+    assert retained["data"]["retained"] is True
+    retained_path = Path(retained["data"]["path"])
+    assert retained_path == tmp_path / "data" / "simulated-camera" / "phase34-simulated.jpg"
+    assert retained_path.is_file()
+
+
+def test_real_camera_capture_requires_explicit_confirmation(tmp_path, capsys) -> None:
+    result = main(
+        [
+            "camera",
+            "capture",
+            "--real",
+            "--config",
+            str(EXAMPLE),
+            "--ledger",
+            str(tmp_path / "camera.sqlite3"),
+        ]
+    )
+
+    assert result == 2
+    assert "real camera capture requires --confirm-camera" in capsys.readouterr().err
 
 
 def test_simulated_display_health_text_clear_and_brightness(tmp_path, capsys) -> None:

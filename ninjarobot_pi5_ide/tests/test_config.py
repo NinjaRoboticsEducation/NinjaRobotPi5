@@ -33,6 +33,11 @@ def test_example_configuration_matches_confirmed_wiring() -> None:
     assert config.hardware.display.brightness == 75
     assert config.hardware.i2c.dfr0566_address == 0x10
     assert config.hardware.i2c.vl53l0x_address == 0x29
+    assert config.hardware.camera.width == 1280
+    assert config.hardware.camera.height == 720
+    assert config.hardware.camera.warmup_seconds == 1.0
+    assert config.hardware.camera.autofocus_mode == "none"
+    assert config.hardware.camera.media_directory == "~/.local/share/ninjarobot_pi5/camera"
     assert config.hardware.camera.retain_media_by_default is False
     assert config.hardware.microphone.sample_rate_hz == 16_000
     assert config.hardware.microphone.retain_audio_by_default is False
@@ -75,6 +80,18 @@ def test_configuration_keeps_group_motion_disabled() -> None:
     payload = load_robot_config(EXAMPLE).model_dump()
     payload["hardware"]["servos"]["group_motion_enabled"] = True
     with pytest.raises(ValidationError, match="Input should be False"):
+        RobotConfig.model_validate(payload)
+
+
+def test_configuration_keeps_default_camera_retention_disabled() -> None:
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["hardware"]["camera"]["retain_media_by_default"] = True
+    with pytest.raises(ValidationError, match="Input should be False"):
+        RobotConfig.model_validate(payload)
+
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["hardware"]["camera"]["autofocus_mode"] = "tracking"
+    with pytest.raises(ValidationError, match="Input should be"):
         RobotConfig.model_validate(payload)
 
 

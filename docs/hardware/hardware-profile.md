@@ -12,7 +12,7 @@ This is the V4-owned hardware record. It was confirmed by the project owner on
 | ST7789V data | SPI0 CE0, MOSI GPIO10, SCLK GPIO11, CE0 GPIO8 |
 | ST7789V control | DC GPIO4, RST GPIO5, BL GPIO6 |
 | ST7789V presentation | 240×320, rotation 90°, brightness 75% |
-| Camera | Raspberry Pi CSI camera |
+| Camera | OV5647 Raspberry Pi CSI camera, fixed-focus, 1280×720 capture |
 | Microphone | Default USB audio input, 16 kHz mono |
 
 The two MG90D continuous-rotation servos currently available are test hardware
@@ -32,5 +32,7 @@ approved:
 - common-ground arrangement
 - accessible emergency power-disconnect procedure
 
-Also record the buzzer circuit, display board revision, camera model, and USB
-microphone ALSA identity before certifying those capabilities.
+The live-Pi audit identifies the camera as OV5647. Confirm its CSI connector
+orientation and visual image quality during Phase 3.4 validation. Also record
+the buzzer circuit, display board revision, and USB microphone ALSA identity
+before certifying those capabilities. ALSA is the Linux audio device layer.

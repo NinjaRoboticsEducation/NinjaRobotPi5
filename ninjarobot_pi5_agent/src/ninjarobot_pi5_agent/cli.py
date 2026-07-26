@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import base64
 import json
 import sqlite3
 import sys
@@ -23,6 +24,9 @@ from ninjarobot_pi5_ide import (
     BuzzerDevice,
     BuzzerStopAdapter,
     BuzzerToneAdapter,
+    CameraCaptureAdapter,
+    CameraDevice,
+    CameraStatusAdapter,
     CapabilityDescriptor,
     CapabilityRegistry,
     DisplayBrightnessAdapter,
@@ -321,6 +325,46 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_backend_options(servo_stop_parser)
     _add_action_identity_options(servo_stop_parser)
+
+    camera_parser = subcommands.add_parser(
+        "camera",
+        help="Exercise privacy-bounded Raspberry Pi still-camera capabilities.",
+    )
+    camera_subcommands = camera_parser.add_subparsers(
+        dest="camera_command",
+        required=True,
+    )
+    camera_health_parser = camera_subcommands.add_parser(
+        "health",
+        help="Check dependencies and storage readiness without taking a photograph.",
+    )
+    _add_backend_options(camera_health_parser)
+    camera_status_parser = camera_subcommands.add_parser(
+        "status",
+        help="Report the camera profile and retention policy without taking a photograph.",
+    )
+    _add_backend_options(camera_status_parser)
+    _add_action_identity_options(camera_status_parser)
+    camera_capture_parser = camera_subcommands.add_parser(
+        "capture",
+        help="Take one simulated photograph unless --real is supplied explicitly.",
+    )
+    _add_backend_options(camera_capture_parser)
+    _add_action_identity_options(camera_capture_parser)
+    camera_capture_parser.add_argument(
+        "--confirm-camera",
+        action="store_true",
+        help="Required with --real to confirm that people nearby consent to capture.",
+    )
+    camera_capture_parser.add_argument(
+        "--retain",
+        action="store_true",
+        help="Keep the image in the configured private media directory.",
+    )
+    camera_capture_parser.add_argument(
+        "--filename",
+        help="Optional retained JPEG name; requires --retain and cannot contain a path.",
+    )
     return parser
 
 
@@ -484,6 +528,41 @@ class _SimulatedDisplayDriver:
         self.closed = True
 
 
+class _SimulatedCameraResult:
+    """Small managed-driver-compatible result for the hardware-free camera."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.metadata: dict[str, Any] = {"simulated": True}
+
+
+class _SimulatedCameraCapture:
+    """Write a valid one-pixel JPEG without importing camera dependencies."""
+
+    _JPEG = base64.b64decode(
+        "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRof"
+        "Hh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwh"
+        "MjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAAR"
+        "CAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAA"
+        "AAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAM"
+        "AwEAAhEDEQA/AJOAD//Z"
+    )
+
+    def __call__(
+        self,
+        config: dict[str, Any],
+        *,
+        output_path: Path | None = None,
+        filename_prefix: str = "photo",
+    ) -> _SimulatedCameraResult:
+        del config, filename_prefix
+        if output_path is None:
+            raise ValueError("simulated camera requires an explicit output path")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(self._JPEG)
+        return _SimulatedCameraResult(output_path)
+
+
 class _SimulatedServoCalibration:
     """Explicit safe calibration used only by the hardware-free CLI backend."""
 
@@ -558,6 +637,7 @@ def _build_distance_engine(
 
 async def _list_capabilities() -> tuple[CapabilityDescriptor, ...]:
     buzzer = BuzzerDevice()
+    camera = CameraDevice()
     display = DisplayDevice()
     servo = ServoDevice()
     engine = ExecutionEngine(
@@ -565,6 +645,8 @@ async def _list_capabilities() -> tuple[CapabilityDescriptor, ...]:
             [
                 BuzzerToneAdapter(buzzer),
                 BuzzerStopAdapter(buzzer),
+                CameraCaptureAdapter(camera),
+                CameraStatusAdapter(camera),
                 DisplayBrightnessAdapter(display),
                 DisplayClearAdapter(display),
                 DisplayShowTextAdapter(display),
@@ -691,6 +773,41 @@ def _build_servo_engine(
                 ServoMoveAdapter(device),
                 ServoStatusAdapter(device),
                 ServoStopAdapter(device),
+            ]
+        ),
+        ActionLedger(Path(ledger_path)),
+        scheduler=ResourceScheduler(max_concurrency=2, max_queue_size=4),
+    )
+
+
+def _build_camera_engine(
+    *,
+    real: bool,
+    config_path: str,
+    ledger_path: str,
+) -> ExecutionEngine:
+    if real:
+        config = load_robot_config(config_path)
+        camera_config = config.hardware.camera
+        device = CameraDevice(
+            enabled=camera_config.enabled,
+            width=camera_config.width,
+            height=camera_config.height,
+            warmup_seconds=camera_config.warmup_seconds,
+            autofocus_mode=camera_config.autofocus_mode,
+            media_directory=camera_config.media_directory,
+        )
+    else:
+        device = CameraDevice(
+            media_directory="data/simulated-camera",
+            camera_factory=lambda: _SimulatedCameraCapture(),
+            simulated=True,
+        )
+    return ExecutionEngine(
+        CapabilityRegistry(
+            [
+                CameraCaptureAdapter(device),
+                CameraStatusAdapter(device),
             ]
         ),
         ActionLedger(Path(ledger_path)),
@@ -863,6 +980,59 @@ async def _run_servo_action(
         await engine.close()
 
 
+async def _run_camera_health(
+    *,
+    real: bool,
+    config_path: str,
+    ledger_path: str,
+) -> HealthReport:
+    engine = _build_camera_engine(
+        real=real,
+        config_path=config_path,
+        ledger_path=ledger_path,
+    )
+    try:
+        return await engine.health()
+    finally:
+        await engine.close()
+
+
+async def _run_camera_action(
+    *,
+    capability: str,
+    arguments: dict[str, Any],
+    real: bool,
+    config_path: str,
+    ledger_path: str,
+    action_id: str | None,
+    idempotency_key: str | None,
+    camera_confirmed: bool,
+) -> ActionResult:
+    if real and capability == "camera.capture" and not camera_confirmed:
+        raise ValueError("real camera capture requires --confirm-camera")
+    generated = uuid.uuid4().hex
+    current_action_id = action_id or f"camera-{generated}"
+    current_key = idempotency_key or f"camera-key-{generated}"
+    engine = _build_camera_engine(
+        real=real,
+        config_path=config_path,
+        ledger_path=ledger_path,
+    )
+    try:
+        return await engine.execute(
+            ActionRequest(
+                action_id=current_action_id,
+                capability=capability,
+                arguments=arguments,
+                requested_by="manual-cli",
+                session_id="manual-camera-test",
+                idempotency_key=current_key,
+            )
+        )
+    finally:
+        await engine.close()
+
+
 async def _run_health(*, real: bool, config_path: str, ledger_path: str) -> HealthReport:
     engine = _build_distance_engine(
         real=real,
@@ -953,7 +1123,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 f"RST{config.hardware.display.reset_gpio}/"
                 f"BL{config.hardware.display.backlight_gpio}, "
                 f"rotation={config.hardware.display.rotation}, "
-                f"brightness={config.hardware.display.brightness}%"
+                f"brightness={config.hardware.display.brightness}%, "
+                f"camera={config.hardware.camera.width}x"
+                f"{config.hardware.camera.height}/"
+                f"{config.hardware.camera.autofocus_mode}"
             )
             return 0
         if args.command == "contracts" and args.contracts_command == "schema":
@@ -1131,6 +1304,41 @@ def main(argv: Sequence[str] | None = None) -> int:
                     idempotency_key=args.idempotency_key,
                     hold_seconds=hold_seconds,
                     motion_confirmed=motion_confirmed,
+                )
+            )
+            print(result.model_dump_json(indent=2))
+            return 0 if result.status is ActionStatus.SUCCEEDED else 1
+        if args.command == "camera" and args.camera_command == "health":
+            health = asyncio.run(
+                _run_camera_health(
+                    real=args.real,
+                    config_path=args.config,
+                    ledger_path=args.ledger,
+                )
+            )
+            print(health.model_dump_json(indent=2))
+            return 0 if health.status is ResourceHealth.READY else 1
+        if args.command == "camera" and args.camera_command in {"status", "capture"}:
+            if args.camera_command == "capture":
+                capability = "camera.capture"
+                arguments = {"retain": args.retain}
+                if args.filename is not None:
+                    arguments["filename"] = args.filename
+                camera_confirmed = args.confirm_camera
+            else:
+                capability = "camera.status"
+                arguments = {}
+                camera_confirmed = False
+            result = asyncio.run(
+                _run_camera_action(
+                    capability=capability,
+                    arguments=arguments,
+                    real=args.real,
+                    config_path=args.config,
+                    ledger_path=args.ledger,
+                    action_id=args.action_id,
+                    idempotency_key=args.idempotency_key,
+                    camera_confirmed=camera_confirmed,
                 )
             )
             print(result.model_dump_json(indent=2))
