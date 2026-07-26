@@ -4,7 +4,7 @@ Date: 2026-07-26
 
 Hardware accessed during implementation: No
 
-Physical Raspberry Pi result: Pending operator validation
+Physical Raspberry Pi result: **PASS** (operator reported)
 
 ## 1. Scope of validation
 
@@ -20,6 +20,11 @@ Automated result: **PASS**
 - Compilation, Ruff lint, Ruff formatting, dependency lock, CLI smoke, and
   `git diff --check`: passed.
 - Driver provenance: 222 tracked files and 23 authorized repairs, unchanged.
+
+The operator subsequently reported that every checklist item passed, including
+the electrical prerequisite, simulated commands, real GPIO27 health, both
+short-tone tests, emergency silence, duplicate protection, and GPIO release.
+No failed or unexpected result was reported.
 
 ## 2. Safety notes
 
@@ -165,20 +170,20 @@ result reports `stopped: true`.
 
 ## 7. Pass/fail checklist
 
-- [ ] Electrical voltage/current/transistor record is complete.
-- [ ] Hardware-free capability listing passes.
-- [ ] Simulated health passes silently.
-- [ ] Simulated play and stop report `simulated: true`.
-- [ ] Hardware dependency installs.
-- [ ] Configuration reports GPIO27.
-- [ ] Real health passes without sound.
-- [ ] 440 Hz test produces one short, quiet tone.
-- [ ] 660 Hz test is audibly higher.
-- [ ] Every tone stops at the requested time.
-- [ ] Emergency stop reports success and leaves the buzzer silent.
-- [ ] Repeating an action ID does not play twice.
-- [ ] GPIO27 is released when each command exits.
-- [ ] No servo, display, camera, or microphone is operated.
+- [x] Electrical voltage/current/transistor record is complete.
+- [x] Hardware-free capability listing passes.
+- [x] Simulated health passes silently.
+- [x] Simulated play and stop report `simulated: true`.
+- [x] Hardware dependency installs.
+- [x] Configuration reports GPIO27.
+- [x] Real health passes without sound.
+- [x] 440 Hz test produces one short, quiet tone.
+- [x] 660 Hz test is audibly higher.
+- [x] Every tone stops at the requested time.
+- [x] Emergency stop reports success and leaves the buzzer silent.
+- [x] Repeating an action ID does not play twice.
+- [x] GPIO27 is released when each command exits.
+- [x] No servo, display, camera, or microphone is operated.
 
 ## 8. Rollback steps
 

@@ -51,6 +51,14 @@ def test_phase_two_capabilities_are_hardware_free(capsys) -> None:
     assert capabilities["distance.read"]["risk"] == "read_only"
     assert capabilities["buzzer.play_tone"]["risk"] == "low"
     assert capabilities["buzzer.stop"]["risk"] == "emergency"
+    assert capabilities["display.show_text"]["risk"] == "low"
+    assert capabilities["display.clear"]["resources"] == [
+        "display",
+        "spi0",
+        "gpio4",
+        "gpio5",
+        "gpio6",
+    ]
 
 
 def test_simulated_distance_health_and_read_are_persisted(tmp_path, capsys) -> None:
@@ -196,3 +204,109 @@ def test_buzzer_cli_rejects_out_of_bounds_tone(tmp_path, capsys) -> None:
     assert result == 1
     assert payload["status"] == "failed"
     assert payload["error"]["code"] == "INVALID_CAPABILITY_ARGUMENTS"
+
+
+def test_simulated_display_health_text_clear_and_brightness(tmp_path, capsys) -> None:
+    ledger = tmp_path / "display.sqlite3"
+    assert main(["display", "health", "--ledger", str(ledger)]) == 0
+    health = json.loads(capsys.readouterr().out)
+    assert health["status"] == "ready"
+
+    assert (
+        main(
+            [
+                "display",
+                "text",
+                "--ledger",
+                str(ledger),
+                "--text",
+                "NinjaRobot",
+                "--font-size",
+                "24",
+                "--foreground",
+                "#00ff00",
+                "--action-id",
+                "display-text-1",
+                "--idempotency-key",
+                "display-text-key-1",
+            ]
+        )
+        == 0
+    )
+    shown = json.loads(capsys.readouterr().out)
+    assert shown["status"] == "succeeded"
+    assert shown["retry_safety"] == "safe"
+    assert shown["data"]["simulated"] is True
+    assert shown["data"]["width"] == 320
+    assert shown["data"]["height"] == 240
+    assert shown["data"]["foreground"] == "#00FF00"
+
+    assert (
+        main(
+            [
+                "display",
+                "brightness",
+                "--ledger",
+                str(ledger),
+                "--percent",
+                "25",
+            ]
+        )
+        == 0
+    )
+    brightness = json.loads(capsys.readouterr().out)
+    assert brightness["data"] == {"brightness": 25, "simulated": True}
+
+    assert (
+        main(
+            [
+                "display",
+                "clear",
+                "--ledger",
+                str(ledger),
+                "--color",
+                "#102030",
+            ]
+        )
+        == 0
+    )
+    cleared = json.loads(capsys.readouterr().out)
+    assert cleared["data"] == {
+        "cleared": True,
+        "color": "#102030",
+        "simulated": True,
+    }
+
+
+def test_display_cli_rejects_invalid_color_and_hold(tmp_path, capsys) -> None:
+    ledger = tmp_path / "invalid-display.sqlite3"
+    result = main(
+        [
+            "display",
+            "text",
+            "--ledger",
+            str(ledger),
+            "--text",
+            "test",
+            "--foreground",
+            "white",
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+    assert result == 1
+    assert payload["error"]["code"] == "INVALID_CAPABILITY_ARGUMENTS"
+
+    assert (
+        main(
+            [
+                "display",
+                "clear",
+                "--ledger",
+                str(ledger),
+                "--hold",
+                "31",
+            ]
+        )
+        == 2
+    )
+    assert "--hold must be between 0 and 30 seconds" in capsys.readouterr().err

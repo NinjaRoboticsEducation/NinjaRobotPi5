@@ -1,5 +1,49 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-26 — Phase 3.2 ST7789V display adapter
+
+### Summary
+
+- Added one shared, SPI-serialized display service with lazy `pi5disp` loading.
+- Added idempotent `display.show_text`, `display.clear`, and
+  `display.set_brightness` capabilities.
+- Passed SPI0 device 0, DC GPIO4, reset GPIO5, backlight GPIO6, 32 MHz,
+  240×320 dimensions, rotation 90°, and initial brightness 75% from V4-owned
+  configuration.
+- Added Pillow-based RGB text rendering with bounded text length, font size,
+  hexadecimal colors, fit checking, and centered multiline placement.
+- Added simulated and explicit-real CLI health, text, clear, and brightness
+  commands. The optional `--hold` value keeps a real visual test visible before
+  deterministic cleanup.
+- Added `pi5disp[pi]` to the root hardware dependency group without changing
+  the managed library.
+- Hardened partial startup cleanup so a constructed driver is closed if
+  backlight initialization fails.
+
+### Validation
+
+- All 66 V4 tests passed, including exact driver settings, RGB-frame size,
+  shared lifecycle, SPI resource declarations, bounded arguments, partial
+  startup failure, write failure, CLI simulation, and CLI hold bounds.
+- The 19 focused display/CLI tests passed.
+- All 449 managed-library tests and every package-local Ruff gate passed. The
+  only warning was the inherited Python `audioop` deprecation in `pi5mic`.
+- Root compilation, Ruff lint, Ruff format, strict mypy for 20 source files,
+  dependency lock, CLI smoke, and `git diff --check` passed.
+- Driver provenance remained at 222 files and 23 authorized repairs.
+
+### Raspberry Pi status
+
+No SPI or physical display command was run during implementation. The
+electrical/wiring inspection, real health check, red/green/blue frames,
+orientation text, 25%/75% brightness comparison, and close-time backlight
+shutdown remain for operator validation.
+
+### Follow-up
+
+Run and review the Phase 3.2 Raspberry Pi checklist. Do not begin servo Phase
+3.3 until that result is reviewed.
+
 ## 2026-07-26 — Phase 3.1 GPIO27 buzzer adapter
 
 ### Summary
@@ -28,14 +72,14 @@
 
 ### Raspberry Pi status
 
-No real GPIO or audible command was run during implementation. Simulation
-passes. Real GPIO27 sound validation is pending confirmation of the buzzer
-module voltage/current and whether a transistor driver is used.
+No real GPIO or audible command was run during implementation. The operator
+subsequently reported the complete Phase 3.1 checklist as passing, including
+the electrical prerequisite, real GPIO27 health, quiet 440 Hz and 660 Hz
+tones, emergency silence, duplicate protection, and GPIO release.
 
 ### Follow-up
 
-Complete the Phase 3.1 Pi checklist and review the result before beginning the
-ST7789V display adapter in Phase 3.2.
+The Phase 3.1 Pi checklist is complete and passed. Phase 3.2 may proceed.
 
 ## 2026-07-26 — Phase 2 IDE core and VL53L0X reference adapter
 

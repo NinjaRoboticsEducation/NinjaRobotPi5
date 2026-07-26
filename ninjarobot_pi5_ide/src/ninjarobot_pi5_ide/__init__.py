@@ -4,6 +4,12 @@ from .adapters import CapabilityAdapter
 from .api import IDEClient
 from .buzzer import BuzzerDevice, BuzzerStopAdapter, BuzzerToneAdapter
 from .config import RobotConfig, load_robot_config
+from .display import (
+    DisplayBrightnessAdapter,
+    DisplayClearAdapter,
+    DisplayDevice,
+    DisplayShowTextAdapter,
+)
 from .distance import VL53L0XDistanceAdapter
 from .engine import ExecutionEngine
 from .errors import IDEError
@@ -36,6 +42,10 @@ __all__ = [
     "BuzzerDevice",
     "BuzzerStopAdapter",
     "BuzzerToneAdapter",
+    "DisplayBrightnessAdapter",
+    "DisplayClearAdapter",
+    "DisplayDevice",
+    "DisplayShowTextAdapter",
     "ErrorDetails",
     "ExecutionEngine",
     "HealthReport",

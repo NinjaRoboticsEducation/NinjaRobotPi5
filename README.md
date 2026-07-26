@@ -15,14 +15,14 @@ which is the single source of truth.
 
 ## Current status
 
-Phase 0, Phase 1, Phase 2, and Phase 3.1 are complete. Phase 0 established project
-governance and preserved the original import hashes for the six existing Pi5
-hardware libraries. Phase 1 added strict IDE and agent contracts,
-deterministic fakes, V4-owned configuration, and the unified
-`ninjarobot_pi5_cli`. Phase 2 adds the IDE capability registry, adapter
-lifecycle, bounded scheduler, resource locks, durable SQLite action ledger, and
-the first read-only adapter: `distance.read` through `pi5vl53l0x`. SQLite is
-Python's built-in local database format.
+Phase 0, Phase 1, Phase 2, Phase 3.1, and the software part of Phase 3.2 are
+complete. Phase 0 established project governance and preserved the original
+import hashes for the six existing Pi5 hardware libraries. Phase 1 added strict
+IDE and agent contracts, deterministic fakes, V4-owned configuration, and the
+unified `ninjarobot_pi5_cli`. Phase 2 added the IDE capability registry,
+adapter lifecycle, bounded scheduler, resource locks, durable SQLite action
+ledger, and the first read-only adapter: `distance.read` through
+`pi5vl53l0x`. SQLite is Python's built-in local database format.
 
 Phase 3.1 adds bounded passive-buzzer control on GPIO27. `buzzer.play_tone`
 accepts only a frequency from 20 through 20,000 hertz, a duration from 0.05
@@ -30,13 +30,21 @@ through 2 seconds, and volume from 1 through 128. `buzzer.stop` is an
 idempotent emergency capability, meaning it is safe to request repeatedly.
 Both commands simulate unless `--real` is present.
 
+Phase 3.2 adds `display.show_text`, `display.clear`, and
+`display.set_brightness`. They share one serialized ST7789V service, which
+means only one display operation can use SPI at a time. SPI (Serial Peripheral
+Interface) is the display's clocked data connection. Commands simulate unless
+`--real` is present. The real path uses SPI0 device 0, DC GPIO4, reset GPIO5,
+backlight GPIO6, rotation 90°, and initial brightness 75%. The software gate
+passes; physical visual confirmation is the remaining Phase 3.2 step.
+
 The `pi5buzzer` development environment is locked and its 65 tests pass. The
 earlier GPIO17 health and sound checks remain historical evidence; the current
-V4 wiring uses GPIO27 and will be validated when the buzzer adapter is added.
+V4 GPIO27 validation has now passed every operator checklist item.
 Non-moving servo backends execute successfully. Display configuration now lives
 under the user's config directory rather than inside the package; all display
-command paths execute, but visual confirmation with the current DC4/RST5/BL6
-wiring is pending. See the
+command paths execute, but Phase 3.2 visual confirmation with the current
+DC4/RST5/BL6 wiring is pending. See the
 [2026-07-25 hardware report](docs/validation/raspberry-pi-hardware-validation-2026-07-25.md).
 
 `pi5camera` now uses the Raspberry Pi OS Picamera2/libcamera packages through a
@@ -77,8 +85,8 @@ The current CLI provides:
   valid contract data.
 - `dry-run` executes against a deterministic fake IDE and labels the result
   `"simulated": true`.
-- `capabilities` lists the read-only distance capability without opening I2C.
-  I2C means the two-wire hardware communication bus used by the sensor.
+- `capabilities` lists all implemented distance, buzzer, and display
+  capabilities without opening hardware.
 - `health` checks a simulated sensor unless `--real` is supplied.
 - `distance read` returns simulated data unless `--real` is supplied.
 - `actions show` reads the durable result for one action from the SQLite
@@ -88,6 +96,14 @@ The current CLI provides:
 - `buzzer play` runs one short bounded tone; it is simulated unless `--real`
   is explicitly supplied.
 - `buzzer stop` requests immediate silence and releases GPIO27.
+- `display health` checks simulated or real ST7789V SPI readiness. Real
+  initialization may briefly light the backlight.
+- `display text` renders centered text; it is simulated unless `--real` is
+  explicitly supplied.
+- `display clear` fills the screen with one `#RRGGBB` color. `RRGGBB` is a
+  six-digit red/green/blue hexadecimal color value.
+- `display brightness` sets the backlight from 0% through 100% for the current
+  CLI session.
 - `--version` reports the installed V4 package version.
 
 The contracts reject unknown fields and unsafe type conversion. They cover
@@ -153,6 +169,18 @@ uv run --frozen ninjarobot_pi5_cli buzzer play \
   --frequency 440 \
   --duration 0.05 \
   --volume 16
+uv run --frozen ninjarobot_pi5_cli display health \
+  --ledger /tmp/ninjarobot-phase32-smoke.sqlite3
+uv run --frozen ninjarobot_pi5_cli display text \
+  --ledger /tmp/ninjarobot-phase32-smoke.sqlite3 \
+  --text "NinjaRobot Phase 3.2" \
+  --font-size 24
+uv run --frozen ninjarobot_pi5_cli display brightness \
+  --ledger /tmp/ninjarobot-phase32-smoke.sqlite3 \
+  --percent 25
+uv run --frozen ninjarobot_pi5_cli display clear \
+  --ledger /tmp/ninjarobot-phase32-smoke.sqlite3 \
+  --color "#000000"
 ```
 
 On the Raspberry Pi, install the optional managed sensor package without
@@ -167,7 +195,8 @@ Then follow
 Real sensor access occurs only when the command includes `--real`.
 For the buzzer, follow
 [`docs/validation/phase-3-1-buzzer-validation-2026-07-26.md`](docs/validation/phase-3-1-buzzer-validation-2026-07-26.md).
-Real sound remains blocked until the module's electrical record is confirmed.
+The operator reports that checklist as passed. For the display, follow
+[`docs/validation/phase-3-2-display-validation-2026-07-26.md`](docs/validation/phase-3-2-display-validation-2026-07-26.md).
 
 Run the complete root gate:
 
@@ -193,8 +222,10 @@ Each copied driver retains its own package-local commands. See
 Default tests and commands without `--real` never access physical hardware.
 The Phase 2 real path reads only the VL53L0X on I2C bus 1 at address `0x29`.
 The Phase 3.1 real path can sound the GPIO27 buzzer, but only through bounded
-arguments and an explicit `--real` flag. It does not move a servo, change the
-display, use the camera, or record audio. Later actuator and privacy-sensitive
-commands require separate Raspberry Pi checklists and operator approval. Model
-output is treated as an untrusted proposal; the deterministic IDE control
-plane retains final authority over robot actions.
+arguments and an explicit `--real` flag. The Phase 3.2 real path resets and
+writes the ST7789V and can energize its backlight at the configured 75%
+brightness. Neither phase moves a servo, uses the camera, or records audio.
+Later actuator and privacy-sensitive commands require separate Raspberry Pi
+checklists and operator approval. Model output is treated as an untrusted
+proposal; the deterministic IDE control plane retains final authority over
+robot actions.

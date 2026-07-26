@@ -25,6 +25,10 @@ from ninjarobot_pi5_ide import (
     BuzzerToneAdapter,
     CapabilityDescriptor,
     CapabilityRegistry,
+    DisplayBrightnessAdapter,
+    DisplayClearAdapter,
+    DisplayDevice,
+    DisplayShowTextAdapter,
     ExecutionEngine,
     HealthReport,
     ResourceHealth,
@@ -186,6 +190,69 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_backend_options(buzzer_stop_parser)
     _add_action_identity_options(buzzer_stop_parser)
+
+    display_parser = subcommands.add_parser(
+        "display",
+        help="Exercise serialized ST7789V display capabilities.",
+    )
+    display_subcommands = display_parser.add_subparsers(
+        dest="display_command",
+        required=True,
+    )
+    display_health_parser = display_subcommands.add_parser(
+        "health",
+        help="Check simulated or real SPI display readiness without writing a test frame.",
+    )
+    _add_backend_options(display_health_parser)
+    display_text_parser = display_subcommands.add_parser(
+        "text",
+        help="Render simulated text unless --real is supplied explicitly.",
+    )
+    _add_backend_options(display_text_parser)
+    _add_action_identity_options(display_text_parser)
+    display_text_parser.add_argument("--text", required=True, help="Text to display.")
+    display_text_parser.add_argument(
+        "--font-size",
+        type=int,
+        default=32,
+        help="Default-font size in pixels, from 8 through 96.",
+    )
+    display_text_parser.add_argument(
+        "--foreground",
+        default="#FFFFFF",
+        help="Text color in #RRGGBB notation.",
+    )
+    display_text_parser.add_argument(
+        "--background",
+        default="#000000",
+        help="Background color in #RRGGBB notation.",
+    )
+    _add_display_hold_option(display_text_parser)
+    display_clear_parser = display_subcommands.add_parser(
+        "clear",
+        help="Clear the simulated display unless --real is supplied explicitly.",
+    )
+    _add_backend_options(display_clear_parser)
+    _add_action_identity_options(display_clear_parser)
+    display_clear_parser.add_argument(
+        "--color",
+        default="#000000",
+        help="Solid clear color in #RRGGBB notation.",
+    )
+    _add_display_hold_option(display_clear_parser)
+    display_brightness_parser = display_subcommands.add_parser(
+        "brightness",
+        help="Set simulated brightness unless --real is supplied explicitly.",
+    )
+    _add_backend_options(display_brightness_parser)
+    _add_action_identity_options(display_brightness_parser)
+    display_brightness_parser.add_argument(
+        "--percent",
+        type=int,
+        required=True,
+        help="Backlight brightness from 0 through 100 percent.",
+    )
+    _add_display_hold_option(display_brightness_parser)
     return parser
 
 
@@ -193,7 +260,7 @@ def _add_backend_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--real",
         action="store_true",
-        help="Explicitly open the configured VL53L0X on Raspberry Pi I2C.",
+        help="Explicitly open the configured Raspberry Pi hardware.",
     )
     parser.add_argument(
         "--config",
@@ -210,6 +277,15 @@ def _add_backend_options(parser: argparse.ArgumentParser) -> None:
 def _add_action_identity_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--action-id", help="Optional explicit action identifier.")
     parser.add_argument("--idempotency-key", help="Optional duplicate-protection key.")
+
+
+def _add_display_hold_option(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--hold",
+        type=float,
+        default=0.0,
+        help="Keep the CLI display session open for 0 through 30 seconds before cleanup.",
+    )
 
 
 def _schema_bundle() -> dict[str, dict[str, Any]]:
@@ -298,6 +374,39 @@ class _SimulatedBuzzerDriver:
         self._initialized = False
 
 
+class _SimulatedDisplayDriver:
+    """Hardware-free display double used by default CLI commands."""
+
+    def __init__(self, **settings: Any) -> None:
+        native_width = int(settings["width"])
+        native_height = int(settings["height"])
+        rotation = int(settings["rotation"])
+        if rotation in (90, 270):
+            self.width = native_height
+            self.height = native_width
+        else:
+            self.width = native_width
+            self.height = native_height
+        self.brightness = 0
+        self.closed = False
+
+    def display(self, image: Any) -> None:
+        if image.size != (self.width, self.height):
+            raise ValueError("simulated frame dimensions do not match the display")
+
+    def clear(self, color: tuple[int, int, int]) -> None:
+        del color
+
+    def set_brightness(self, percent: int) -> None:
+        self.brightness = percent
+
+    def health_check(self) -> bool:
+        return not self.closed
+
+    def close(self) -> None:
+        self.closed = True
+
+
 def _build_distance_engine(
     *,
     real: bool,
@@ -322,11 +431,15 @@ def _build_distance_engine(
 
 async def _list_capabilities() -> tuple[CapabilityDescriptor, ...]:
     buzzer = BuzzerDevice()
+    display = DisplayDevice()
     engine = ExecutionEngine(
         CapabilityRegistry(
             [
                 BuzzerToneAdapter(buzzer),
                 BuzzerStopAdapter(buzzer),
+                DisplayBrightnessAdapter(display),
+                DisplayClearAdapter(display),
+                DisplayShowTextAdapter(display),
                 VL53L0XDistanceAdapter(),
             ]
         ),
@@ -363,6 +476,45 @@ def _build_buzzer_engine(
         ),
         ActionLedger(Path(ledger_path)),
         scheduler=ResourceScheduler(max_concurrency=2, max_queue_size=4),
+    )
+
+
+def _build_display_engine(
+    *,
+    real: bool,
+    config_path: str,
+    ledger_path: str,
+) -> ExecutionEngine:
+    if real:
+        config = load_robot_config(config_path)
+        display_config = config.hardware.display
+        device = DisplayDevice(
+            spi_bus=display_config.spi_bus,
+            spi_device=display_config.spi_device,
+            dc_gpio=display_config.dc_gpio,
+            reset_gpio=display_config.reset_gpio,
+            backlight_gpio=display_config.backlight_gpio,
+            frequency_hz=display_config.frequency_hz,
+            width=display_config.width,
+            height=display_config.height,
+            rotation=display_config.rotation,
+            initial_brightness=display_config.brightness,
+        )
+    else:
+        device = DisplayDevice(
+            driver_factory=lambda **settings: _SimulatedDisplayDriver(**settings),
+            simulated=True,
+        )
+    return ExecutionEngine(
+        CapabilityRegistry(
+            [
+                DisplayBrightnessAdapter(device),
+                DisplayClearAdapter(device),
+                DisplayShowTextAdapter(device),
+            ]
+        ),
+        ActionLedger(Path(ledger_path)),
+        scheduler=ResourceScheduler(max_concurrency=3, max_queue_size=6),
     )
 
 
@@ -412,6 +564,62 @@ async def _run_buzzer_action(
                 idempotency_key=current_key,
             )
         )
+    finally:
+        await engine.close()
+
+
+async def _run_display_health(
+    *,
+    real: bool,
+    config_path: str,
+    ledger_path: str,
+) -> HealthReport:
+    engine = _build_display_engine(
+        real=real,
+        config_path=config_path,
+        ledger_path=ledger_path,
+    )
+    try:
+        return await engine.health()
+    finally:
+        await engine.close()
+
+
+async def _run_display_action(
+    *,
+    capability: str,
+    arguments: dict[str, Any],
+    real: bool,
+    config_path: str,
+    ledger_path: str,
+    action_id: str | None,
+    idempotency_key: str | None,
+    hold_seconds: float,
+) -> ActionResult:
+    if not 0 <= hold_seconds <= 30:
+        raise ValueError("--hold must be between 0 and 30 seconds")
+    generated = uuid.uuid4().hex
+    current_action_id = action_id or f"display-{generated}"
+    current_key = idempotency_key or f"display-key-{generated}"
+    engine = _build_display_engine(
+        real=real,
+        config_path=config_path,
+        ledger_path=ledger_path,
+    )
+    try:
+        result = await engine.execute(
+            ActionRequest(
+                action_id=current_action_id,
+                capability=capability,
+                arguments=arguments,
+                requested_by="manual-cli",
+                session_id="manual-display-test",
+                idempotency_key=current_key,
+            )
+        )
+        if result.status is ActionStatus.SUCCEEDED and hold_seconds:
+            await asyncio.sleep(hold_seconds)
+        return result
     finally:
         await engine.close()
 
@@ -592,6 +800,49 @@ def main(argv: Sequence[str] | None = None) -> int:
                     ledger_path=args.ledger,
                     action_id=args.action_id,
                     idempotency_key=args.idempotency_key,
+                )
+            )
+            print(result.model_dump_json(indent=2))
+            return 0 if result.status is ActionStatus.SUCCEEDED else 1
+        if args.command == "display" and args.display_command == "health":
+            health = asyncio.run(
+                _run_display_health(
+                    real=args.real,
+                    config_path=args.config,
+                    ledger_path=args.ledger,
+                )
+            )
+            print(health.model_dump_json(indent=2))
+            return 0 if health.status is ResourceHealth.READY else 1
+        if args.command == "display" and args.display_command in {
+            "text",
+            "clear",
+            "brightness",
+        }:
+            if args.display_command == "text":
+                capability = "display.show_text"
+                arguments = {
+                    "text": args.text,
+                    "font_size": args.font_size,
+                    "foreground": args.foreground,
+                    "background": args.background,
+                }
+            elif args.display_command == "clear":
+                capability = "display.clear"
+                arguments = {"color": args.color}
+            else:
+                capability = "display.set_brightness"
+                arguments = {"percent": args.percent}
+            result = asyncio.run(
+                _run_display_action(
+                    capability=capability,
+                    arguments=arguments,
+                    real=args.real,
+                    config_path=args.config,
+                    ledger_path=args.ledger,
+                    action_id=args.action_id,
+                    idempotency_key=args.idempotency_key,
+                    hold_seconds=args.hold,
                 )
             )
             print(result.model_dump_json(indent=2))

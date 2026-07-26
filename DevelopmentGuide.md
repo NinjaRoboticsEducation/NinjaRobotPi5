@@ -215,6 +215,63 @@ uv sync --frozen --extra hardware
 Do not run a real tone until the buzzer voltage, current, and transistor-driver
 arrangement are recorded. Follow the Phase 3.1 validation report.
 
+## Phase 3.2 ST7789V display adapter
+
+`ninjarobot_pi5_ide.display` owns the lazy `pi5disp` import. One
+`DisplayDevice` is shared by three low-risk, idempotent capabilities:
+
+- `display.show_text` renders centered, multiline text
+- `display.clear` fills the display with one solid color
+- `display.set_brightness` controls the backlight from 0% through 100%
+
+Idempotent means that repeating the same completed request produces the same
+final display state. All three descriptors claim the same `display`, `spi0`,
+and GPIO4/GPIO5/GPIO6 resources. The scheduler and the device's own lock
+therefore prevent two SPI writes or a write/backlight change from overlapping.
+
+The device constructor passes the V4 configuration directly to the managed
+driver: SPI device 0, DC GPIO4, reset GPIO5, backlight GPIO6, 32 MHz, native
+240×320 dimensions, and rotation 90°. After rotation, the drawable frame is
+320×240. MHz means megahertz, or one million clock cycles per second.
+Initialization sets 75% brightness. Closing the service turns off the
+backlight and releases SPI.
+
+Pillow is the Python image-drawing library used to create the same RGB frame
+in simulation and real execution. RGB means red, green, and blue. Text length,
+font size, color notation, and brightness are checked before a hardware write.
+Text that would not fit is rejected instead of silently clipping.
+
+Simulation is the default:
+
+```bash
+uv run --frozen ninjarobot_pi5_cli display health \
+  --ledger /tmp/ninjarobot-phase32.sqlite3
+uv run --frozen ninjarobot_pi5_cli display text \
+  --ledger /tmp/ninjarobot-phase32.sqlite3 \
+  --text "NinjaRobot Phase 3.2" \
+  --font-size 24
+uv run --frozen ninjarobot_pi5_cli display brightness \
+  --ledger /tmp/ninjarobot-phase32.sqlite3 \
+  --percent 25
+uv run --frozen ninjarobot_pi5_cli display clear \
+  --ledger /tmp/ninjarobot-phase32.sqlite3 \
+  --color "#000000"
+```
+
+Each result must say `"simulated": true`. Install the aggregate hardware extra
+before real Raspberry Pi use:
+
+```bash
+uv sync --frozen --extra hardware
+```
+
+Real access requires `--real`. The optional `--hold` value keeps the CLI
+session open for up to 30 seconds so a person can inspect the screen. The
+driver turns the backlight off when that session closes, so a dark screen after
+the command exits is expected. A real health command initializes the panel and
+may briefly light the backlight at 75%, even though it does not send a test
+frame. Follow the Phase 3.2 validation report before using the real commands.
+
 ## Driver package validation commands
 
 ### Standalone README contract
@@ -322,6 +379,22 @@ test; the separate pre-Phase-1 live-Pi report is stored under `docs/validation/`
 - **A tone is interrupted or the CLI is cancelled:** the adapter calls
   `off()` before closing. Run `buzzer stop --real` if GPIO access remains
   available, then disconnect buzzer power if silence cannot be confirmed.
+- **A display result says `simulated: true` and the screen does not change:**
+  this is the safe default. Add `--real` only on the correctly wired Raspberry
+  Pi after completing the Phase 3.2 electrical checks.
+- **Real display health says unavailable:** confirm SPI is enabled, confirm
+  `/dev/spidev0.0` exists, install with `uv sync --frozen --extra hardware`,
+  and make sure no other process owns SPI0 or GPIO4/GPIO5/GPIO6.
+- **The display lights but shows no image:** verify CE0/CS is GPIO8, MOSI/SDA
+  is GPIO10, SCLK/SCL is GPIO11, DC is GPIO4, reset is GPIO5, and backlight is
+  GPIO6. CE means chip enable, MOSI means controller-to-display data, and SCLK
+  means serial clock.
+- **Text is sideways:** the authoritative V4 rotation is 90°. Validate the
+  checked-in TOML file and make sure the command uses that file with
+  `--config`.
+- **The screen goes dark as soon as a command completes:** this is intentional
+  cleanup. Add `--hold 5` to a real manual test so the process keeps the
+  backlight active long enough to inspect the frame.
 - **DFR0566 digital GPIO12/GPIO13 do not show a PWM alternate function:** add
   `dtparam=audio=off` and
   `dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4` to
