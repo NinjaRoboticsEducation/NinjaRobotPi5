@@ -1,12 +1,16 @@
 [project]
 name = "ninjarobot-pi5-v4"
-version = "0.0.0"
+version = "0.1.0"
 description = "Modular robot middleware and AI agent for Raspberry Pi 5."
 requires-python = ">=3.11,<3.14"
-dependencies = []
+dependencies = [
+    "ninjarobot-pi5-agent",
+    "ninjarobot-pi5-ide",
+]
 
 [dependency-groups]
 dev = [
+    "mypy>=1.18,<2",
     "pytest>=8.0,<10",
     "pytest-cov>=5.0,<8",
     "ruff==0.15.5",
@@ -14,6 +18,16 @@ dev = [
 
 [tool.uv]
 package = false
+
+[tool.uv.sources]
+ninjarobot-pi5-agent = { workspace = true }
+ninjarobot-pi5-ide = { workspace = true }
+
+[tool.uv.workspace]
+members = [
+    "ninjarobot_pi5_agent",
+    "ninjarobot_pi5_ide",
+]
 
 [tool.ruff]
 line-length = 100
@@ -24,9 +38,22 @@ select = ["E", "F", "I", "W"]
 
 [tool.pytest.ini_options]
 addopts = ["--strict-markers"]
-testpaths = ["tests"]
+testpaths = [
+    "tests",
+    "ninjarobot_pi5_ide/tests",
+    "ninjarobot_pi5_agent/tests",
+]
 markers = [
     "hardware: requires physical Raspberry Pi hardware and explicit operator approval",
     "integration: exercises more than one V4 component",
     "provider_live: calls a real model provider and is excluded from default validation",
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_configs = true
+files = [
+    "ninjarobot_pi5_ide/src",
+    "ninjarobot_pi5_agent/src",
 ]

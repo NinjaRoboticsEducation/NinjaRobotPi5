@@ -6,8 +6,9 @@ incomplete or conflicts with it.
 
 ## Repository layout
 
-- `ninjarobot_pi5_ide/`: deterministic robot middleware, beginning in Phase 1.
-- `ninjarobot_pi5_agent/`: provider-neutral AI orchestrator, beginning in Phase 1.
+- `ninjarobot_pi5_ide/`: deterministic robot contracts and future middleware.
+- `ninjarobot_pi5_agent/`: provider-neutral agent contracts and unified CLI.
+- `config/`: V4-owned configuration examples; never driver-local runtime state.
 - `pi5*/`: independently testable hardware libraries copied from the historical
   project and maintained under the managed-driver policy.
 - `tests/`: root integration and governance tests.
@@ -61,7 +62,7 @@ strictly read-only.
 
 ## Root quality gate
 
-Phase 0 has no IDE or agent source yet, so its root gate is:
+Phase 0's historical root gate was:
 
 ```bash
 uv run python scripts/verify_immutable_drivers.py
@@ -72,20 +73,49 @@ uv run pytest -q
 git diff --check
 ```
 
-Beginning in Phase 1, use the complete gate defined in the implementation plan:
+Beginning in Phase 1, use this complete gate:
 
 ```bash
-uv run --extra dev python -m compileall \
+uv run --frozen python scripts/verify_immutable_drivers.py
+uv run --frozen python -m compileall -q \
+  ninjarobot_pi5_ide/src ninjarobot_pi5_agent/src scripts tests
+uv run --frozen ruff check \
+  ninjarobot_pi5_ide ninjarobot_pi5_agent scripts tests
+uv run --frozen ruff format --check \
+  ninjarobot_pi5_ide ninjarobot_pi5_agent scripts tests
+uv run --frozen mypy \
   ninjarobot_pi5_ide/src ninjarobot_pi5_agent/src
-uv run --extra dev ruff check \
-  ninjarobot_pi5_ide ninjarobot_pi5_agent tests
-uv run --extra dev ruff format --check \
-  ninjarobot_pi5_ide ninjarobot_pi5_agent tests
-uv run --extra dev pytest \
-  tests ninjarobot_pi5_ide/tests ninjarobot_pi5_agent/tests
+uv run --frozen pytest -q
+git diff --check
 ```
 
-Typing becomes mandatory when Phase 1 selects and configures a type checker.
+Strict mypy typing is mandatory for the two new V4 source packages. It does not
+change the independently maintained `pi5*` libraries.
+
+## Phase 1 configuration and CLI
+
+Validate the checked-in example:
+
+```bash
+uv run --frozen ninjarobot_pi5_cli config validate \
+  --config config/ninjarobot_pi5.toml.example
+```
+
+The example is authoritative V4 configuration, not a driver configuration. It
+records GPIO12/GPIO13 servos, GPIO27 buzzer, and the ST7789V display on
+DC4/RST5/BL6 with rotation 90° and brightness 75%.
+
+Inspect schemas or exercise the fake IDE:
+
+```bash
+uv run --frozen ninjarobot_pi5_cli contracts schema
+uv run --frozen ninjarobot_pi5_cli dry-run \
+  --capability system.echo \
+  --json '{"message":"hello"}'
+```
+
+`dry-run` never opens GPIO, I2C, SPI, camera, or audio. Its result must include
+`"simulated": true`.
 
 ## Driver package validation commands
 

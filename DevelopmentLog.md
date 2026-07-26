@@ -1,5 +1,41 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-26 — Phase 1 contracts and package skeletons
+
+### Summary
+
+- Added installable `ninjarobot_pi5_ide` and `ninjarobot_pi5_agent` workspace
+  packages plus the unified `ninjarobot_pi5_cli`.
+- Added strict, serializable capability, action, result, error, provider, tool,
+  session, memory, health, and configuration contracts.
+- Added deterministic fake IDE/provider/clock/ID helpers that cannot access
+  hardware.
+- Added V4-owned hardware configuration with GPIO12/GPIO13 servos, GPIO27
+  buzzer, ST7789V DC4/RST5/BL6, rotation 90°, and brightness 75%.
+- Accepted ADRs for Pydantic v2 boundary validation and strict mypy typing.
+- Added import-boundary tests preventing agent imports of `pi5*`, OpenClaw, or
+  the historical runtime.
+
+### Validation
+
+- Phase 1 compilation, Ruff lint, Ruff format, and strict mypy passed.
+- All 30 V4/root tests passed in the final full regression gate.
+- All 447 managed-library tests and every package-local Ruff gate passed after
+  Phase 1, confirming no driver regression.
+- CLI version, help, configuration validation, module execution, schema, and
+  simulated dry-run paths passed.
+- Driver provenance remained at 222 files and 23 authorized repairs.
+
+### Raspberry Pi status
+
+Phase 1 contains contracts and fakes only. No GPIO, PWM, I2C, SPI, camera,
+microphone, buzzer, display, sensor, or servo operation was performed.
+
+### Follow-up
+
+Phase 2 may implement the IDE registry, execution engine, action ledger,
+resource locks, and the first read-only adapter after separate approval.
+
 ## 2026-07-26 — Phase 0 exit reconciliation
 
 ### Summary

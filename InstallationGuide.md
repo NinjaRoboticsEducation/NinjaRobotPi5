@@ -1,7 +1,8 @@
 # NinjaRobotPi5V4 Installation Guide
 
-NinjaRobotPi5V4 is currently in Phase 0 and does not yet provide a runnable
-robot agent. These instructions install only the locked developer environment.
+NinjaRobotPi5V4 has completed Phase 1. It provides strict contracts,
+configuration validation, deterministic fakes, and a unified developer CLI. It
+does not yet provide a real robot agent, model provider, or IDE device adapter.
 
 ## Requirements
 
@@ -44,9 +45,20 @@ target alignment, power, ground, SDA, and SCL; then cold-power-cycle the sensor.
 ```bash
 git clone <repository-url> NinjaRobotPi5V4
 cd NinjaRobotPi5V4
-uv sync --dev
-uv run python scripts/verify_immutable_drivers.py
-uv run pytest -q
+uv sync --frozen
+uv run --frozen python scripts/verify_immutable_drivers.py
+uv run --frozen pytest -q
+```
+
+Confirm the installed Phase 1 CLI:
+
+```bash
+uv run --frozen ninjarobot_pi5_cli --version
+uv run --frozen ninjarobot_pi5_cli config validate \
+  --config config/ninjarobot_pi5.toml.example
+uv run --frozen ninjarobot_pi5_cli dry-run \
+  --capability system.echo \
+  --json '{"message":"hello"}'
 ```
 
 For the camera library on Raspberry Pi OS, install Picamera2 from `apt` and use
@@ -69,7 +81,7 @@ Build whisper.cpp and download its multilingual base model as documented in
 `pi5mic/README.md`, then register the executable and model with a user-owned
 config such as `~/.config/pi5mic/mic.json`.
 
-Do not install or run hardware extras until the relevant Raspberry Pi checklist
-has been approved. Runtime installation, configuration, Ollama setup, provider
-credentials, and managed startup will be documented only when those features
-are implemented in later phases.
+These Phase 1 commands are non-moving and do not use hardware. Do not run
+driver hardware commands until the relevant Raspberry Pi checklist has been
+approved. Ollama setup, real device adapters, provider credentials, and managed
+startup will be documented only when those features are implemented later.

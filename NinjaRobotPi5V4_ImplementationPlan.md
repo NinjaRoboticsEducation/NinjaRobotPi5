@@ -4,7 +4,7 @@ Status: Approved architecture and delivery plan
 Last updated: 2026-07-23 (project and hardware decisions incorporated)
 Primary development computer: Raspberry Pi 5, 8 GM RAM
 Target computer: Raspberry Pi 5, 8 GB RAM
-Implementation status: Phase 0 complete; Phase 1 approved
+Implementation status: Phase 0 and Phase 1 complete
 
 ## 1. Purpose of this document
 
@@ -1358,6 +1358,8 @@ copied driver.
   is complete.
 
 ### Phase 1: V4 contracts and package skeletons
+
+**Status: Complete (2026-07-26)**
 
 **Objective**
 

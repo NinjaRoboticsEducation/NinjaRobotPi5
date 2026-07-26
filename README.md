@@ -15,11 +15,11 @@ which is the single source of truth.
 
 ## Current status
 
-Phase 0 is complete. It established project governance and preserved the
-original import hashes for the six existing Pi5 hardware libraries. The project
-owner has authorized focused repairs to those standalone libraries; every
-repaired hash is tracked separately from the import baseline. Phase 1 is
-approved and will add the first V4 IDE and agent contracts.
+Phase 0 and Phase 1 are complete. Phase 0 established project governance and
+preserved the original import hashes for the six existing Pi5 hardware
+libraries. Phase 1 added strict IDE and agent contracts, deterministic fakes,
+V4-owned configuration, and the unified `ninjarobot_pi5_cli`. No real hardware
+adapter or model provider is implemented yet.
 
 The `pi5buzzer` development environment is locked and its 65 tests pass. The
 earlier GPIO17 health and sound checks remain historical evidence; the current
@@ -57,6 +57,23 @@ are valid.
    providers, memory, policy, and IDE tool calls. It will never import hardware
    drivers directly.
 
+## Phase 1 functions
+
+The current CLI provides safe development checks only:
+
+- `config validate` strictly validates V4-owned TOML configuration.
+- `contracts schema` prints JSON Schema, a machine-readable description of
+  valid contract data.
+- `dry-run` executes against a deterministic fake IDE and labels the result
+  `"simulated": true`.
+- `--version` reports the installed V4 package version.
+
+Phase 1 contracts reject unknown fields and unsafe type conversion. They cover
+capabilities, actions, results, errors, provider turns, tool calls, sessions,
+memory candidates, health, and configuration. Strict mypy checking—the static
+analysis of type hints without running the program—is mandatory for new V4
+source.
+
 The nested `NinjaClawBot/` checkout is an excluded, read-only historical
 reference. It is not part of the V4 product or Git history.
 
@@ -81,17 +98,33 @@ Python 3.11 is the project baseline. Install the locked root development
 environment:
 
 ```bash
-uv sync --dev
+uv sync --frozen
 ```
 
-Run the Phase 0 root gate:
+Validate Phase 1 manually without hardware:
 
 ```bash
-uv run python scripts/verify_immutable_drivers.py
-uv run python -m compileall -q scripts
-uv run ruff check scripts tests
-uv run ruff format --check scripts tests
-uv run pytest -q
+uv run --frozen ninjarobot_pi5_cli --version
+uv run --frozen ninjarobot_pi5_cli config validate \
+  --config config/ninjarobot_pi5.toml.example
+uv run --frozen ninjarobot_pi5_cli dry-run \
+  --capability system.echo \
+  --json '{"message":"hello"}'
+```
+
+Run the complete root gate:
+
+```bash
+uv run --frozen python scripts/verify_immutable_drivers.py
+uv run --frozen python -m compileall -q \
+  ninjarobot_pi5_ide/src ninjarobot_pi5_agent/src scripts tests
+uv run --frozen ruff check \
+  ninjarobot_pi5_ide ninjarobot_pi5_agent scripts tests
+uv run --frozen ruff format --check \
+  ninjarobot_pi5_ide ninjarobot_pi5_agent scripts tests
+uv run --frozen mypy \
+  ninjarobot_pi5_ide/src ninjarobot_pi5_agent/src
+uv run --frozen pytest -q
 git diff --check
 ```
 

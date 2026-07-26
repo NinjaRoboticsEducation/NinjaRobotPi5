@@ -1,0 +1,52 @@
+schema_version = 1
+
+[hardware.buzzer]
+enabled = true
+gpio = 27
+
+[hardware.servos]
+enabled = true
+endpoints = ["gpio12", "gpio13"]
+
+[hardware.display]
+enabled = true
+model = "ST7789V"
+width = 240
+height = 320
+spi_bus = 0
+spi_device = 0
+frequency_hz = 32000000
+dc_gpio = 4
+reset_gpio = 5
+backlight_gpio = 6
+rotation = 90
+brightness = 75
+
+[hardware.i2c]
+bus = 1
+dfr0566_address = 16
+vl53l0x_address = 41
+
+[hardware.camera]
+enabled = true
+width = 1280
+height = 720
+retain_media_by_default = false
+
+[hardware.microphone]
+enabled = true
+sample_rate_hz = 16000
+channels = 1
+retain_audio_by_default = false
+
+[agent]
+default_provider = "ollama"
+max_model_turns = 6
+max_tool_calls = 8
+turn_timeout_seconds = 90.0
+
+[providers.ollama]
+kind = "ollama"
+model = "configured-by-user"
+enabled = true
+base_url = "http://127.0.0.1:11434"
