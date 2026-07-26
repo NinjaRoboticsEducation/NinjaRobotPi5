@@ -1,5 +1,48 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-26 — Phase 2 IDE core and VL53L0X reference adapter
+
+### Summary
+
+- Added capability registration, explicit adapter lifecycle, bounded
+  scheduling, deterministic resource locks, and a durable SQLite action
+  ledger.
+- Added an execution engine that prevents duplicate action execution and
+  records deadlines, queue rejection, timeout, cancellation, unexpected
+  failures, and restart-time unknown outcomes.
+- Added the read-only `distance.read` adapter. It lazily loads the unchanged
+  `pi5vl53l0x` package only for real execution and normalizes its output into
+  the Phase 1 action-result contract.
+- Added an explicit guard that reports `8191 mm` as
+  `DEVICE_INVALID_READING`; it can no longer look like a successful distance.
+- Added hardware-free capability, health, simulated distance, idempotency, and
+  action-ledger CLI paths. Real I2C use requires `--real`.
+- Added the root `hardware` extra so the local managed VL53L0X package can be
+  installed without changing that package.
+
+### Validation
+
+- Registry rollback, ledger persistence, resource races, bounded queues,
+  cancellation, deadlines, idempotency, timeouts, unknown outcomes, restart
+  recovery, adapter lifecycle, invalid readings, and CLI persistence are
+  covered by automated tests.
+- Compilation, Ruff lint, Ruff formatting, strict mypy, root pytest, all
+  package-local managed-driver tests, and immutable-driver verification passed.
+- Driver provenance remained at 222 files and 23 authorized repairs. No
+  `pi5*` file changed.
+
+### Raspberry Pi status
+
+No physical hardware command was run during implementation. The real adapter
+path is ready for operator testing on I2C bus 1 at address `0x29`. The
+previously observed `8191 mm` sentinel remains an expected test failure until
+the physical sensor issue is corrected.
+
+### Follow-up
+
+Run the Phase 2 Raspberry Pi checklist. Begin Phase 3 with the buzzer adapter
+only after Phase 2 review and separate approval.
+
 ## 2026-07-26 — Phase 1 contracts and package skeletons
 
 ### Summary

@@ -15,11 +15,14 @@ which is the single source of truth.
 
 ## Current status
 
-Phase 0 and Phase 1 are complete. Phase 0 established project governance and
-preserved the original import hashes for the six existing Pi5 hardware
-libraries. Phase 1 added strict IDE and agent contracts, deterministic fakes,
-V4-owned configuration, and the unified `ninjarobot_pi5_cli`. No real hardware
-adapter or model provider is implemented yet.
+Phase 0, Phase 1, and Phase 2 are complete. Phase 0 established project
+governance and preserved the original import hashes for the six existing Pi5
+hardware libraries. Phase 1 added strict IDE and agent contracts,
+deterministic fakes, V4-owned configuration, and the unified
+`ninjarobot_pi5_cli`. Phase 2 adds the IDE capability registry, adapter
+lifecycle, bounded scheduler, resource locks, durable SQLite action ledger, and
+the first read-only adapter: `distance.read` through `pi5vl53l0x`. SQLite is
+Python's built-in local database format.
 
 The `pi5buzzer` development environment is locked and its 65 tests pass. The
 earlier GPIO17 health and sound checks remain historical evidence; the current
@@ -51,28 +54,42 @@ are valid.
 1. **Managed Pi5 libraries** — `pi5buzzer`, `pi5servo`, `pi5disp`,
    `pi5camera`, `pi5mic`, and `pi5vl53l0x` retain independent hardware-driver
    responsibilities, standalone APIs, and package-level validation.
-2. **NinjaRobotPi5 IDE** — will own capability registration, hardware
-   initialization, resource scheduling, standardized results, and a manual CLI.
+2. **NinjaRobotPi5 IDE** — owns capability registration, hardware
+   initialization, resource scheduling, standardized results, action history,
+   and the manual CLI.
 3. **NinjaRobotPi5 Agent** — will own user interaction, bounded planning, model
    providers, memory, policy, and IDE tool calls. It will never import hardware
    drivers directly.
 
-## Phase 1 functions
+## Implemented CLI functions
 
-The current CLI provides safe development checks only:
+The current CLI provides:
 
 - `config validate` strictly validates V4-owned TOML configuration.
 - `contracts schema` prints JSON Schema, a machine-readable description of
   valid contract data.
 - `dry-run` executes against a deterministic fake IDE and labels the result
   `"simulated": true`.
+- `capabilities` lists the read-only distance capability without opening I2C.
+  I2C means the two-wire hardware communication bus used by the sensor.
+- `health` checks a simulated sensor unless `--real` is supplied.
+- `distance read` returns simulated data unless `--real` is supplied.
+- `actions show` reads the durable result for one action from the SQLite
+  ledger.
 - `--version` reports the installed V4 package version.
 
-Phase 1 contracts reject unknown fields and unsafe type conversion. They cover
+The contracts reject unknown fields and unsafe type conversion. They cover
 capabilities, actions, results, errors, provider turns, tool calls, sessions,
 memory candidates, health, and configuration. Strict mypy checking—the static
 analysis of type hints without running the program—is mandatory for new V4
 source.
+
+Phase 2 accepts an action ID only once. Repeating the same action ID and request
+returns the stored result without reading the sensor again. Timeouts,
+cancellation, full queues, expired deadlines, startup interruption, and
+unknown outcomes are recorded as structured failures. A reading of `8191 mm`
+is explicitly rejected because it is the VL53L0X out-of-range sentinel
+(special invalid value), not a real distance.
 
 The nested `NinjaClawBot/` checkout is an excluded, read-only historical
 reference. It is not part of the V4 product or Git history.
@@ -94,14 +111,14 @@ display is 240×320, rotated 90°, at 75% brightness.
 
 ## Developer setup
 
-Python 3.11 is the project baseline. Install the locked root development
-environment:
+Python 3.11 is the project baseline. Install the locked, hardware-free root
+development environment:
 
 ```bash
 uv sync --frozen
 ```
 
-Validate Phase 1 manually without hardware:
+Validate Phase 2 manually without hardware:
 
 ```bash
 uv run --frozen ninjarobot_pi5_cli --version
@@ -110,7 +127,25 @@ uv run --frozen ninjarobot_pi5_cli config validate \
 uv run --frozen ninjarobot_pi5_cli dry-run \
   --capability system.echo \
   --json '{"message":"hello"}'
+uv run --frozen ninjarobot_pi5_cli capabilities
+uv run --frozen ninjarobot_pi5_cli health \
+  --ledger /tmp/ninjarobot-phase2-smoke.sqlite3
+uv run --frozen ninjarobot_pi5_cli distance read \
+  --ledger /tmp/ninjarobot-phase2-smoke.sqlite3 \
+  --action-id phase2-smoke-1 \
+  --idempotency-key phase2-smoke-key-1
 ```
+
+On the Raspberry Pi, install the optional managed sensor package without
+changing its source:
+
+```bash
+uv sync --frozen --extra hardware
+```
+
+Then follow
+[`docs/validation/phase-2-validation-2026-07-26.md`](docs/validation/phase-2-validation-2026-07-26.md).
+Real sensor access occurs only when the command includes `--real`.
 
 Run the complete root gate:
 
@@ -133,7 +168,10 @@ Each copied driver retains its own package-local commands. See
 
 ## Safety
 
-Default tests never access physical hardware. Commands marked `hardware` require
-an explicit Raspberry Pi checklist and operator approval. Model output will be
-treated as an untrusted proposal; the deterministic IDE control plane will
-retain final authority over robot actions.
+Default tests and commands without `--real` never access physical hardware.
+The Phase 2 real path reads only the VL53L0X on I2C bus 1 at address `0x29`; it
+does not move a servo, sound the buzzer, change the display, use the camera, or
+record audio. Later actuator commands will require a separate Raspberry Pi
+checklist and operator approval. Model output will be treated as an untrusted
+proposal; the deterministic IDE control plane retains final authority over
+robot actions.

@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 
 from .models import (
+    ActionRecord,
     ActionRequest,
     ActionResult,
     ActionStatus,
@@ -64,7 +65,12 @@ class FakeIDEClient:
         self._descriptors = tuple(descriptors)
         self._clock = clock or FakeClock()
         self.requests: list[ActionRequest] = []
+        self.results: dict[str, ActionResult] = {}
         self.closed = False
+
+    async def start(self) -> None:
+        """Start the hardware-free fake."""
+        self._ensure_open()
 
     async def capabilities(self) -> tuple[CapabilityDescriptor, ...]:
         """Return configured fake descriptors."""
@@ -76,7 +82,7 @@ class FakeIDEClient:
         self._ensure_open()
         self.requests.append(request)
         timestamp = self._clock.now()
-        return ActionResult(
+        result = ActionResult(
             action_id=request.action_id,
             status=ActionStatus.SUCCEEDED,
             data={"simulated": True, "capability": request.capability},
@@ -84,6 +90,21 @@ class FakeIDEClient:
             finished_at=timestamp,
             retry_safety=RetrySafety.SAFE,
         )
+        self.results[request.action_id] = result
+        return result
+
+    async def action(self, action_id: str) -> ActionRecord | None:
+        """The lightweight Phase 1 fake does not simulate durable records."""
+        self._ensure_open()
+        return None
+
+    async def cancel(self, action_id: str) -> ActionResult:
+        """Return a terminal result or report that no live fake action exists."""
+        self._ensure_open()
+        try:
+            return self.results[action_id]
+        except KeyError as exc:
+            raise KeyError(f"unknown action: {action_id}") from exc
 
     async def health(self) -> HealthReport:
         """Return a non-hardware fake health report."""

@@ -6,7 +6,8 @@ incomplete or conflicts with it.
 
 ## Repository layout
 
-- `ninjarobot_pi5_ide/`: deterministic robot contracts and future middleware.
+- `ninjarobot_pi5_ide/`: deterministic robot contracts, scheduler, action
+  ledger, and managed-driver adapters.
 - `ninjarobot_pi5_agent/`: provider-neutral agent contracts and unified CLI.
 - `config/`: V4-owned configuration examples; never driver-local runtime state.
 - `pi5*/`: independently testable hardware libraries copied from the historical
@@ -117,6 +118,64 @@ uv run --frozen ninjarobot_pi5_cli dry-run \
 `dry-run` never opens GPIO, I2C, SPI, camera, or audio. Its result must include
 `"simulated": true`.
 
+## Phase 2 IDE and distance adapter
+
+Phase 2 keeps every driver import inside the IDE. The agent and its CLI import
+only `ninjarobot_pi5_ide`; they never import a `pi5*` package directly.
+
+The main components are:
+
+- `CapabilityRegistry`: registers one unique adapter per capability and owns
+  startup, health, and close ordering.
+- `ResourceScheduler`: bounds concurrent and waiting work, then locks shared
+  resources in sorted order to prevent deadlock. Deadlock means two operations
+  wait forever for each other's lock.
+- `ActionLedger`: stores accepted, running, and completed actions in SQLite.
+  SQLite is the small local database included with Python.
+- `ExecutionEngine`: enforces action IDs, idempotency keys, deadlines,
+  timeouts, cancellation, restart recovery, and normalized errors. An
+  idempotency key is a caller-supplied identifier that prevents an accidental
+  duplicate operation.
+- `VL53L0XDistanceAdapter`: lazily loads `pi5vl53l0x` only for explicit real
+  use and exposes the read-only `distance.read` capability.
+
+Install the ordinary development environment for simulation:
+
+```bash
+uv sync --frozen
+```
+
+Install the optional local VL53L0X package on the Raspberry Pi:
+
+```bash
+uv sync --frozen --extra hardware
+```
+
+Run safe simulation and ledger checks:
+
+```bash
+uv run --frozen ninjarobot_pi5_cli capabilities
+uv run --frozen ninjarobot_pi5_cli health \
+  --ledger /tmp/ninjarobot-phase2.sqlite3
+uv run --frozen ninjarobot_pi5_cli distance read \
+  --ledger /tmp/ninjarobot-phase2.sqlite3 \
+  --action-id phase2-test-1 \
+  --idempotency-key phase2-test-key-1
+uv run --frozen ninjarobot_pi5_cli actions show \
+  --ledger /tmp/ninjarobot-phase2.sqlite3 \
+  --action-id phase2-test-1
+```
+
+These commands are simulated unless `health` or `distance read` includes
+`--real`. The real path uses the configured I2C bus 1 and address `0x29`. It
+returns exit code 1 for a structured device failure, including the known
+`8191 mm` invalid sentinel.
+
+Do not use the same idempotency key for different arguments or capabilities.
+That is rejected as a conflicting request. On restart, an action that was only
+queued is marked safe to retry. An action that was already running is recorded
+with an unknown outcome, so software cannot silently repeat it.
+
 ## Driver package validation commands
 
 ### Standalone README contract
@@ -202,6 +261,20 @@ test; the separate pre-Phase-1 live-Pi report is stored under `docs/validation/`
   new hash with `--record-authorized`.
 - **A test tries to access hardware:** ensure it is explicitly marked
   `hardware` and exclude it from the default gate.
+- **`distance read` returns 250 mm without opening I2C:** this is the expected
+  simulation. Add `--real` only on the Raspberry Pi when you intend to open the
+  sensor.
+- **The real command reports `DEVICE_UNAVAILABLE`:** install with
+  `uv sync --frozen --extra hardware`, confirm I2C is enabled, and confirm
+  address `0x29` appears on bus 1.
+- **The real command reports `DEVICE_INVALID_READING` and `8191`:** the
+  middleware is working correctly by rejecting the sensor's out-of-range
+  sentinel. Check sensor power, SDA/SCL wiring (the I2C data and clock wires),
+  optical window, target reflectivity, alignment, and cold power before
+  considering calibration.
+- **A repeated action does not read again:** this is intentional when the same
+  action ID or idempotency key is used. Generate a new ID and key for a new
+  physical reading.
 - **DFR0566 digital GPIO12/GPIO13 do not show a PWM alternate function:** add
   `dtparam=audio=off` and
   `dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4` to

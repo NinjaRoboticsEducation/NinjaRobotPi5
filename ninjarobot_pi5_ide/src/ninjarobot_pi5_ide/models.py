@@ -65,6 +65,17 @@ class ActionStatus(StrEnum):
     REJECTED = "rejected"
 
 
+class LifecycleState(StrEnum):
+    """Explicit lifecycle shared by registries, schedulers, and the IDE."""
+
+    CREATED = "created"
+    STARTING = "starting"
+    RUNNING = "running"
+    CLOSING = "closing"
+    CLOSED = "closed"
+    FAILED = "failed"
+
+
 class RetrySafety(StrEnum):
     """Whether repeating an operation is known to be safe."""
 
@@ -167,6 +178,43 @@ class ActionResult(ContractModel):
             raise ValueError("successful results must not include error details")
         if self.error is not None and self.error.retry_safety is not self.retry_safety:
             raise ValueError("result and error retry_safety must agree")
+        return self
+
+
+class ActionRecord(ContractModel):
+    """Durable snapshot of one accepted action and its latest known state."""
+
+    request: ActionRequest
+    status: ActionStatus
+    result: ActionResult | None = None
+    accepted_at: datetime
+    updated_at: datetime
+
+    @model_validator(mode="after")
+    def record_is_consistent(self) -> ActionRecord:
+        """Reject time travel and mismatched terminal records."""
+        if self.accepted_at.tzinfo is None or self.updated_at.tzinfo is None:
+            raise ValueError("record timestamps must include a timezone")
+        if self.updated_at < self.accepted_at:
+            raise ValueError("updated_at must not be before accepted_at")
+        if self.result is not None:
+            if self.result.action_id != self.request.action_id:
+                raise ValueError("record request and result action IDs must agree")
+            if self.status is not self.result.status:
+                raise ValueError("record and result statuses must agree")
+        if (
+            self.status
+            in {
+                ActionStatus.SUCCEEDED,
+                ActionStatus.FAILED,
+                ActionStatus.CANCELLED,
+                ActionStatus.REJECTED,
+            }
+            and self.result is None
+        ):
+            raise ValueError("terminal action records require a result")
+        if self.status in {ActionStatus.ACCEPTED, ActionStatus.RUNNING} and self.result is not None:
+            raise ValueError("non-terminal action records must not contain a result")
         return self
 
 

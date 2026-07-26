@@ -8,6 +8,11 @@ dependencies = [
     "ninjarobot-pi5-ide",
 ]
 
+[project.optional-dependencies]
+hardware = [
+    "pi5vl53l0x",
+]
+
 [dependency-groups]
 dev = [
     "mypy>=1.18,<2",
@@ -22,6 +27,7 @@ package = false
 [tool.uv.sources]
 ninjarobot-pi5-agent = { workspace = true }
 ninjarobot-pi5-ide = { workspace = true }
+pi5vl53l0x = { path = "pi5vl53l0x" }
 
 [tool.uv.workspace]
 members = [

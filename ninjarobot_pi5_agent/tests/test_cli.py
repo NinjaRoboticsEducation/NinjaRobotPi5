@@ -42,3 +42,78 @@ def test_cli_rejects_non_object_json(capsys) -> None:
     captured = capsys.readouterr()
     assert result == 2
     assert "must contain a JSON object" in captured.err
+
+
+def test_phase_two_capabilities_are_hardware_free(capsys) -> None:
+    assert main(["capabilities"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload[0]["name"] == "distance.read"
+    assert payload[0]["risk"] == "read_only"
+
+
+def test_simulated_distance_health_and_read_are_persisted(tmp_path, capsys) -> None:
+    ledger = tmp_path / "actions.sqlite3"
+    assert main(["health", "--ledger", str(ledger)]) == 0
+    health = json.loads(capsys.readouterr().out)
+    assert health["status"] == "ready"
+
+    command = [
+        "distance",
+        "read",
+        "--ledger",
+        str(ledger),
+        "--action-id",
+        "manual-distance-1",
+        "--idempotency-key",
+        "manual-distance-key-1",
+    ]
+    assert main(command) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "succeeded"
+    assert result["data"]["distance_mm"] == 250
+    assert set(result) == {
+        "action_id",
+        "status",
+        "data",
+        "error",
+        "started_at",
+        "finished_at",
+        "retry_safety",
+    }
+
+    assert main(command) == 0
+    repeated = json.loads(capsys.readouterr().out)
+    assert repeated == result
+
+    assert (
+        main(
+            [
+                "actions",
+                "show",
+                "--ledger",
+                str(ledger),
+                "--action-id",
+                "manual-distance-1",
+            ]
+        )
+        == 0
+    )
+    record = json.loads(capsys.readouterr().out)
+    assert record["result"] == result
+
+
+def test_distance_cli_rejects_unsafe_bounds(tmp_path, capsys) -> None:
+    assert (
+        main(
+            [
+                "distance",
+                "read",
+                "--ledger",
+                str(tmp_path / "bounds.sqlite3"),
+                "--count",
+                "101",
+            ]
+        )
+        == 2
+    )
+    assert "--count must be between 1 and 100" in capsys.readouterr().err
