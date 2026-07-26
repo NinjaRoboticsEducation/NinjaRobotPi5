@@ -2,6 +2,17 @@
 
 from .adapters import CapabilityAdapter
 from .api import IDEClient
+from .behavior_assets import BehaviorAssetError, BehaviorAssetRepository
+from .behavior_models import (
+    BehaviorDefinition,
+    BehaviorStage,
+    DriveOperation,
+    FaceOperation,
+    MelodyOperation,
+    TextOperation,
+    WaitOperation,
+)
+from .behavior_runtime import BehaviorRunner, Melody, StageResult, load_pi5buzzer_melody
 from .buzzer import BuzzerDevice, BuzzerStopAdapter, BuzzerToneAdapter
 from .camera import CameraCaptureAdapter, CameraDevice, CameraStatusAdapter
 from .config import RobotConfig, load_robot_config
@@ -35,6 +46,15 @@ from .models import (
     RiskLevel,
 )
 from .registry import CapabilityRegistry
+from .robot import RobotAssembly
+from .safety import (
+    MotionController,
+    MotionSafetyError,
+    SafetySnapshot,
+    SafetyStateStore,
+    SystemSafetyController,
+    raspberry_pi_undervoltage_active,
+)
 from .scheduler import QueueCapacityError, ResourceScheduler
 from .servo import (
     ServoDevice,
@@ -56,6 +76,11 @@ __all__ = [
     "BuzzerDevice",
     "BuzzerStopAdapter",
     "BuzzerToneAdapter",
+    "BehaviorAssetError",
+    "BehaviorAssetRepository",
+    "BehaviorDefinition",
+    "BehaviorStage",
+    "BehaviorRunner",
     "CameraCaptureAdapter",
     "CameraDevice",
     "CameraStatusAdapter",
@@ -63,8 +88,10 @@ __all__ = [
     "DisplayClearAdapter",
     "DisplayDevice",
     "DisplayShowTextAdapter",
+    "DriveOperation",
     "ErrorDetails",
     "ExecutionEngine",
+    "FaceOperation",
     "HealthReport",
     "IDEClient",
     "IDEError",
@@ -73,18 +100,31 @@ __all__ = [
     "MicrophoneBackend",
     "MicrophoneDevice",
     "MicrophoneStatusAdapter",
+    "Melody",
+    "MelodyOperation",
+    "MotionController",
+    "MotionSafetyError",
     "QueueCapacityError",
     "ResourceHealth",
     "ResourceScheduler",
     "RetrySafety",
     "RiskLevel",
+    "RobotAssembly",
     "RobotConfig",
+    "SafetySnapshot",
+    "SafetyStateStore",
     "ServoDevice",
     "ServoMoveAdapter",
     "ServoRuntime",
     "ServoStatusAdapter",
     "ServoStopAdapter",
+    "SystemSafetyController",
+    "TextOperation",
     "VL53L0XDistanceAdapter",
+    "WaitOperation",
+    "StageResult",
+    "load_pi5buzzer_melody",
+    "raspberry_pi_undervoltage_active",
     "load_robot_config",
 ]
 

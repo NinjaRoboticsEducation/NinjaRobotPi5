@@ -201,6 +201,43 @@ class DisplayDevice:
                 "simulated": self._simulated,
             }
 
+    async def show_image(self, image: Image.Image, *, source: str) -> dict[str, Any]:
+        """Write one already-rendered RGB frame through the shared display lock."""
+        if not source or len(source) > 128:
+            raise ValueError("image source must contain 1 through 128 characters")
+        async with self._lock:
+            driver = await self._require_driver_locked("display.show_image")
+            if image.size != (driver.width, driver.height):
+                raise _invalid_arguments(
+                    "rendered image must match the configured display dimensions",
+                    capability="display.show_image",
+                )
+            frame = image.convert("RGB")
+            try:
+                await asyncio.to_thread(driver.display, frame)
+            except Exception as exc:
+                raise _display_error(
+                    code="DISPLAY_WRITE_FAILED",
+                    message="The ST7789V display could not write the image frame.",
+                    technical_detail=f"{type(exc).__name__}: {exc}",
+                    definitely_not_executed=False,
+                    capability="display.show_image",
+                ) from exc
+            return {
+                "source": source,
+                "width": driver.width,
+                "height": driver.height,
+                "rotation": self._rotation,
+                "brightness": self._brightness,
+                "simulated": self._simulated,
+            }
+
+    async def dimensions(self) -> tuple[int, int]:
+        """Return physical frame dimensions after safe display initialization."""
+        async with self._lock:
+            driver = await self._require_driver_locked("display.dimensions")
+            return driver.width, driver.height
+
     async def clear(self, *, color: str) -> dict[str, Any]:
         """Fill the display with one bounded RGB color."""
         async with self._lock:

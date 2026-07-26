@@ -15,7 +15,8 @@ which is the single source of truth.
 
 ## Current status
 
-Phase 0, Phase 1, Phase 2, and Phase 3.1 through Phase 3.5 are implemented.
+Phase 0, Phase 1, Phase 2, Phase 3.1 through Phase 3.5, and Phase 4 are
+implemented.
 Phase 0 established project governance and preserved the
 original import hashes for the six existing Pi5 hardware libraries. Phase 1
 added strict IDE and agent contracts, deterministic fakes, V4-owned
@@ -39,13 +40,15 @@ Interface) is the display's clocked data connection. Commands simulate unless
 backlight GPIO6, rotation 90°, and initial brightness 75%. The operator reports
 that the complete Phase 3.2 physical checklist passes.
 
-Phase 3.3 adds the fixed six-servo mixed backend and three capabilities:
+Phase 3.3 added a six-endpoint-capable mixed backend and three capabilities:
 `servo.status`, single-endpoint `servo.move`, and emergency `servo.stop`.
 GPIO12/GPIO13 use Raspberry Pi hardware PWM, while `hat_pwm1` through
-`hat_pwm4` use DFR0566 PWM0 through PWM3 over I2C. Real movement is disabled in
-the checked-in configuration and additionally requires `--real`,
-`--confirm-motion`, and a valid endpoint calibration. Group motion is not
-available. The Phase 3.3 software gate passes. The operator reports that all
+`hat_pwm4` use DFR0566 PWM0 through PWM3 over I2C. Phase 4 changes the default
+robot topology to the two installed wheel servos on GPIO12 and GPIO13 while
+retaining the four HAT PWM names for user-customized configurations. Real
+single-servo movement remains disabled in the checked-in configuration and
+requires `--real`, `--confirm-motion`, and a valid endpoint calibration. The
+Phase 3.3 software gate passes. The operator reports that all
 Phase 3.3 manual tests pass; detailed command output and electrical values were
 not attached to that report, so the validation record preserves that
 distinction.
@@ -67,6 +70,22 @@ audio. WAV files are deleted by default; `--retain` saves one owner-only file
 inside `~/.local/share/ninjarobot_pi5/microphone`. WAV is an uncompressed audio
 file format. Transcription, wake-word listening, Gemini, and historical
 OpenClaw integrations are not Phase 3.5 features.
+
+Phase 4 adds validated integrated behaviors and the `ninjarobot-ide-tool`.
+Behavior stages run in order, while display, buzzer, and motor operations
+inside one stage begin together. The bundled expressions are `idle`,
+`greeting`, `happy`, `thinking`, `success`, `warning`, and `error`. The bundled
+movements are `move_forward`, `move_backward`, `turn_left`, and `turn_right`.
+`stop` is deliberately a safety command, not a reusable behavior asset.
+
+The default logical mapping is `left_motor` to GPIO12 and `right_motor` to
+GPIO13. Front-guarded movement requires three clear VL53L0X readings before it
+starts. Three consecutive readings at or below 100 mm produce a Level 1 motion
+stop. Undervoltage and a frozen control-loop watchdog also stop both motors.
+Ctrl+C, normal tool shutdown, an explicit behavior stop, or a hardware-driver
+failure performs Level 2 cleanup: stop servos and ranging, close camera and
+microphone devices, silence the buzzer, and show `SYSTEM STOPPED`. Driver
+failure remains latched until an explicitly confirmed healthy resume.
 
 The `pi5buzzer` development environment is locked and its 65 tests pass. The
 earlier GPIO17 health and sound checks remain historical evidence; the current
@@ -158,6 +177,21 @@ The current CLI provides:
   is also supplied.
 - `--version` reports the installed V4 package version.
 
+The integrated `ninjarobot-ide-tool` additionally provides:
+
+- an interactive menu when run without a subcommand
+- `hardware status` for configuration and optional safe real-device probes
+- `config discover` and preview-first `config import`
+- `behavior list`, `show`, `health`, `simulate`, `run`, `create`, `validate`,
+  and `stop`
+- `motion resume --confirm` for a Level 1 latch
+- `system resume --confirm` for a driver-failure Level 2 latch
+
+Simulation is always the default. A real movement also requires
+`--confirm-motion`. Private behaviors are stored under
+`~/.config/ninjarobot_pi5/behaviors`, validated before use, previewed in
+simulation before saving, and never overwrite an existing action silently.
+
 The contracts reject unknown fields and unsafe type conversion. They cover
 capabilities, actions, results, errors, provider turns, tool calls, sessions,
 memory candidates, health, and configuration. Strict mypy checking—the static
@@ -177,13 +211,21 @@ reference. It is not part of the V4 product or Git history.
 ## Hardware foundation
 
 The confirmed target is a Raspberry Pi 5 with 8 GB RAM and a 256 GB NVMe SSD.
-The robot uses the DFRobot DFR0566 expansion HAT, six planned servo endpoints,
+The robot uses the DFRobot DFR0566 expansion HAT, two default wheel-servo endpoints,
 a passive buzzer, VL53L0X sensor, ST7789V display, USB microphone, and Raspberry
 Pi camera. The temporary servos are connected to the DFR0566 digital
 GPIO12/GPIO13 breakouts. Those connectors use the Raspberry Pi's native
 hardware PWM and require the `pwm-2chan` boot overlay; they are not the HAT's
-dedicated I2C-controlled PWM0/PWM1 sockets. Powered servo tests remain blocked
-until an accessible emergency disconnect is installed.
+dedicated I2C-controlled PWM0/PWM1 sockets. The installed motors are MG90D
+360-degree continuous-rotation servos. Their values represent direction and
+speed around calibrated neutral, not a requested physical angle.
+
+The owner-confirmed power chain is the official 27 W supply into the Geekworm
+X1208, then the Raspberry Pi and DFR0566, with both servo red wires connected
+to the D12/D13 `+` terminals. The measured servo voltage is within the stated
+4.8–6.6 V range. There is no accessible physical emergency power disconnect.
+That is a material residual risk; software stop and watchdog controls reduce
+the risk but cannot replace a physical cutoff.
 
 The current V4-owned wiring record uses the passive buzzer on GPIO27 and the
 ST7789V display on SPI0 with DC GPIO4, reset GPIO5, and backlight GPIO6. The
@@ -269,6 +311,23 @@ changing their source:
 uv sync --frozen --extra hardware
 ```
 
+Start with integrated hardware-free checks:
+
+```bash
+uv run --frozen ninjarobot-ide-tool behavior list
+uv run --frozen ninjarobot-ide-tool behavior show greeting
+uv run --frozen ninjarobot-ide-tool behavior health
+uv run --frozen ninjarobot-ide-tool behavior simulate greeting
+uv run --frozen ninjarobot-ide-tool behavior simulate move_forward \
+  --duration 2
+```
+
+Run the interactive menu with:
+
+```bash
+uv run --frozen ninjarobot-ide-tool
+```
+
 Real Picamera2 access additionally requires the Raspberry Pi OS camera
 packages. The safe bootstrap installs or checks those packages, keeps the
 ordinary project `.venv`, and verifies the interpreter bridge without taking
@@ -299,6 +358,8 @@ Real capture requires consent from everyone nearby.
 For microphone integration, follow
 [`docs/validation/phase-3-5-microphone-validation-2026-07-26.md`](docs/validation/phase-3-5-microphone-validation-2026-07-26.md).
 Real recording also requires consent from everyone nearby.
+For Phase 4 integrated behaviors and movements, follow
+[`docs/validation/phase-4-integrated-behavior-validation-2026-07-26.md`](docs/validation/phase-4-integrated-behavior-validation-2026-07-26.md).
 
 Run the complete root gate:
 
@@ -337,5 +398,15 @@ The Phase 3.5 microphone path is also classified as `privacy`, requires
 explicit real-recording confirmation, and deletes audio unless retention is
 requested. It performs no transcription, wake-word detection, cloud request,
 or agent handoff.
+
+Phase 4 never moves physical motors in simulation. Real integrated movement
+requires the private configuration to enable both motion gates, valid
+calibration for GPIO12 and GPIO13, `--real`, and `--confirm-motion`. A Level 1
+stop keeps display, buzzer, and sensors available but blocks another movement
+until `motion resume --confirm`. A driver-failure Level 2 stop blocks all
+behaviors until `system resume --confirm` completes healthy probes. Invalid or
+stale distance readings warn without stopping a movement already in progress,
+as explicitly selected by the owner; guarded movement still cannot start
+without three valid clear readings.
 Model output is treated as an untrusted proposal; the
 deterministic IDE control plane retains final authority over robot actions.

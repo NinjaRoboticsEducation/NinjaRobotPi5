@@ -1,5 +1,186 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-26 — Phase 4.4 integrated IDE tool and Phase 4 completion
+
+### Summary
+
+- Added the `ninjarobot-ide-tool` console entry point with both an interactive
+  menu and scriptable subcommands.
+- Added configuration-only and safe real hardware status, behavior catalog
+  list/show/health, simulation, real execution, validation, private action
+  creation, full stop, Level 1 resume, and health-gated Level 2 resume.
+- Added read-only discovery and preview-first import of known standalone
+  `pi5*` JSON settings. Applying an import creates an owner-private V4 TOML
+  file and never rewrites a standalone source configuration.
+- Added hardware-free display, buzzer, servo, and distance simulation drivers.
+  Continuous simulated movement is always time-bounded.
+- Added preview and explicit save confirmation for user-created actions.
+  Private files are schema-validated, atomic, owner-only, confined to their
+  directory, and cannot silently overwrite bundled or existing actions.
+- Added active real-behavior registration with PID and Linux process-start
+  token validation. A second `behavior stop` process requests Ctrl+C from the
+  correct foreground behavior rather than trusting a reused PID.
+- Added concise CLI error conversion so expected validation and safety failures
+  do not print Python tracebacks.
+- Updated README, installation guide, developer guide, implementation plan,
+  and the Phase 4 Raspberry Pi validation procedure.
+
+### Validation
+
+- Added CLI tests for catalog inspection, simulation, physical confirmation
+  gates, private action creation, friendly failures, interactive exit, latch
+  resume, and TOML round-trip.
+- Added configuration import tests proving supported field mapping, unchanged
+  source JSON, valid private output, mode `0600`, and no silent overwrite.
+- Added active-process registry permission and ownership tests.
+- The complete V4 suite passes with 154 tests.
+- Root compilation, Ruff lint, Ruff formatting, strict mypy, dependency lock,
+  and diff validation pass.
+- Managed-driver provenance remains 222 tracked files and 23 authorized
+  repairs. No `pi5*` file changed during Phase 4.
+
+### Raspberry Pi status
+
+All Phase 4 implementation validation used deterministic simulation. Physical
+expressions and wheel movement are deliberately deferred to the ordered
+operator checklist. The first real motor checks must use raised wheels and a
+second terminal prepared with `behavior stop`.
+
+### Follow-up
+
+Run and record the Phase 4 Raspberry Pi checklist. After physical approval,
+begin Phase 5 bounded agent-core work without giving the agent direct driver
+access.
+
+## 2026-07-26 — Phase 4.3 guarded continuous movement and two-level stop
+
+### Summary
+
+- Added coordinated GPIO12/GPIO13 movement through the existing
+  calibration-gated `ServoDevice` boundary. No integrated code imports or
+  bypasses the managed servo driver.
+- Added logical `left_motor` and `right_motor` resolution for the approved
+  forward, backward, left-turn, and right-turn targets.
+- Added three valid clear readings before front-guarded movement can start.
+- Added a 100 mm front obstacle rule that requires three consecutive low
+  readings before a Level 1 motion stop. The threshold remains configurable
+  but cannot be lower than 50 mm.
+- Preserved the owner's selected policy that invalid, missing, or stale
+  distance samples produce warnings and do not stop a movement already in
+  progress. A guarded movement still cannot start without valid clear samples.
+- Added rear-coverage warnings for backward movement and side/rear-coverage
+  warnings for turns.
+- Added Level 1 stops for front obstacles, current undervoltage, and a
+  thread-backed software watchdog. The watchdog directly requests zero pulse
+  even when the asyncio event loop is frozen.
+- Added Level 2 cleanup for Ctrl+C/shutdown/operator-stop integration and
+  latched driver failure: stop servos, stop ranging, close camera and
+  microphone devices, silence the buzzer, and show `SYSTEM STOPPED`.
+- Added owner-private atomic safety state. Motion resumes through explicit
+  confirmation; a driver-failure system latch requires confirmation plus
+  healthy device probes.
+- Kept every managed `pi5*` source file unchanged.
+
+### Validation
+
+- Added tests for group-motion gates and calibrations, exact approved motor
+  targets, clear-start checks, obstacle debounce, warning-only invalid samples,
+  undervoltage, watchdog event-loop freeze, long asynchronous servo ramps,
+  Level 1 resume, Level 2 cleanup, system latching, health-gated resume, state
+  corruption, atomic storage, and owner-only permissions.
+
+### Follow-up
+
+Implement Phase 4.4 `ninjarobot-ide-tool`, including interactive and scriptable
+behavior, status, safe import, action creation, stop, and resume workflows.
+
+## 2026-07-26 — Phase 4.2 coordinated expressions and robot assembly
+
+### Summary
+
+- Added a V4 `RobotAssembly` that owns and shares one configured display and
+  buzzer instance.
+- Added procedural Pillow face rendering for the approved idle, happy,
+  thinking, success, warning, and error expressions.
+- Added sequential behavior stages whose operations run concurrently within
+  each stage. This makes the greeting text and existing happy melody begin
+  together after the initial happy-face stage.
+- Added a narrowly scoped melody loader that reads the existing
+  `pi5buzzer.notes` definitions without importing its command-line or runtime
+  layers.
+- Added expression cancellation, buzzer cleanup after cancellation or device
+  failure, health reporting, and idempotent assembly cleanup.
+- Added an image-frame method to the shared display device so integrated
+  behavior never creates a second SPI display instance.
+- Kept movement execution closed until the Phase 4.3 safety controller is
+  active.
+
+### Validation
+
+- Added tests for every procedural face, sequential/concurrent stages,
+  cancellation, forced display failure, shared assembly health, cleanup, and
+  movement rejection before the safety layer.
+
+### Follow-up
+
+Implement Phase 4.3 continuous-rotation drive execution, obstacle monitoring,
+watchdog and undervoltage motion stops, and full-system cleanup/latching.
+
+## 2026-07-26 — Phase 4.1 behavior contracts and secure catalog
+
+### Summary
+
+- Added strict, immutable schemas for expression and movement behaviors,
+  sequential stages, concurrent stage operations, colors, text, faces,
+  existing buzzer melodies, waits, logical servo roles, and bounded targets.
+- Added read-only bundled behaviors for `idle`, `greeting`, `happy`,
+  `thinking`, `success`, `warning`, `error`, `move_forward`,
+  `move_backward`, `turn_right`, and `turn_left`.
+- Preserved `stop` as a safety command instead of treating it as an ordinary
+  behavior asset.
+- Added a confined user behavior repository with validated names, symbolic-link
+  rejection, owner-only files, atomic writes, and no silent overwrite.
+- Changed the default robot servo topology to GPIO12 and GPIO13 while retaining
+  explicit support for the four DFR0566 PWM endpoints in custom configurations.
+- Mapped `left_motor` to GPIO12 and `right_motor` to GPIO13 in V4 configuration,
+  rather than embedding hardware endpoints in behavior assets.
+- Normalized the VL53L0X and DFR0566 shared I2C resource name to `i2c1`.
+- Kept every managed `pi5*` file unchanged.
+
+### Validation
+
+- Added catalog, path traversal, symbolic-link, filename mismatch, schema,
+  motion-map, permissions, and no-overwrite tests.
+- Updated configuration and servo compatibility coverage for the two-endpoint
+  default and optional custom topology.
+
+### Follow-up
+
+Implement Phase 4.2 robot assembly, procedural faces, and concurrent display
+and buzzer expression execution.
+
+## 2026-07-26 — Phase 3 physical validation closed
+
+### Summary
+
+- Recorded the operator's confirmation that every Phase 3.5 microphone test
+  passed.
+- Marked all Phase 3 device integrations and their physical validation
+  complete.
+- Cleared the Phase 4 entry gate without changing any runtime or managed
+  driver file.
+
+### Validation
+
+- Managed-driver provenance passed with 222 tracked files and 23 authorized
+  repairs.
+- No physical hardware was accessed during this documentation-only close-out.
+
+### Follow-up
+
+Implement the approved Phase 4 integrated behavior system one validated
+subphase at a time.
+
 ## 2026-07-26 — Phase 3.5 privacy-bounded microphone adapter
 
 ### Summary

@@ -6,7 +6,7 @@ gpio = 27
 
 [hardware.servos]
 enabled = true
-endpoints = ["gpio12", "gpio13", "hat_pwm1", "hat_pwm2", "hat_pwm3", "hat_pwm4"]
+endpoints = ["gpio12", "gpio13"]
 calibration_file = "~/.config/pi5servo/servo.json"
 motion_enabled = false
 group_motion_enabled = false
@@ -47,6 +47,24 @@ channels = 1
 max_capture_seconds = 10.0
 media_directory = "~/.local/share/ninjarobot_pi5/microphone"
 retain_audio_by_default = false
+
+[behaviors]
+user_directory = "~/.config/ninjarobot_pi5/behaviors"
+safety_state_file = "~/.local/state/ninjarobot_pi5/safety.json"
+left_motor_role = "left_motor"
+right_motor_role = "right_motor"
+obstacle_threshold_mm = 100
+obstacle_consecutive_readings = 3
+clear_readings_before_motion = 3
+clear_reading_timeout_seconds = 5.0
+distance_poll_interval_seconds = 0.05
+watchdog_timeout_seconds = 1.0
+system_stopped_display_seconds = 2.0
+stop_on_invalid_distance = false
+
+[behaviors.servo_roles]
+left_motor = "gpio12"
+right_motor = "gpio13"
 
 [agent]
 default_provider = "ollama"

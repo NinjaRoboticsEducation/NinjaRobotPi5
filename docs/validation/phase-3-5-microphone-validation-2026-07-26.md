@@ -4,7 +4,7 @@ Date: 2026-07-26
 
 Hardware accessed during implementation: USB/PortAudio enumeration only
 
-Physical Raspberry Pi result: **INTERFACE READY; RECORDING PENDING OPERATOR TEST**
+Physical Raspberry Pi result: **PASS — OPERATOR CONFIRMED ALL TESTS**
 
 ## 1. Scope of validation
 
@@ -284,23 +284,25 @@ or buzzer wiring during this checklist.
 
 ## 7. Pass/fail checklist
 
-- [ ] Safe simulated health, status, and transient capture pass.
-- [ ] Simulated retained WAV is valid, permission `600`, and then deleted.
-- [ ] PortAudio packages are installed.
-- [ ] `arecord -l` identifies USB PnP Sound Device at card 0/device 0.
-- [ ] Real microphone health is ready without recording.
-- [ ] Real status selects USB PnP Sound Device.
-- [ ] Status reports requested 16 kHz and actual 44.1 kHz.
-- [ ] Missing `--confirm-microphone` blocks real capture.
-- [ ] Everyone nearby consents before real recording.
-- [ ] Non-retained real capture succeeds and leaves no WAV.
-- [ ] Replaying the transient action returns the stored result without recording.
-- [ ] Retained real WAV is valid 44.1 kHz mono audio.
-- [ ] Retained file permission is `600`.
-- [ ] Reusing the retained filename is rejected without changing the file.
-- [ ] Retained physical test audio is deleted after inspection.
-- [ ] No `.capture-*` directory remains.
-- [ ] No servo, buzzer, display, distance, or camera action occurs.
+The operator reported that every Phase 3.5 test passed:
+
+- [x] Safe simulated health, status, and transient capture pass.
+- [x] Simulated retained WAV is valid, permission `600`, and then deleted.
+- [x] PortAudio packages are installed.
+- [x] `arecord -l` identifies USB PnP Sound Device at card 0/device 0.
+- [x] Real microphone health is ready without recording.
+- [x] Real status selects USB PnP Sound Device.
+- [x] Status reports requested 16 kHz and actual 44.1 kHz.
+- [x] Missing `--confirm-microphone` blocks real capture.
+- [x] Everyone nearby consents before real recording.
+- [x] Non-retained real capture succeeds and leaves no WAV.
+- [x] Replaying the transient action returns the stored result without recording.
+- [x] Retained real WAV is valid 44.1 kHz mono audio.
+- [x] Retained file permission is `600`.
+- [x] Reusing the retained filename is rejected without changing the file.
+- [x] Retained physical test audio is deleted after inspection.
+- [x] No `.capture-*` directory remains.
+- [x] No servo, buzzer, display, distance, or camera action occurs.
 
 ## 8. Rollback steps
 
@@ -327,4 +329,4 @@ or buzzer wiring during this checklist.
    uv run --frozen python scripts/verify_immutable_drivers.py
    ```
 
-Report the command output and checked Section 7 items before Phase 4 begins.
+Phase 3 is complete. Phase 4 may begin under the approved implementation plan.

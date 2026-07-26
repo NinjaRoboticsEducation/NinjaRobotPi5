@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "name": "warning",
+  "description": "Show a warning face while playing the existing surprising melody.",
+  "category": "expression",
+  "stages": [
+    {
+      "name": "warning_expression",
+      "operations": [
+        {
+          "kind": "face",
+          "expression": "warning",
+          "background": "#402000",
+          "foreground": "#FFFFFF",
+          "accent": "#FFAA00",
+          "hold_seconds": 2.0
+        },
+        {
+          "kind": "melody",
+          "melody": "surprising",
+          "volume": 64
+        }
+      ]
+    }
+  ]
+}

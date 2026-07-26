@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import pytest
 from ninjarobot_pi5_ide.servo import ServoRuntime
 
 from ninjarobot_pi5_ide import (
@@ -13,6 +14,7 @@ from ninjarobot_pi5_ide import (
     ActionStatus,
     CapabilityRegistry,
     ExecutionEngine,
+    IDEError,
     ResourceHealth,
     ResourceScheduler,
     RetrySafety,
@@ -128,6 +130,7 @@ def engine_for(
 def runtime_factory(
     group: FakeServoGroup,
     calibrated: frozenset[str] = frozenset(ENDPOINTS),
+    expected_endpoints: tuple[str, ...] = ENDPOINTS,
 ):
     def factory(
         endpoints: tuple[str, ...],
@@ -135,7 +138,7 @@ def runtime_factory(
         i2c_bus: int,
         address: int,
     ) -> ServoRuntime:
-        assert endpoints == ENDPOINTS
+        assert endpoints == expected_endpoints
         assert calibration_file == "/tmp/test-servo.json"
         assert i2c_bus == 1
         assert address == 0x10
@@ -297,6 +300,59 @@ def test_target_outside_endpoint_calibration_is_rejected(tmp_path: Path) -> None
         assert result.error.code == "SERVO_TARGET_OUTSIDE_CALIBRATION"
         assert group.servos["gpio12"].center_calls == 0
         await engine.close()
+
+    asyncio.run(exercise())
+
+
+def test_group_move_requires_gate_and_centers_both_endpoints(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        group = FakeServoGroup()
+        disabled = ServoDevice(
+            endpoints=("gpio12", "gpio13"),
+            calibration_file="/tmp/test-servo.json",
+            motion_enabled=True,
+            group_motion_enabled=False,
+            runtime_factory=runtime_factory(
+                group,
+                calibrated=frozenset({"gpio12", "gpio13"}),
+                expected_endpoints=("gpio12", "gpio13"),
+            ),
+            simulated=True,
+        )
+        await disabled.start()
+        with pytest.raises(IDEError) as disabled_error:
+            await disabled.move_group(
+                targets={"gpio12": 45.0, "gpio13": -45.0},
+                speed_mode="M",
+            )
+        assert disabled_error.value.details.code == "SERVO_GROUP_MOTION_DISABLED"
+        await disabled.close()
+
+        group = FakeServoGroup()
+        device = ServoDevice(
+            endpoints=("gpio12", "gpio13"),
+            calibration_file="/tmp/test-servo.json",
+            motion_enabled=True,
+            group_motion_enabled=True,
+            runtime_factory=runtime_factory(
+                group,
+                calibrated=frozenset({"gpio12", "gpio13"}),
+                expected_endpoints=("gpio12", "gpio13"),
+            ),
+            simulated=True,
+        )
+        await device.start()
+
+        result = await device.move_group(
+            targets={"gpio12": 45.0, "gpio13": -45.0},
+            speed_mode="M",
+        )
+
+        assert result["interrupted"] is False
+        assert group.servos["gpio12"].center_calls == 1
+        assert group.servos["gpio13"].center_calls == 1
+        assert group.move_calls == [([45.0, -45.0], "M")]
+        await device.close()
 
     asyncio.run(exercise())
 

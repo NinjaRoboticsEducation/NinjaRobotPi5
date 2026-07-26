@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "name": "turn_right",
+  "description": "Turn right continuously while reporting limited side and rear sensor coverage.",
+  "category": "movement",
+  "stages": [
+    {
+      "name": "turn_right",
+      "operations": [
+        {
+          "kind": "text",
+          "text": "TURN RIGHT\nSIDE/REAR UNPROTECTED",
+          "font_size": 22,
+          "foreground": "#FFFFFF",
+          "background": "#202040",
+          "hold_seconds": null
+        },
+        {
+          "kind": "melody",
+          "melody": "confusing",
+          "volume": 64
+        },
+        {
+          "kind": "drive",
+          "targets": {
+            "left_motor": 45.0,
+            "right_motor": 45.0
+          },
+          "speed_mode": "M",
+          "hold_seconds": null
+        }
+      ]
+    }
+  ]
+}

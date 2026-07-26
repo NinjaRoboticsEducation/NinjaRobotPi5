@@ -15,14 +15,7 @@ def test_example_configuration_matches_confirmed_wiring() -> None:
     config = load_robot_config(EXAMPLE)
 
     assert config.hardware.buzzer.gpio == 27
-    assert config.hardware.servos.endpoints == (
-        "gpio12",
-        "gpio13",
-        "hat_pwm1",
-        "hat_pwm2",
-        "hat_pwm3",
-        "hat_pwm4",
-    )
+    assert config.hardware.servos.endpoints == ("gpio12", "gpio13")
     assert config.hardware.servos.calibration_file == "~/.config/pi5servo/servo.json"
     assert config.hardware.servos.motion_enabled is False
     assert config.hardware.servos.group_motion_enabled is False
@@ -45,6 +38,13 @@ def test_example_configuration_matches_confirmed_wiring() -> None:
     assert config.hardware.microphone.max_capture_seconds == 10.0
     assert config.hardware.microphone.media_directory == "~/.local/share/ninjarobot_pi5/microphone"
     assert config.hardware.microphone.retain_audio_by_default is False
+    assert config.behaviors.servo_roles == {
+        "left_motor": "gpio12",
+        "right_motor": "gpio13",
+    }
+    assert config.behaviors.obstacle_threshold_mm == 100
+    assert config.behaviors.obstacle_consecutive_readings == 3
+    assert config.behaviors.stop_on_invalid_distance is False
     assert config.providers["ollama"].api_key_env is None
 
 
@@ -61,28 +61,63 @@ def test_configuration_rejects_unknown_fields_and_gpio_conflicts() -> None:
         RobotConfig.model_validate(payload)
 
 
-def test_configuration_rejects_partial_or_reordered_servo_topology() -> None:
+def test_configuration_allows_supported_servo_topology_customization() -> None:
     payload = load_robot_config(EXAMPLE).model_dump()
-    payload["hardware"]["servos"]["endpoints"] = ("gpio12", "gpio13")
-    with pytest.raises(ValidationError, match="Phase 3.3 servo endpoints"):
+    payload["hardware"]["servos"]["endpoints"] = ("gpio13", "gpio12", "hat_pwm1")
+    payload["behaviors"]["servo_roles"] = {
+        "left_motor": "gpio13",
+        "right_motor": "gpio12",
+    }
+
+    config = RobotConfig.model_validate(payload)
+
+    assert config.hardware.servos.endpoints == ("gpio13", "gpio12", "hat_pwm1")
+
+
+@pytest.mark.parametrize(
+    ("endpoints", "message"),
+    [
+        ((), "must not be empty"),
+        (("gpio12", "gpio12"), "must not contain duplicates"),
+        (("gpio12", "gpio99"), "unsupported servo endpoints"),
+    ],
+)
+def test_configuration_rejects_invalid_servo_topology(
+    endpoints: tuple[str, ...],
+    message: str,
+) -> None:
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["hardware"]["servos"]["endpoints"] = endpoints
+    with pytest.raises(ValidationError, match=message):
         RobotConfig.model_validate(payload)
 
-    payload = load_robot_config(EXAMPLE).model_dump()
-    payload["hardware"]["servos"]["endpoints"] = (
-        "gpio13",
-        "gpio12",
-        "hat_pwm1",
-        "hat_pwm2",
-        "hat_pwm3",
-        "hat_pwm4",
-    )
-    with pytest.raises(ValidationError, match="Phase 3.3 servo endpoints"):
-        RobotConfig.model_validate(payload)
 
-
-def test_configuration_keeps_group_motion_disabled() -> None:
+def test_configuration_permits_explicit_group_motion_gate() -> None:
     payload = load_robot_config(EXAMPLE).model_dump()
     payload["hardware"]["servos"]["group_motion_enabled"] = True
+
+    config = RobotConfig.model_validate(payload)
+
+    assert config.hardware.servos.group_motion_enabled is True
+
+
+def test_configuration_rejects_behavior_roles_outside_servo_topology() -> None:
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["behaviors"]["servo_roles"]["right_motor"] = "hat_pwm1"
+
+    with pytest.raises(ValidationError, match="require configured endpoints"):
+        RobotConfig.model_validate(payload)
+
+
+def test_configuration_bounds_obstacle_policy() -> None:
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["behaviors"]["obstacle_threshold_mm"] = 49
+
+    with pytest.raises(ValidationError, match="greater than or equal to 50"):
+        RobotConfig.model_validate(payload)
+
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["behaviors"]["stop_on_invalid_distance"] = True
     with pytest.raises(ValidationError, match="Input should be False"):
         RobotConfig.model_validate(payload)
 

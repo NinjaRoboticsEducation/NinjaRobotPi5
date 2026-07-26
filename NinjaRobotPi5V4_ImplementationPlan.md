@@ -1,11 +1,11 @@
 # NinjaRobotPi5V4 Implementation Plan
 
 Status: Approved architecture and delivery plan
-Last updated: 2026-07-23 (project and hardware decisions incorporated)
+Last updated: 2026-07-26 (Phase 4 implementation and safety decisions incorporated)
 Primary development computer: Raspberry Pi 5, 8 GM RAM
 Target computer: Raspberry Pi 5, 8 GB RAM
-Implementation status: Phases 0–2 and Phase 3.1–3.5 implemented; Phase 3.5
-physical recording validation is pending operator review
+Implementation status: Phases 0–4 implemented; Phase 4 physical validation is
+pending operator review
 
 ## 1. Purpose of this document
 
@@ -1220,21 +1220,18 @@ References:
 The four HAT servos therefore use the DFR0566's MCU-managed PWM ports, while
 the two GPIO12/GPIO13 servos use the Pi's independent RP1 hardware PWM.
 
-The exact servo models and their rated voltage/current are still required
-before hardware power-on. The DFR0566 documentation indicates that external VP
-power is presented to the PWM-port supply rail. A 6–12 V supply must not be
-connected to a servo that is not rated for that voltage. The Pi checklist must
-record:
+Phase 4 defaults to two TowerPro MG90D 360-degree continuous-rotation motors on
+the digital D12/D13 connections, using native GPIO12/GPIO13 hardware PWM. The
+owner reports red wires on D12/D13 `+`, a measured voltage within the MG90D
+4.8–6.6 V range, and this power chain: official Raspberry Pi 27 W supply to
+Geekworm X1208, then Raspberry Pi/DFR0566, then both motors.
 
-- all six servo models
-- each servo's rated voltage and stall current
-- selected supply voltage and continuous/peak current rating
-- fuse or current-limiting arrangement
-- common-ground arrangement
-- emergency power-disconnect procedure
-
-Until those values are recorded and reviewed, HAT servo power validation is
-blocked even though adapter development with fakes may proceed.
+There is no accessible physical emergency power disconnect. The owner
+explicitly approved Phase 4 real-motion support with that residual risk.
+Software stop, obstacle monitoring, undervoltage stop, and watchdog controls
+do not replace a physical cutoff. The four dedicated HAT PWM endpoints remain
+optional future expansion. Every added servo requires a new voltage, current,
+protection, grounding, and disconnect review.
 
 ### 20.3 Display orientation
 
@@ -1262,7 +1259,7 @@ must be recorded before the corresponding powered Pi checklist:
   that continuous autofocus is supported
 - exact USB microphone model and ALSA device identity
 - whether speaker/audio output is required in a later phase
-- the six servo models and the complete supply design listed in Section 20.2
+- any future servo beyond the two default MG90D motors and its supply design
 
 These items do not block root scaffolding, contracts, fakes, or macOS adapter
 development. They do block production hardware certification for the affected
@@ -1280,9 +1277,10 @@ The pre-Phase-1 hardware run recorded:
   available to the Python environment used by `pi5camera`
 - USB PnP Sound Device detected; native mono capture works at 44.1 kHz, while
   `pi5mic` is blocked by missing PortAudio and local Whisper assets
-- temporary MG90D servos are connected to GPIO12/GPIO13 through the HAT's
-  header passthrough, use a reported 5 V supply, and were not moved because no
-  accessible emergency disconnect exists
+- MG90D servos are connected to GPIO12/GPIO13 through the HAT digital
+  connectors and were not moved during this historical audit because no
+  accessible emergency disconnect existed; the later Phase 4 decision
+  explicitly accepts that residual risk for ordered operator testing
 - buzzer command paths and both servo backend probes completed
 - display command paths completed; visual sign-off is still required
 
@@ -1427,8 +1425,8 @@ capability is easier to validate safely than motion.
 
 ### Phase 3: Integrate all immutable device libraries through IDE adapters
 
-**Status: Subphases 3.1–3.5 implemented; Phase 3.5 physical recording
-validation pending (2026-07-26)**
+**Status: Complete; all Phase 3.1–3.5 physical validation passed operator
+review (2026-07-26)**
 
 **Objective**
 
@@ -1444,7 +1442,7 @@ Add adapters incrementally without changing the copied standalone libraries.
 
 Each device is its own subphase and review.
 
-The servo subphase has a fixed six-servo topology:
+The Phase 3.3 servo adapter was validated with a six-endpoint-capable topology:
 
 - `gpio12` and `gpio13` use the Pi 5 RP1 hardware-PWM backend
 - `hat_pwm1` through `hat_pwm4` map to DFR0566 physical PWM0 through PWM3
@@ -1453,8 +1451,9 @@ The servo subphase has a fixed six-servo topology:
   hardware backend without changing `pi5servo`
 - every servo begins at its safe calibrated center and is validated one at a
   time before group motion
-- group motion is disabled until all six calibrations and the electrical power
-  record are approved
+- group motion remained disabled during Phase 3.3. Phase 4 changes the default
+  active topology to calibrated GPIO12/GPIO13 and adds its own guarded
+  two-motor group boundary.
 
 **Deliverables per device**
 
@@ -1485,33 +1484,61 @@ The servo subphase has a fixed six-servo topology:
 
 **Objective**
 
-Implement the cross-device expressions, movements, asset loading, and robot
-initialization required by V4. Historical behavior may inform requirements, but
-no old runtime code is imported.
+Implement validated cross-device expressions, continuous wheel movements,
+private action creation, two-level stopping, and a user-facing IDE tool. No
+historical runtime or OpenClaw code is imported.
 
 **Deliverables**
 
-- Behavior capability adapter.
-- Safe multi-resource acquisition.
-- Asset repository with validated identifiers and paths.
-- V4 behavior catalog and schema.
-- Reference matrix covering deliberately retained historical actions and
-  expressions.
+- Strict behavior, stage, display, melody, wait, and logical-drive schemas.
+- Read-only bundled assets plus owner-private confined user assets.
+- Sequential stages with concurrent operations inside each stage.
+- Procedural Pillow faces and existing `pi5buzzer` emotion melodies.
+- Default expressions: `idle`, `greeting`, `happy`, `thinking`, `success`,
+  `warning`, and `error`.
+- Default movement commands: `move_forward`, `move_backward`, `turn_right`,
+  and `turn_left`. `stop` remains a safety command rather than an asset.
+- Default logical roles: GPIO12 left MG90D wheel motor and GPIO13 right MG90D
+  wheel motor.
+- Exact motor targets: forward `+45/-45`, backward `-30/+30`, right
+  `+45/+45`, and left `-45/-45`.
+- Front motion starts after three valid readings above 100 mm. Three
+  consecutive readings at or below 100 mm cause a Level 1 motion stop.
+- Invalid, missing, and stale readings warn without stopping an already-running
+  movement, following the project owner's explicit decision.
+- Level 1 stops for obstacle, current undervoltage, and watchdog timeout.
+- Level 2 cleanup for Ctrl+C, shutdown, explicit stop, and driver failure.
+  Driver failure remains latched until explicit confirmation and healthy
+  probes.
+- Interactive and scriptable `ninjarobot-ide-tool` with hardware status,
+  configuration discovery/import, behavior list/show/health/simulate/run,
+  private action creation/validation, stop, and resume commands.
+- Simulation preview and user confirmation before saving new actions. Future
+  AI-proposed actions use the same approval boundary.
 
 **Pi validation**
 
-- New V4 behavior and integration tests.
-- Immutable driver baseline remains separately recorded.
-- Asset and path security tests.
-- Multi-device fake scenarios.
-- Conservative expression and movement checks.
-- Cancellation midway through behavior.
-- Shutdown and resource release after forced failure.
+- Safe configuration and simulation tests before any real hardware.
+- Real health probes that move no motors and record no media.
+- Real greeting and expression checks before actuator use.
+- Raised-wheel movement checks with a second terminal prepared to stop.
+- Front-obstacle debounce and Level 1 resume check.
+- Ctrl+C/cross-process stop and full cleanup check.
+- Power-risk and watchdog triggers are not intentionally induced on hardware.
+- Immutable driver verification before and after the phase.
 
 **Exit criteria**
 
-- Approved V4 behavior works through IDE APIs.
+- All approved V4 behaviors work through IDE-owned APIs and the IDE tool.
+- Private actions are validated, previewed, confined, and confirmation-gated.
+- Level 1 and Level 2 stop behavior passes deterministic tests.
 - No V4 package imports `ninjaclawbot` or OpenClaw.
+
+**Implementation result**
+
+Complete in software on 2026-07-26. The full root suite passes with 154 tests,
+strict mypy, Ruff lint and formatting, and unchanged managed-driver
+provenance. Physical validation remains pending.
 
 ### Phase 5: Agent core and Ollama adapter
 
@@ -1727,7 +1754,8 @@ NinjaRobotPi5V4 is complete when:
 - Raspberry Pi 5 validation passes with a signed-off report
 - installation, development, migration, privacy, and recovery documentation is
   accurate
-- the six-servo power design is recorded and approved
+- the default two-servo power path is recorded, with the missing physical
+  cutoff documented as an accepted residual risk
 - no V4 runtime path imports OpenClaw
 - the user approves the release
 
@@ -1761,7 +1789,8 @@ Approval is requested at these points:
 4. Approve any proposed copied-driver change separately; the default answer is
    no change.
 5. Approve Pi hardware execution when the deferred checklists are ready.
-6. Approve the completed servo electrical record before powered servo tests.
+6. Review the Phase 4 servo power record and residual-risk statement before
+   powered servo tests.
 7. Approve optional systemd auto-start separately after manual startup is
    stable.
 

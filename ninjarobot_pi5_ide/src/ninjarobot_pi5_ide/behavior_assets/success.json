@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "name": "success",
+  "description": "Show a success face while playing the existing exciting melody.",
+  "category": "expression",
+  "stages": [
+    {
+      "name": "success_expression",
+      "operations": [
+        {
+          "kind": "face",
+          "expression": "success",
+          "background": "#003000",
+          "foreground": "#FFFFFF",
+          "accent": "#00FF66",
+          "hold_seconds": 2.0
+        },
+        {
+          "kind": "melody",
+          "melody": "exciting",
+          "volume": 64
+        }
+      ]
+    }
+  ]
+}

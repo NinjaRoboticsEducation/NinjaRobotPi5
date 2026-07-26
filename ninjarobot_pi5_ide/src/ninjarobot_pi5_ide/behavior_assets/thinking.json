@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "name": "thinking",
+  "description": "Show a quiet thinking face.",
+  "category": "expression",
+  "stages": [
+    {
+      "name": "thinking_expression",
+      "operations": [
+        {
+          "kind": "face",
+          "expression": "thinking",
+          "background": "#101020",
+          "foreground": "#FFFFFF",
+          "accent": "#00BFFF",
+          "hold_seconds": 2.0
+        }
+      ]
+    }
+  ]
+}

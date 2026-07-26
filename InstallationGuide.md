@@ -1,9 +1,9 @@
 # NinjaRobotPi5V4 Installation Guide
 
-NinjaRobotPi5V4 currently implements the deterministic IDE core, distance,
-buzzer, display, six-servo, privacy-bounded still-camera, and privacy-bounded
-USB microphone adapters. Default commands use simulation. A real device is
-opened only when its command includes `--real`.
+NinjaRobotPi5V4 implements the deterministic IDE core, all six device
+adapters, and integrated Phase 4 expressions and wheel movements. Default
+commands use simulation. A real device is opened only when its command
+includes `--real`.
 
 ## Requirements
 
@@ -50,6 +50,8 @@ uv run --frozen ninjarobot_pi5_cli --version
 uv run --frozen ninjarobot_pi5_cli config validate \
   --config config/ninjarobot_pi5.toml.example
 uv run --frozen ninjarobot_pi5_cli capabilities
+uv run --frozen ninjarobot-ide-tool behavior list
+uv run --frozen ninjarobot-ide-tool behavior health
 uv run --frozen pytest -q
 ```
 
@@ -86,6 +88,70 @@ uv sync --frozen --extra hardware
 
 An extra is an optional dependency group. The `hardware` extra installs the
 local managed libraries and their Raspberry Pi dependencies.
+
+## Private integrated configuration
+
+The checked-in example is safe and keeps physical movement disabled. Discover
+existing standalone Pi5 settings without changing them:
+
+```bash
+uv run --frozen ninjarobot-ide-tool config discover
+uv run --frozen ninjarobot-ide-tool config import
+```
+
+The second command is preview-only. Carefully check every imported pin and
+path. Apply it only after the preview matches the robot:
+
+```bash
+uv run --frozen ninjarobot-ide-tool config import --apply
+chmod 600 ~/.config/ninjarobot_pi5/config.toml
+```
+
+The import reads known `pi5*` JSON files but never runs their CLI tools and
+never rewrites their settings. Standalone reset or calibration still belongs
+to the relevant `pi5*` CLI.
+
+For physical integrated wheel movement, edit
+`~/.config/ninjarobot_pi5/config.toml` and verify these values:
+
+```toml
+[hardware.servos]
+endpoints = ["gpio12", "gpio13"]
+calibration_file = "~/.config/pi5servo/servo.json"
+motion_enabled = true
+group_motion_enabled = true
+
+[behaviors]
+left_motor_role = "left_motor"
+right_motor_role = "right_motor"
+obstacle_threshold_mm = 100
+obstacle_consecutive_readings = 3
+clear_readings_before_motion = 3
+
+[behaviors.servo_roles]
+left_motor = "gpio12"
+right_motor = "gpio13"
+```
+
+Both exact endpoints must have valid standalone calibration records before
+real group movement. For a continuous-rotation servo, calibration center is
+the neutral stop value.
+
+## Integrated simulation
+
+Run these checks before any real behavior:
+
+```bash
+uv run --frozen ninjarobot-ide-tool behavior list
+uv run --frozen ninjarobot-ide-tool behavior show greeting
+uv run --frozen ninjarobot-ide-tool behavior health
+uv run --frozen ninjarobot-ide-tool behavior simulate greeting
+uv run --frozen ninjarobot-ide-tool behavior simulate move_forward \
+  --duration 2
+```
+
+Run `uv run --frozen ninjarobot-ide-tool` for the interactive menu. Simulation
+does not open GPIO, PWM, I2C, SPI, camera, or microphone hardware.
 
 ## Camera-capable Raspberry Pi environment
 
@@ -220,6 +286,11 @@ Use the phase-specific reports:
   [`docs/validation/phase-3-4-camera-validation-2026-07-26.md`](docs/validation/phase-3-4-camera-validation-2026-07-26.md)
 - microphone:
   [`docs/validation/phase-3-5-microphone-validation-2026-07-26.md`](docs/validation/phase-3-5-microphone-validation-2026-07-26.md)
+- integrated Phase 4 behavior:
+  [`docs/validation/phase-4-integrated-behavior-validation-2026-07-26.md`](docs/validation/phase-4-integrated-behavior-validation-2026-07-26.md)
 
 Never change wiring while powered. Keep the servo emergency power disconnect
-within reach during any actuator-moving test.
+within reach during any actuator-moving test. The currently reported robot
+does not have such a disconnect, so real movement retains additional risk.
+Keep the wheels raised for initial tests, keep hands and loose items away, and
+use a second terminal with `ninjarobot-ide-tool behavior stop`.

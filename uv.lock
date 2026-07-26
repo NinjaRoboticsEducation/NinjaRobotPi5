@@ -699,12 +699,14 @@ name = "ninjarobot-pi5-ide"
 version = "0.1.0"
 source = { editable = "ninjarobot_pi5_ide" }
 dependencies = [
+    { name = "click" },
     { name = "pillow" },
     { name = "pydantic" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "click", specifier = ">=8.1,<9" },
     { name = "pillow", specifier = ">=10.1,<13" },
     { name = "pydantic", specifier = ">=2.12,<3" },
 ]

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "name": "idle",
+  "description": "Show the neutral waiting face without sound or movement.",
+  "category": "expression",
+  "stages": [
+    {
+      "name": "idle_face",
+      "operations": [
+        {
+          "kind": "face",
+          "expression": "idle",
+          "background": "#000020",
+          "foreground": "#FFFFFF",
+          "accent": "#00BFFF",
+          "hold_seconds": null
+        }
+      ]
+    }
+  ]
+}

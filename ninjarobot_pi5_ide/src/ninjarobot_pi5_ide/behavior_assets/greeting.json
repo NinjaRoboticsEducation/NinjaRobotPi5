@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "name": "greeting",
+  "description": "Show a happy face, then greet with text and the existing happy melody.",
+  "category": "expression",
+  "stages": [
+    {
+      "name": "happy_face",
+      "operations": [
+        {
+          "kind": "face",
+          "expression": "happy",
+          "background": "#000040",
+          "foreground": "#FFFFFF",
+          "accent": "#FFD700",
+          "hold_seconds": 2.0
+        }
+      ]
+    },
+    {
+      "name": "greeting_text_and_sound",
+      "operations": [
+        {
+          "kind": "text",
+          "text": "Nice to meet you",
+          "font_size": 30,
+          "foreground": "#FFFFFF",
+          "background": "#000040",
+          "hold_seconds": 2.0
+        },
+        {
+          "kind": "melody",
+          "melody": "happy",
+          "volume": 64
+        }
+      ]
+    }
+  ]
+}

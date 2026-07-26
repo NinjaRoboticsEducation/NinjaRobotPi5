@@ -20,9 +20,12 @@ EnvironmentVariable = Annotated[
     StringConstraints(min_length=2, max_length=128, pattern=r"^[A-Z][A-Z0-9_]+$"),
 ]
 NonEmptyText = Annotated[str, StringConstraints(min_length=1, max_length=256)]
-SERVO_ENDPOINTS = (
+DEFAULT_SERVO_ENDPOINTS = (
     "gpio12",
     "gpio13",
+)
+SUPPORTED_SERVO_ENDPOINTS = (
+    *DEFAULT_SERVO_ENDPOINTS,
     "hat_pwm1",
     "hat_pwm2",
     "hat_pwm3",
@@ -44,13 +47,13 @@ class BuzzerConfig(ConfigModel):
 
 
 class ServoConfig(ConfigModel):
-    """Fixed mixed-backend servo topology and motion safety gate."""
+    """Configured servo topology and motion safety gates."""
 
     enabled: bool = True
-    endpoints: tuple[str, ...] = SERVO_ENDPOINTS
+    endpoints: tuple[str, ...] = DEFAULT_SERVO_ENDPOINTS
     calibration_file: NonEmptyText = "~/.config/pi5servo/servo.json"
     motion_enabled: bool = False
-    group_motion_enabled: Literal[False] = False
+    group_motion_enabled: bool = False
 
     @field_validator("endpoints", mode="before")
     @classmethod
@@ -63,14 +66,14 @@ class ServoConfig(ConfigModel):
     @field_validator("endpoints")
     @classmethod
     def endpoints_must_be_unique_and_explicit(cls, endpoints: tuple[str, ...]) -> tuple[str, ...]:
-        """Require the approved six-servo topology in stable routing order."""
+        """Require one or more supported, uniquely routed endpoints."""
+        if not endpoints:
+            raise ValueError("servo endpoints must not be empty")
         if len(endpoints) != len(set(endpoints)):
             raise ValueError("servo endpoints must not contain duplicates")
-        if endpoints != SERVO_ENDPOINTS:
-            raise ValueError(
-                "Phase 3.3 servo endpoints must be gpio12, gpio13, "
-                "hat_pwm1, hat_pwm2, hat_pwm3, and hat_pwm4 in that order"
-            )
+        unsupported = sorted(set(endpoints) - set(SUPPORTED_SERVO_ENDPOINTS))
+        if unsupported:
+            raise ValueError(f"unsupported servo endpoints: {', '.join(unsupported)}")
         return endpoints
 
 
@@ -138,6 +141,48 @@ class MicrophoneConfig(ConfigModel):
     retain_audio_by_default: Literal[False] = False
 
 
+class BehaviorConfig(ConfigModel):
+    """Behavior assets, drive roles, and approved distance-watch settings."""
+
+    user_directory: NonEmptyText = "~/.config/ninjarobot_pi5/behaviors"
+    safety_state_file: NonEmptyText = "~/.local/state/ninjarobot_pi5/safety.json"
+    left_motor_role: NonEmptyText = "left_motor"
+    right_motor_role: NonEmptyText = "right_motor"
+    servo_roles: dict[str, str] = Field(
+        default_factory=lambda: {
+            "left_motor": "gpio12",
+            "right_motor": "gpio13",
+        }
+    )
+    obstacle_threshold_mm: Annotated[int, Field(ge=50, le=2_000)] = 100
+    obstacle_consecutive_readings: Annotated[int, Field(ge=1, le=10)] = 3
+    clear_readings_before_motion: Annotated[int, Field(ge=1, le=10)] = 3
+    clear_reading_timeout_seconds: Annotated[float, Field(ge=1.0, le=30.0)] = 5.0
+    distance_poll_interval_seconds: Annotated[float, Field(ge=0.02, le=2.0)] = 0.05
+    watchdog_timeout_seconds: Annotated[float, Field(ge=0.1, le=10.0)] = 1.0
+    system_stopped_display_seconds: Annotated[float, Field(ge=0.0, le=10.0)] = 2.0
+    stop_on_invalid_distance: Literal[False] = False
+
+    @model_validator(mode="after")
+    def motor_roles_must_be_distinct_and_supported(self) -> BehaviorConfig:
+        """Require two distinct logical motor roles mapped to supported endpoints."""
+        if self.left_motor_role == self.right_motor_role:
+            raise ValueError("left and right motor role names must be distinct")
+        required = {self.left_motor_role, self.right_motor_role}
+        missing = sorted(required - set(self.servo_roles))
+        if missing:
+            raise ValueError(f"servo_roles is missing required roles: {', '.join(missing)}")
+        endpoints = tuple(self.servo_roles.values())
+        if len(endpoints) != len(set(endpoints)):
+            raise ValueError("servo_roles must map to distinct servo endpoints")
+        unsupported = sorted(set(endpoints) - set(SUPPORTED_SERVO_ENDPOINTS))
+        if unsupported:
+            raise ValueError(
+                f"servo_roles contains unsupported endpoints: {', '.join(unsupported)}"
+            )
+        return self
+
+
 class HardwareConfig(ConfigModel):
     """Authoritative V4 hardware mapping."""
 
@@ -192,8 +237,20 @@ class RobotConfig(ConfigModel):
 
     schema_version: Literal[1] = 1
     hardware: HardwareConfig = Field(default_factory=HardwareConfig)
+    behaviors: BehaviorConfig = Field(default_factory=BehaviorConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
     providers: dict[str, ProviderConfig] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def behavior_servo_roles_must_be_configured(self) -> RobotConfig:
+        """Prevent a behavior role from resolving outside the active servo topology."""
+        configured = set(self.hardware.servos.endpoints)
+        missing = sorted(set(self.behaviors.servo_roles.values()) - configured)
+        if missing:
+            raise ValueError(
+                "behavior servo roles require configured endpoints: " + ", ".join(missing)
+            )
+        return self
 
     @model_validator(mode="after")
     def default_provider_must_exist_and_be_enabled(self) -> RobotConfig:

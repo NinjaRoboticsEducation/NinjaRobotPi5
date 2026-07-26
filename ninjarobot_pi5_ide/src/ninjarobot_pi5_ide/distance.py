@@ -66,7 +66,7 @@ class VL53L0XDistanceAdapter:
             "additionalProperties": False,
         },
         risk=RiskLevel.READ_ONLY,
-        resources=("i2c-1", "vl53l0x-0x29"),
+        resources=("i2c1", "vl53l0x-0x29"),
         default_timeout_seconds=2.0,
         idempotent=True,
         cancellable=True,

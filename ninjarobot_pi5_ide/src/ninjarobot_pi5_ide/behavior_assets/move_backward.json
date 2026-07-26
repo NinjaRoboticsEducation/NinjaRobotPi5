@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "name": "move_backward",
+  "description": "Drive backward continuously while warning that the rear is not protected by the front sensor.",
+  "category": "movement",
+  "stages": [
+    {
+      "name": "drive_backward",
+      "operations": [
+        {
+          "kind": "text",
+          "text": "MOVING BACKWARD\nREAR UNPROTECTED",
+          "font_size": 24,
+          "foreground": "#FFFFFF",
+          "background": "#402000",
+          "hold_seconds": null
+        },
+        {
+          "kind": "melody",
+          "melody": "surprising",
+          "volume": 64
+        },
+        {
+          "kind": "drive",
+          "targets": {
+            "left_motor": -30.0,
+            "right_motor": 30.0
+          },
+          "speed_mode": "M",
+          "obstacle_policy": "warn_only",
+          "hold_seconds": null
+        }
+      ]
+    }
+  ]
+}

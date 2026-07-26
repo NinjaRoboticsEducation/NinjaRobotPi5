@@ -1,4 +1,4 @@
-"""Safety-gated mixed-backend servo capabilities for the fixed six-servo topology."""
+"""Safety-gated mixed-backend servo capabilities for configured endpoints."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, cast
 
-from .config import SERVO_ENDPOINTS
+from .config import SUPPORTED_SERVO_ENDPOINTS
 from .errors import IDEError
 from .models import (
     CapabilityDescriptor,
@@ -129,16 +129,22 @@ class ServoDevice:
     def __init__(
         self,
         *,
-        endpoints: tuple[str, ...] = SERVO_ENDPOINTS,
+        endpoints: tuple[str, ...] = SUPPORTED_SERVO_ENDPOINTS,
         calibration_file: str = "~/.config/pi5servo/servo.json",
         i2c_bus: int = 1,
         dfr0566_address: int = 0x10,
         motion_enabled: bool = False,
+        group_motion_enabled: bool = False,
         runtime_factory: ServoFactory | None = None,
         simulated: bool = False,
     ) -> None:
-        if endpoints != SERVO_ENDPOINTS:
-            raise ValueError("servo device requires the fixed Phase 3.3 six-servo topology")
+        if not endpoints:
+            raise ValueError("servo device requires at least one endpoint")
+        if len(endpoints) != len(set(endpoints)):
+            raise ValueError("servo endpoints must not contain duplicates")
+        unsupported = sorted(set(endpoints) - set(SUPPORTED_SERVO_ENDPOINTS))
+        if unsupported:
+            raise ValueError(f"unsupported servo endpoints: {', '.join(unsupported)}")
         if not calibration_file:
             raise ValueError("calibration_file must not be empty")
         if i2c_bus != 1:
@@ -151,6 +157,7 @@ class ServoDevice:
         self._i2c_bus = i2c_bus
         self._dfr0566_address = dfr0566_address
         self._motion_enabled = motion_enabled
+        self._group_motion_enabled = group_motion_enabled
         self._runtime_factory = runtime_factory or _load_servo_runtime
         self._simulated = simulated
         self._runtime: ServoRuntime | None = None
@@ -184,7 +191,7 @@ class ServoDevice:
                 "endpoints": list(self._endpoints),
                 "calibrated": {endpoint: endpoint in calibrated for endpoint in self._endpoints},
                 "motion_enabled": self._motion_enabled,
-                "group_motion_enabled": False,
+                "group_motion_enabled": self._group_motion_enabled,
                 "driver_available": runtime is not None,
                 "simulated": self._simulated,
             }
@@ -305,6 +312,155 @@ class ServoDevice:
             "simulated": self._simulated,
         }
 
+    async def move_group(
+        self,
+        *,
+        targets: dict[str, float],
+        speed_mode: str,
+    ) -> dict[str, Any]:
+        """Center and command multiple calibrated endpoints as one drive action."""
+        async with self._state_lock:
+            runtime = self._require_runtime_locked("servo.move_group")
+            if not self._motion_enabled:
+                raise _servo_error(
+                    code="SERVO_MOTION_DISABLED",
+                    message="Real servo motion is disabled by V4 configuration.",
+                    technical_detail="Set motion_enabled = true only after calibration.",
+                    definitely_not_executed=True,
+                    retry_safety=RetrySafety.SAFE,
+                    capability="servo.move_group",
+                )
+            if not self._group_motion_enabled:
+                raise _servo_error(
+                    code="SERVO_GROUP_MOTION_DISABLED",
+                    message="Coordinated servo motion is disabled by V4 configuration.",
+                    technical_detail=(
+                        "Set group_motion_enabled = true after both motors are calibrated."
+                    ),
+                    definitely_not_executed=True,
+                    retry_safety=RetrySafety.SAFE,
+                    capability="servo.move_group",
+                )
+            if not targets:
+                raise _servo_error(
+                    code="INVALID_CAPABILITY_ARGUMENTS",
+                    message="A group movement requires at least one servo target.",
+                    technical_detail=None,
+                    definitely_not_executed=True,
+                    retry_safety=RetrySafety.SAFE,
+                    capability="servo.move_group",
+                )
+            unsupported = sorted(set(targets) - set(self._endpoints))
+            if unsupported:
+                raise _servo_error(
+                    code="INVALID_CAPABILITY_ARGUMENTS",
+                    message="A group target references an unconfigured servo endpoint.",
+                    technical_detail=", ".join(unsupported),
+                    definitely_not_executed=True,
+                    retry_safety=RetrySafety.SAFE,
+                    capability="servo.move_group",
+                )
+            uncalibrated = sorted(set(targets) - set(runtime.calibrated_endpoints))
+            if uncalibrated:
+                raise _servo_error(
+                    code="SERVO_NOT_CALIBRATED",
+                    message="Every group endpoint requires an explicit calibration.",
+                    technical_detail=", ".join(uncalibrated),
+                    definitely_not_executed=True,
+                    retry_safety=RetrySafety.SAFE,
+                    capability="servo.move_group",
+                )
+            if self._movement_task is not None and not self._movement_task.done():
+                raise _servo_error(
+                    code="SERVO_BUSY",
+                    message="Another servo movement is already running.",
+                    technical_detail=None,
+                    definitely_not_executed=True,
+                    retry_safety=RetrySafety.SAFE,
+                    capability="servo.move_group",
+                )
+            servos: list[tuple[str, ServoDriver]] = []
+            for endpoint, target in targets.items():
+                servo = runtime.group.get_servo(endpoint)
+                if servo is None:
+                    raise _servo_error(
+                        code="SERVO_ENDPOINT_UNAVAILABLE",
+                        message=f"Servo endpoint {endpoint} is unavailable.",
+                        technical_detail=None,
+                        definitely_not_executed=True,
+                        retry_safety=RetrySafety.SAFE,
+                        capability="servo.move_group",
+                    )
+                if not servo.calibration.angle_min <= target <= servo.calibration.angle_max:
+                    raise _servo_error(
+                        code="SERVO_TARGET_OUTSIDE_CALIBRATION",
+                        message=f"Servo target is outside the calibration for {endpoint}.",
+                        technical_detail=(
+                            f"Allowed range is {servo.calibration.angle_min} through "
+                            f"{servo.calibration.angle_max} degrees."
+                        ),
+                        definitely_not_executed=True,
+                        retry_safety=RetrySafety.SAFE,
+                        capability="servo.move_group",
+                    )
+                servos.append((endpoint, servo))
+            try:
+                await asyncio.gather(
+                    *(asyncio.to_thread(servo.move_to_center) for _endpoint, servo in servos)
+                )
+            except Exception as exc:
+                await asyncio.to_thread(runtime.group.off)
+                raise _servo_error(
+                    code="SERVO_CENTER_FAILED",
+                    message="The drive servos could not reach their calibrated stop values.",
+                    technical_detail=f"{type(exc).__name__}: {exc}",
+                    definitely_not_executed=False,
+                    retry_safety=RetrySafety.UNKNOWN,
+                    capability="servo.move_group",
+                ) from exc
+            ordered_targets = [targets.get(endpoint) for endpoint in self._endpoints]
+            movement_task = asyncio.create_task(
+                runtime.group.move_all_async(ordered_targets, speed_mode=speed_mode)
+            )
+            self._movement_task = movement_task
+
+        try:
+            completed = await movement_task
+        except asyncio.CancelledError:
+            await self.stop()
+            raise
+        except Exception as exc:
+            await self.stop()
+            raise _servo_error(
+                code="SERVO_MOVE_FAILED",
+                message="The coordinated servo movement failed.",
+                technical_detail=f"{type(exc).__name__}: {exc}",
+                definitely_not_executed=False,
+                retry_safety=RetrySafety.UNKNOWN,
+                capability="servo.move_group",
+            ) from exc
+        finally:
+            async with self._state_lock:
+                if self._movement_task is movement_task:
+                    self._movement_task = None
+        if not completed:
+            await self.stop()
+        return {
+            "targets": targets,
+            "speed_mode": speed_mode,
+            "interrupted": not completed,
+            "simulated": self._simulated,
+        }
+
+    def emergency_stop_sync(self) -> bool:
+        """Best-effort direct zero pulse for a watchdog thread."""
+        runtime = self._runtime
+        if runtime is None:
+            return False
+        runtime.group.abort()
+        runtime.group.off()
+        return True
+
     async def stop(self) -> dict[str, Any]:
         """Abort movement and set every configured servo output to zero."""
         async with self._state_lock:
@@ -382,7 +538,7 @@ class ServoDevice:
         if self._runtime is None:
             raise _servo_error(
                 code="SERVO_UNAVAILABLE",
-                message="The mixed GPIO12/GPIO13 and DFR0566 servo backend is unavailable.",
+                message="The configured mixed servo backend is unavailable.",
                 technical_detail=self._startup_error,
                 definitely_not_executed=True,
                 retry_safety=RetrySafety.SAFE,
@@ -470,7 +626,7 @@ class ServoMoveAdapter:
             "properties": {
                 "endpoint": {
                     "type": "string",
-                    "enum": list(SERVO_ENDPOINTS),
+                    "enum": list(SUPPORTED_SERVO_ENDPOINTS),
                 },
                 "target_angle": {
                     "type": "number",
@@ -528,9 +684,9 @@ class ServoMoveAdapter:
         endpoint = arguments.get("endpoint")
         target_angle = arguments.get("target_angle")
         speed_mode = arguments.get("speed_mode", "S")
-        if not isinstance(endpoint, str) or endpoint not in SERVO_ENDPOINTS:
+        if not isinstance(endpoint, str) or endpoint not in SUPPORTED_SERVO_ENDPOINTS:
             raise _invalid_arguments(
-                f"endpoint must be one of {list(SERVO_ENDPOINTS)}",
+                f"endpoint must be one of {list(SUPPORTED_SERVO_ENDPOINTS)}",
                 capability="servo.move",
             )
         if (

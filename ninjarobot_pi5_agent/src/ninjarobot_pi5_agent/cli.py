@@ -868,6 +868,7 @@ def _build_servo_engine(
             i2c_bus=config.hardware.i2c.bus,
             dfr0566_address=config.hardware.i2c.dfr0566_address,
             motion_enabled=servo_config.motion_enabled,
+            group_motion_enabled=servo_config.group_motion_enabled,
         )
     else:
         endpoints = (

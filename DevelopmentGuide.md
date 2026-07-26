@@ -503,6 +503,151 @@ uv run --frozen ninjarobot_pi5_cli microphone capture \
 Real health and status query the USB interface but do not record. Follow the
 Phase 3.5 report before adding `--real --confirm-microphone`.
 
+## Phase 4 integrated behavior system
+
+Phase 4 lives entirely inside `ninjarobot_pi5_ide`. Managed hardware libraries
+remain device drivers; they do not own behavior schemas, cross-device timing,
+safety latches, or action storage.
+
+The main modules are:
+
+- `behavior_models.py`: strict immutable definitions for stages and operations
+- `behavior_assets.py`: read-only bundled assets and confined private assets
+- `behavior_runtime.py`: ordered stages and concurrent operations
+- `face_renderer.py`: procedural Pillow faces; Pillow is the Python image
+  library used to draw each frame
+- `robot.py`: one shared assembly for display, buzzer, servos, distance,
+  camera, and microphone
+- `safety.py`: logical motor mapping, distance guard, watchdog, undervoltage,
+  two stop levels, and persistent restart gates
+- `config_import.py`: preview-first read-only import of standalone Pi5 JSON
+  settings
+- `runtime_control.py`: owner-private active-process registration so a second
+  CLI can request stop
+- `cli.py`: the interactive and scriptable `ninjarobot-ide-tool`
+
+### Behavior format
+
+A behavior contains one or more stages. Stages execute in order. Operations
+inside a stage begin concurrently. A stage may contain one display operation,
+one existing buzzer melody, one drive operation, and one wait. This structure
+makes greeting text and sound start together without forcing every robot
+behavior into one long serial sequence.
+
+Bundled assets are package data and read-only. Private assets live in
+`~/.config/ninjarobot_pi5/behaviors`. Names cannot contain paths, symbolic
+links are rejected, files use mode `0600`, writes are atomic, and existing
+assets are not overwritten unless the user explicitly requests it.
+
+The bundled catalog is:
+
+- expressions: `idle`, `greeting`, `happy`, `thinking`, `success`, `warning`,
+  and `error`
+- movements: `move_forward`, `move_backward`, `turn_left`, and `turn_right`
+
+`stop` is not an asset. It is a safety command that cannot be embedded or
+redefined by a private action.
+
+### Default motor and obstacle policy
+
+Behavior assets use logical roles, not pins. The example configuration maps:
+
+```toml
+[behaviors.servo_roles]
+left_motor = "gpio12"
+right_motor = "gpio13"
+```
+
+The approved continuous-rotation targets are:
+
+| Behavior | Left motor | Right motor |
+| --- | ---: | ---: |
+| `move_forward` | +45 | -45 |
+| `move_backward` | -30 | +30 |
+| `turn_right` | +45 | +45 |
+| `turn_left` | -45 | -45 |
+
+Zero or the calibrated center represents neutral for these MG90D
+continuous-rotation motors. An emergency stop uses zero PWM pulse through the
+driver's `off` path rather than leaving a motion target active.
+
+Front-guarded motion requires three valid clear readings above 100 mm before
+the motors start. Three consecutive readings at or below 100 mm cause a Level
+1 stop. The threshold is configurable but the schema refuses values below
+50 mm. Backward movement uses warning-only monitoring because the sensor faces
+forward. Turns report that side and rear space is not protected.
+
+The owner explicitly selected warning-only behavior for missing, invalid, and
+stale readings during an already-running movement. Those samples break the
+three-reading sequence but do not stop the motors. A front-guarded action still
+cannot start until it receives the configured number of valid clear readings.
+
+### Stop levels
+
+Level 1 stops only servo movement and blocks another movement:
+
+- three consecutive front-obstacle readings
+- current Raspberry Pi undervoltage
+- software-watchdog timeout
+
+Resume with:
+
+```bash
+uv run --frozen ninjarobot-ide-tool motion resume --confirm
+```
+
+Level 2 stops servo movement and ranging, closes camera and microphone devices,
+silences the buzzer, and keeps the display long enough to show
+`SYSTEM STOPPED`. Ctrl+C, explicit behavior stop, shutdown cleanup, and driver
+failure use this path. Driver failure persists a system latch. Start a fresh
+CLI process and resume only after all safe health probes pass:
+
+```bash
+uv run --frozen --extra hardware ninjarobot-ide-tool \
+  system resume --confirm
+```
+
+The watchdog uses a daemon thread, meaning a small background operating-system
+thread, and calls the servo zero-pulse path directly if the main asyncio event
+loop stops updating. Asyncio is Python's cooperative asynchronous task system.
+The thread is tested both with a frozen event loop and with a legitimately slow
+asynchronous servo ramp.
+
+### IDE tool examples
+
+```bash
+uv run --frozen ninjarobot-ide-tool
+uv run --frozen ninjarobot-ide-tool hardware status
+uv run --frozen ninjarobot-ide-tool config discover
+uv run --frozen ninjarobot-ide-tool config import
+uv run --frozen ninjarobot-ide-tool behavior list
+uv run --frozen ninjarobot-ide-tool behavior show greeting
+uv run --frozen ninjarobot-ide-tool behavior health
+uv run --frozen ninjarobot-ide-tool behavior simulate greeting
+uv run --frozen ninjarobot-ide-tool behavior simulate move_forward \
+  --duration 2
+```
+
+Real expressions need `--real`. Real movement additionally needs valid
+calibration, both private configuration gates, and `--confirm-motion`. The
+complete ordered manual procedure is in the Phase 4 validation report.
+
+Create a one-stage private expression:
+
+```bash
+uv run --frozen ninjarobot-ide-tool behavior create \
+  --name my_success \
+  --description "Celebrate a completed task." \
+  --face success \
+  --melody exciting \
+  --confirm-save
+```
+
+The tool validates and simulates the action before saving it. A complete
+multi-stage action can instead be supplied with `--from-file`. Any future
+AI-proposed action uses the same preview and confirmation path; it cannot save
+or physically run itself without user approval.
+
 ## Driver package validation commands
 
 ### Standalone README contract
@@ -643,9 +788,34 @@ test; the separate pre-Phase-1 live-Pi report is stored under `docs/validation/`
 - **A continuous-rotation servo does not move to an angle:** this is expected.
   Its calibrated center is neutral, while either side controls direction and
   speed. Begin with a very small value and no mechanical load.
-- **Unexpected motion or jitter occurs:** run `servo stop`, use the physical
-  power disconnect, shut down before touching wiring, and inspect power,
-  common ground, signal routing, and calibration.
+- **Unexpected motion or jitter occurs:** run `behavior stop`, use a physical
+  power disconnect if one is installed, shut down before touching wiring, and
+  inspect power, common ground, signal routing, and calibration. The current
+  robot has no accessible cutoff, which is a known residual risk.
+- **Integrated movement says it did not receive clear readings:** keep the
+  front sensor aimed at open space beyond 100 mm and confirm it returns three
+  valid readings. The motors have not started.
+- **Integrated movement says motion is latched:** remove the obstacle or solve
+  the power/watchdog problem, then run
+  `ninjarobot-ide-tool motion resume --confirm`.
+- **Integrated behavior says the system is stopped:** a driver failure is
+  latched. Start a fresh process and run
+  `uv run --frozen --extra hardware ninjarobot-ide-tool system resume
+  --confirm`. The command refuses to clear the latch when a required health
+  probe fails.
+- **A second terminal cannot stop a behavior:** first run
+  `ninjarobot-ide-tool behavior stop`. It validates the recorded process start
+  token before sending Ctrl+C, which avoids signaling an unrelated process
+  after a process identifier is reused. If no live behavior is registered, it
+  safely initializes the servo and distance boundaries and requests direct
+  cleanup.
+- **Backward or turn output says an area is unprotected:** this is expected.
+  The VL53L0X faces forward, so it cannot see behind or fully cover either
+  side.
+- **Distance readings become invalid during movement:** V4 visibly reports the
+  warning and continues, following the owner-approved policy. Use
+  `behavior stop` immediately if continuing is not safe. Do not unplug the
+  sensor while power is on.
 - **DFR0566 digital GPIO12/GPIO13 do not show a PWM alternate function:** add
   `dtparam=audio=off` and
   `dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4` to
