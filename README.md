@@ -67,8 +67,10 @@ command paths and the current DC4/RST5/BL6 visual checklist pass. See the
 [2026-07-25 hardware report](docs/validation/raspberry-pi-hardware-validation-2026-07-25.md).
 
 `pi5camera` now uses the Raspberry Pi OS Picamera2/libcamera packages through a
-system-site-enabled Python 3.13 environment. Doctor, status, and a verified
-1280×720 JPEG capture pass.
+small V4 interpreter bridge. The ordinary project environment remains on its
+locked Python version; only real managed-camera checks and capture run through
+Raspberry Pi OS `/usr/bin/python3`. Doctor, status, and a verified 1280×720
+JPEG capture pass.
 
 `pi5mic` now has PortAudio and a local whisper.cpp base model. USB-device
 discovery, a five-second library recording, doctor, and offline transcription
@@ -243,14 +245,18 @@ changing their source:
 uv sync --frozen --extra hardware
 ```
 
-Real Picamera2 access additionally requires the Raspberry Pi OS Python
-environment. The safe bootstrap preserves an incompatible existing `.venv`
-before creating a system-site-enabled replacement:
+Real Picamera2 access additionally requires the Raspberry Pi OS camera
+packages. The safe bootstrap installs or checks those packages, keeps the
+ordinary project `.venv`, and verifies the interpreter bridge without taking
+a photograph:
 
 ```bash
 ./scripts/bootstrap-rpi-camera-workspace.sh
-source .venv/bin/activate
 ```
+
+It is normal for `python -c "import picamera2"` inside the project `.venv` to
+fail. The required check is
+`/usr/bin/python3 -s -c "import libcamera, picamera2"`.
 
 Then follow
 [`docs/validation/phase-2-validation-2026-07-26.md`](docs/validation/phase-2-validation-2026-07-26.md).

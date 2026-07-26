@@ -90,39 +90,42 @@ local managed libraries and their Raspberry Pi dependencies.
 
 Picamera2 is provided by Raspberry Pi OS and is linked to the matching
 libcamera components. A downloaded `uv` Python usually cannot import those
-system packages. Prepare the root environment with:
+system packages. V4 keeps its ordinary locked environment and sends only
+managed real-camera work to Raspberry Pi OS `/usr/bin/python3`. Prepare this
+bridge with:
 
 ```bash
 cd /home/rogerchang/NinjaRobotPi5
 ./scripts/bootstrap-rpi-camera-workspace.sh
-source .venv/bin/activate
 ```
 
 The script:
 
-1. installs `python3-picamera2`, `python3-libcamera`, and `python3-venv`
-2. moves an incompatible `.venv` to a timestamped recoverable backup beside
-   the project
-3. creates `.venv` with Raspberry Pi OS `/usr/bin/python3`
-4. enables `--system-site-packages`, which lets the environment see the
-   Picamera2 packages installed by the operating system
-5. installs the frozen root hardware dependency set
-6. verifies Picamera2 imports and managed-driver hashes
+1. installs `python3-picamera2` and `python3-libcamera`
+2. leaves the existing `.venv` in place
+3. syncs the frozen root hardware dependency set
+4. verifies Picamera2 with Raspberry Pi OS `/usr/bin/python3`
+5. verifies managed-driver hashes
+6. runs real camera health without taking a photograph
 
 If the operating-system packages are already installed:
 
 ```bash
 ./scripts/bootstrap-rpi-camera-workspace.sh --skip-apt
-source .venv/bin/activate
 ```
 
-Confirm the environment and camera:
+Confirm the system camera bindings and camera:
 
 ```bash
-python -c \
+/usr/bin/python3 -s -c \
   "import libcamera, picamera2; print('Picamera2:', picamera2.__file__)"
 rpicam-hello --list-cameras
 ```
+
+Do not use the project command `python -c "import picamera2"` as this check.
+The project can stay on Python 3.11 while Raspberry Pi OS provides its camera
+bindings for Python 3.13. The V4 adapter joins those two environments only for
+the managed camera operation.
 
 The current hardware should list an OV5647 camera. OV5647 is fixed-focus, so
 the V4 example uses `autofocus_mode = "none"`.

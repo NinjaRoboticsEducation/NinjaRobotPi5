@@ -4,7 +4,7 @@ Date: 2026-07-26
 
 Hardware accessed during implementation: No
 
-Physical Raspberry Pi result: **PENDING OPERATOR TEST**
+Physical Raspberry Pi result: **CAMERA BRIDGE READY; CAPTURE PENDING OPERATOR TEST**
 
 ## 1. Scope of validation
 
@@ -23,13 +23,15 @@ camera access are not part of Phase 3.4.
 
 Automated result: **PASS**
 
-- Root/V4 tests: 92 passed.
-- Focused camera, configuration, and CLI tests: 31 passed.
+- Root/V4 tests: 96 passed.
+- Focused camera, configuration, and CLI tests: 35 passed.
 - Managed-library tests: 449 passed, with one inherited `audioop` deprecation
   warning from `pi5mic`.
 - Strict mypy type checking passed for 22 V4 source files.
 - Driver provenance remained at 222 tracked files and 23 authorized repairs.
 - No managed `pi5*` file changed.
+- Raspberry Pi OS camera imports passed and safe real V4 health reported both
+  camera capabilities ready without opening the camera or taking a photograph.
 
 ## 2. Safety notes
 
@@ -116,37 +118,41 @@ That deletion is permanent unless the file was backed up.
 ### Prepare the Picamera2 environment
 
 The ordinary project `.venv` may use a downloaded Python that cannot see the
-Raspberry Pi OS camera packages. Run the provided bootstrap:
+Raspberry Pi OS camera packages. That is expected. V4 uses the ordinary
+project environment for the application and Raspberry Pi OS `/usr/bin/python3`
+only for managed camera access. Run the provided bootstrap:
 
 ```bash
 cd /home/rogerchang/NinjaRobotPi5
 ./scripts/bootstrap-rpi-camera-workspace.sh
-source .venv/bin/activate
 ```
 
 If `python3-picamera2` and `python3-libcamera` are already installed:
 
 ```bash
 ./scripts/bootstrap-rpi-camera-workspace.sh --skip-apt
-source .venv/bin/activate
 ```
 
-The script preserves an incompatible old environment beside the project as
-`NinjaRobotPi5.venv-before-camera-<timestamp>`. Confirm imports and detection:
+The script leaves `.venv` in place and performs no capture. Confirm the
+operating-system imports and camera detection:
 
 ```bash
-python -c \
+/usr/bin/python3 -s -c \
   "import libcamera, picamera2; print('Picamera2:', picamera2.__file__)"
 rpicam-hello --list-cameras
 ```
 
 Expected: Picamera2 imports from Raspberry Pi OS and at least one camera is
 listed. For the current hardware, the list should identify an OV5647 camera.
+It is acceptable for the project `.venv` command
+`python -c "import picamera2"` to fail; the V4 bridge is responsible for
+crossing that interpreter boundary.
 
 ### Check V4 without taking a photograph
 
 ```bash
-PHASE34_LEDGER="${PHASE34_LEDGER:-$(mktemp /tmp/ninjarobot-phase34-XXXXXX.sqlite3)}"
+unset PHASE34_LEDGER
+PHASE34_LEDGER="$(mktemp /tmp/ninjarobot-phase34-bridge-XXXXXX.sqlite3)"
 
 uv run --frozen --extra hardware ninjarobot_pi5_cli config validate \
   --config config/ninjarobot_pi5.toml.example
@@ -190,8 +196,8 @@ uv run --frozen --extra hardware ninjarobot_pi5_cli camera capture \
   --confirm-camera \
   --config config/ninjarobot_pi5.toml.example \
   --ledger "$PHASE34_LEDGER" \
-  --action-id phase34-real-transient-1 \
-  --idempotency-key phase34-real-transient-key-1
+  --action-id phase34-bridge-transient-1 \
+  --idempotency-key phase34-bridge-transient-key-1
 ```
 
 Expected: the result succeeds with `"simulated": false`,
@@ -209,8 +215,8 @@ uv run --frozen --extra hardware ninjarobot_pi5_cli camera capture \
   --filename phase34-physical.jpg \
   --config config/ninjarobot_pi5.toml.example \
   --ledger "$PHASE34_LEDGER" \
-  --action-id phase34-real-retained-1 \
-  --idempotency-key phase34-real-retained-key-1
+  --action-id phase34-bridge-retained-1 \
+  --idempotency-key phase34-bridge-retained-key-1
 
 CAMERA_FILE="$HOME/.local/share/ninjarobot_pi5/camera/phase34-physical.jpg"
 file "$CAMERA_FILE"
@@ -265,8 +271,8 @@ servo-power rail is used by this phase.
 
 - [ ] Safe simulated health, status, and transient capture pass.
 - [ ] Simulated retained JPEG is valid, permission `600`, and then deleted.
-- [ ] Camera bootstrap completes without deleting the previous `.venv`.
-- [ ] Picamera2 and libcamera import inside the root `.venv`.
+- [ ] Camera bootstrap completes without moving or replacing `.venv`.
+- [ ] Picamera2 and libcamera import with Raspberry Pi OS `/usr/bin/python3`.
 - [ ] `rpicam-hello --list-cameras` identifies the OV5647.
 - [ ] Real camera health passes without taking a photograph.
 - [ ] Real status reports 1280×720, autofocus none, and retention false.
@@ -293,17 +299,9 @@ servo-power rail is used by this phase.
 
    This deletion is permanent unless the photograph was backed up.
 
-3. If the bootstrap replaced an older environment, preserve the new one and
-   restore the timestamped backup:
-
-   ```bash
-   deactivate 2>/dev/null || true
-   mv -- .venv "../NinjaRobotPi5.venv-phase34-rollback"
-   mv -- "../NinjaRobotPi5.venv-before-camera-<timestamp>" .venv
-   ```
-
-   Replace `<timestamp>` with the exact backup name printed by the bootstrap.
-
+3. The corrected bootstrap does not replace `.venv`, so environment
+   restoration is not required. A backup created by the earlier faulty
+   bootstrap may be retained until testing passes and then handled manually.
 4. Keep `retain_media_by_default = false`. Do not change camera wiring while
    powered.
 5. Recheck driver integrity:

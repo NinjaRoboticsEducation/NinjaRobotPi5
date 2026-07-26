@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import subprocess
 import threading
 import time
 from pathlib import Path
@@ -21,6 +23,7 @@ from ninjarobot_pi5_ide import (
     ResourceScheduler,
     RetrySafety,
 )
+from ninjarobot_pi5_ide import camera as camera_module
 
 
 class FakeCaptureResult:
@@ -104,6 +107,115 @@ def engine_for(tmp_path: Path, device: CameraDevice) -> ExecutionEngine:
         ActionLedger(tmp_path / "camera.sqlite3"),
         scheduler=ResourceScheduler(max_concurrency=2, max_queue_size=4),
     )
+
+
+def test_loader_uses_system_python_when_current_picamera_import_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fallback = FakeCapture()
+
+    def unavailable_in_process() -> FakeCapture:
+        raise ModuleNotFoundError("No module named 'picamera2'")
+
+    monkeypatch.setattr(
+        camera_module,
+        "_load_in_process_camera_capture",
+        unavailable_in_process,
+    )
+    monkeypatch.setattr(
+        camera_module._SystemPythonCameraCapture,
+        "create",
+        lambda: fallback,
+    )
+
+    assert camera_module._load_camera_capture() is fallback
+
+
+def test_system_python_bridge_probes_and_captures_with_managed_source(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source_root = tmp_path / "managed-source"
+    capture_source = source_root / "pi5camera" / "core" / "capture.py"
+    capture_source.parent.mkdir(parents=True)
+    capture_source.write_text("# managed test source\n", encoding="utf-8")
+    calls: list[dict[str, Any]] = []
+
+    def fake_run(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        calls.append({"command": command, **kwargs})
+        if "import libcamera, picamera2" in command[-1]:
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+        payload = json.loads(kwargs["input"])
+        output_path = Path(payload["output_path"])
+        output_path.write_bytes(b"\xff\xd8bridge-jpeg\xff\xd9")
+        stdout = (
+            "camera diagnostic\n"
+            f"{camera_module.SYSTEM_CAMERA_RESULT_PREFIX}"
+            f"{json.dumps({'path': str(output_path)})}\n"
+        )
+        return subprocess.CompletedProcess(command, 0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(camera_module.subprocess, "run", fake_run)
+    monkeypatch.setenv("VIRTUAL_ENV", "/unsafe/venv")
+    bridge = camera_module._SystemPythonCameraCapture(
+        Path("/usr/bin/python3"),
+        source_root,
+    )
+
+    bridge._probe()
+    output_path = tmp_path / "capture.jpg"
+    result = bridge({"camera": {"backend": "picamera2"}}, output_path=output_path)
+
+    assert result.path == output_path
+    assert output_path.is_file()
+    assert len(calls) == 2
+    for call in calls:
+        assert call["command"][:2] == ["/usr/bin/python3", "-s"]
+        assert call["env"]["PYTHONPATH"] == str(source_root)
+        assert "VIRTUAL_ENV" not in call["env"]
+        assert "shell" not in call
+
+
+def test_loader_reports_both_interpreter_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def unavailable_in_process() -> FakeCapture:
+        raise ModuleNotFoundError("No module named 'picamera2'")
+
+    def unavailable_system() -> FakeCapture:
+        raise ImportError("No module named 'libcamera'")
+
+    monkeypatch.setattr(
+        camera_module,
+        "_load_in_process_camera_capture",
+        unavailable_in_process,
+    )
+    monkeypatch.setattr(
+        camera_module._SystemPythonCameraCapture,
+        "create",
+        unavailable_system,
+    )
+
+    with pytest.raises(ImportError) as exc_info:
+        camera_module._load_camera_capture()
+
+    message = str(exc_info.value)
+    assert "picamera2" in message
+    assert "/usr/bin/python3 bridge also failed" in message
+    assert "bootstrap-rpi-camera-workspace.sh" in message
+
+
+def test_camera_bootstrap_never_replaces_the_project_venv() -> None:
+    project_root = Path(__file__).resolve().parents[2]
+    script = (project_root / "scripts/bootstrap-rpi-camera-workspace.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "uv venv" not in script
+    assert "mv --" not in script
+    assert "--system-site-packages" not in script
+    assert "uv sync --frozen --extra hardware" in script
+    assert 'PYTHON_BIN="/usr/bin/python3"' in script
 
 
 def test_status_and_default_capture_do_not_retain_media(tmp_path: Path) -> None:

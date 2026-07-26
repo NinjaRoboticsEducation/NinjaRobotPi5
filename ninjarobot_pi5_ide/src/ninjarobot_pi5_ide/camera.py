@@ -5,16 +5,23 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import importlib
+import importlib.metadata
+import importlib.util
+import json
 import os
 import re
 import shutil
+import subprocess
+import sys
 import tempfile
 import threading
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol, cast
+from urllib.parse import unquote, urlparse
 
 from .errors import IDEError
 from .models import (
@@ -28,6 +35,25 @@ from .models import (
 CAMERA_RESOURCES = ("camera",)
 CAMERA_FILENAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}\.jpg$")
 CAMERA_CAPTURE_TIMEOUT_SECONDS = 20.0
+SYSTEM_CAMERA_PYTHON = Path("/usr/bin/python3")
+SYSTEM_CAMERA_PROBE_TIMEOUT_SECONDS = 5.0
+SYSTEM_CAMERA_CAPTURE_TIMEOUT_SECONDS = 18.0
+SYSTEM_CAMERA_RESULT_PREFIX = "NINJAROBOT_CAMERA_RESULT="
+SYSTEM_CAMERA_BRIDGE = f"""
+import json
+import sys
+from pathlib import Path
+
+from pi5camera.core.capture import capture_photo
+
+payload = json.load(sys.stdin)
+result = capture_photo(
+    payload["config"],
+    output_path=Path(payload["output_path"]),
+    filename_prefix=payload["filename_prefix"],
+)
+print({SYSTEM_CAMERA_RESULT_PREFIX!r} + json.dumps({{"path": str(result.path)}}))
+"""
 
 
 class CameraCaptureResult(Protocol):
@@ -56,11 +82,177 @@ class _CaptureCancelledInWorker(Exception):
     """Signal that cleanup completed after cancellation reached a worker thread."""
 
 
-def _load_camera_capture() -> CameraCapture:
-    """Load Picamera2 and the managed driver lazily without opening the camera."""
+@dataclass(slots=True)
+class _BridgeCaptureResult:
+    """Minimal managed-driver result returned across the interpreter boundary."""
+
+    path: Path
+    metadata: dict[str, Any]
+
+
+def _managed_pi5camera_source_root() -> Path:
+    """Locate the managed ``pi5camera`` source used by this workspace."""
+    try:
+        distribution = importlib.metadata.distribution("pi5camera")
+        direct_url_text = distribution.read_text("direct_url.json")
+        if direct_url_text is not None:
+            direct_url = json.loads(direct_url_text)
+            parsed_url = urlparse(direct_url.get("url", ""))
+            if parsed_url.scheme == "file":
+                project_directory = Path(unquote(parsed_url.path)).resolve()
+                source_root = project_directory / "src"
+                if (source_root / "pi5camera" / "core" / "capture.py").is_file():
+                    return source_root
+    except (
+        importlib.metadata.PackageNotFoundError,
+        json.JSONDecodeError,
+        OSError,
+        TypeError,
+    ):
+        pass
+
+    for parent in Path(__file__).resolve().parents:
+        source_root = parent / "pi5camera" / "src"
+        if (source_root / "pi5camera" / "core" / "capture.py").is_file():
+            return source_root
+
+    spec = importlib.util.find_spec("pi5camera")
+    locations = spec.submodule_search_locations if spec is not None else None
+    if not locations:
+        raise ImportError("the managed pi5camera package is not installed")
+    for location in locations:
+        source_root = Path(location).resolve().parent
+        if (
+            source_root.name == "src"
+            and (source_root / "pi5camera" / "core" / "capture.py").is_file()
+        ):
+            return source_root
+    raise ImportError("the managed pi5camera project source could not be located outside .venv")
+
+
+def _system_camera_environment(source_root: Path) -> dict[str, str]:
+    """Build a bounded environment for the Raspberry Pi OS camera interpreter."""
+    environment = os.environ.copy()
+    environment.pop("PYTHONHOME", None)
+    environment.pop("VIRTUAL_ENV", None)
+    environment["PYTHONPATH"] = str(source_root)
+    return environment
+
+
+class _SystemPythonCameraCapture:
+    """Run managed ``pi5camera`` capture with Raspberry Pi OS camera bindings."""
+
+    def __init__(self, python: Path, source_root: Path) -> None:
+        self._python = python
+        self._source_root = source_root
+        self._environment = _system_camera_environment(source_root)
+
+    @classmethod
+    def create(cls) -> _SystemPythonCameraCapture:
+        """Create and probe the bridge without opening the physical camera."""
+        if not SYSTEM_CAMERA_PYTHON.is_file():
+            raise ImportError(f"Raspberry Pi OS camera Python is missing: {SYSTEM_CAMERA_PYTHON}")
+        capture = cls(SYSTEM_CAMERA_PYTHON, _managed_pi5camera_source_root())
+        capture._probe()
+        return capture
+
+    def _probe(self) -> None:
+        command = [
+            str(self._python),
+            "-s",
+            "-c",
+            "import libcamera, picamera2; from pi5camera.core.capture import capture_photo",
+        ]
+        try:
+            result = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=SYSTEM_CAMERA_PROBE_TIMEOUT_SECONDS,
+                env=self._environment,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise ImportError(f"could not probe Raspberry Pi OS camera Python: {exc}") from exc
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout).strip()
+            raise ImportError(
+                "Raspberry Pi OS camera imports failed" + (f": {detail[-1000:]}" if detail else "")
+            )
+
+    def __call__(
+        self,
+        config: dict[str, Any],
+        *,
+        output_path: Path | None = None,
+        filename_prefix: str = "photo",
+    ) -> CameraCaptureResult:
+        if output_path is None:
+            raise ValueError("system camera bridge requires an explicit output path")
+        payload = json.dumps(
+            {
+                "config": config,
+                "output_path": str(output_path),
+                "filename_prefix": filename_prefix,
+            }
+        )
+        try:
+            result = subprocess.run(
+                [str(self._python), "-s", "-c", SYSTEM_CAMERA_BRIDGE],
+                check=False,
+                capture_output=True,
+                text=True,
+                input=payload,
+                timeout=SYSTEM_CAMERA_CAPTURE_TIMEOUT_SECONDS,
+                env=self._environment,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError("Raspberry Pi OS camera capture exceeded 18 seconds") from exc
+        except OSError as exc:
+            raise RuntimeError(f"could not start Raspberry Pi OS camera capture: {exc}") from exc
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout).strip()
+            raise RuntimeError(
+                "Raspberry Pi OS camera capture failed" + (f": {detail[-1000:]}" if detail else "")
+            )
+        result_line = next(
+            (
+                line
+                for line in reversed(result.stdout.splitlines())
+                if line.startswith(SYSTEM_CAMERA_RESULT_PREFIX)
+            ),
+            None,
+        )
+        if result_line is None:
+            raise RuntimeError("Raspberry Pi OS camera bridge returned no result")
+        try:
+            result_payload = json.loads(result_line.removeprefix(SYSTEM_CAMERA_RESULT_PREFIX))
+            captured_path = Path(result_payload["path"])
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise RuntimeError("Raspberry Pi OS camera bridge returned an invalid result") from exc
+        return _BridgeCaptureResult(path=captured_path, metadata={})
+
+
+def _load_in_process_camera_capture() -> CameraCapture:
+    """Load Picamera2 and the managed driver in the current interpreter."""
     importlib.import_module("picamera2")
     module = importlib.import_module("pi5camera.core.capture")
     return cast(CameraCapture, module.capture_photo)
+
+
+def _load_camera_capture() -> CameraCapture:
+    """Load camera capture locally or bridge to Raspberry Pi OS Python."""
+    try:
+        return _load_in_process_camera_capture()
+    except (ImportError, OSError) as current_error:
+        try:
+            return cast(CameraCapture, _SystemPythonCameraCapture.create())
+        except (ImportError, OSError) as system_error:
+            raise ImportError(
+                f"camera imports failed in {sys.executable}: {current_error}; "
+                f"the {SYSTEM_CAMERA_PYTHON} bridge also failed: {system_error}. "
+                "Run ./scripts/bootstrap-rpi-camera-workspace.sh."
+            ) from system_error
 
 
 class CameraDevice:

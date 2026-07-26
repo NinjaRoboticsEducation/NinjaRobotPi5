@@ -409,19 +409,25 @@ uv run --frozen ninjarobot_pi5_cli camera capture \
 
 The Raspberry Pi OS Picamera2 package is tied to its system libcamera ABI. ABI
 means the low-level binary interface between compiled components. A downloaded
-Python environment normally cannot import it. Prepare the root environment
-with:
+Python environment normally cannot import it. V4 therefore keeps its normal
+locked Python environment and runs only the managed real-camera operation
+through Raspberry Pi OS `/usr/bin/python3`. Prepare both sides with:
 
 ```bash
 ./scripts/bootstrap-rpi-camera-workspace.sh
-source .venv/bin/activate
 ```
 
-The script moves an incompatible `.venv` to a timestamped recoverable backup,
-creates a new environment with `/usr/bin/python3` and
-`--system-site-packages`, then installs the frozen hardware dependency set.
-Use `--skip-apt` only when the Raspberry Pi OS camera packages are already
-installed.
+The script never moves, deletes, or recreates `.venv`. It installs the
+operating-system camera packages, syncs the normal frozen hardware dependency
+set, checks Picamera2 with `/usr/bin/python3`, and runs real camera health
+without taking a photograph. Use `--skip-apt` only when the Raspberry Pi OS
+camera packages are already installed.
+
+The bridge uses a fixed subprocess argument list and the exact managed
+`pi5camera/src` directory recorded by the local package installation.
+`subprocess` means a separate program launched by V4. It does not expose the
+Python 3.11 `.venv` packages to Python 3.13, so compiled packages such as NumPy
+cannot cross the incompatible interpreter boundary.
 
 Real status does not take a photograph. Real capture requires informed consent
 from everyone nearby plus both `--real` and `--confirm-camera`. Images are
@@ -582,19 +588,19 @@ test; the separate pre-Phase-1 live-Pi report is stored under `docs/validation/`
 - **Python 3.11 is missing:** install it through `uv python install 3.11`, then
   rerun `uv sync --dev`.
 - **Root camera health reports unavailable while `/usr/bin/python3` imports
-  Picamera2:** the root `.venv` cannot see Raspberry Pi OS packages. Run
-  `./scripts/bootstrap-rpi-camera-workspace.sh`, activate `.venv`, and retry.
+  Picamera2:** run `./scripts/bootstrap-rpi-camera-workspace.sh` and retry from
+  the project root. Do not recreate `.venv` with
+  `--system-site-packages`; V4 handles the interpreter boundary itself.
 - **A real camera capture requires `--confirm-camera`:** tell everyone nearby
   and obtain consent before adding the flag. Add `--retain` only when the
   image must remain after the command.
 - **A retained camera name is rejected:** use a new name such as
   `phase34-test.jpg`. Paths, spaces, extra dots, and overwriting are blocked.
 - **`pi5camera capture` reports Picamera2 missing:** verify the OS Picamera2
-  package is installed, then run the package bootstrap. The environment must
-  use `/usr/bin/python3`, `--system-site-packages`, and
-  `uv sync --active --frozen`; a separate uv Python cannot import the OS
-  libcamera ABI. Native `rpicam-*` success alone does not validate
-  `pi5camera`.
+  package with
+  `/usr/bin/python3 -s -c "import libcamera, picamera2"`, then run the root
+  camera bootstrap. The project `.venv` does not need to import Picamera2.
+  Native `rpicam-*` success alone does not validate the managed V4 bridge.
 - **`pi5mic` reports PortAudio missing:** the ALSA device may still be present,
   but library recording requires `libportaudio2`. Install it and
   `portaudio19-dev`, then verify `pi5mic devices`. Local transcription requires

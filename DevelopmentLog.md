@@ -1,5 +1,49 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-26 — Phase 3.4 camera interpreter-bridge correction
+
+### Summary
+
+- Reproduced the operator's `ModuleNotFoundError` for `picamera2` and
+  `libcamera`.
+- Confirmed that the first bootstrap created a system-Python environment but
+  `uv sync` replaced it with the project-pinned Python 3.11 environment.
+- Kept the normal locked project environment and added a V4-only bridge that
+  probes and runs managed `pi5camera` through Raspberry Pi OS
+  `/usr/bin/python3`.
+- Restricted the bridge to the exact local `pi5camera/src` directory. This
+  prevents Python 3.13 from loading compiled Python 3.11 packages such as
+  NumPy from `.venv`.
+- Replaced the bootstrap workflow so it never moves, deletes, or recreates
+  `.venv`.
+- Kept every managed `pi5*` source file unchanged.
+
+### Validation
+
+- Driver provenance passed before implementation: 222 tracked files and 23
+  authorized repairs.
+- Twelve focused camera adapter tests pass, including the exact missing
+  Picamera2 fallback, bounded subprocess environment, dual-interpreter error,
+  and bootstrap no-replacement regression.
+- Raspberry Pi OS `/usr/bin/python3` imports `libcamera` and `picamera2`.
+- Safe real camera health reports `camera.capture` and `camera.status` ready.
+  Health does not open the camera or take a photograph.
+- All 96 V4 tests and all 35 focused camera, configuration, and CLI tests
+  pass.
+- Strict mypy passes for 22 source files. Root and all six managed libraries
+  pass Ruff lint and format checks.
+- All 449 managed-library tests pass. The only warning is the inherited
+  `audioop` deprecation from `pi5mic`.
+- The physical capture checklist remains pending because implementation
+  validation intentionally did not take a photograph.
+
+### Operator note
+
+The failed capture action stored in the old ledger is durable. Retesting must
+use a fresh ledger or new action and idempotency identifiers. Idempotency means
+that replaying the same identifier returns the stored result rather than
+performing the operation again.
+
 ## 2026-07-26 — Phase 3.4 privacy-bounded camera adapter
 
 ### Summary
@@ -20,8 +64,9 @@
   returning a timeout or cancellation.
 - Added the managed `pi5camera` package to the root hardware dependency group
   without changing any managed driver file.
-- Added a recoverable Raspberry Pi workspace bootstrap for the system-provided
-  Picamera2/libcamera Python environment.
+- Added the initial Raspberry Pi workspace bootstrap for the system-provided
+  Picamera2/libcamera Python environment. The correction above replaces its
+  environment-replacement design with the permanent interpreter bridge.
 
 ### Validation
 
@@ -39,10 +84,10 @@
 
 ### Raspberry Pi status
 
-No real camera command was run during implementation. The Raspberry Pi OS
-system Python imports Picamera2, while the pre-existing root Python 3.11
-environment does not. The new bootstrap addresses that verified environment
-boundary without altering `pi5camera`.
+No real camera capture was run during implementation. The Raspberry Pi OS
+system Python imports Picamera2, while the root Python 3.11 environment does
+not. The correction above now handles that verified environment boundary
+without altering `pi5camera`.
 
 The physical Phase 3.4 checklist remains pending. Real capture requires consent
 from everyone nearby. Media is deleted by default, and the one retained visual

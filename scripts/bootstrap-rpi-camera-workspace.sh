@@ -4,7 +4,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 PYTHON_BIN="/usr/bin/python3"
-VENV_DIR="${PROJECT_ROOT}/.venv"
 SKIP_APT=0
 
 usage() {
@@ -13,9 +12,9 @@ Usage: ./scripts/bootstrap-rpi-camera-workspace.sh [--skip-apt]
 
 Prepare the NinjaRobotPi5 root environment for Picamera2 by:
 1. Installing Raspberry Pi OS camera packages
-2. Preserving any incompatible .venv as a timestamped backup
-3. Creating .venv with system-site-packages enabled
-4. Syncing the locked root hardware dependencies
+2. Keeping the normal locked NinjaRobotPi5 .venv unchanged in design
+3. Syncing the locked root hardware dependencies
+4. Verifying the safe system-Python camera bridge without taking a photo
 
 Options:
   --skip-apt   Skip apt installation when the camera packages are already present
@@ -38,18 +37,6 @@ require_command() {
   fi
 }
 
-venv_is_ready() {
-  [[ -x "${VENV_DIR}/bin/python" ]] || return 1
-  "${VENV_DIR}/bin/python" - <<'PY' >/dev/null 2>&1
-import sys
-import libcamera
-import picamera2
-
-if not (3, 11) <= sys.version_info[:2] < (3, 14):
-    raise SystemExit(1)
-PY
-}
-
 install_system_packages() {
   if ((SKIP_APT)); then
     log "Skipping apt installation."
@@ -57,59 +44,33 @@ install_system_packages() {
   fi
   require_command sudo
   require_command apt
-  log "Installing Raspberry Pi OS camera and virtual-environment packages."
+  log "Installing Raspberry Pi OS camera packages."
   sudo apt update
-  sudo apt install -y python3-picamera2 python3-libcamera python3-venv
-}
-
-prepare_venv() {
-  if venv_is_ready; then
-    log "The existing .venv already imports Picamera2; keeping it."
-    return
-  fi
-
-  if [[ -e "${VENV_DIR}" ]]; then
-    local backup_dir="${PROJECT_ROOT}.venv-before-camera-$(date +%Y%m%d-%H%M%S)"
-    log "Moving the existing .venv to ${backup_dir}."
-    mv -- "${VENV_DIR}" "${backup_dir}"
-  fi
-
-  log "Creating .venv with Raspberry Pi OS system packages enabled."
-  "${PYTHON_BIN}" -m venv --system-site-packages "${VENV_DIR}"
+  sudo apt install -y python3-picamera2 python3-libcamera
 }
 
 sync_workspace() {
   log "Syncing the locked NinjaRobotPi5 hardware environment."
   (
     cd "${PROJECT_ROOT}"
-    source "${VENV_DIR}/bin/activate"
-    uv sync --active --frozen --extra hardware
+    uv sync --frozen --extra hardware
   )
 }
 
-ensure_system_site_packages() {
-  local venv_config="${VENV_DIR}/pyvenv.cfg"
-  if [[ ! -f "${venv_config}" ]]; then
-    fail "Virtual-environment configuration is missing: ${venv_config}"
-  fi
-  if grep -q 'include-system-site-packages = false' "${venv_config}"; then
-    sed -i \
-      's/include-system-site-packages = false/include-system-site-packages = true/' \
-      "${venv_config}"
-  elif ! grep -q 'include-system-site-packages' "${venv_config}"; then
-    printf '%s\n' 'include-system-site-packages = true' >>"${venv_config}"
-  fi
-}
-
 verify_environment() {
-  if ! venv_is_ready; then
-    fail "Picamera2 or libcamera is not importable from ${VENV_DIR}."
+  log "Checking Picamera2 with Raspberry Pi OS Python."
+  if ! "${PYTHON_BIN}" -s -c "import libcamera, picamera2" >/dev/null 2>&1; then
+    fail "Picamera2 or libcamera is not importable from ${PYTHON_BIN}."
   fi
   (
     cd "${PROJECT_ROOT}"
-    "${VENV_DIR}/bin/python" scripts/verify_immutable_drivers.py
-    "${VENV_DIR}/bin/python" -c \
-      "import libcamera, picamera2; print('Picamera2 import passed:', picamera2.__file__)"
+    uv run --frozen --extra hardware python scripts/verify_immutable_drivers.py
+    uv run --frozen --extra hardware python -c \
+      "import ninjarobot_pi5_ide, pi5camera; print('NinjaRobotPi5 environment passed')"
+    uv run --frozen --extra hardware ninjarobot_pi5_cli camera health \
+      --real \
+      --config config/ninjarobot_pi5.toml.example \
+      --ledger "${TMPDIR:-/tmp}/ninjarobot-camera-bootstrap-health.sqlite3"
   )
 }
 
@@ -139,11 +100,9 @@ main() {
   fi
 
   install_system_packages
-  prepare_venv
   sync_workspace
-  ensure_system_site_packages
   verify_environment
-  log "Camera-capable NinjaRobotPi5 environment is ready."
+  log "Camera bridge is ready. No photograph was taken."
 }
 
 main "$@"
