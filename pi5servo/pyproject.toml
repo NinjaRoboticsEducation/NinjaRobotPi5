@@ -1,0 +1,44 @@
+[project]
+name = "pi5servo"
+version = "1.0.0"
+description = "Servo control library for Raspberry Pi 5 with velocity-based motion."
+authors = [
+    {name = "NinjaRobot Team"},
+]
+dependencies = [
+    "click",
+    "blessed",
+]
+requires-python = ">=3.11,<3.14"
+readme = "README.md"
+license = {file = "LICENSE"}
+
+[project.optional-dependencies]
+pi = [
+    "rpi-hardware-pwm>=0.3.1",
+    "smbus2>=0.4.3",
+    "adafruit-blinka>=8.0.0",
+    "adafruit-circuitpython-pca9685>=3.4.20",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "ruff",
+]
+
+[project.scripts]
+pi5servo = "pi5servo.__main__:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+lint.select = ["E", "F", "W", "I"]
+lint.ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

@@ -1,0 +1,39 @@
+[project]
+name = "pi5vl53l0x"
+version = "0.1.0"
+description = "A robust Python driver for the VL53L0X Time-of-Flight distance sensor on Raspberry Pi 5."
+authors = [
+    {name = "Nil Creator", email = "nilcreator@gmail.com"},
+]
+dependencies = [
+    "click>=8.1",
+    "blessed>=1.20",
+    "smbus2>=0.6.0",
+]
+requires-python = ">=3.9,<3.14"
+readme = "README.md"
+
+[project.optional-dependencies]
+pi = []
+ninjarobot = [
+    "ninja_utils",
+]
+dev = [
+    "pytest>=7.0",
+    "ruff",
+]
+
+[project.scripts]
+pi5vl53l0x = "pi5vl53l0x.__main__:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

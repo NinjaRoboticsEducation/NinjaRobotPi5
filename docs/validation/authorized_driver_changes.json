@@ -1,0 +1,306 @@
+{
+  "authorization": {
+    "authorized_by": "project owner",
+    "authorized_on": "2026-07-25",
+    "scope": "Robust fixes to each copied Pi5 library after README review, Serena code audit, failure reproduction, linting, automated tests, and Raspberry Pi hardware validation."
+  },
+  "files": {
+    "pi5buzzer/README.md": {
+      "approved": {
+        "sha256": "bf17fb800f049fccabe333e4e0fc3b627e96deb7287c1dc4c891174302f5e500",
+        "size": 11971
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "a597351a8c39dd12e2365569a167cade946ba3215e81ee60f424103cafa9ccda",
+        "size": 11550
+      },
+      "reason": "Standalone installation, dependency, and CLI validation documentation"
+    },
+    "pi5buzzer/pyproject.toml": {
+      "approved": {
+        "sha256": "930f54cb0647a8682a7ba0ffb7497486958f3a94c13848ce1d4dd2d73b3006e0",
+        "size": 791
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "df5a98b86289e8dc37f2e96fc7ea0a21cc4960193e22fd44c4e46f162558b4d0",
+        "size": 735
+      },
+      "reason": "Pin and explicitly configure Ruff, and add a lockfile so fresh pi5buzzer development environments reproduce the validated lint toolchain."
+    },
+    "pi5buzzer/tests/test_config.py": {
+      "approved": {
+        "sha256": "28273ede8fd3af6f7b35865e224838863a913833d8c847a1acf8434da741afd8",
+        "size": 6635
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "95cba9d0fb998afa05969b65dbd4b972d581170dac5e4bf3a4c8b8da91675881",
+        "size": 6635
+      },
+      "reason": "Sort the config-test import so the package passes its now-explicit Ruff import-order rule."
+    },
+    "pi5buzzer/uv.lock": {
+      "approved": {
+        "sha256": "e431617b681f577fbd7a0cd8949e302c5ba322069b737a52426841eb6ccad2f9",
+        "size": 31667
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": null,
+      "reason": "Pin and explicitly configure Ruff, and add a lockfile so fresh pi5buzzer development environments reproduce the validated lint toolchain."
+    },
+    "pi5camera/README.md": {
+      "approved": {
+        "sha256": "6b257588ec641af645f4e41a5c72a2fba646f387c04d626a4cbe46bd6306ba11",
+        "size": 17227
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "e98bb38e7b079e795dc0f4951469f62fa0e1eae19a98ac5133d7a92a2793f4ce",
+        "size": 16874
+      },
+      "reason": "Standalone installation, dependency, and CLI validation documentation"
+    },
+    "pi5camera/scripts/bootstrap-rpi-standalone.sh": {
+      "approved": {
+        "sha256": "7cc7ecdec674ef67da3cc22754df5584daaa99fd877105d749fef4dce3280245",
+        "size": 3581
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "10345e3012569d5adcca41943d1542024078259dad56486c09385a860d5de3fd",
+        "size": 3572
+      },
+      "reason": "Normalize camera CLI failures at the CameraError boundary, add backend-unavailable regression coverage, and make the supported system-site Picamera2 environment reproducible with frozen dependencies."
+    },
+    "pi5camera/src/pi5camera/cli/capture_cmd.py": {
+      "approved": {
+        "sha256": "07ffd9eb99f5ef24f84551fd377762319110ee9e7320f9681136ef319acfe0a5",
+        "size": 1109
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "c2c9552879671f9a73f728d2b00847f5b296628ca189c2852fb3237836a9e306",
+        "size": 1165
+      },
+      "reason": "Normalize camera CLI failures at the CameraError boundary, add backend-unavailable regression coverage, and make the supported system-site Picamera2 environment reproducible with frozen dependencies."
+    },
+    "pi5camera/src/pi5camera/cli/enroll_cmd.py": {
+      "approved": {
+        "sha256": "a3ffaaaeb9f28a9c6e79b8420bcb5bbe01fb305070b98cf5124d42c89d0b4cb7",
+        "size": 1800
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "ece65b61dd530c26ef90124f1275dcf5efa82b7647a46d36fb9b3ea72bb3071f",
+        "size": 1898
+      },
+      "reason": "Normalize camera CLI failures at the CameraError boundary, add backend-unavailable regression coverage, and make the supported system-site Picamera2 environment reproducible with frozen dependencies."
+    },
+    "pi5camera/src/pi5camera/cli/recognize_cmd.py": {
+      "approved": {
+        "sha256": "c6db96fb01ea84b8c1997deab73f99365b1a8a24843cd90a3a9b67dfac2a0221",
+        "size": 2863
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "addb56b08480436c159922a5cf459480a488fc5e0a2e196a97b88db2f49a8e23",
+        "size": 3028
+      },
+      "reason": "Normalize camera CLI failures at the CameraError boundary, add backend-unavailable regression coverage, and make the supported system-site Picamera2 environment reproducible with frozen dependencies."
+    },
+    "pi5camera/tests/test_camera_backend.py": {
+      "approved": {
+        "sha256": "783d5496030b6f6810e49ee109ce6a1abca32eabf55ac4b326f7d5a73224e754",
+        "size": 2368
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "4b7d2d86d10a05cc4e1fb551eb1f6fcd0a45779aad4fc647d126c1998c7d7e03",
+        "size": 1482
+      },
+      "reason": "Normalize camera CLI failures at the CameraError boundary, add backend-unavailable regression coverage, and make the supported system-site Picamera2 environment reproducible with frozen dependencies."
+    },
+    "pi5disp/README.md": {
+      "approved": {
+        "sha256": "dfed75a2a2142949fe841c8da9f347cd8c2e3012bd82541aed0e30b86d4ef5e6",
+        "size": 16056
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "8c7ebe5ef454c2c54f334373b83695236a459add7b436e3d30a551f4b79acb0a",
+        "size": 15495
+      },
+      "reason": "Standalone installation, dependency, and CLI validation documentation"
+    },
+    "pi5disp/src/pi5disp/config/config_manager.py": {
+      "approved": {
+        "sha256": "ab2716a69e6adb892ab1737206789dd5394ebfb9bf7954c0fafcb74d242bf5f3",
+        "size": 7554
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "f4bb50c705d9ce6d461c1f0f8009225a1dabce2627234a4eaae4d007193ffd04",
+        "size": 6924
+      },
+      "reason": "Move writable display state out of the package into a per-user config path, add an environment override and regression coverage, and document runtime configuration behavior."
+    },
+    "pi5disp/tests/test_config.py": {
+      "approved": {
+        "sha256": "de8c58b4d80b0a9b0081255d59aaf476ed4f0aa67d9ffb32714f9197270c2a97",
+        "size": 4770
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "7028324fefb31b13ea7a91b5a1a78be21e996c8d15cd368ed24ddc6868c9d2db",
+        "size": 3743
+      },
+      "reason": "Move writable display state out of the package into a per-user config path, add an environment override and regression coverage, and document runtime configuration behavior."
+    },
+    "pi5mic/README.md": {
+      "approved": {
+        "sha256": "d723104beacc1e65baa947d60058c6ccdf78ce7717080e4456d7845bcb14fc08",
+        "size": 39398
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "ac8b9c14528c140c35ce3321bca998ea3d0f3d76ae801abf4b086ea99ca6ec6e",
+        "size": 39220
+      },
+      "reason": "Standalone installation, dependency, and CLI validation documentation"
+    },
+    "pi5servo/README.md": {
+      "approved": {
+        "sha256": "afccff0e1f93436e07e601ea5a070c90e0923cc8a66f88e77d57cf67fd4a7fcb",
+        "size": 22584
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-26",
+      "baseline": {
+        "sha256": "43c174e7a149dcd79c43f7a861ef8a26cc6b4122d5c47fe49f7a3a17f21a7b77",
+        "size": 21085
+      },
+      "reason": "Correct native PWM alternate-pin routing and two-channel setup guidance"
+    },
+    "pi5servo/src/pi5servo/core/backends/hardware_pwm.py": {
+      "approved": {
+        "sha256": "b0f1d0844fcc1bc39322e390ea5fbc45c222d14aa01594ade331677b116af48d",
+        "size": 8880
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-26",
+      "baseline": {
+        "sha256": "ed869805488a6f6f4f612afd96646a75182a916264a00cac2b21cf1870ab6d12",
+        "size": 7736
+      },
+      "reason": "Correct native PWM alternate-pin routing and two-channel setup guidance"
+    },
+    "pi5servo/tests/test_backend.py": {
+      "approved": {
+        "sha256": "a4963d322a82c3386c2389ab5a11f47e62068ef5e1a871abb421b473c9b93abb",
+        "size": 12036
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-26",
+      "baseline": {
+        "sha256": "c5498ba11e948ca925f5655f88120d2c1ff82ebed3d33ef8a17da130360459ed",
+        "size": 11153
+      },
+      "reason": "Regression coverage for native PWM alternate-pin routing"
+    },
+    "pi5vl53l0x/README.md": {
+      "approved": {
+        "sha256": "dabecb58e6aaa6d92f40046189c4f473dfeb6574ccda9af554d2492108e447fe",
+        "size": 14745
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "1f9351a7d07ab88953d5a184d48ede403e94076701bb76b840aae2f71e374d63",
+        "size": 13425
+      },
+      "reason": "Standalone installation, dependency, and CLI validation documentation"
+    },
+    "pi5vl53l0x/src/pi5vl53l0x/cli/sensor_tool.py": {
+      "approved": {
+        "sha256": "4d4cb6d1b408be29084ce9c903b1aca9a811270c5abafda78812c4a67afbf931",
+        "size": 23998
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "b9359a5406d061d110f962505627e6f59e06017a3ee6c728fd84715a47869c41",
+        "size": 22860
+      },
+      "reason": "VL53L0X timing, bounded calibration recovery, invalid-reading safeguards, tests, and documentation"
+    },
+    "pi5vl53l0x/src/pi5vl53l0x/core/sensor.py": {
+      "approved": {
+        "sha256": "087d48861446f2a452adc6b5b17fe03104d77384fde30903c239afa2e0dc8ea6",
+        "size": 26679
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "dc7cee8c019a37d6695e49985f05699268e669ab3f70c3ad12563c1a69cd6ec7",
+        "size": 23361
+      },
+      "reason": "VL53L0X timing, bounded calibration recovery, invalid-reading safeguards, tests, and documentation"
+    },
+    "pi5vl53l0x/src/pi5vl53l0x/registers.py": {
+      "approved": {
+        "sha256": "6ce6f1a2536d947d401679d2d2af7e419ba114bb414ecc866869ea99aa8e06a7",
+        "size": 1421
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "26097b8ba6edefe7970e7d92c35c05ec1ff1de20999ee705d3d7103ceea5c375",
+        "size": 1387
+      },
+      "reason": "VL53L0X timing, bounded calibration recovery, invalid-reading safeguards, tests, and documentation"
+    },
+    "pi5vl53l0x/tests/test_cli.py": {
+      "approved": {
+        "sha256": "2b01a243e42146019c7fcb9ba05905d121ad7bdc0141203939ea280efc0c57a3",
+        "size": 2161
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "2911d2ec938b7952840e3d7e180c1dfbe6a78c56747fd77f51a4f945ef1daa7e",
+        "size": 818
+      },
+      "reason": "VL53L0X timing, bounded calibration recovery, invalid-reading safeguards, tests, and documentation"
+    },
+    "pi5vl53l0x/tests/test_sensor.py": {
+      "approved": {
+        "sha256": "ae6b3fd6ee03151b2cdce27063853a13f2e912f329a0fc3c979c81c4ef3479d2",
+        "size": 17449
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-07-25",
+      "baseline": {
+        "sha256": "da79a3a87489b5e7addaa90060aac5d9a19e03cc513a3b7fc3699af933d8f798",
+        "size": 12681
+      },
+      "reason": "VL53L0X timing, bounded calibration recovery, invalid-reading safeguards, tests, and documentation"
+    }
+  },
+  "schema_version": 1
+}

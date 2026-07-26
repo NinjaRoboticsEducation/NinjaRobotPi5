@@ -1,0 +1,39 @@
+# Historical reference repository (never shipped or committed with V4)
+/NinjaClawBot/
+
+# Local tooling and environments
+/.serena/
+/.venv/
+.env
+.env.*
+!.env.example
+
+# Python-generated files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Build and packaging output
+build/
+dist/
+*.egg-info/
+
+# Runtime state and private media
+data/
+*.db
+*.sqlite
+*.sqlite3
+/pi5buzzer/buzzer.json
+/pi5camera/camera_data/
+/pi5camera/photo/
+/pi5servo/servo.json
+/pi5vl53l0x/src/pi5vl53l0x/config/vl53l0x.json
+
+# Editor and operating-system files
+*.swp
+*.swo
+.DS_Store

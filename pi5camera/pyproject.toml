@@ -1,0 +1,41 @@
+[project]
+name = "pi5camera"
+version = "0.2.0"
+description = "Standalone-first Raspberry Pi 5 camera tools for NinjaClawBot."
+authors = [
+    {name = "Nil Creator", email = "nilcreator@gmail.com"},
+]
+dependencies = [
+    "click>=8.1",
+    "numpy>=1.24",
+    "pillow>=10.0",
+    "opencv-python-headless>=4.8",
+]
+requires-python = ">=3.11"
+readme = "README.md"
+
+[project.optional-dependencies]
+recognition = [
+    "mediapipe>=0.10",
+]
+dev = [
+    "pytest>=7.0",
+    "ruff",
+]
+
+[project.scripts]
+pi5camera = "pi5camera.__main__:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+lint.select = ["E", "F", "W", "I"]
+lint.ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

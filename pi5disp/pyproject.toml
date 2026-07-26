@@ -1,0 +1,42 @@
+[project]
+name = "pi5disp"
+version = "0.1.0"
+description = "ST7789V display driver for Raspberry Pi 5 with reliable full-frame rendering."
+authors = [
+    {name = "Nil Creator", email = "nilcreator@gmail.com"},
+]
+dependencies = [
+    "click>=8.1",
+    "numpy>=1.24",
+    "pillow>=10.0",
+]
+requires-python = ">=3.9,<3.14"
+readme = "README.md"
+
+[project.optional-dependencies]
+pi = [
+    "rpi-lgpio>=0.6; platform_system == 'Linux'",
+    "spidev>=3.6; platform_system == 'Linux'",
+]
+ninjarobot = [
+    "ninja_utils",
+]
+dev = [
+    "pytest>=7.0",
+    "ruff",
+]
+
+[project.scripts]
+pi5disp = "pi5disp.__main__:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

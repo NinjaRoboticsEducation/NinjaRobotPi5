@@ -1,0 +1,45 @@
+[project]
+name = "pi5mic"
+version = "0.1.0"
+description = "Standalone-first microphone capture library for NinjaClawBot and Raspberry Pi 5."
+authors = [
+    {name = "Nil Creator", email = "nilcreator@gmail.com"},
+]
+dependencies = [
+    "click>=8.1",
+    "google-genai>=1.33.0",
+    "sounddevice>=0.5",
+    "audioop-lts>=0.2.1; python_version >= '3.13'",
+]
+requires-python = ">=3.11,<3.14"
+readme = "README.md"
+
+[project.optional-dependencies]
+wakeword = [
+    "openwakeword>=0.6,<1",
+]
+voiceinput = [
+    "openwakeword>=0.6,<1",
+    "onnxruntime>=1.16; python_version >= '3.12'",
+]
+dev = [
+    "pytest>=7.0",
+    "ruff",
+]
+
+[project.scripts]
+pi5mic = "pi5mic.__main__:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+lint.select = ["E", "F", "W", "I"]
+lint.ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

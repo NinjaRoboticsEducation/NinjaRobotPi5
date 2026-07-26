@@ -1,0 +1,902 @@
+{
+  "drivers": [
+    "pi5buzzer",
+    "pi5camera",
+    "pi5disp",
+    "pi5mic",
+    "pi5servo",
+    "pi5vl53l0x"
+  ],
+  "files": {
+    "pi5buzzer/.python-version": {
+      "sha256": "49a506dd32096b010d75205acf3430c9ae6c40351888129499e5a5e487126c93",
+      "size": 5
+    },
+    "pi5buzzer/LICENSE": {
+      "sha256": "acdc0593e925de640c5f47a1c9481fac62d9c4352f0a913525bad43df0288d3e",
+      "size": 1072
+    },
+    "pi5buzzer/README.md": {
+      "sha256": "a597351a8c39dd12e2365569a167cade946ba3215e81ee60f424103cafa9ccda",
+      "size": 11550
+    },
+    "pi5buzzer/pyproject.toml": {
+      "sha256": "df5a98b86289e8dc37f2e96fc7ea0a21cc4960193e22fd44c4e46f162558b4d0",
+      "size": 735
+    },
+    "pi5buzzer/src/pi5buzzer/__init__.py": {
+      "sha256": "b277a9dabebefa38bf52440e36e5d345b0db1712ad75a9c1856f9db34825b03a",
+      "size": 197
+    },
+    "pi5buzzer/src/pi5buzzer/__main__.py": {
+      "sha256": "b6da04c43a116627e68a4c96bd29831de8ab6d8b1af376980fa38d3404189387",
+      "size": 6215
+    },
+    "pi5buzzer/src/pi5buzzer/cli/buzzer_tool.py": {
+      "sha256": "37e012c2731d2f59a751c68f2f69c2f6f7fa81452c3cfad349e9422b361f0b41",
+      "size": 7853
+    },
+    "pi5buzzer/src/pi5buzzer/config/config_manager.py": {
+      "sha256": "7b67e253d2123d528089b4254cb6dfe5e64e18d3543c6ba26b39100b90dfeb90",
+      "size": 4857
+    },
+    "pi5buzzer/src/pi5buzzer/core/driver.py": {
+      "sha256": "3f315d23d9536018b03283bb830bf604cc10a654ccc9647dea993c0875ff35ac",
+      "size": 10125
+    },
+    "pi5buzzer/src/pi5buzzer/core/music.py": {
+      "sha256": "e263088fab3f749edb6abdd2d10535a69bbf6c77135deba815e212398d803cbb",
+      "size": 3503
+    },
+    "pi5buzzer/src/pi5buzzer/driver.py": {
+      "sha256": "1992a25ac5b57a126f614e135ec344b8b8cb9221721edb2575940f2ed5370fd0",
+      "size": 191
+    },
+    "pi5buzzer/src/pi5buzzer/notes.py": {
+      "sha256": "c83a45b89c28866008b5fb980bbb5aeca13c02b2b93c1f695d9315cbcb018bf2",
+      "size": 2789
+    },
+    "pi5buzzer/tests/conftest.py": {
+      "sha256": "ad52b88e1649fbb781d10d29ba6f5c9daa5b8d01083bf022d80b007a5317b9c1",
+      "size": 1410
+    },
+    "pi5buzzer/tests/test_config.py": {
+      "sha256": "95cba9d0fb998afa05969b65dbd4b972d581170dac5e4bf3a4c8b8da91675881",
+      "size": 6635
+    },
+    "pi5buzzer/tests/test_driver.py": {
+      "sha256": "10e5e0adab94c5a4302ecc10b6e653ffc142bb9b0dd3860da8c7e379a33eaad2",
+      "size": 8799
+    },
+    "pi5buzzer/tests/test_music.py": {
+      "sha256": "be2112127cd2d7c48f3c97c6094702832594827a02d07e1d064d45c63d78ae70",
+      "size": 2884
+    },
+    "pi5camera/README.md": {
+      "sha256": "e98bb38e7b079e795dc0f4951469f62fa0e1eae19a98ac5133d7a92a2793f4ce",
+      "size": 16874
+    },
+    "pi5camera/pyproject.toml": {
+      "sha256": "21b12fb406506a9e9a9e4e5a3b142512a3212651283fa8601332d5f4d833162d",
+      "size": 789
+    },
+    "pi5camera/scripts/bootstrap-rpi-standalone.sh": {
+      "sha256": "10345e3012569d5adcca41943d1542024078259dad56486c09385a860d5de3fd",
+      "size": 3572
+    },
+    "pi5camera/src/pi5camera/__init__.py": {
+      "sha256": "9a5d83cee3f842a709fbbc3bcc6e52a42c1f950c70a219fd18c57e7ed408435d",
+      "size": 1284
+    },
+    "pi5camera/src/pi5camera/__main__.py": {
+      "sha256": "7ec96f19f82aae64ee07369d4ee81bd57599ed98cb4b3826eec3a27490ee47ef",
+      "size": 2923
+    },
+    "pi5camera/src/pi5camera/cli/__init__.py": {
+      "sha256": "0eaaaa4c29eb88a6483c597170d0ff048bc92d28cc57c96d1454bb848abd9490",
+      "size": 170
+    },
+    "pi5camera/src/pi5camera/cli/_common.py": {
+      "sha256": "47f7108e7f9ed45c45fa75486e85e89a5abc572b7df09a4ad6118c57b23ee09b",
+      "size": 2239
+    },
+    "pi5camera/src/pi5camera/cli/camera_tool.py": {
+      "sha256": "b66237a7e10a05f89b0e67e85853cbc8d1e4f38cd9ed64da44999ada6a761c33",
+      "size": 2258
+    },
+    "pi5camera/src/pi5camera/cli/capture_cmd.py": {
+      "sha256": "c2c9552879671f9a73f728d2b00847f5b296628ca189c2852fb3237836a9e306",
+      "size": 1165
+    },
+    "pi5camera/src/pi5camera/cli/doctor.py": {
+      "sha256": "8bea72e2d675692888cff2c3e8552ccb42fb1b0d13c076c7345b8437b2d03e4d",
+      "size": 2372
+    },
+    "pi5camera/src/pi5camera/cli/enroll_cmd.py": {
+      "sha256": "ece65b61dd530c26ef90124f1275dcf5efa82b7647a46d36fb9b3ea72bb3071f",
+      "size": 1898
+    },
+    "pi5camera/src/pi5camera/cli/manage_faces_cmd.py": {
+      "sha256": "663e3787c8175848595a314579a3318b527b68f390d03a1d1326f8bb28353763",
+      "size": 1541
+    },
+    "pi5camera/src/pi5camera/cli/recognize_cmd.py": {
+      "sha256": "addb56b08480436c159922a5cf459480a488fc5e0a2e196a97b88db2f49a8e23",
+      "size": 3028
+    },
+    "pi5camera/src/pi5camera/cli/setup_cmd.py": {
+      "sha256": "3c7e1afbf9dd5c071bf1d1360dd3ece18573a0c412f38e5e111f3329b17e6923",
+      "size": 3214
+    },
+    "pi5camera/src/pi5camera/cli/status.py": {
+      "sha256": "2b4a12cf0d2ef81ad9df86e8429fa7063a6a44ed0144fb0436e9a05c71f627cf",
+      "size": 1611
+    },
+    "pi5camera/src/pi5camera/config/__init__.py": {
+      "sha256": "2211657083e9a8fe2db95a7cfa0b5c2a803dac89a23ed864f03c5a7777a6dfb9",
+      "size": 36
+    },
+    "pi5camera/src/pi5camera/config/config_manager.py": {
+      "sha256": "9b8103f95f3da65ec8a840d722b1d255ba038d93460b25c648bdf9f69b23ccd8",
+      "size": 7161
+    },
+    "pi5camera/src/pi5camera/core/__init__.py": {
+      "sha256": "8f9315ec50acc4cb3d3991a6ab6d14c1c37ed7fb468f0cd45d2bba8698b57e2e",
+      "size": 139
+    },
+    "pi5camera/src/pi5camera/core/camera_backend.py": {
+      "sha256": "3bf34e48b9b33d73915d54de6f4d89a875d54a8c2360b51407b5e4e723ed82aa",
+      "size": 6030
+    },
+    "pi5camera/src/pi5camera/core/capture.py": {
+      "sha256": "4c2683b7f032607dee9c4b133d010dc1225121b5425beeee5f33f828083b0801",
+      "size": 1562
+    },
+    "pi5camera/src/pi5camera/core/enrollment.py": {
+      "sha256": "fc3f05379ab2a846e544e81a04c10d42b9e9136dff0ca4ba443a6d157beb26ee",
+      "size": 3503
+    },
+    "pi5camera/src/pi5camera/core/recognition.py": {
+      "sha256": "d9292fc40edd3877b9ed8d5f07c6ae77ee64be4b44607387be50a0ed2ae19c79",
+      "size": 5241
+    },
+    "pi5camera/src/pi5camera/driver.py": {
+      "sha256": "8428880605805d76b12e419f34928dd92d01b53346939bb6850c0ed4c5551a83",
+      "size": 1260
+    },
+    "pi5camera/src/pi5camera/environment.py": {
+      "sha256": "3e366a84292c02f7362e1bce3497c967f42defab3c85f807bb361c129c9806da",
+      "size": 4172
+    },
+    "pi5camera/src/pi5camera/errors.py": {
+      "sha256": "9be26e9d1dd03b523d61b45dcbf3017c5b5f54e2fc29f6844b2a84660680e763",
+      "size": 764
+    },
+    "pi5camera/src/pi5camera/models.py": {
+      "sha256": "220329c84e652cfba9fe67f2d15caffaa1c3fef30f86e759816328132a98644b",
+      "size": 2706
+    },
+    "pi5camera/src/pi5camera/recognition/__init__.py": {
+      "sha256": "9b519fef71c2bcd20903c4918fd1f0510e9862f5277439362e0034236450b1a4",
+      "size": 42
+    },
+    "pi5camera/src/pi5camera/recognition/base.py": {
+      "sha256": "a1985723ffc835c5307a7748542459a2523f8dc844d0b6b08dde603226e6fe3d",
+      "size": 444
+    },
+    "pi5camera/src/pi5camera/recognition/mediapipe_opencv_backend.py": {
+      "sha256": "3a7c7e2a183721e682bbd296c97ee1c02e2f00fa0f2ed5b1b34a08c21de89ce7",
+      "size": 9115
+    },
+    "pi5camera/src/pi5camera/storage/__init__.py": {
+      "sha256": "ecaf1e6a24a878b44c55f981ee147ce884e149337e4c2151eedb8ec089a7f36c",
+      "size": 40
+    },
+    "pi5camera/src/pi5camera/storage/face_index.py": {
+      "sha256": "e912d05e97d053255d9af489293bcccdf6bed1f6813e939573863eed18864a50",
+      "size": 5831
+    },
+    "pi5camera/src/pi5camera/storage/pending_records.py": {
+      "sha256": "2d8bf8c809a8e3b3b55bc354348b69240c1d8e71b1da6d45c8b7bc1bbd00b299",
+      "size": 6321
+    },
+    "pi5camera/src/pi5camera/storage/photo_storage.py": {
+      "sha256": "a5fc8e57c017a47879e05a2171ce3d67a2daa352dda51307c4d49a5c380855e1",
+      "size": 1021
+    },
+    "pi5camera/tests/test_camera_backend.py": {
+      "sha256": "4b7d2d86d10a05cc4e1fb551eb1f6fcd0a45779aad4fc647d126c1998c7d7e03",
+      "size": 1482
+    },
+    "pi5camera/tests/test_cli_startup.py": {
+      "sha256": "a945b8bac9ee4e818d49952b0e6ed29e54d6ff0d310e5911747ead7dbdf77099",
+      "size": 1770
+    },
+    "pi5camera/tests/test_config_manager.py": {
+      "sha256": "6ffad2cab79a5d6832a54e06d933a86e97eb4b44c3809fa00bf0f28ef4b3e291",
+      "size": 2819
+    },
+    "pi5camera/tests/test_face_index.py": {
+      "sha256": "4aa751ac9fb7289761a3659f4931b5f7cb5cbbf2261dda29fcb5f023728aa752",
+      "size": 2031
+    },
+    "pi5camera/tests/test_pending_records.py": {
+      "sha256": "01b51782215342573eb5f9d38498073e83bed0c267bd9632b3f630fa446576a6",
+      "size": 2082
+    },
+    "pi5camera/tests/test_photo_storage.py": {
+      "sha256": "c601a22db64eef76e24658b8dac519a4773e6efa5b79e9fca6bf2b79b9a6a993",
+      "size": 1037
+    },
+    "pi5camera/tests/test_recognition_flow.py": {
+      "sha256": "633987d7bb7b7036f8ac89e633df19094e4e6abef554bcb6027c2e7510e91051",
+      "size": 4656
+    },
+    "pi5camera/uv.lock": {
+      "sha256": "6229bc38febb7f72e18209e43ae2362aabb101675e3955c6a9e27d90890e90b7",
+      "size": 177466
+    },
+    "pi5disp/.python-version": {
+      "sha256": "49a506dd32096b010d75205acf3430c9ae6c40351888129499e5a5e487126c93",
+      "size": 5
+    },
+    "pi5disp/LICENSE": {
+      "sha256": "acdc0593e925de640c5f47a1c9481fac62d9c4352f0a913525bad43df0288d3e",
+      "size": 1072
+    },
+    "pi5disp/README.md": {
+      "sha256": "8c7ebe5ef454c2c54f334373b83695236a459add7b436e3d30a551f4b79acb0a",
+      "size": 15495
+    },
+    "pi5disp/display.json": {
+      "sha256": "374f1619c9ccb1c7a8d8aff8b6ded447a250893b9a099b8af6e33cf7639f1b16",
+      "size": 210
+    },
+    "pi5disp/pyproject.toml": {
+      "sha256": "435e4699df7d3703d1950e73c713e076097cdee8163fc35c470d15f63161c114",
+      "size": 810
+    },
+    "pi5disp/src/pi5disp/__init__.py": {
+      "sha256": "e78b8da3a4c04ab59fa034b0e2aeaa9a5f47350ad5cb5bee269a8cf2d6836d19",
+      "size": 206
+    },
+    "pi5disp/src/pi5disp/__main__.py": {
+      "sha256": "a2d99aabbf447d1cc7d52e7fab00cd37b7f644d1d71c026f6bacf1698a775452",
+      "size": 2789
+    },
+    "pi5disp/src/pi5disp/cli/__init__.py": {
+      "sha256": "deb2ead233c458d9852b192bcb35df4c8f668ef1b4d7cded38c298cd128667eb",
+      "size": 32
+    },
+    "pi5disp/src/pi5disp/cli/_common.py": {
+      "sha256": "21364f44a031d4c95778715e71a3fb4ff239f440b10496ca7c8162e08d823f1d",
+      "size": 1049
+    },
+    "pi5disp/src/pi5disp/cli/demo_cmd.py": {
+      "sha256": "a0a0b66acd69d0f8adb17ba0b6f7bf44c4bbd7c1de359488f3919d679695618c",
+      "size": 3408
+    },
+    "pi5disp/src/pi5disp/cli/display_tool.py": {
+      "sha256": "8d9def4ae10231470084325410538264513c341df0c30a62e5e8b53d9a9b9344",
+      "size": 10496
+    },
+    "pi5disp/src/pi5disp/cli/image_cmd.py": {
+      "sha256": "7a7c3a4d82ca99dc6ce58edc4e716394feddc01736af377257c3553779f8bdf4",
+      "size": 736
+    },
+    "pi5disp/src/pi5disp/cli/info_cmd.py": {
+      "sha256": "41c4bf523ec796bc4f1087fb9c8cbc34a95ff94afc271e9cd70833ade6dea419",
+      "size": 2314
+    },
+    "pi5disp/src/pi5disp/cli/init_cmd.py": {
+      "sha256": "75d819aab417cb6930add3ea8e48429fc4657150cc97c9c735088453808788d2",
+      "size": 441
+    },
+    "pi5disp/src/pi5disp/cli/text_cmd.py": {
+      "sha256": "f787ea0d05f2f81cf4440e16c5967cb61772855eb12260d62bf7ef705ffa636e",
+      "size": 2425
+    },
+    "pi5disp/src/pi5disp/config/__init__.py": {
+      "sha256": "32237be7f7596deacedb76bc9a12bada3ca3ac9557d49b68fb05cceb83ab6aac",
+      "size": 113
+    },
+    "pi5disp/src/pi5disp/config/config_manager.py": {
+      "sha256": "f4bb50c705d9ce6d461c1f0f8009225a1dabce2627234a4eaae4d007193ffd04",
+      "size": 6924
+    },
+    "pi5disp/src/pi5disp/core/__init__.py": {
+      "sha256": "18b4a2014d540c3a4415b15a8252832f1ffd77291d408f2096bac7f1604aacf0",
+      "size": 186
+    },
+    "pi5disp/src/pi5disp/core/driver.py": {
+      "sha256": "c5960790c74b5c5f397e0538566615e92c4b6dbd10cc9ed969ca24d367eeb264",
+      "size": 13897
+    },
+    "pi5disp/src/pi5disp/core/renderer.py": {
+      "sha256": "3a4aad07f90a3040dca6edec9ff84b44752bb4a80d3d99fe23836bee2559c2fd",
+      "size": 4541
+    },
+    "pi5disp/src/pi5disp/effects/__init__.py": {
+      "sha256": "016ecaf60a10ef553622943ef565feb9a130bbbe43395d5f7a55cc0f4ed138f9",
+      "size": 121
+    },
+    "pi5disp/src/pi5disp/effects/text_ticker.py": {
+      "sha256": "40f88698fdd0d9b9c0457131cebb0cfe85850dc2d93e1096e479ab8af64a027d",
+      "size": 3381
+    },
+    "pi5disp/src/pi5disp/fonts/NotoSans-Regular.ttf": {
+      "sha256": "e6d03ebde2bb9c3cb5e9a932f394521233c39c42d57914f699193a9d9d2b546b",
+      "size": 493780
+    },
+    "pi5disp/src/pi5disp/fonts/NotoSansJP-Regular.otf": {
+      "sha256": "f64bd8e47ae4a787b35dd8eddb71dda115fccc8e2eeb824c2e1722c86a0cdd30",
+      "size": 4521268
+    },
+    "pi5disp/src/pi5disp/fonts/NotoSansTC-Regular.otf": {
+      "sha256": "44b606dad683f7c1c8f5c95757ec4169e0f8876c4898e6045544bf97f8fdf835",
+      "size": 1605
+    },
+    "pi5disp/tests/conftest.py": {
+      "sha256": "a0a004cefeb74aeadc101848f0e3b8d9e3f84772c732edbd9b379d7eaaaa5fb6",
+      "size": 594
+    },
+    "pi5disp/tests/test_cli.py": {
+      "sha256": "0b570485cac7d027d25c65bb049ba41d3afe995188203618131e2538ccd0754b",
+      "size": 2513
+    },
+    "pi5disp/tests/test_config.py": {
+      "sha256": "7028324fefb31b13ea7a91b5a1a78be21e996c8d15cd368ed24ddc6868c9d2db",
+      "size": 3743
+    },
+    "pi5disp/tests/test_display_tool.py": {
+      "sha256": "e76a9316159ec66070e05f0cdfa29b33f67c205abf1a493dff38b21c5a8d67bc",
+      "size": 2742
+    },
+    "pi5disp/tests/test_driver.py": {
+      "sha256": "bbf15faa73e41670be78b9d3fc2480f71e84adcd5e1f2b6c766f94806df336e8",
+      "size": 10604
+    },
+    "pi5disp/tests/test_renderer.py": {
+      "sha256": "c91908a07dc27046727882babf5c3747759e2dfbfcd5325936331a6db8ccb8db",
+      "size": 3084
+    },
+    "pi5disp/tests/test_smoke.py": {
+      "sha256": "97539ac66f5ae097b6cd5bf651fb83ca62b4c422532d2bc33c3bb0f651250404",
+      "size": 272
+    },
+    "pi5disp/tests/test_text_ticker.py": {
+      "sha256": "d3e488931eca2b06f3a929cda56f013ebf7982b8db4e1ab6dcc9c238ed85a86d",
+      "size": 861
+    },
+    "pi5disp/uv.lock": {
+      "sha256": "dfc08fadb3369a857fef54420dce4a5fa5aed95fece872fdbf1ff3a1bfb7c256",
+      "size": 130650
+    },
+    "pi5mic/LICENSE": {
+      "sha256": "acdc0593e925de640c5f47a1c9481fac62d9c4352f0a913525bad43df0288d3e",
+      "size": 1072
+    },
+    "pi5mic/README.md": {
+      "sha256": "ac8b9c14528c140c35ce3321bca998ea3d0f3d76ae801abf4b086ea99ca6ec6e",
+      "size": 39220
+    },
+    "pi5mic/pyproject.toml": {
+      "sha256": "d590cc6ce961ea3ebab5f10d9b7a9e97c647922f2ab45df8402628e63d117cae",
+      "size": 932
+    },
+    "pi5mic/src/pi5mic/__init__.py": {
+      "sha256": "cd14fd66669cb8566c85e963cb2e3767de8d19635e732e62bb298c9ad76f15ed",
+      "size": 1478
+    },
+    "pi5mic/src/pi5mic/__main__.py": {
+      "sha256": "0a00b7295a4d552cd0c8c658a4f945aea036ab603059a8ca6dd09d65629ff99c",
+      "size": 5210
+    },
+    "pi5mic/src/pi5mic/cli/__init__.py": {
+      "sha256": "6c2e8d075d3ef7ea02845424ec7aad4f4771307e2f2efd905a40b1598985343e",
+      "size": 526
+    },
+    "pi5mic/src/pi5mic/cli/_common.py": {
+      "sha256": "9f2cf8e0b72356c1c35d6148bbb5503eef67317d7eeb968a65d2e7895d85527a",
+      "size": 5036
+    },
+    "pi5mic/src/pi5mic/cli/config_cmd.py": {
+      "sha256": "3eb595deb1f8f92ec2b3d19054e5c73dd086bf6d98fe59c2ed40a748f1385e03",
+      "size": 1748
+    },
+    "pi5mic/src/pi5mic/cli/doctor.py": {
+      "sha256": "786dbf5f78758c8f76ff82b2a57fb92d7b63e347f108f4677f4574f4dce77894",
+      "size": 15471
+    },
+    "pi5mic/src/pi5mic/cli/install_cmd.py": {
+      "sha256": "0b8026341f3310906c678605d63df7bcc1d917267ea88df3194b864a112fd475",
+      "size": 7332
+    },
+    "pi5mic/src/pi5mic/cli/mic_tool.py": {
+      "sha256": "b5c27e7a42c90383826d9974c1961a614067737135ac7775cd2282b1401810f0",
+      "size": 1908
+    },
+    "pi5mic/src/pi5mic/cli/run_cmd.py": {
+      "sha256": "2a3af6d8f8f37e8bb277a8b0f763c17a2d75de88b9420529f98e820f6e43ccb4",
+      "size": 8226
+    },
+    "pi5mic/src/pi5mic/cli/setup_cmd.py": {
+      "sha256": "821e011b59d37e5186e222d3d5479b8fe83f37d0d0e40f7a06667a0a88f346c4",
+      "size": 22590
+    },
+    "pi5mic/src/pi5mic/cli/status.py": {
+      "sha256": "2a463a519e1910e9acc264ea3d9dce4cd62820d0aeb0e230938c146e4e0a16ed",
+      "size": 5760
+    },
+    "pi5mic/src/pi5mic/cli/voiceinput_tool.py": {
+      "sha256": "de2c232e04c288e1ee185dfd7d260b61b2c2e264164d4055e2e2ab70be8dde8f",
+      "size": 14960
+    },
+    "pi5mic/src/pi5mic/config/__init__.py": {
+      "sha256": "131897d5c150db452f4106444ca37a82f8507529e7f315644948a673b6d9ad5d",
+      "size": 235
+    },
+    "pi5mic/src/pi5mic/config/config_manager.py": {
+      "sha256": "8d4657506d2f88262291f0bed0d125b6b70157b8d1f586a6cb462498e50691d9",
+      "size": 7944
+    },
+    "pi5mic/src/pi5mic/core/__init__.py": {
+      "sha256": "5967152aea266847947801b59ac66fb884daef1b2880920e5b0e9ea361b874c8",
+      "size": 579
+    },
+    "pi5mic/src/pi5mic/core/audio_backend.py": {
+      "sha256": "14bfa09a0986243adb93ebcd4e7db105d1b4fd8a2f6288a53e35bdf4f1ddbf85",
+      "size": 1256
+    },
+    "pi5mic/src/pi5mic/core/devices.py": {
+      "sha256": "2b080cea3afde97b6a5a9e6d34310651b90e306a1c07d5dcff46a55e4c436611",
+      "size": 6964
+    },
+    "pi5mic/src/pi5mic/core/listener.py": {
+      "sha256": "abc81a9e876b8778234f4ac70c0a4dd0cd1e6090f7321994f0b24f302bc64c4f",
+      "size": 5638
+    },
+    "pi5mic/src/pi5mic/core/recorder.py": {
+      "sha256": "aa9a29f27affddb8af76a6e9760204614111846cae0c823a4b60f83c5b7b2593",
+      "size": 3081
+    },
+    "pi5mic/src/pi5mic/core/session.py": {
+      "sha256": "5bcbbfb3bea821a986dbb1edd8023ecd48ac9562fe38a3978b9cbefcf21a62df",
+      "size": 689
+    },
+    "pi5mic/src/pi5mic/core/system_info.py": {
+      "sha256": "b75203dac0cae62e46b964f7ef2aa697bb691c47bc4433f2fac40129db8f4b48",
+      "size": 3755
+    },
+    "pi5mic/src/pi5mic/core/voiceinput.py": {
+      "sha256": "3696f60cbf071557160b4f42ef9d4d272cd8eadd8bf1d76f1d7765f7224acc7b",
+      "size": 30776
+    },
+    "pi5mic/src/pi5mic/driver.py": {
+      "sha256": "a20128f676b30d3eb1f1a9a53b695b8f50d8597c43ea27e059ca62c4cfe0ed9e",
+      "size": 889
+    },
+    "pi5mic/src/pi5mic/errors.py": {
+      "sha256": "adf73b005c45871ec5b10e159a8581ed0c8578c19863ec1b6671e1015831159e",
+      "size": 972
+    },
+    "pi5mic/src/pi5mic/install/__init__.py": {
+      "sha256": "2bc5be65f10a375c6cdef549a01c8bd72adfc0e29616af08dc9265986455b1c4",
+      "size": 57
+    },
+    "pi5mic/src/pi5mic/install/openwakeword.py": {
+      "sha256": "7fd27f0bdd5c8c42882839640c30bdd810c2e568db38a2d9504aad238fcd66b7",
+      "size": 6809
+    },
+    "pi5mic/src/pi5mic/install/whisper_cpp.py": {
+      "sha256": "929a65c1db20ad287f32378874f8cbf92731b6c018148ff05a238ac928ade1ee",
+      "size": 1575
+    },
+    "pi5mic/src/pi5mic/integration/__init__.py": {
+      "sha256": "242e44b94b8b3586155a9fe6940fc59fb71ed4a5177b6527b18c1ba1cefdf858",
+      "size": 381
+    },
+    "pi5mic/src/pi5mic/integration/delivery.py": {
+      "sha256": "2345b2802ca7bf36c738f0d7bc0177650807d84c5d30545f815e6318f9160a71",
+      "size": 2132
+    },
+    "pi5mic/src/pi5mic/integration/openclaw_session.py": {
+      "sha256": "bb42f4f58c44fdb0573495a75b004f3f2e60f042412277352670aecfd777f4a3",
+      "size": 1343
+    },
+    "pi5mic/src/pi5mic/integration/openclaw_setup.py": {
+      "sha256": "55b4ebe2ea24349419568acf9d789a5068d51040014d237b2531be2a7ca55b3d",
+      "size": 23053
+    },
+    "pi5mic/src/pi5mic/integration/presence.py": {
+      "sha256": "e52214ec5e276f5e9dcf50cff88c9dfaa4438c505b55eaf6e94df17297ccca8c",
+      "size": 2473
+    },
+    "pi5mic/src/pi5mic/models.py": {
+      "sha256": "08763d6e7497e9a6c0b22c31ec92a8ba935be4c88db294431c30a499c64f8aa6",
+      "size": 2409
+    },
+    "pi5mic/src/pi5mic/stt/__init__.py": {
+      "sha256": "80f8d1d211387b261f5d78b3b0f85136adc719df3ee5ddd4258364928480cfb9",
+      "size": 261
+    },
+    "pi5mic/src/pi5mic/stt/base.py": {
+      "sha256": "3520cbf297aac70d27ad1dfeb48cbfefc9626bdd7d053b78f2f9faff99c5569c",
+      "size": 408
+    },
+    "pi5mic/src/pi5mic/stt/gemini.py": {
+      "sha256": "2333edf063f3903a0538baa0d137c5e6b47db96134fb66b1c2ca6775f62b3a6f",
+      "size": 3666
+    },
+    "pi5mic/src/pi5mic/stt/whisper_cpp.py": {
+      "sha256": "36836f15d56b717d1ef60667373470e55d07ca4441e36c30c32097c0a4713f86",
+      "size": 7290
+    },
+    "pi5mic/src/pi5mic/transport/__init__.py": {
+      "sha256": "5fca298d83a0ae13e739ae04123762ea8b7bc87dd2b0341bff588841809a30f2",
+      "size": 205
+    },
+    "pi5mic/src/pi5mic/transport/base.py": {
+      "sha256": "e56a27ecb038ec4eb82468d7985bdbd4d570c5b9124406a22295201a4e232a4a",
+      "size": 396
+    },
+    "pi5mic/src/pi5mic/transport/openclaw_cli.py": {
+      "sha256": "93e869ffb749e2e959f20bfb7c6e5cdf1091524e058543adeb0c96d57bb95a9f",
+      "size": 8794
+    },
+    "pi5mic/src/pi5mic/vad/__init__.py": {
+      "sha256": "d8277aa4ddbb7c1b3c9e24b0feb5d8336a92bf1d906d1ae37662c94f981bd5ee",
+      "size": 247
+    },
+    "pi5mic/src/pi5mic/vad/base.py": {
+      "sha256": "702706978f3e0bc25ccc4822113ed81b611bc07e9dc9f74acf63cec67486026b",
+      "size": 693
+    },
+    "pi5mic/src/pi5mic/vad/silence.py": {
+      "sha256": "3ac78e0b431f7809e14f2158e582172165ffcf97b416164d6ab94e5cc30a0c6c",
+      "size": 1864
+    },
+    "pi5mic/src/pi5mic/wakeword/__init__.py": {
+      "sha256": "f59570a38f77491556db1a4e7614d190fa0b2f3ce301af50c37ca778efaddc5e",
+      "size": 240
+    },
+    "pi5mic/src/pi5mic/wakeword/base.py": {
+      "sha256": "d0536bea5443b21567542d3deb9a7ebca89a87ace94f4e7d198d3b039043f89b",
+      "size": 855
+    },
+    "pi5mic/src/pi5mic/wakeword/openwakeword.py": {
+      "sha256": "583abb2de0107d896e245ce297bcceb8eeec624b25c7699cc6188fa311bd7756",
+      "size": 4284
+    },
+    "pi5mic/tests/test_cli.py": {
+      "sha256": "f9422699f09e64ee31da2a8a1a3e8bc056345b7ac9db0d117dc2cf1519772da8",
+      "size": 14866
+    },
+    "pi5mic/tests/test_config.py": {
+      "sha256": "f363fcba53ae004d88f37f5c2383701248ead115be0ae51231e86bf17446e74e",
+      "size": 4133
+    },
+    "pi5mic/tests/test_devices.py": {
+      "sha256": "5058071829498627f7b1d7b7e5a90bf06ccdd33ed08c61887be07e9b7bf065a9",
+      "size": 5071
+    },
+    "pi5mic/tests/test_doctor.py": {
+      "sha256": "aabd53c7d4a9397c711a0f5821f7b4fa1411075345ceba92374a5db3a1c1d18a",
+      "size": 19479
+    },
+    "pi5mic/tests/test_listener.py": {
+      "sha256": "bde2f9130a9b69f1fc11fc101f8181bdf49ce0c372bc16c416631d73a68f0b39",
+      "size": 2110
+    },
+    "pi5mic/tests/test_mic_tool.py": {
+      "sha256": "36d61af3cb53723573f23f95f71c3f3896d67be6131900d108f7908950d1d360",
+      "size": 476
+    },
+    "pi5mic/tests/test_mic_tool_setup.py": {
+      "sha256": "51a2544920cf20856fb0a0fb62ae7593ac34793595aa00ea2aeab57908e8251d",
+      "size": 2612
+    },
+    "pi5mic/tests/test_openclaw_session.py": {
+      "sha256": "edcc1b95b2c8f95f4110271a1b6ba67e31f8584bd66b37e64b5ae964b49e271c",
+      "size": 932
+    },
+    "pi5mic/tests/test_openclaw_setup.py": {
+      "sha256": "a858f1f310e1398846d4c79aec8375b6713f212355c299d1de0f3dfe760b086f",
+      "size": 4574
+    },
+    "pi5mic/tests/test_recorder.py": {
+      "sha256": "f7f550c556cc46e28f108d24163b45fde7b975780476eb9e56581d7928009d9a",
+      "size": 3728
+    },
+    "pi5mic/tests/test_stt_gemini.py": {
+      "sha256": "dc0102ad01edff60c8d0ff3ac7dde55dd997c054a219e300606f7be30bcdb597",
+      "size": 3474
+    },
+    "pi5mic/tests/test_stt_whisper_cpp.py": {
+      "sha256": "fa2d33557069e344558d4b6a8938d6b85d029ad832aa1eb0cab04b4204597105",
+      "size": 6671
+    },
+    "pi5mic/tests/test_system_info.py": {
+      "sha256": "4e9d8ae31b8a2500caf3f2509217a07482522146a2ee8cf0fa24cc25af4bda96",
+      "size": 461
+    },
+    "pi5mic/tests/test_transport_openclaw.py": {
+      "sha256": "0325f9ad0aab9da7a420b1c30940930a22c08649daed69451f1d864d9bc65047",
+      "size": 3538
+    },
+    "pi5mic/tests/test_vad.py": {
+      "sha256": "6ad4f0db4f4b069b5ebc361e0d45d82b785748150783771617227801a28e667a",
+      "size": 1143
+    },
+    "pi5mic/tests/test_voiceinput.py": {
+      "sha256": "1557a6348854b5483761a621e7e0e927b15865b116d7b4516b0b84895a6a42ac",
+      "size": 15357
+    },
+    "pi5mic/tests/test_voiceinput_tool.py": {
+      "sha256": "ceef85bd913663d6b81d31d3a602fc8b7fb0dc364ea05e76639f345d19b6c7a1",
+      "size": 4013
+    },
+    "pi5mic/tests/test_wakeword.py": {
+      "sha256": "d7f818fb46e75dfdd934375d77c6ba0b1d45d2510e0f8b47be98966e19c039d6",
+      "size": 2937
+    },
+    "pi5mic/uv.lock": {
+      "sha256": "11d76dfa34576a3720e974e677a35372cd62d196b280bc31e761922bd37c18aa",
+      "size": 163833
+    },
+    "pi5mic/voiceinput/hey_Ninja.onnx": {
+      "sha256": "12c87f97ea41b08a356631dc1162af455aa30ac27ff6235963a31d0f5e39016a",
+      "size": 206276
+    },
+    "pi5mic/voiceinput/hey_Ninja.tflite": {
+      "sha256": "667021851674f4ab0783083e301915ed81b2a4e5bebe8661268e5510f0121a0b",
+      "size": 206992
+    },
+    "pi5servo/.python-version": {
+      "sha256": "49a506dd32096b010d75205acf3430c9ae6c40351888129499e5a5e487126c93",
+      "size": 5
+    },
+    "pi5servo/LICENSE": {
+      "sha256": "acdc0593e925de640c5f47a1c9481fac62d9c4352f0a913525bad43df0288d3e",
+      "size": 1072
+    },
+    "pi5servo/README.md": {
+      "sha256": "43c174e7a149dcd79c43f7a861ef8a26cc6b4122d5c47fe49f7a3a17f21a7b77",
+      "size": 21085
+    },
+    "pi5servo/pyproject.toml": {
+      "sha256": "01083c1e5e3e61d129875966e34d36139355f3be084e55e31ae2ea68ddb78d46",
+      "size": 849
+    },
+    "pi5servo/src/pi5servo/__init__.py": {
+      "sha256": "9640cc8b023c6650e6ef7854462d0e8e9ef8dbc5cc589b093018f3ee04dbc15b",
+      "size": 1879
+    },
+    "pi5servo/src/pi5servo/__main__.py": {
+      "sha256": "beb29d0cc0ca3ac959865c3ce0e1f9e7cdcfbbac762aa9e13e72a085bfc6a325",
+      "size": 866
+    },
+    "pi5servo/src/pi5servo/cli/__init__.py": {
+      "sha256": "887366e4a5503b4aed467b30fbbf1f3090f402ea06f8924aa3fe4b4618c96189",
+      "size": 503
+    },
+    "pi5servo/src/pi5servo/cli/_common.py": {
+      "sha256": "0b3414c083ce444e1c3f0b0dc2127a6518bef727347b01f44962b8430f6f83d5",
+      "size": 9502
+    },
+    "pi5servo/src/pi5servo/cli/calib.py": {
+      "sha256": "fb36a8ad2501e8ef497a11e713bc45328faaad265f3837d37f9033146d130179",
+      "size": 11808
+    },
+    "pi5servo/src/pi5servo/cli/cmd.py": {
+      "sha256": "7a5faa5edc5d35109eb315490f54c3093f20879386a32ce3db566711722d8a08",
+      "size": 2385
+    },
+    "pi5servo/src/pi5servo/cli/config_cmd.py": {
+      "sha256": "972617917f4facd5b79b4d63edde75b0bc4afcc38b943ac993835724aa3ef31f",
+      "size": 4756
+    },
+    "pi5servo/src/pi5servo/cli/move.py": {
+      "sha256": "c86db12116352fd826a0766c2f00b574b9339e5d86cd7aa1f769c9052f118981",
+      "size": 2882
+    },
+    "pi5servo/src/pi5servo/cli/servo_tool.py": {
+      "sha256": "4b27b6529af9893dc4320e394a73617acf9edc333dba0cc8ba6cd572637fbf9f",
+      "size": 18891
+    },
+    "pi5servo/src/pi5servo/cli/status.py": {
+      "sha256": "9c4921dff9b07c50f4da6f9351f48edbb3e766008c9c15a96932ae3a8fe1f75c",
+      "size": 3616
+    },
+    "pi5servo/src/pi5servo/config/__init__.py": {
+      "sha256": "88c5faac350d1c20e013286f0e2f6eba5220def3ed6314bf726e1f29193f9296",
+      "size": 439
+    },
+    "pi5servo/src/pi5servo/config/config_manager.py": {
+      "sha256": "8e44a2dea4bd4c1d75ef6e8bfd47f3aa2c2b35e094ac5d6109bcee49e94c61b8",
+      "size": 8664
+    },
+    "pi5servo/src/pi5servo/core/__init__.py": {
+      "sha256": "f0851d8c48f67e9e2802713837262102116703715d5b518cb00ff38cc89fbb32",
+      "size": 901
+    },
+    "pi5servo/src/pi5servo/core/backend.py": {
+      "sha256": "7d1c7bc15beb2cb82af294f2650a299b90b404cd61a5fd7b76f576e791ce5c5d",
+      "size": 9850
+    },
+    "pi5servo/src/pi5servo/core/backend_errors.py": {
+      "sha256": "95bc7eeee8d1bd0e36af9b51999a41093f20b72f983769b3f7dd3097721c00e4",
+      "size": 391
+    },
+    "pi5servo/src/pi5servo/core/backends/__init__.py": {
+      "sha256": "48e178ab44f98e08a620ac6180814a4ee23adc50c0418fd441b457336257f7ed",
+      "size": 339
+    },
+    "pi5servo/src/pi5servo/core/backends/dfr0566.py": {
+      "sha256": "17f5639f2dce86f4a4bda0d3bafa2a0246260591bdb8a8afc264e1ee6f8e788c",
+      "size": 6765
+    },
+    "pi5servo/src/pi5servo/core/backends/hardware_pwm.py": {
+      "sha256": "ed869805488a6f6f4f612afd96646a75182a916264a00cac2b21cf1870ab6d12",
+      "size": 7736
+    },
+    "pi5servo/src/pi5servo/core/backends/pca9685.py": {
+      "sha256": "de72eb3233561e0e1bd87283c0e45a06595cde7a0523fa109fddf18adbab688c",
+      "size": 4611
+    },
+    "pi5servo/src/pi5servo/core/backends/pwm_pio.py": {
+      "sha256": "dc9b3dfbb2617be756dacc7f3f371556b75e5ad772832f6e8fe14d41ad34dad7",
+      "size": 566
+    },
+    "pi5servo/src/pi5servo/core/endpoint.py": {
+      "sha256": "2d73b0a159acbaf481021aec044c317257774c090e993185b4a6c909870c6c96",
+      "size": 2255
+    },
+    "pi5servo/src/pi5servo/core/multi_servos.py": {
+      "sha256": "cc0c99f2168b90ed34f74bee4eb7ea665975130c9ecbbd70110b18ec3725079b",
+      "size": 17173
+    },
+    "pi5servo/src/pi5servo/core/servo.py": {
+      "sha256": "27a0e0f0799e58cf853440b4536caa88ea6b8a670af3548fe7bb4fb99017d7b6",
+      "size": 8751
+    },
+    "pi5servo/src/pi5servo/driver.py": {
+      "sha256": "5f2e76d1e44bd28c32cfd25f7e5dd86de30a6906311f4daa7586edfe43d78637",
+      "size": 273
+    },
+    "pi5servo/src/pi5servo/motion/__init__.py": {
+      "sha256": "52fce6dcc951f3802e02b4097afd08c544edcc9c85e33bb9ec28039145a9d66f",
+      "size": 1315
+    },
+    "pi5servo/src/pi5servo/motion/calculator.py": {
+      "sha256": "6f507f8b2fc32b03ad6044c0f0ddbbdc4721260d357670255b715b4d32a30f9a",
+      "size": 1973
+    },
+    "pi5servo/src/pi5servo/motion/easing.py": {
+      "sha256": "5c05ab9be4d5f672a044c98c6c20c80b4e4abb61b778f3c4008c5dbf580215f9",
+      "size": 2399
+    },
+    "pi5servo/src/pi5servo/parser/__init__.py": {
+      "sha256": "6e9ce3377a98163363b1db54af860ba58b45661b6a1cb533a2632e7c07004bd5",
+      "size": 756
+    },
+    "pi5servo/src/pi5servo/parser/command.py": {
+      "sha256": "71d0efb1d18a1f663157d8fa7a38daaf34a05f3b21cc928b1c2473ae180c6846",
+      "size": 4754
+    },
+    "pi5servo/tests/__init__.py": {
+      "sha256": "167c8f1b6124fe064733103c924c5acb71d0739ad088507c52821893f36211c1",
+      "size": 30
+    },
+    "pi5servo/tests/conftest.py": {
+      "sha256": "ba47f67a3796f82f53234c132e4c71c21ef51fb47748193399ed74f2f1987041",
+      "size": 1085
+    },
+    "pi5servo/tests/test_backend.py": {
+      "sha256": "c5498ba11e948ca925f5655f88120d2c1ff82ebed3d33ef8a17da130360459ed",
+      "size": 11153
+    },
+    "pi5servo/tests/test_cli.py": {
+      "sha256": "169ce978366ed235b591a1ef2165d7a182512288a5aae8187ef46eef76805349",
+      "size": 5552
+    },
+    "pi5servo/tests/test_config.py": {
+      "sha256": "2ec27c9d9af0d4806d37ad9a97423ba94c033570de5596a984bde4d5e76e0723",
+      "size": 7517
+    },
+    "pi5servo/tests/test_core.py": {
+      "sha256": "0e14db507494600a910e3ae72a85ee12611eb0cdb3e33c24d55593805aaeda1d",
+      "size": 12620
+    },
+    "pi5servo/tests/test_motion.py": {
+      "sha256": "762154a1bfa078c5f384a972cecbec30273dcad6ae657f7e9c9da5fe275bcade",
+      "size": 3968
+    },
+    "pi5servo/tests/test_parser.py": {
+      "sha256": "51efddd7512ca646b82889479cd4a8009ce0eeafdd126090a6b262468905cd9c",
+      "size": 8616
+    },
+    "pi5servo/tests/test_servo_tool.py": {
+      "sha256": "069fad2da01798ce771ca6a20360ae1e729c0ac14bf154abc41b1a2fec98c256",
+      "size": 18424
+    },
+    "pi5servo/uv.lock": {
+      "sha256": "ae674298667c16d0dab3bb55ac04e08df25d5354f3cb448841959a80a9461ae9",
+      "size": 49213
+    },
+    "pi5vl53l0x/.python-version": {
+      "sha256": "49a506dd32096b010d75205acf3430c9ae6c40351888129499e5a5e487126c93",
+      "size": 5
+    },
+    "pi5vl53l0x/LICENSE": {
+      "sha256": "acdc0593e925de640c5f47a1c9481fac62d9c4352f0a913525bad43df0288d3e",
+      "size": 1072
+    },
+    "pi5vl53l0x/README.md": {
+      "sha256": "1f9351a7d07ab88953d5a184d48ede403e94076701bb76b840aae2f71e374d63",
+      "size": 13425
+    },
+    "pi5vl53l0x/pyproject.toml": {
+      "sha256": "21ceff117220bf20e943eb9bd77db9dce83eb612d3270c81bac05532d0e8ec75",
+      "size": 735
+    },
+    "pi5vl53l0x/src/pi5vl53l0x/__init__.py": {
+      "sha256": "0964ff4bb194b7daa0c173847ccc4c6a4808ff3ef22f5180c9a7c20d8d09444a",
+      "size": 359
+    },
+    "pi5vl53l0x/src/pi5vl53l0x/__main__.py": {
+      "sha256": "3d536c91b7ff1ff4d88c994dc3f8047ceb271baf6f3b9ac28f40bc59120830e1",
+      "size": 179
+    },
+    "pi5vl53l0x/src/pi5vl53l0x/cli/sensor_tool.py": {
+      "sha256": "b9359a5406d061d110f962505627e6f59e06017a3ee6c728fd84715a47869c41",
+      "size": 22860
+    },
+    "pi5vl53l0x/src/pi5vl53l0x/config/config_manager.py": {
+      "sha256": "414e293cfd90b937385974a7ca5e6d8d411860fdd1213014d84ddf44dab19fb2",
+      "size": 3306
+    },
+    "pi5vl53l0x/src/pi5vl53l0x/core/i2c.py": {
+      "sha256": "d3ee7b27aef1c6957171b90de6812361f43ee0612019e91c1103fb7df97e4bee",
+      "size": 7457
+    },
+    "pi5vl53l0x/src/pi5vl53l0x/core/sensor.py": {
+      "sha256": "dc7cee8c019a37d6695e49985f05699268e669ab3f70c3ad12563c1a69cd6ec7",
+      "size": 23361
+    },
+    "pi5vl53l0x/src/pi5vl53l0x/driver.py": {
+      "sha256": "aa476e2f14cf2bd62d11c65e02f0d438ccb6cd6d1f517836465e9e6c4c795318",
+      "size": 124
+    },
+    "pi5vl53l0x/src/pi5vl53l0x/registers.py": {
+      "sha256": "26097b8ba6edefe7970e7d92c35c05ec1ff1de20999ee705d3d7103ceea5c375",
+      "size": 1387
+    },
+    "pi5vl53l0x/tests/test_cli.py": {
+      "sha256": "2911d2ec938b7952840e3d7e180c1dfbe6a78c56747fd77f51a4f945ef1daa7e",
+      "size": 818
+    },
+    "pi5vl53l0x/tests/test_config.py": {
+      "sha256": "f4f88ad4b47f6b5013cfe70dd6db3518566c5a4dc05b90c908d0a9a4003905bd",
+      "size": 5343
+    },
+    "pi5vl53l0x/tests/test_i2c.py": {
+      "sha256": "53b7d4ff1b24cafec22183ce7f519327764a826f7d19e9cccc380db4f19bcd95",
+      "size": 11352
+    },
+    "pi5vl53l0x/tests/test_sensor.py": {
+      "sha256": "da79a3a87489b5e7addaa90060aac5d9a19e03cc513a3b7fc3699af933d8f798",
+      "size": 12681
+    },
+    "pi5vl53l0x/uv.lock": {
+      "sha256": "b0c7791ba7cd71e2f1f8116ea8af291c8c16ce17715612d17dc30fd9d76b0df4",
+      "size": 30991
+    }
+  },
+  "schema_version": 1,
+  "source": {
+    "branch": "clawbotV3_01",
+    "commit": "1aa6700d403dff65d2a53ad6fda9718b60723cb7",
+    "repository": "https://github.com/Nilcreator/NinjaClawBot.git"
+  }
+}
