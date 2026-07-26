@@ -272,6 +272,84 @@ the command exits is expected. A real health command initializes the panel and
 may briefly light the backlight at 75%, even though it does not send a test
 frame. Follow the Phase 3.2 validation report before using the real commands.
 
+## Phase 3.3 six-servo mixed-backend adapter
+
+`ninjarobot_pi5_ide.servo` owns the lazy `pi5servo` import and creates the
+managed library's existing `auto` mixed backend for this fixed topology:
+
+- `gpio12` and `gpio13` use RP1 hardware PWM
+- `hat_pwm1` through `hat_pwm4` use DFR0566 physical PWM0 through PWM3
+- DFR0566 uses I2C bus 1 at address `0x10`
+
+The V4 configuration must list those six names in that exact order. It also
+points to `~/.config/pi5servo/servo.json`, where the standalone calibration
+tool stores endpoint calibration. V4 reads that file but never rewrites it.
+
+Three capabilities share one `ServoDevice`:
+
+- `servo.status` is read-only and reports topology, calibration readiness, and
+  safety gates without sending a center pulse
+- `servo.move` is a non-idempotent motion action for one endpoint
+- `servo.stop` is an idempotent emergency action that aborts movement and sets
+  all six outputs to zero without waiting for the normal servo resource lock
+
+Non-idempotent means repeating the physical action may repeat motion, so
+successful moves report `retry_safety: unsafe`. Reusing the same action ID
+returns the stored result instead of moving twice.
+
+The checked-in example has:
+
+```toml
+motion_enabled = false
+group_motion_enabled = false
+```
+
+Group motion has no capability in Phase 3.3 and the configuration schema
+rejects enabling it. Real single-servo motion requires:
+
+- `motion_enabled = true` in a private configuration
+- an explicit valid calibration for the selected endpoint
+- `--real`
+- `--confirm-motion`
+
+Before moving, the service sends the selected endpoint's calibrated center.
+It then uses the managed driver's cancellable slow/medium/fast movement path.
+For a continuous-rotation servo, center means neutral/stop and other values
+usually mean direction and speed rather than a physical angle.
+
+Simulation is the default:
+
+```bash
+uv run --frozen ninjarobot_pi5_cli servo health \
+  --ledger /tmp/ninjarobot-phase33.sqlite3
+uv run --frozen ninjarobot_pi5_cli servo status \
+  --ledger /tmp/ninjarobot-phase33.sqlite3
+uv run --frozen ninjarobot_pi5_cli servo move \
+  --ledger /tmp/ninjarobot-phase33.sqlite3 \
+  --endpoint gpio12 \
+  --angle 10 \
+  --speed S
+uv run --frozen ninjarobot_pi5_cli servo stop \
+  --ledger /tmp/ninjarobot-phase33.sqlite3
+```
+
+Every result must say `"simulated": true`. The simulated status intentionally
+reports all endpoints calibrated and motion enabled so the motion contract can
+be tested without hardware.
+
+Install the aggregate hardware extra before non-moving Raspberry Pi interface
+checks:
+
+```bash
+uv sync --frozen --extra hardware
+```
+
+A real health/status session claims GPIO12/GPIO13 at zero pulse, verifies the
+DFR0566 identity, disables its PWM, sets all four HAT duties to zero, and
+releases both backends during cleanup. It must not move a servo. Powered
+calibration and motion remain blocked until the complete electrical record and
+emergency disconnect are approved. Follow the Phase 3.3 validation report.
+
 ## Driver package validation commands
 
 ### Standalone README contract
@@ -395,6 +473,26 @@ test; the separate pre-Phase-1 live-Pi report is stored under `docs/validation/`
 - **The screen goes dark as soon as a command completes:** this is intentional
   cleanup. Add `--hold 5` to a real manual test so the process keeps the
   backlight active long enough to inspect the frame.
+- **Servo status reports `simulated: true`:** this is the safe default. No PWM
+  or I2C interface was opened.
+- **Real servo health is unavailable:** verify the GPIO12/GPIO13
+  `pwm-2chan` overlay, confirm I2C address `0x10`, install the hardware extra,
+  and confirm the user can access `/sys/class/pwm` and `/dev/i2c-1`.
+- **A real move says `--confirm-motion` is required:** this is the first
+  deliberate-motion gate. Do not bypass it until the workspace and power
+  cutoff are ready.
+- **A real move returns `SERVO_MOTION_DISABLED`:** the checked-in configuration
+  intentionally blocks movement. Use a private configuration only after the
+  electrical record is approved.
+- **A real move returns `SERVO_NOT_CALIBRATED`:** calibrate that exact endpoint
+  with the standalone `pi5servo` tool. Do not substitute another servo's
+  calibration.
+- **A continuous-rotation servo does not move to an angle:** this is expected.
+  Its calibrated center is neutral, while either side controls direction and
+  speed. Begin with a very small value and no mechanical load.
+- **Unexpected motion or jitter occurs:** run `servo stop`, use the physical
+  power disconnect, shut down before touching wiring, and inspect power,
+  common ground, signal routing, and calibration.
 - **DFR0566 digital GPIO12/GPIO13 do not show a PWM alternate function:** add
   `dtparam=audio=off` and
   `dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4` to

@@ -4,7 +4,7 @@ Date: 2026-07-26
 
 Hardware accessed during implementation: No
 
-Physical Raspberry Pi result: **PENDING OPERATOR TEST**
+Physical Raspberry Pi result: **PASS** (operator reported)
 
 ## 1. Scope of validation
 
@@ -39,6 +39,15 @@ Automated result: **PASS**
 - Compilation, Ruff lint, Ruff formatting, dependency lock, CLI smoke, and
   `git diff --check`: passed.
 - Driver provenance: 222 tracked files and 23 authorized repairs, unchanged.
+
+The operator subsequently reported that the complete checklist passed. The
+provided transcript confirms successful real red and blue clears, centered
+multiline text at 320×240 with rotation 90 and brightness 75, and backlight
+changes to 25% and 75%. Every attached action reported `simulated: false`,
+`status: succeeded`, and `retry_safety: safe`. The transcript contains the red
+command twice and does not contain the green command's JSON result; green is
+therefore recorded as an operator-confirmed visual pass rather than an attached
+machine-output result.
 
 ## 2. Safety notes
 
@@ -242,22 +251,22 @@ after each command exits.
 
 ## 7. Pass/fail checklist
 
-- [ ] Display-board voltage and wiring record is complete.
-- [ ] Hardware-free capability listing passes.
-- [ ] Simulated health reports ready.
-- [ ] Simulated text, brightness, and clear report `simulated: true`.
-- [ ] Hardware dependency installs.
-- [ ] SPI is enabled and `/dev/spidev0.0` exists.
-- [ ] Configuration reports DC4/RST5/BL6, rotation 90, and brightness 75%.
-- [ ] Real health reports ready.
-- [ ] Red frame is even and correctly colored.
-- [ ] Green frame is even and correctly colored.
-- [ ] Blue frame is even and correctly colored.
-- [ ] Text is centered, readable, and in the intended orientation.
-- [ ] 25% brightness is dimmer than 75%.
-- [ ] Backlight turns off after every CLI command.
-- [ ] No GPIO conflict, heat, smell, severe flicker, or undervoltage occurs.
-- [ ] No buzzer, servo, sensor, camera, or microphone is operated.
+- [x] Display-board voltage and wiring record is complete.
+- [x] Hardware-free capability listing passes.
+- [x] Simulated health reports ready.
+- [x] Simulated text, brightness, and clear report `simulated: true`.
+- [x] Hardware dependency installs.
+- [x] SPI is enabled and `/dev/spidev0.0` exists.
+- [x] Configuration reports DC4/RST5/BL6, rotation 90, and brightness 75%.
+- [x] Real health reports ready.
+- [x] Red frame is even and correctly colored.
+- [x] Green frame is even and correctly colored (operator reported).
+- [x] Blue frame is even and correctly colored.
+- [x] Text is centered, readable, and in the intended orientation.
+- [x] 25% brightness is dimmer than 75%.
+- [x] Backlight turns off after every CLI command.
+- [x] No GPIO conflict, heat, smell, severe flicker, or undervoltage occurs.
+- [x] No buzzer, servo, sensor, camera, or microphone is operated.
 
 ## 8. Rollback steps
 

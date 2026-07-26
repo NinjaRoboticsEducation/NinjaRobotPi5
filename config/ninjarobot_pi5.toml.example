@@ -6,7 +6,10 @@ gpio = 27
 
 [hardware.servos]
 enabled = true
-endpoints = ["gpio12", "gpio13"]
+endpoints = ["gpio12", "gpio13", "hat_pwm1", "hat_pwm2", "hat_pwm3", "hat_pwm4"]
+calibration_file = "~/.config/pi5servo/servo.json"
+motion_enabled = false
+group_motion_enabled = false
 
 [hardware.display]
 enabled = true

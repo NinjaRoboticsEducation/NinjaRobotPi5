@@ -15,14 +15,15 @@ which is the single source of truth.
 
 ## Current status
 
-Phase 0, Phase 1, Phase 2, Phase 3.1, and the software part of Phase 3.2 are
-complete. Phase 0 established project governance and preserved the original
-import hashes for the six existing Pi5 hardware libraries. Phase 1 added strict
-IDE and agent contracts, deterministic fakes, V4-owned configuration, and the
-unified `ninjarobot_pi5_cli`. Phase 2 added the IDE capability registry,
-adapter lifecycle, bounded scheduler, resource locks, durable SQLite action
-ledger, and the first read-only adapter: `distance.read` through
-`pi5vl53l0x`. SQLite is Python's built-in local database format.
+Phase 0, Phase 1, Phase 2, Phase 3.1, Phase 3.2, and the software part of Phase
+3.3 are complete. Phase 0 established project governance and preserved the
+original import hashes for the six existing Pi5 hardware libraries. Phase 1
+added strict IDE and agent contracts, deterministic fakes, V4-owned
+configuration, and the unified `ninjarobot_pi5_cli`. Phase 2 added the IDE
+capability registry, adapter lifecycle, bounded scheduler, resource locks,
+durable SQLite action ledger, and the first read-only adapter:
+`distance.read` through `pi5vl53l0x`. SQLite is Python's built-in local
+database format.
 
 Phase 3.1 adds bounded passive-buzzer control on GPIO27. `buzzer.play_tone`
 accepts only a frequency from 20 through 20,000 hertz, a duration from 0.05
@@ -35,16 +36,24 @@ Phase 3.2 adds `display.show_text`, `display.clear`, and
 means only one display operation can use SPI at a time. SPI (Serial Peripheral
 Interface) is the display's clocked data connection. Commands simulate unless
 `--real` is present. The real path uses SPI0 device 0, DC GPIO4, reset GPIO5,
-backlight GPIO6, rotation 90°, and initial brightness 75%. The software gate
-passes; physical visual confirmation is the remaining Phase 3.2 step.
+backlight GPIO6, rotation 90°, and initial brightness 75%. The operator reports
+that the complete Phase 3.2 physical checklist passes.
+
+Phase 3.3 adds the fixed six-servo mixed backend and three capabilities:
+`servo.status`, single-endpoint `servo.move`, and emergency `servo.stop`.
+GPIO12/GPIO13 use Raspberry Pi hardware PWM, while `hat_pwm1` through
+`hat_pwm4` use DFR0566 PWM0 through PWM3 over I2C. Real movement is disabled in
+the checked-in configuration and additionally requires `--real`,
+`--confirm-motion`, and a valid endpoint calibration. Group motion is not
+available. The Phase 3.3 software gate passes; powered servo validation remains
+blocked until the electrical record and calibrations are approved.
 
 The `pi5buzzer` development environment is locked and its 65 tests pass. The
 earlier GPIO17 health and sound checks remain historical evidence; the current
 V4 GPIO27 validation has now passed every operator checklist item.
 Non-moving servo backends execute successfully. Display configuration now lives
 under the user's config directory rather than inside the package; all display
-command paths execute, but Phase 3.2 visual confirmation with the current
-DC4/RST5/BL6 wiring is pending. See the
+command paths and the current DC4/RST5/BL6 visual checklist pass. See the
 [2026-07-25 hardware report](docs/validation/raspberry-pi-hardware-validation-2026-07-25.md).
 
 `pi5camera` now uses the Raspberry Pi OS Picamera2/libcamera packages through a
@@ -85,7 +94,7 @@ The current CLI provides:
   valid contract data.
 - `dry-run` executes against a deterministic fake IDE and labels the result
   `"simulated": true`.
-- `capabilities` lists all implemented distance, buzzer, and display
+- `capabilities` lists all implemented distance, buzzer, display, and servo
   capabilities without opening hardware.
 - `health` checks a simulated sensor unless `--real` is supplied.
 - `distance read` returns simulated data unless `--real` is supplied.
@@ -104,6 +113,13 @@ The current CLI provides:
   six-digit red/green/blue hexadecimal color value.
 - `display brightness` sets the backlight from 0% through 100% for the current
   CLI session.
+- `servo health` claims the two native PWM interfaces and verifies the DFR0566
+  at zero output. It does not send a servo pulse.
+- `servo status` reports the six endpoints, calibration readiness, and motion
+  gates without centering a servo.
+- `servo move` moves exactly one calibrated endpoint. It is simulated unless
+  `--real` is supplied, and real movement requires additional safety gates.
+- `servo stop` aborts movement and requests zero pulse for all six endpoints.
 - `--version` reports the installed V4 package version.
 
 The contracts reject unknown fields and unsafe type conversion. They cover
@@ -181,10 +197,21 @@ uv run --frozen ninjarobot_pi5_cli display brightness \
 uv run --frozen ninjarobot_pi5_cli display clear \
   --ledger /tmp/ninjarobot-phase32-smoke.sqlite3 \
   --color "#000000"
+uv run --frozen ninjarobot_pi5_cli servo health \
+  --ledger /tmp/ninjarobot-phase33-smoke.sqlite3
+uv run --frozen ninjarobot_pi5_cli servo status \
+  --ledger /tmp/ninjarobot-phase33-smoke.sqlite3
+uv run --frozen ninjarobot_pi5_cli servo move \
+  --ledger /tmp/ninjarobot-phase33-smoke.sqlite3 \
+  --endpoint gpio12 \
+  --angle 10 \
+  --speed S
+uv run --frozen ninjarobot_pi5_cli servo stop \
+  --ledger /tmp/ninjarobot-phase33-smoke.sqlite3
 ```
 
-On the Raspberry Pi, install the optional managed sensor package without
-changing its source:
+On the Raspberry Pi, install the optional managed hardware packages without
+changing their source:
 
 ```bash
 uv sync --frozen --extra hardware
@@ -197,6 +224,10 @@ For the buzzer, follow
 [`docs/validation/phase-3-1-buzzer-validation-2026-07-26.md`](docs/validation/phase-3-1-buzzer-validation-2026-07-26.md).
 The operator reports that checklist as passed. For the display, follow
 [`docs/validation/phase-3-2-display-validation-2026-07-26.md`](docs/validation/phase-3-2-display-validation-2026-07-26.md).
+The operator reports that checklist as passed. For the servo integration,
+follow
+[`docs/validation/phase-3-3-servo-validation-2026-07-26.md`](docs/validation/phase-3-3-servo-validation-2026-07-26.md).
+Do not run its actuator-moving section until the electrical record is approved.
 
 Run the complete root gate:
 
@@ -225,7 +256,9 @@ The Phase 3.1 real path can sound the GPIO27 buzzer, but only through bounded
 arguments and an explicit `--real` flag. The Phase 3.2 real path resets and
 writes the ST7789V and can energize its backlight at the configured 75%
 brightness. Neither phase moves a servo, uses the camera, or records audio.
-Later actuator and privacy-sensitive commands require separate Raspberry Pi
-checklists and operator approval. Model output is treated as an untrusted
-proposal; the deterministic IDE control plane retains final authority over
-robot actions.
+The Phase 3.3 real health/status path keeps all servo duties at zero. Its
+movement path is classified as `motion`, disabled by default, restricted to
+one calibrated endpoint, and guarded by explicit confirmation. Later
+privacy-sensitive commands require separate Raspberry Pi checklists and
+operator approval. Model output is treated as an untrusted proposal; the
+deterministic IDE control plane retains final authority over robot actions.

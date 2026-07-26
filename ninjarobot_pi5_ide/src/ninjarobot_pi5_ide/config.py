@@ -20,6 +20,14 @@ EnvironmentVariable = Annotated[
     StringConstraints(min_length=2, max_length=128, pattern=r"^[A-Z][A-Z0-9_]+$"),
 ]
 NonEmptyText = Annotated[str, StringConstraints(min_length=1, max_length=256)]
+SERVO_ENDPOINTS = (
+    "gpio12",
+    "gpio13",
+    "hat_pwm1",
+    "hat_pwm2",
+    "hat_pwm3",
+    "hat_pwm4",
+)
 
 
 class ConfigModel(BaseModel):
@@ -36,10 +44,13 @@ class BuzzerConfig(ConfigModel):
 
 
 class ServoConfig(ConfigModel):
-    """Native hardware-PWM servo endpoints selected by the boot overlay."""
+    """Fixed mixed-backend servo topology and motion safety gate."""
 
     enabled: bool = True
-    endpoints: tuple[str, ...] = ("gpio12", "gpio13")
+    endpoints: tuple[str, ...] = SERVO_ENDPOINTS
+    calibration_file: NonEmptyText = "~/.config/pi5servo/servo.json"
+    motion_enabled: bool = False
+    group_motion_enabled: Literal[False] = False
 
     @field_validator("endpoints", mode="before")
     @classmethod
@@ -52,14 +63,14 @@ class ServoConfig(ConfigModel):
     @field_validator("endpoints")
     @classmethod
     def endpoints_must_be_unique_and_explicit(cls, endpoints: tuple[str, ...]) -> tuple[str, ...]:
-        """Require unambiguous native-GPIO endpoint names."""
-        if not endpoints:
-            raise ValueError("at least one servo endpoint is required when servos are enabled")
+        """Require the approved six-servo topology in stable routing order."""
         if len(endpoints) != len(set(endpoints)):
             raise ValueError("servo endpoints must not contain duplicates")
-        invalid = [item for item in endpoints if item not in {"gpio12", "gpio13"}]
-        if invalid:
-            raise ValueError("Phase 1 native servo endpoints must be gpio12 and/or gpio13")
+        if endpoints != SERVO_ENDPOINTS:
+            raise ValueError(
+                "Phase 3.3 servo endpoints must be gpio12, gpio13, "
+                "hat_pwm1, hat_pwm2, hat_pwm3, and hat_pwm4 in that order"
+            )
         return endpoints
 
 

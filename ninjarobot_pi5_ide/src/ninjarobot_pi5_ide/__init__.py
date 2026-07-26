@@ -29,6 +29,13 @@ from .models import (
 )
 from .registry import CapabilityRegistry
 from .scheduler import QueueCapacityError, ResourceScheduler
+from .servo import (
+    ServoDevice,
+    ServoMoveAdapter,
+    ServoRuntime,
+    ServoStatusAdapter,
+    ServoStopAdapter,
+)
 
 __all__ = [
     "ActionLedger",
@@ -58,6 +65,11 @@ __all__ = [
     "RetrySafety",
     "RiskLevel",
     "RobotConfig",
+    "ServoDevice",
+    "ServoMoveAdapter",
+    "ServoRuntime",
+    "ServoStatusAdapter",
+    "ServoStopAdapter",
     "VL53L0XDistanceAdapter",
     "load_robot_config",
 ]

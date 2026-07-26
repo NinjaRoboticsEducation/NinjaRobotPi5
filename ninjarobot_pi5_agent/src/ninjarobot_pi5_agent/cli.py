@@ -34,6 +34,11 @@ from ninjarobot_pi5_ide import (
     ResourceHealth,
     ResourceScheduler,
     RiskLevel,
+    ServoDevice,
+    ServoMoveAdapter,
+    ServoRuntime,
+    ServoStatusAdapter,
+    ServoStopAdapter,
     VL53L0XDistanceAdapter,
     load_robot_config,
 )
@@ -253,6 +258,69 @@ def build_parser() -> argparse.ArgumentParser:
         help="Backlight brightness from 0 through 100 percent.",
     )
     _add_display_hold_option(display_brightness_parser)
+
+    servo_parser = subcommands.add_parser(
+        "servo",
+        help="Exercise safety-gated six-servo capabilities.",
+    )
+    servo_subcommands = servo_parser.add_subparsers(
+        dest="servo_command",
+        required=True,
+    )
+    servo_health_parser = servo_subcommands.add_parser(
+        "health",
+        help="Check simulated or real mixed-backend readiness without sending a pulse.",
+    )
+    _add_backend_options(servo_health_parser)
+    servo_status_parser = servo_subcommands.add_parser(
+        "status",
+        help="Report topology, calibration readiness, and motion gates.",
+    )
+    _add_backend_options(servo_status_parser)
+    _add_action_identity_options(servo_status_parser)
+    servo_move_parser = servo_subcommands.add_parser(
+        "move",
+        help="Move one simulated endpoint, or one explicitly enabled real endpoint.",
+    )
+    _add_backend_options(servo_move_parser)
+    _add_action_identity_options(servo_move_parser)
+    servo_move_parser.add_argument(
+        "--endpoint",
+        required=True,
+        choices=(
+            "gpio12",
+            "gpio13",
+            "hat_pwm1",
+            "hat_pwm2",
+            "hat_pwm3",
+            "hat_pwm4",
+        ),
+        help="One explicit V4 servo endpoint.",
+    )
+    servo_move_parser.add_argument(
+        "--angle",
+        type=float,
+        required=True,
+        help="Calibrated target from -90 through 90 degrees.",
+    )
+    servo_move_parser.add_argument(
+        "--speed",
+        choices=("S", "M", "F"),
+        default="S",
+        help="S, M, or F for slow, medium, or fast; slow is the safe default.",
+    )
+    servo_move_parser.add_argument(
+        "--confirm-motion",
+        action="store_true",
+        help="Required with --real to confirm the workspace and power cutoff are ready.",
+    )
+    _add_servo_hold_option(servo_move_parser)
+    servo_stop_parser = servo_subcommands.add_parser(
+        "stop",
+        help="Request emergency zero pulse on all servo endpoints.",
+    )
+    _add_backend_options(servo_stop_parser)
+    _add_action_identity_options(servo_stop_parser)
     return parser
 
 
@@ -285,6 +353,15 @@ def _add_display_hold_option(parser: argparse.ArgumentParser) -> None:
         type=float,
         default=0.0,
         help="Keep the CLI display session open for 0 through 30 seconds before cleanup.",
+    )
+
+
+def _add_servo_hold_option(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--hold",
+        type=float,
+        default=0.0,
+        help="Keep the servo session active for 0 through 5 seconds before zero-pulse cleanup.",
     )
 
 
@@ -407,6 +484,56 @@ class _SimulatedDisplayDriver:
         self.closed = True
 
 
+class _SimulatedServoCalibration:
+    """Explicit safe calibration used only by the hardware-free CLI backend."""
+
+    pulse_min = 1000
+    pulse_max = 2000
+    pulse_center = 1500
+    angle_min = -90.0
+    angle_max = 90.0
+    angle_center = 0.0
+    speed = 80
+
+
+class _SimulatedServo:
+    def __init__(self) -> None:
+        self.calibration = _SimulatedServoCalibration()
+
+    def move_to_center(self) -> None:
+        return None
+
+
+class _SimulatedServoGroup:
+    """Hardware-free six-servo group used by default CLI commands."""
+
+    def __init__(self, endpoints: tuple[str, ...]) -> None:
+        self._servos = {endpoint: _SimulatedServo() for endpoint in endpoints}
+        self._aborted = False
+
+    def get_servo(self, pin: int | str) -> _SimulatedServo | None:
+        return self._servos.get(str(pin))
+
+    async def move_all_async(
+        self,
+        targets: list[float | None],
+        speed_mode: str = "M",
+    ) -> bool:
+        del targets, speed_mode
+        self._aborted = False
+        await asyncio.sleep(0)
+        return not self._aborted
+
+    def abort(self) -> None:
+        self._aborted = True
+
+    def off(self) -> None:
+        return None
+
+    def close(self) -> None:
+        return None
+
+
 def _build_distance_engine(
     *,
     real: bool,
@@ -432,6 +559,7 @@ def _build_distance_engine(
 async def _list_capabilities() -> tuple[CapabilityDescriptor, ...]:
     buzzer = BuzzerDevice()
     display = DisplayDevice()
+    servo = ServoDevice()
     engine = ExecutionEngine(
         CapabilityRegistry(
             [
@@ -440,6 +568,9 @@ async def _list_capabilities() -> tuple[CapabilityDescriptor, ...]:
                 DisplayBrightnessAdapter(display),
                 DisplayClearAdapter(display),
                 DisplayShowTextAdapter(display),
+                ServoMoveAdapter(servo),
+                ServoStatusAdapter(servo),
+                ServoStopAdapter(servo),
                 VL53L0XDistanceAdapter(),
             ]
         ),
@@ -515,6 +646,55 @@ def _build_display_engine(
         ),
         ActionLedger(Path(ledger_path)),
         scheduler=ResourceScheduler(max_concurrency=3, max_queue_size=6),
+    )
+
+
+def _build_servo_engine(
+    *,
+    real: bool,
+    config_path: str,
+    ledger_path: str,
+) -> ExecutionEngine:
+    if real:
+        config = load_robot_config(config_path)
+        servo_config = config.hardware.servos
+        device = ServoDevice(
+            endpoints=servo_config.endpoints,
+            calibration_file=servo_config.calibration_file,
+            i2c_bus=config.hardware.i2c.bus,
+            dfr0566_address=config.hardware.i2c.dfr0566_address,
+            motion_enabled=servo_config.motion_enabled,
+        )
+    else:
+        endpoints = (
+            "gpio12",
+            "gpio13",
+            "hat_pwm1",
+            "hat_pwm2",
+            "hat_pwm3",
+            "hat_pwm4",
+        )
+        simulated_group = _SimulatedServoGroup(endpoints)
+        device = ServoDevice(
+            endpoints=endpoints,
+            calibration_file="simulated-servo.json",
+            motion_enabled=True,
+            runtime_factory=lambda current_endpoints, _path, _bus, _address: ServoRuntime(
+                group=simulated_group,
+                calibrated_endpoints=frozenset(current_endpoints),
+            ),
+            simulated=True,
+        )
+    return ExecutionEngine(
+        CapabilityRegistry(
+            [
+                ServoMoveAdapter(device),
+                ServoStatusAdapter(device),
+                ServoStopAdapter(device),
+            ]
+        ),
+        ActionLedger(Path(ledger_path)),
+        scheduler=ResourceScheduler(max_concurrency=2, max_queue_size=4),
     )
 
 
@@ -614,6 +794,65 @@ async def _run_display_action(
                 arguments=arguments,
                 requested_by="manual-cli",
                 session_id="manual-display-test",
+                idempotency_key=current_key,
+            )
+        )
+        if result.status is ActionStatus.SUCCEEDED and hold_seconds:
+            await asyncio.sleep(hold_seconds)
+        return result
+    finally:
+        await engine.close()
+
+
+async def _run_servo_health(
+    *,
+    real: bool,
+    config_path: str,
+    ledger_path: str,
+) -> HealthReport:
+    engine = _build_servo_engine(
+        real=real,
+        config_path=config_path,
+        ledger_path=ledger_path,
+    )
+    try:
+        return await engine.health()
+    finally:
+        await engine.close()
+
+
+async def _run_servo_action(
+    *,
+    capability: str,
+    arguments: dict[str, Any],
+    real: bool,
+    config_path: str,
+    ledger_path: str,
+    action_id: str | None,
+    idempotency_key: str | None,
+    hold_seconds: float = 0.0,
+    motion_confirmed: bool = False,
+) -> ActionResult:
+    if not 0 <= hold_seconds <= 5:
+        raise ValueError("--hold must be between 0 and 5 seconds")
+    if real and capability == "servo.move" and not motion_confirmed:
+        raise ValueError("real servo movement requires --confirm-motion")
+    generated = uuid.uuid4().hex
+    current_action_id = action_id or f"servo-{generated}"
+    current_key = idempotency_key or f"servo-key-{generated}"
+    engine = _build_servo_engine(
+        real=real,
+        config_path=config_path,
+        ledger_path=ledger_path,
+    )
+    try:
+        result = await engine.execute(
+            ActionRequest(
+                action_id=current_action_id,
+                capability=capability,
+                arguments=arguments,
+                requested_by="manual-cli",
+                session_id="manual-servo-test",
                 idempotency_key=current_key,
             )
         )
@@ -843,6 +1082,55 @@ def main(argv: Sequence[str] | None = None) -> int:
                     action_id=args.action_id,
                     idempotency_key=args.idempotency_key,
                     hold_seconds=args.hold,
+                )
+            )
+            print(result.model_dump_json(indent=2))
+            return 0 if result.status is ActionStatus.SUCCEEDED else 1
+        if args.command == "servo" and args.servo_command == "health":
+            health = asyncio.run(
+                _run_servo_health(
+                    real=args.real,
+                    config_path=args.config,
+                    ledger_path=args.ledger,
+                )
+            )
+            print(health.model_dump_json(indent=2))
+            return 0 if health.status is ResourceHealth.READY else 1
+        if args.command == "servo" and args.servo_command in {
+            "status",
+            "move",
+            "stop",
+        }:
+            if args.servo_command == "move":
+                capability = "servo.move"
+                arguments = {
+                    "endpoint": args.endpoint,
+                    "target_angle": args.angle,
+                    "speed_mode": args.speed,
+                }
+                hold_seconds = args.hold
+                motion_confirmed = args.confirm_motion
+            elif args.servo_command == "status":
+                capability = "servo.status"
+                arguments = {}
+                hold_seconds = 0.0
+                motion_confirmed = False
+            else:
+                capability = "servo.stop"
+                arguments = {}
+                hold_seconds = 0.0
+                motion_confirmed = False
+            result = asyncio.run(
+                _run_servo_action(
+                    capability=capability,
+                    arguments=arguments,
+                    real=args.real,
+                    config_path=args.config,
+                    ledger_path=args.ledger,
+                    action_id=args.action_id,
+                    idempotency_key=args.idempotency_key,
+                    hold_seconds=hold_seconds,
+                    motion_confirmed=motion_confirmed,
                 )
             )
             print(result.model_dump_json(indent=2))

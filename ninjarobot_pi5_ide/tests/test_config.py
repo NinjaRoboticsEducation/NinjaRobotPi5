@@ -15,7 +15,17 @@ def test_example_configuration_matches_confirmed_wiring() -> None:
     config = load_robot_config(EXAMPLE)
 
     assert config.hardware.buzzer.gpio == 27
-    assert config.hardware.servos.endpoints == ("gpio12", "gpio13")
+    assert config.hardware.servos.endpoints == (
+        "gpio12",
+        "gpio13",
+        "hat_pwm1",
+        "hat_pwm2",
+        "hat_pwm3",
+        "hat_pwm4",
+    )
+    assert config.hardware.servos.calibration_file == "~/.config/pi5servo/servo.json"
+    assert config.hardware.servos.motion_enabled is False
+    assert config.hardware.servos.group_motion_enabled is False
     assert config.hardware.display.dc_gpio == 4
     assert config.hardware.display.reset_gpio == 5
     assert config.hardware.display.backlight_gpio == 6
@@ -39,6 +49,32 @@ def test_configuration_rejects_unknown_fields_and_gpio_conflicts() -> None:
     payload = load_robot_config(EXAMPLE).model_dump()
     payload["hardware"]["buzzer"]["gpio"] = 4
     with pytest.raises(ValidationError, match="buzzer GPIO must not overlap"):
+        RobotConfig.model_validate(payload)
+
+
+def test_configuration_rejects_partial_or_reordered_servo_topology() -> None:
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["hardware"]["servos"]["endpoints"] = ("gpio12", "gpio13")
+    with pytest.raises(ValidationError, match="Phase 3.3 servo endpoints"):
+        RobotConfig.model_validate(payload)
+
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["hardware"]["servos"]["endpoints"] = (
+        "gpio13",
+        "gpio12",
+        "hat_pwm1",
+        "hat_pwm2",
+        "hat_pwm3",
+        "hat_pwm4",
+    )
+    with pytest.raises(ValidationError, match="Phase 3.3 servo endpoints"):
+        RobotConfig.model_validate(payload)
+
+
+def test_configuration_keeps_group_motion_disabled() -> None:
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["hardware"]["servos"]["group_motion_enabled"] = True
+    with pytest.raises(ValidationError, match="Input should be False"):
         RobotConfig.model_validate(payload)
 
 

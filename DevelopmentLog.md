@@ -1,5 +1,51 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-26 — Phase 3.3 six-servo mixed-backend adapter
+
+### Summary
+
+- Expanded V4 configuration to the fixed `gpio12`, `gpio13`, and
+  `hat_pwm1`–`hat_pwm4` topology.
+- Added a calibration-file reference, a default-off real-motion gate, and a
+  permanently disabled Phase 3.3 group-motion gate.
+- Added one shared servo service that lazily selects `pi5servo`'s mixed
+  hardware-PWM/DFR0566 backend without changing the managed library.
+- Added read-only `servo.status`, confirmation-required single-endpoint
+  `servo.move`, and lock-free emergency `servo.stop` capabilities.
+- Required valid explicit endpoint calibration before real movement and
+  checked endpoint-specific angle limits before sending a center pulse.
+- Added cancellation and emergency shutdown that abort movement and sets all
+  six outputs to zero.
+- Added simulation-first and explicit-real CLI paths. Real movement also
+  requires `--confirm-motion`; `--hold` is bounded to five seconds.
+- Added `pi5servo[pi]` to the root hardware dependency group.
+
+### Validation
+
+- All 81 V4 tests passed, including topology validation, disabled-motion and
+  missing-calibration gates, endpoint limits, center-first movement,
+  cancellation, emergency stop, unavailable backends, CLI confirmation, and
+  action-result semantics.
+- The 30 focused servo/configuration/CLI tests passed.
+- All 449 managed-library tests and every package-local Ruff gate passed. The
+  only warning was the inherited Python `audioop` deprecation in `pi5mic`.
+- Root compilation, Ruff lint, Ruff format, strict mypy for 21 source files,
+  dependency lock, CLI smoke, and `git diff --check` passed.
+- Driver provenance remained at 222 files and 23 authorized repairs.
+
+### Raspberry Pi status
+
+No PWM, I2C, servo pulse, calibration, or movement command was run during
+implementation. Non-moving interface checks may proceed with external servo
+power disconnected. Powered calibration and one-at-a-time movement remain
+blocked until the six-servo electrical record, calibrations, mechanical
+workspace, and emergency power disconnect are approved.
+
+### Follow-up
+
+Run and review the Phase 3.3 Raspberry Pi checklist. Do not begin camera Phase
+3.4 until that result is reviewed.
+
 ## 2026-07-26 — Phase 3.2 ST7789V display adapter
 
 ### Summary
@@ -34,15 +80,16 @@
 
 ### Raspberry Pi status
 
-No SPI or physical display command was run during implementation. The
-electrical/wiring inspection, real health check, red/green/blue frames,
-orientation text, 25%/75% brightness comparison, and close-time backlight
-shutdown remain for operator validation.
+No SPI or physical display command was run during implementation. The operator
+subsequently reported the complete checklist as passing. Attached output
+confirms real red and blue frames, centered 320×240 text at rotation 90,
+25%/75% brightness changes, safe retry classification, and real rather than
+simulated execution. Green was visually confirmed by the operator, although
+its JSON output was not included in the transcript.
 
 ### Follow-up
 
-Run and review the Phase 3.2 Raspberry Pi checklist. Do not begin servo Phase
-3.3 until that result is reviewed.
+The Phase 3.2 Pi checklist is complete and passed. Phase 3.3 may proceed.
 
 ## 2026-07-26 — Phase 3.1 GPIO27 buzzer adapter
 

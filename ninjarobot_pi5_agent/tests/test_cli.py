@@ -59,6 +59,10 @@ def test_phase_two_capabilities_are_hardware_free(capsys) -> None:
         "gpio5",
         "gpio6",
     ]
+    assert capabilities["servo.status"]["risk"] == "read_only"
+    assert capabilities["servo.move"]["risk"] == "motion"
+    assert capabilities["servo.move"]["confirmation_required"] is True
+    assert capabilities["servo.stop"]["risk"] == "emergency"
 
 
 def test_simulated_distance_health_and_read_are_persisted(tmp_path, capsys) -> None:
@@ -310,3 +314,113 @@ def test_display_cli_rejects_invalid_color_and_hold(tmp_path, capsys) -> None:
         == 2
     )
     assert "--hold must be between 0 and 30 seconds" in capsys.readouterr().err
+
+
+def test_simulated_servo_health_status_move_and_stop(tmp_path, capsys) -> None:
+    ledger = tmp_path / "servo.sqlite3"
+    assert main(["servo", "health", "--ledger", str(ledger)]) == 0
+    health = json.loads(capsys.readouterr().out)
+    assert health["status"] == "ready"
+
+    assert (
+        main(
+            [
+                "servo",
+                "status",
+                "--ledger",
+                str(ledger),
+                "--action-id",
+                "servo-status-1",
+                "--idempotency-key",
+                "servo-status-key-1",
+            ]
+        )
+        == 0
+    )
+    status = json.loads(capsys.readouterr().out)
+    assert status["status"] == "succeeded"
+    assert status["data"]["simulated"] is True
+    assert status["data"]["motion_enabled"] is True
+    assert status["data"]["group_motion_enabled"] is False
+    assert all(status["data"]["calibrated"].values())
+
+    assert (
+        main(
+            [
+                "servo",
+                "move",
+                "--ledger",
+                str(ledger),
+                "--endpoint",
+                "gpio12",
+                "--angle",
+                "10",
+                "--speed",
+                "S",
+                "--action-id",
+                "servo-move-1",
+                "--idempotency-key",
+                "servo-move-key-1",
+            ]
+        )
+        == 0
+    )
+    moved = json.loads(capsys.readouterr().out)
+    assert moved["status"] == "succeeded"
+    assert moved["retry_safety"] == "unsafe"
+    assert moved["data"] == {
+        "endpoint": "gpio12",
+        "target_angle": 10.0,
+        "speed_mode": "S",
+        "interrupted": False,
+        "simulated": True,
+    }
+
+    assert main(["servo", "stop", "--ledger", str(ledger)]) == 0
+    stopped = json.loads(capsys.readouterr().out)
+    assert stopped["status"] == "succeeded"
+    assert stopped["data"] == {
+        "stopped": True,
+        "driver_available": True,
+        "simulated": True,
+    }
+
+
+def test_real_servo_move_requires_cli_confirmation_before_hardware(
+    tmp_path,
+    capsys,
+) -> None:
+    result = main(
+        [
+            "servo",
+            "move",
+            "--real",
+            "--ledger",
+            str(tmp_path / "real-servo.sqlite3"),
+            "--endpoint",
+            "gpio12",
+            "--angle",
+            "0",
+        ]
+    )
+    assert result == 2
+    assert "requires --confirm-motion" in capsys.readouterr().err
+
+
+def test_servo_cli_rejects_unsafe_hold_bound(tmp_path, capsys) -> None:
+    result = main(
+        [
+            "servo",
+            "move",
+            "--ledger",
+            str(tmp_path / "servo-hold.sqlite3"),
+            "--endpoint",
+            "gpio12",
+            "--angle",
+            "0",
+            "--hold",
+            "6",
+        ]
+    )
+    assert result == 2
+    assert "--hold must be between 0 and 5 seconds" in capsys.readouterr().err

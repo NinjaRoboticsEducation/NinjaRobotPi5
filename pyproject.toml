@@ -12,6 +12,7 @@ dependencies = [
 hardware = [
     "pi5buzzer[pi]",
     "pi5disp[pi]",
+    "pi5servo[pi]",
     "pi5vl53l0x",
 ]
 
@@ -31,6 +32,7 @@ ninjarobot-pi5-agent = { workspace = true }
 ninjarobot-pi5-ide = { workspace = true }
 pi5buzzer = { path = "pi5buzzer" }
 pi5disp = { path = "pi5disp" }
+pi5servo = { path = "pi5servo" }
 pi5vl53l0x = { path = "pi5vl53l0x" }
 
 [tool.uv.workspace]
