@@ -10,6 +10,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import threading
@@ -35,6 +36,7 @@ from .models import (
 MICROPHONE_RESOURCES = ("microphone",)
 MICROPHONE_FILENAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}\.wav$")
 MICROPHONE_CAPTURE_TIMEOUT_SECONDS = 35.0
+MICROPHONE_TRANSCRIPTION_TIMEOUT_SECONDS = 90.0
 MICROPHONE_ALLOWED_MODULES = frozenset(
     {
         "pi5mic",
@@ -93,6 +95,115 @@ class MicrophoneBackend(Protocol):
         channels: int,
         duration_seconds: float,
     ) -> MicrophoneClip: ...
+
+
+class SpeechTranscriber(Protocol):
+    """Local speech-to-text boundary used by the IDE microphone capability."""
+
+    async def transcribe(self, wav_path: Path, *, language: str) -> str: ...
+
+    def available(self) -> bool: ...
+
+
+class WhisperCppTranscriber:
+    """Run a local ``whisper.cpp`` command without a shell or retained audio."""
+
+    def __init__(
+        self,
+        *,
+        command: str | Path,
+        model: str | Path,
+        threads: int = 4,
+        timeout_seconds: float = 75.0,
+    ) -> None:
+        if threads < 1 or threads > 8:
+            raise ValueError("whisper.cpp threads must be from 1 through 8")
+        if timeout_seconds <= 0:
+            raise ValueError("whisper.cpp timeout must be positive")
+        self._command = Path(command).expanduser().resolve()
+        self._model = Path(model).expanduser().resolve()
+        self._threads = threads
+        self._timeout_seconds = timeout_seconds
+
+    def available(self) -> bool:
+        return (
+            self._command.is_file() and os.access(self._command, os.X_OK) and self._model.is_file()
+        )
+
+    async def transcribe(self, wav_path: Path, *, language: str) -> str:
+        if language not in {"auto", "en", "ja"}:
+            raise ValueError("language must be auto, en, or ja")
+        if not self.available():
+            raise RuntimeError("whisper.cpp is unavailable; verify the command and model paths")
+        resolved_wav = wav_path.expanduser().resolve()
+        if not resolved_wav.is_file():
+            raise FileNotFoundError(resolved_wav)
+        output_directory = Path(tempfile.mkdtemp(prefix=".ninjarobot-transcript-"))
+        output_prefix = output_directory / "transcript"
+        process: asyncio.subprocess.Process | None = None
+        try:
+            process = await asyncio.create_subprocess_exec(
+                str(self._command),
+                "-m",
+                str(self._model),
+                "-f",
+                str(resolved_wav),
+                "-l",
+                language,
+                "-t",
+                str(self._threads),
+                "-otxt",
+                "-of",
+                str(output_prefix),
+                "-np",
+                "-nt",
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+            )
+            try:
+                _stdout, stderr = await asyncio.wait_for(
+                    process.communicate(),
+                    timeout=self._timeout_seconds,
+                )
+            except TimeoutError:
+                process.terminate()
+                try:
+                    await asyncio.wait_for(process.wait(), timeout=2.0)
+                except TimeoutError:
+                    process.kill()
+                    await process.wait()
+                raise RuntimeError("whisper.cpp transcription timed out") from None
+            if process.returncode != 0:
+                detail = stderr.decode("utf-8", errors="replace")[-1000:].strip()
+                raise RuntimeError(f"whisper.cpp exited with status {process.returncode}: {detail}")
+            transcript_path = output_prefix.with_suffix(".txt")
+            transcript = transcript_path.read_text(encoding="utf-8").strip()
+            if not transcript:
+                raise RuntimeError("whisper.cpp returned an empty transcript")
+            return transcript
+        except asyncio.CancelledError:
+            if process is not None and process.returncode is None:
+                process.terminate()
+                try:
+                    await asyncio.wait_for(process.wait(), timeout=2.0)
+                except TimeoutError:
+                    process.kill()
+                    await process.wait()
+            raise
+        finally:
+            shutil.rmtree(output_directory, ignore_errors=True)
+
+
+class SimulatedSpeechTranscriber:
+    """Return deterministic text while exercising the full privacy workflow."""
+
+    def available(self) -> bool:
+        return True
+
+    async def transcribe(self, wav_path: Path, *, language: str) -> str:
+        if not wav_path.is_file():
+            raise FileNotFoundError(wav_path)
+        return f"Simulated {language} microphone prompt"
 
 
 MicrophoneBackendFactory = Callable[[], MicrophoneBackend]
@@ -776,6 +887,138 @@ class MicrophoneCaptureAdapter:
 
     async def health(self) -> ResourceHealth:
         return await self._device.health()
+
+    async def close(self) -> None:
+        await self._device.close()
+
+
+class MicrophoneTranscribeAdapter:
+    """Capture a temporary WAV and convert it to text with local whisper.cpp."""
+
+    descriptor = CapabilityDescriptor(
+        name="microphone.transcribe",
+        version="1.0.0",
+        description=(
+            "Record one bounded USB-microphone clip, transcribe it locally, "
+            "and delete the temporary audio."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "duration_seconds": {
+                    "type": "number",
+                    "minimum": 0.25,
+                    "maximum": 10,
+                    "default": 5.0,
+                },
+                "language": {
+                    "type": "string",
+                    "enum": ["auto", "en", "ja"],
+                    "default": "auto",
+                },
+            },
+            "additionalProperties": False,
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "transcript": {"type": "string", "minLength": 1},
+                "language": {"type": "string", "enum": ["auto", "en", "ja"]},
+                "duration_seconds": {"type": "number"},
+                "audio_retained": {"type": "boolean", "const": False},
+                "simulated": {"type": "boolean"},
+            },
+            "required": [
+                "transcript",
+                "language",
+                "duration_seconds",
+                "audio_retained",
+                "simulated",
+            ],
+            "additionalProperties": False,
+        },
+        risk=RiskLevel.PRIVACY,
+        resources=MICROPHONE_RESOURCES,
+        default_timeout_seconds=MICROPHONE_TRANSCRIPTION_TIMEOUT_SECONDS,
+        idempotent=False,
+        cancellable=True,
+        confirmation_required=True,
+    )
+
+    def __init__(
+        self,
+        device: MicrophoneDevice,
+        transcriber: SpeechTranscriber,
+    ) -> None:
+        self._device = device
+        self._transcriber = transcriber
+
+    async def start(self) -> None:
+        await self._device.start()
+
+    async def execute(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        unexpected = sorted(set(arguments) - {"duration_seconds", "language"})
+        if unexpected:
+            raise _invalid_arguments(
+                f"Unexpected argument keys: {unexpected}",
+                capability="microphone.transcribe",
+            )
+        duration = arguments.get("duration_seconds", 5.0)
+        language = arguments.get("language", "auto")
+        if isinstance(duration, bool) or not isinstance(duration, (int, float)):
+            raise _invalid_arguments(
+                "duration_seconds must be a number",
+                capability="microphone.transcribe",
+            )
+        if language not in {"auto", "en", "ja"}:
+            raise _invalid_arguments(
+                "language must be auto, en, or ja",
+                capability="microphone.transcribe",
+            )
+        filename = f"transcribe-{uuid.uuid4().hex}.wav"
+        capture: dict[str, Any] | None = None
+        try:
+            capture = await self._device.capture(
+                duration_seconds=float(duration),
+                retain=True,
+                filename=filename,
+            )
+            raw_path = capture.get("path")
+            if not isinstance(raw_path, str):
+                raise RuntimeError("temporary microphone capture returned no path")
+            transcript = await self._transcriber.transcribe(
+                Path(raw_path),
+                language=language,
+            )
+            return {
+                "transcript": transcript,
+                "language": language,
+                "duration_seconds": float(capture["duration_seconds"]),
+                "audio_retained": False,
+                "simulated": self._device.simulated,
+            }
+        except IDEError:
+            raise
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            raise _microphone_error(
+                code="MICROPHONE_TRANSCRIPTION_FAILED",
+                message="The local microphone transcription could not be completed.",
+                technical_detail=f"{type(exc).__name__}: {exc}",
+                capability="microphone.transcribe",
+                definitely_not_executed=False,
+                retry_safety=RetrySafety.UNKNOWN,
+            ) from exc
+        finally:
+            if capture is not None and isinstance(capture.get("path"), str):
+                Path(capture["path"]).unlink(missing_ok=True)
+
+    async def health(self) -> ResourceHealth:
+        device_health = await self._device.health()
+        if device_health is not ResourceHealth.READY or not self._transcriber.available():
+            return ResourceHealth.UNAVAILABLE
+        return ResourceHealth.READY
 
     async def close(self) -> None:
         await self._device.close()

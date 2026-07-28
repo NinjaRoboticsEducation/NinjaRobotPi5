@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "examples": [
+    {
+      "input": {
+        "query": "Raspberry Pi official news"
+      },
+      "expected_tools": [
+        "mcp.tavily.tavily-search"
+      ],
+      "simulation_only": true
+    }
+  ]
+}

@@ -16,6 +16,7 @@ from ninjarobot_pi5_ide import (
     ActionStatus,
     CameraCaptureAdapter,
     CameraDevice,
+    CameraPreviewAdapter,
     CameraStatusAdapter,
     CapabilityRegistry,
     ExecutionEngine,
@@ -101,12 +102,45 @@ def engine_for(tmp_path: Path, device: CameraDevice) -> ExecutionEngine:
         CapabilityRegistry(
             [
                 CameraCaptureAdapter(device),
+                CameraPreviewAdapter(device),
                 CameraStatusAdapter(device),
             ]
         ),
         ActionLedger(tmp_path / "camera.sqlite3"),
         scheduler=ResourceScheduler(max_concurrency=2, max_queue_size=4),
     )
+
+
+def test_preview_returns_jpeg_data_without_retaining_a_file(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        media = tmp_path / "private-camera"
+        engine = engine_for(
+            tmp_path,
+            CameraDevice(
+                media_directory=media,
+                camera_factory=FakeCapture,
+                simulated=True,
+            ),
+        )
+
+        result = await engine.execute(request("camera-preview-1", "camera.preview", {}))
+
+        assert result.status is ActionStatus.SUCCEEDED
+        assert result.data is not None
+        assert result.data["jpeg_base64"] == "/9hmYWtlLWpwZWctZGF0Yf/Z"
+        assert result.data["retained"] is False
+        assert result.data["path"] is None
+        assert list(media.glob("*.jpg")) == []
+        record = await engine.action("camera-preview-1")
+        assert record is not None
+        assert record.result is not None
+        assert record.result.data is None
+        ledger_bytes = (tmp_path / "camera.sqlite3").read_bytes()
+        assert b"fake-jpeg-data" not in ledger_bytes
+        assert b"/9hmYWtlLWpwZWctZGF0Yf/Z" not in ledger_bytes
+        await engine.close()
+
+    asyncio.run(exercise())
 
 
 def test_loader_uses_system_python_when_current_picamera_import_fails(

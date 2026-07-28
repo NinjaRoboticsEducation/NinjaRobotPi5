@@ -22,9 +22,11 @@ from ninjarobot_pi5_ide import (
     MicrophoneCaptureAdapter,
     MicrophoneDevice,
     MicrophoneStatusAdapter,
+    MicrophoneTranscribeAdapter,
     ResourceHealth,
     ResourceScheduler,
     RetrySafety,
+    SimulatedSpeechTranscriber,
 )
 from ninjarobot_pi5_ide import microphone as microphone_module
 
@@ -158,11 +160,36 @@ def engine_for(tmp_path: Path, device: MicrophoneDevice) -> ExecutionEngine:
             [
                 MicrophoneCaptureAdapter(device),
                 MicrophoneStatusAdapter(device),
+                MicrophoneTranscribeAdapter(device, SimulatedSpeechTranscriber()),
             ]
         ),
         ActionLedger(tmp_path / "microphone.sqlite3"),
         scheduler=ResourceScheduler(max_concurrency=2, max_queue_size=4),
     )
+
+
+def test_transcription_deletes_its_temporary_audio(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        backend = FakeBackend()
+        media = tmp_path / "private-microphone"
+        engine = engine_for(tmp_path, device_for(tmp_path, backend))
+
+        result = await engine.execute(
+            request(
+                "microphone-transcribe-1",
+                "microphone.transcribe",
+                {"duration_seconds": 0.25, "language": "en"},
+            )
+        )
+
+        assert result.status is ActionStatus.SUCCEEDED
+        assert result.data is not None
+        assert result.data["transcript"] == "Simulated en microphone prompt"
+        assert result.data["audio_retained"] is False
+        assert list(media.glob("transcribe-*.wav")) == []
+        await engine.close()
+
+    asyncio.run(exercise())
 
 
 def test_device_only_loader_never_imports_historical_or_voice_modules() -> None:

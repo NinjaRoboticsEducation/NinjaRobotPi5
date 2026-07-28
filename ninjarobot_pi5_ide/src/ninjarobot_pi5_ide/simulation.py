@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import time
+import wave
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from .servo import ServoRuntime
@@ -152,3 +154,67 @@ class SimulatedDistanceSensor:
 
     def close(self) -> None:
         self.closed = True
+
+
+class SimulatedMicrophoneDeviceInfo:
+    """Managed-driver-compatible simulated mono input device."""
+
+    index = 0
+    name = "Simulated USB Microphone"
+    max_input_channels = 1
+    default_samplerate = 16_000.0
+    hostapi = 0
+
+
+class SimulatedMicrophoneClip:
+    """Managed-driver-compatible simulated WAV result."""
+
+    def __init__(self, path: Path, duration_seconds: float, sample_rate: int) -> None:
+        self.path = path
+        self.duration_seconds = duration_seconds
+        self.sample_rate = sample_rate
+        self.channels = 1
+        self.frames = max(1, round(duration_seconds * sample_rate))
+        self.bytes_written = path.stat().st_size
+        self.overflowed = False
+
+
+class SimulatedMicrophoneBackend:
+    """Generate bounded silence without opening audio hardware."""
+
+    def __init__(self) -> None:
+        self._device = SimulatedMicrophoneDeviceInfo()
+
+    def list_input_devices(self) -> list[SimulatedMicrophoneDeviceInfo]:
+        return [self._device]
+
+    def resolve_input_settings(
+        self,
+        *,
+        selector: str,
+        sample_rate: int,
+        channels: int,
+    ) -> tuple[int, int, SimulatedMicrophoneDeviceInfo, None]:
+        del selector
+        if channels != 1:
+            raise ValueError("simulated microphone supports mono audio only")
+        return self._device.index, sample_rate, self._device, None
+
+    def record_wav(
+        self,
+        output_path: Path,
+        *,
+        selector: str,
+        sample_rate: int,
+        channels: int,
+        duration_seconds: float,
+    ) -> SimulatedMicrophoneClip:
+        del selector
+        frame_count = max(1, round(duration_seconds * sample_rate))
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with wave.open(str(output_path), "wb") as wav_file:
+            wav_file.setnchannels(channels)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(sample_rate)
+            wav_file.writeframes(b"\x00\x00" * frame_count * channels)
+        return SimulatedMicrophoneClip(output_path, duration_seconds, sample_rate)

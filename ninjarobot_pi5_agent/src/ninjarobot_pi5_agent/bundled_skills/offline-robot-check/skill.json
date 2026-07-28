@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "id": "offline-robot-check",
+  "version": "1.0.0",
+  "name": "Offline Robot Check",
+  "description": "Inspect local robot status without using network services.",
+  "activation_examples": [
+    "Check whether the robot is ready without using the internet"
+  ],
+  "allowed_tools": [
+    "robot.distance.read"
+  ],
+  "input_schema": {
+    "type": "object",
+    "properties": {},
+    "required": [],
+    "additionalProperties": false
+  },
+  "limits": {
+    "max_model_turns": 2,
+    "max_tool_calls": 2,
+    "timeout_seconds": 20.0
+  },
+  "safety": {
+    "external_content": "untrusted",
+    "physical_motion": "session_armed"
+  }
+}

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 
 from .behavior_assets import BehaviorAssetRepository
 from .behavior_models import BehaviorDefinition
@@ -26,6 +26,13 @@ from .safety import (
     raspberry_pi_undervoltage_active,
 )
 from .servo import ServoDevice, ServoFactory
+from .simulation import (
+    SimulatedBuzzerDriver,
+    SimulatedDisplayDriver,
+    SimulatedDistanceSensor,
+    SimulatedMicrophoneBackend,
+    simulated_servo_runtime,
+)
 
 
 class RobotAssembly:
@@ -63,12 +70,24 @@ class RobotAssembly:
             height=display_config.height,
             rotation=display_config.rotation,
             initial_brightness=display_config.brightness,
-            driver_factory=display_factory,
+            driver_factory=(
+                display_factory
+                if display_factory is not None
+                else SimulatedDisplayDriver
+                if simulated
+                else None
+            ),
             simulated=simulated,
         )
         self.buzzer = BuzzerDevice(
             pin=buzzer_config.gpio,
-            driver_factory=buzzer_factory,
+            driver_factory=(
+                buzzer_factory
+                if buzzer_factory is not None
+                else SimulatedBuzzerDriver
+                if simulated
+                else None
+            ),
             simulated=simulated,
         )
         self.servo = ServoDevice(
@@ -78,13 +97,25 @@ class RobotAssembly:
             dfr0566_address=i2c_config.dfr0566_address,
             motion_enabled=servo_config.motion_enabled,
             group_motion_enabled=servo_config.group_motion_enabled,
-            runtime_factory=servo_factory,
+            runtime_factory=(
+                servo_factory
+                if servo_factory is not None
+                else simulated_servo_runtime
+                if simulated
+                else None
+            ),
             simulated=simulated,
         )
         self.distance = VL53L0XDistanceAdapter(
             i2c_bus=i2c_config.bus,
             i2c_address=i2c_config.vl53l0x_address,
-            sensor_factory=distance_factory,
+            sensor_factory=(
+                distance_factory
+                if distance_factory is not None
+                else SimulatedDistanceSensor
+                if simulated
+                else None
+            ),
         )
         self.camera = CameraDevice(
             enabled=camera_config.enabled,
@@ -103,7 +134,13 @@ class RobotAssembly:
             channels=microphone_config.channels,
             max_capture_seconds=microphone_config.max_capture_seconds,
             media_directory=microphone_config.media_directory,
-            backend_factory=microphone_factory,
+            backend_factory=(
+                microphone_factory
+                if microphone_factory is not None
+                else cast(MicrophoneBackendFactory, SimulatedMicrophoneBackend)
+                if simulated
+                else None
+            ),
             simulated=simulated,
         )
         self.safety_state = SafetyStateStore(config.behaviors.safety_state_file)

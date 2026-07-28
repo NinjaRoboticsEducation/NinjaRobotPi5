@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import importlib
 import importlib.metadata
@@ -35,6 +36,7 @@ from .models import (
 CAMERA_RESOURCES = ("camera",)
 CAMERA_FILENAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}\.jpg$")
 CAMERA_CAPTURE_TIMEOUT_SECONDS = 20.0
+CAMERA_PREVIEW_MAX_BYTES = 5_000_000
 SYSTEM_CAMERA_PYTHON = Path("/usr/bin/python3")
 SYSTEM_CAMERA_PROBE_TIMEOUT_SECONDS = 5.0
 SYSTEM_CAMERA_CAPTURE_TIMEOUT_SECONDS = 18.0
@@ -340,8 +342,32 @@ class CameraDevice:
         filename: str | None,
     ) -> dict[str, Any]:
         """Capture once, waiting for worker cleanup if the action is cancelled."""
+        return await self._capture_action(
+            retain=retain,
+            filename=filename,
+            include_preview=False,
+            capability="camera.capture",
+        )
+
+    async def preview(self) -> dict[str, Any]:
+        """Capture one bounded JPEG preview without retaining it on disk."""
+        return await self._capture_action(
+            retain=False,
+            filename=None,
+            include_preview=True,
+            capability="camera.preview",
+        )
+
+    async def _capture_action(
+        self,
+        *,
+        retain: bool,
+        filename: str | None,
+        include_preview: bool,
+        capability: str,
+    ) -> dict[str, Any]:
         async with self._lock:
-            capture = self._require_capture()
+            capture = self._require_capture(capability=capability)
             destination = self._prepare_destination(retain=retain, filename=filename)
             cancellation = threading.Event()
             task = asyncio.create_task(
@@ -351,6 +377,7 @@ class CameraDevice:
                     retain,
                     destination,
                     cancellation,
+                    include_preview,
                 )
             )
             try:
@@ -369,7 +396,7 @@ class CameraDevice:
                     code="CAMERA_CAPTURE_FAILED",
                     message="The camera could not complete the still-image capture.",
                     technical_detail=f"{type(exc).__name__}: {exc}",
-                    capability="camera.capture",
+                    capability=capability,
                     definitely_not_executed=False,
                     retry_safety=RetrySafety.UNKNOWN,
                 ) from exc
@@ -389,13 +416,13 @@ class CameraDevice:
             self._capture = None
             self._closed = True
 
-    def _require_capture(self) -> CameraCapture:
+    def _require_capture(self, *, capability: str = "camera.capture") -> CameraCapture:
         if self._capture is None:
             raise _camera_error(
                 code="CAMERA_UNAVAILABLE",
                 message="The configured camera backend is unavailable.",
                 technical_detail=self._startup_error,
-                capability="camera.capture",
+                capability=capability,
                 definitely_not_executed=True,
                 retry_safety=RetrySafety.SAFE,
             )
@@ -434,6 +461,7 @@ class CameraDevice:
         retain: bool,
         destination: Path | None,
         cancellation: threading.Event,
+        include_preview: bool = False,
     ) -> dict[str, Any]:
         staging_directory = Path(
             tempfile.mkdtemp(prefix=".capture-", dir=self._media_directory)
@@ -465,6 +493,10 @@ class CameraDevice:
                 raise RuntimeError("managed camera returned an unexpected capture path")
             os.chmod(captured_path, 0o600)
             byte_count = captured_path.stat().st_size
+            if include_preview and byte_count > CAMERA_PREVIEW_MAX_BYTES:
+                raise RuntimeError(
+                    f"camera preview exceeds the {CAMERA_PREVIEW_MAX_BYTES}-byte limit"
+                )
             sha256 = _sha256_file(captured_path)
             if cancellation.is_set():
                 raise _CaptureCancelledInWorker
@@ -476,7 +508,7 @@ class CameraDevice:
                 retained_path = destination
                 if cancellation.is_set():
                     raise _CaptureCancelledInWorker
-            return {
+            payload: dict[str, Any] = {
                 "captured": True,
                 "width": self._width,
                 "height": self._height,
@@ -487,6 +519,11 @@ class CameraDevice:
                 "path": str(retained_path) if retained_path is not None else None,
                 "simulated": self._simulated,
             }
+            if include_preview:
+                payload["jpeg_base64"] = base64.b64encode(captured_path.read_bytes()).decode(
+                    "ascii"
+                )
+            return payload
         finally:
             if cancellation.is_set() and retained_path is not None:
                 retained_path.unlink(missing_ok=True)
@@ -636,6 +673,80 @@ class CameraCaptureAdapter:
                 capability="camera.capture",
             )
         return await self._device.capture(retain=retain, filename=filename)
+
+    async def health(self) -> ResourceHealth:
+        return await self._device.health()
+
+    async def close(self) -> None:
+        await self._device.close()
+
+
+class CameraPreviewAdapter:
+    """Expose one temporary JPEG preview for an active local controller."""
+
+    descriptor = CapabilityDescriptor(
+        name="camera.preview",
+        version="1.0.0",
+        description="Capture one bounded JPEG preview without retaining it on disk.",
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "captured": {"type": "boolean"},
+                "width": {"type": "integer"},
+                "height": {"type": "integer"},
+                "format": {"type": "string", "const": "jpeg"},
+                "byte_count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": CAMERA_PREVIEW_MAX_BYTES,
+                },
+                "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+                "retained": {"type": "boolean", "const": False},
+                "path": {"type": "null"},
+                "simulated": {"type": "boolean"},
+                "jpeg_base64": {"type": "string", "minLength": 1},
+            },
+            "required": [
+                "captured",
+                "width",
+                "height",
+                "format",
+                "byte_count",
+                "sha256",
+                "retained",
+                "path",
+                "simulated",
+                "jpeg_base64",
+            ],
+            "additionalProperties": False,
+        },
+        risk=RiskLevel.PRIVACY,
+        resources=CAMERA_RESOURCES,
+        default_timeout_seconds=CAMERA_CAPTURE_TIMEOUT_SECONDS,
+        idempotent=False,
+        cancellable=True,
+        confirmation_required=True,
+        persist_result_data=False,
+    )
+
+    def __init__(self, device: CameraDevice) -> None:
+        self._device = device
+
+    async def start(self) -> None:
+        await self._device.start()
+
+    async def execute(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        if arguments:
+            raise _invalid_arguments(
+                f"Unexpected argument keys: {sorted(arguments)}",
+                capability="camera.preview",
+            )
+        return await self._device.preview()
 
     async def health(self) -> ResourceHealth:
         return await self._device.health()

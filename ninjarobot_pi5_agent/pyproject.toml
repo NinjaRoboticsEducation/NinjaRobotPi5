@@ -8,11 +8,18 @@ version = "0.1.0"
 description = "Provider-neutral agent contracts and CLI for NinjaRobotPi5V4."
 requires-python = ">=3.11,<3.14"
 dependencies = [
+    "cryptography>=45,<47",
+    "fastapi>=0.116,<1",
+    "httpx>=0.28,<1",
+    "jsonschema>=4.26,<5",
+    "mcp>=1.12,<2",
     "ninjarobot-pi5-ide",
     "pydantic>=2.12,<3",
+    "uvicorn>=0.35,<1",
 ]
 
 [project.scripts]
+ninjarobot-agent = "ninjarobot_pi5_agent.agent_cli:main"
 ninjarobot_pi5_cli = "ninjarobot_pi5_agent.cli:main"
 
 [tool.uv.sources]

@@ -107,6 +107,7 @@ class CapabilityDescriptor(ContractModel):
     idempotent: bool
     cancellable: bool
     confirmation_required: bool
+    persist_result_data: bool = True
 
     @field_validator("resources")
     @classmethod

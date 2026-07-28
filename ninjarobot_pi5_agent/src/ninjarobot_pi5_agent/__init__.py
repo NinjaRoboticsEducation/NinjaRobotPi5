@@ -1,5 +1,33 @@
 """Public Phase 1 contracts for the bounded NinjaRobotPi5V4 agent."""
 
+from .agent_loop import AgentLoop, AgentLoopConfig, AgentLoopError, AgentReply
+from .benchmark import (
+    BenchmarkCase,
+    BenchmarkMetrics,
+    BenchmarkReport,
+    BenchmarkThresholds,
+    LinuxSystemProbe,
+    ModelBenchmark,
+    SystemSnapshot,
+)
+from .events import AgentEvent, AgentEventType, EventBroker
+from .ipc import AgentIPCClient, AgentIPCError, AgentIPCServer
+from .mcp_client import (
+    MCPConnection,
+    MCPProtocolError,
+    MCPToolProvider,
+    MCPUnavailableError,
+    SDKMCPConnection,
+)
+from .mcp_config import (
+    MCPAuthentication,
+    MCPConfiguration,
+    MCPServerConfig,
+    MCPTransport,
+    load_mcp_configuration,
+    save_mcp_configuration,
+    tavily_server_config,
+)
 from .models import (
     FinishReason,
     MemoryCandidate,
@@ -7,31 +35,130 @@ from .models import (
     MessageRole,
     ModelMessage,
     ModelRequest,
+    ModelStreamEvent,
     ModelTurn,
     ProviderCapabilities,
     ProviderHealth,
     ProviderHealthStatus,
     SessionRecord,
+    StreamEventType,
     ToolCall,
     ToolDefinition,
+    ToolExecutionResult,
+    ToolExecutionStatus,
+    ToolInvocation,
+    ToolTrust,
 )
+from .ollama import (
+    OllamaConfig,
+    OllamaError,
+    OllamaProtocolError,
+    OllamaProvider,
+    OllamaUnavailableError,
+)
+from .persistence import ConversationStore, StoredMessage
+from .policy import MotionArmManager, PolicyContext, PolicyDecision, PolicyEngine
+from .prompts import IDENTITY_PROMPT, IMMUTABLE_SAFETY_PROMPT, PromptComposer
 from .providers import LLMProvider
+from .recovery import RecoveryAction, RecoveryDecision, RecoveryPolicy
+from .runtime import AgentRuntime
+from .secrets import SecretStore
+from .service import AgentService, ServiceAlreadyRunningError, ServiceOwnership
+from .skills import (
+    LoadedSkill,
+    SkillExamples,
+    SkillLimits,
+    SkillManifest,
+    SkillRepository,
+    SkillSafety,
+    SkillValidationError,
+)
+from .tools import CancellationToken, IDEToolProvider, ToolProvider, ToolRegistry, ToolRegistryError
 
 __all__ = [
+    "AgentEvent",
+    "AgentEventType",
+    "AgentLoop",
+    "AgentLoopConfig",
+    "AgentLoopError",
+    "AgentReply",
+    "AgentIPCClient",
+    "AgentIPCError",
+    "AgentIPCServer",
+    "AgentRuntime",
+    "AgentService",
+    "BenchmarkCase",
+    "BenchmarkMetrics",
+    "BenchmarkReport",
+    "BenchmarkThresholds",
+    "ConversationStore",
+    "EventBroker",
     "FinishReason",
+    "MCPAuthentication",
+    "MCPConfiguration",
+    "MCPConnection",
+    "MCPProtocolError",
+    "MCPServerConfig",
+    "MCPToolProvider",
+    "MCPTransport",
+    "MCPUnavailableError",
+    "IDENTITY_PROMPT",
+    "IMMUTABLE_SAFETY_PROMPT",
     "LLMProvider",
+    "LinuxSystemProbe",
     "MemoryCandidate",
     "MemoryKind",
     "MessageRole",
     "ModelMessage",
+    "ModelBenchmark",
     "ModelRequest",
+    "ModelStreamEvent",
     "ModelTurn",
+    "OllamaConfig",
+    "OllamaError",
+    "OllamaProtocolError",
+    "OllamaProvider",
+    "OllamaUnavailableError",
+    "MotionArmManager",
+    "PolicyContext",
+    "PolicyDecision",
+    "PolicyEngine",
+    "PromptComposer",
     "ProviderCapabilities",
     "ProviderHealth",
     "ProviderHealthStatus",
+    "RecoveryAction",
+    "RecoveryDecision",
+    "RecoveryPolicy",
     "SessionRecord",
+    "ServiceAlreadyRunningError",
+    "ServiceOwnership",
+    "SecretStore",
+    "SDKMCPConnection",
+    "StoredMessage",
+    "SystemSnapshot",
+    "StreamEventType",
+    "LoadedSkill",
+    "SkillExamples",
+    "SkillLimits",
+    "SkillManifest",
+    "SkillRepository",
+    "SkillSafety",
+    "SkillValidationError",
+    "CancellationToken",
+    "IDEToolProvider",
     "ToolCall",
     "ToolDefinition",
+    "ToolExecutionResult",
+    "ToolExecutionStatus",
+    "ToolInvocation",
+    "ToolProvider",
+    "ToolRegistry",
+    "ToolRegistryError",
+    "ToolTrust",
+    "load_mcp_configuration",
+    "save_mcp_configuration",
+    "tavily_server_config",
 ]
 
 __version__ = "0.1.0"

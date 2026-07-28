@@ -8,10 +8,12 @@ from datetime import UTC, datetime
 
 from .models import (
     ModelRequest,
+    ModelStreamEvent,
     ModelTurn,
     ProviderCapabilities,
     ProviderHealth,
     ProviderHealthStatus,
+    StreamEventType,
 )
 
 
@@ -53,9 +55,14 @@ class FakeProvider:
             raise ValueError("scripted turn request_id does not match the request")
         return turn
 
-    async def stream(self, request: ModelRequest) -> AsyncIterator[ModelTurn]:
+    async def stream(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
         """Yield the same single scripted turn used by generate."""
-        yield await self.generate(request)
+        turn = await self.generate(request)
+        yield ModelStreamEvent(
+            request_id=request.request_id,
+            event=StreamEventType.DONE,
+            turn=turn,
+        )
 
     async def health(self) -> ProviderHealth:
         """Return deterministic fake-provider readiness."""

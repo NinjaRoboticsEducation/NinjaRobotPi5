@@ -15,7 +15,9 @@ available for robot control and future local AI models.
 
 NinjaRobotPi5 is Python software for a Raspberry Pi 5 robot. It brings the
 display, buzzer, wheel servos, distance sensor, camera, and microphone together
-behind one consistent robot interface.
+behind one consistent robot interface. NinjaRobotAgent adds local Ollama chat,
+approved web search, reusable skills, and an HTTPS controller for a desktop or
+mobile browser on the same local network.
 
 Each `pi5*` library can still configure and test its own hardware independently.
 The NinjaRobotPi5 IDE then uses selected settings from those standalone
@@ -58,6 +60,9 @@ physical 45-degree position.
 - `uv`, which installs Python and the project's locked Python packages
 - Raspberry Pi camera packages
 - PortAudio and ALSA audio tools for the USB microphone
+- Ollama for the local language model
+- whisper.cpp for local English and Japanese speech-to-text
+- FastAPI and HTTPS for the local browser controller
 - NinjaRobotPi5 and its six managed `pi5*` hardware libraries
 
 ### Project file structure
@@ -67,7 +72,7 @@ After installation, the important project folders are:
 ```text
 NinjaRobotPi5/
 ├── ninjarobot_pi5_ide/       Coordinates robot hardware and behaviors
-├── ninjarobot_pi5_agent/     Future AI-agent integration
+├── ninjarobot_pi5_agent/     Local AI agent, MCP, skills, CLI, and web UI
 ├── pi5buzzer/                Standalone buzzer library
 ├── pi5camera/                Standalone camera library
 ├── pi5disp/                  Standalone display library
@@ -86,7 +91,7 @@ project folder:
 ~/.config/pi5*/                    Standalone module settings
 ~/.config/ninjarobot_pi5/          Integrated robot settings and behaviors
 ~/.local/share/ninjarobot_pi5/     Retained camera and microphone files
-~/.local/state/ninjarobot_pi5/     Safety state
+~/.local/state/ninjarobot_pi5/     Safety and running-service state
 ```
 
 `~` means your Linux home directory, such as `/home/rogerchang`. Keeping
@@ -147,6 +152,8 @@ Install the tools required by NinjaRobotPi5:
 
 ```bash
 sudo apt install -y \
+  build-essential \
+  cmake \
   git \
   curl \
   i2c-tools \
@@ -214,7 +221,8 @@ Download the project into your home directory:
 
 ```bash
 cd "$HOME"
-git clone https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
+git clone --branch NinjaPi5Agent --single-branch \
+  https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
 cd NinjaRobotPi5
 ```
 
@@ -242,6 +250,43 @@ Prepare the Raspberry Pi camera bridge:
 This installs the matching Raspberry Pi OS Picamera2 and libcamera packages,
 keeps the normal project environment, and verifies the camera bridge without
 taking a photograph. Picamera2 is Raspberry Pi's Python camera interface.
+
+Install Ollama and the Qwen3:4B candidate model:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+sudo systemctl enable --now ollama
+ollama pull qwen3:4b
+ollama list
+```
+
+The model is downloaded to Ollama's own data directory. Qwen3:4B is a
+candidate until it passes the Phase 5 benchmark in Step 7; installation alone
+does not prove it is fast or reliable enough for this Raspberry Pi.
+
+Build local whisper.cpp and download its multilingual base model:
+
+```bash
+cd "$HOME"
+git clone https://github.com/ggml-org/whisper.cpp.git
+cd whisper.cpp
+
+cmake -B build \
+  -DWHISPER_BUILD_TESTS=OFF \
+  -DWHISPER_BUILD_EXAMPLES=ON
+cmake --build build --config Release -j2
+bash models/download-ggml-model.sh base
+
+test -x "$HOME/whisper.cpp/build/bin/whisper-cli"
+test -f "$HOME/whisper.cpp/models/ggml-base.bin"
+cd "$HOME/NinjaRobotPi5"
+```
+
+`-j2` uses two build jobs to limit heat and memory pressure. whisper.cpp runs
+speech-to-text locally; the Phase 5 workflow does not upload USB-microphone
+audio to a cloud service. The temporary audio is deleted, but recognized text
+becomes an ordinary chat prompt and can remain in the seven-day conversation
+history.
 
 Verify that Python is using all six libraries from this downloaded project:
 
@@ -577,6 +622,118 @@ press Enter in the second terminal to request the Level 2 stop.
 For complete device-by-device checks, expected results, and rollback steps,
 continue with [Simulation, testing, and troubleshooting](#3-simulation-testing-and-troubleshooting).
 
+### Step 7 — Set up and verify NinjaRobotAgent
+
+First confirm Ollama and local speech-to-text are present:
+
+```bash
+ollama list
+test -x "$HOME/whisper.cpp/build/bin/whisper-cli"
+test -f "$HOME/whisper.cpp/models/ggml-base.bin"
+```
+
+Run the Qwen3:4B acceptance benchmark before calling it the robot's default
+model:
+
+```bash
+cd "$HOME/NinjaRobotPi5"
+
+uv run --frozen ninjarobot-agent benchmark ollama \
+  --model qwen3:4b \
+  --output "$HOME/.local/share/ninjarobot_pi5/benchmarks/qwen3-4b-latest.json"
+```
+
+This is CPU-, memory-, and heat-intensive but does not execute robot tools.
+The report is accepted only when first-token latency is at most 15 seconds,
+total response latency is at most 30 seconds, tool-call correctness is at
+least 90%, peak total memory is below 7 GB, temperature stays below 80°C,
+there is no undervoltage or throttling, and no unsafe loop, duplicate physical
+action, or malformed execution occurs. If it reports `"accepted": false`, keep
+using simulation and review the report before selecting another model.
+
+Start the agent in simulation:
+
+```bash
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" \
+  service start
+
+uv run --frozen ninjarobot-agent status
+uv run --frozen ninjarobot-agent chat \
+  "Reply with one short greeting and do not use a tool."
+```
+
+`service start` launches the one background owner. A second CLI connects to
+that same service; it does not initialize another robot.
+
+Start the HTTPS web interface:
+
+```bash
+uv run --frozen ninjarobot-agent web start
+```
+
+Open the printed URL from one browser on the same local network. If the bare
+hostname does not resolve, use:
+
+```text
+https://ninjarobotpi5.local:8443/
+```
+
+The certificate is self-signed, meaning your Raspberry Pi created it rather
+than a public certificate company. The browser warning is expected; inspect
+that the address is your own Raspberry Pi before continuing. The first
+browser receives the only controller lease. A second browser is rejected with
+HTTP `423 Locked`; some browsers show only a generic connection failure for a
+rejected WebSocket.
+
+In simulation, check:
+
+1. Chat sends and streams a response.
+2. The system log displays service and tool events.
+3. D-pad buttons report simulated movement and stop when released.
+4. X performs simulated Emergency Stop.
+5. Y asks for confirmation before Resume.
+6. A runs Greeting and B runs Celebrate.
+7. Camera displays a temporary simulated preview.
+8. USB Microphone returns simulated recognized text.
+9. Web Microphone offers English and Japanese when the browser supports its
+   Speech Recognition API.
+
+Stop only the web interface:
+
+```bash
+uv run --frozen ninjarobot-agent web stop
+```
+
+The CLI can still chat because the agent service continues. Stop the complete
+service when finished:
+
+```bash
+uv run --frozen ninjarobot-agent service stop
+```
+
+After every simulation and Phase 4 physical test passes, start the real
+hardware service:
+
+```bash
+uv run --frozen --extra hardware ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" \
+  service start --real
+```
+
+You can then run the interactive agent tool from another terminal:
+
+```bash
+uv run --frozen ninjarobot-agent
+```
+
+Choose **Quit CLI** to disconnect only that terminal. Choose **Stop Web
+Interface** to release the browser server. Choose **Stop Agent Service** to
+release the model, IDE, hardware, MCP connections, database, socket, and web
+resources. Complete the privacy and raised-wheel checks in the
+[Phase 5 validation guide](docs/validation/phase-5-agent-validation-2026-07-28.md)
+before using real movement from chat or the browser.
+
 ## 3. Simulation, testing, and troubleshooting
 
 ### Recommended validation order
@@ -725,6 +882,35 @@ Detailed checklists:
 
 - [Phase 4 integrated behavior validation](docs/validation/phase-4-integrated-behavior-validation-2026-07-26.md)
 - [Phase 4 animated-face and interactive-tool validation](docs/validation/phase-4-refinement-validation-2026-07-27.md)
+
+### NinjaRobotAgent test
+
+Start with the simulation service:
+
+```bash
+uv run --frozen ninjarobot-agent \
+  --config "$HOME/.config/ninjarobot_pi5/config.toml" \
+  service start
+
+uv run --frozen ninjarobot-agent status
+uv run --frozen ninjarobot-agent session list
+uv run --frozen ninjarobot-agent skill list
+uv run --frozen ninjarobot-agent web start
+```
+
+Expected result: status reports Ollama and the IDE ready, the bundled
+`offline-robot-check` and `current-web-answer` skills are listed, and the web
+command prints an HTTPS URL. Stop in this order:
+
+```bash
+uv run --frozen ninjarobot-agent web stop
+uv run --frozen ninjarobot-agent service stop
+```
+
+For the complete model, Tavily, HTTPS lease, camera, USB microphone, browser
+microphone, network-loss, Emergency Stop, and raised-wheel test sequence, use:
+
+[Phase 5 agent validation](docs/validation/phase-5-agent-validation-2026-07-28.md).
 
 ### Common installation problems
 
@@ -903,6 +1089,86 @@ uv run --frozen --extra hardware ninjarobot-ide-tool \
 
 Resume only after correcting the cause and making sure the robot is safe.
 
+#### Agent service is unavailable
+
+Check Ollama and the background service:
+
+```bash
+systemctl status ollama --no-pager
+ollama list
+uv run --frozen ninjarobot-agent service status
+```
+
+If the service failed during startup, inspect:
+
+```bash
+tail -n 100 "$HOME/.local/state/ninjarobot_pi5/agent-service.log"
+```
+
+Do not start a second manual IDE or agent process against real hardware. Stop
+the recorded service cleanly, correct the reported error, and start it again.
+
+#### Web interface says `423 Locked`
+
+Another browser owns the one controller lease. Close that browser and wait
+about 10 seconds, or stop and restart only the web interface from a local SSH
+terminal:
+
+```bash
+uv run --frozen ninjarobot-agent web stop
+uv run --frozen ninjarobot-agent web start
+```
+
+This releases active movement before the web server closes. Do not expose
+port 8443 through router port forwarding.
+
+#### Browser rejects the HTTPS certificate
+
+The default certificate is self-signed and stored under:
+
+```text
+~/.config/ninjarobot_pi5/tls/
+```
+
+Confirm the browser address is your own Raspberry Pi and accept the local
+warning. Browser microphone access normally requires HTTPS. If the certificate
+and key become mismatched, stop the web interface and move both files to a
+private backup location; the next `web start` creates a new matching pair.
+Never share `agent-key.pem`.
+
+#### USB microphone transcription is unavailable
+
+Check the exact default paths:
+
+```bash
+test -x "$HOME/whisper.cpp/build/bin/whisper-cli"
+test -f "$HOME/whisper.cpp/models/ggml-base.bin"
+
+"$HOME/whisper.cpp/build/bin/whisper-cli" -h | head
+```
+
+If whisper.cpp is installed elsewhere, stop the agent and place these global
+options before `service start`:
+
+```bash
+uv run --frozen --extra hardware ninjarobot-agent \
+  --config "$HOME/.config/ninjarobot_pi5/config.toml" \
+  --whisper-command /absolute/path/to/whisper-cli \
+  --whisper-model /absolute/path/to/ggml-model.bin \
+  service start --real
+```
+
+Temporary audio is deleted after transcription, cancellation, or failure.
+
+#### Qwen3:4B benchmark is rejected
+
+Rejection means the candidate missed at least one measured threshold. It does
+not mean the agent architecture or robot drivers are broken. Read the saved
+JSON report, confirm active cooling and stable power, close other large
+processes, and repeat once. Do not repeatedly benchmark an overheating or
+undervoltage Pi. Keep the model marked as a candidate until every threshold
+passes.
+
 #### Raspberry Pi reports undervoltage
 
 Check:
@@ -1011,10 +1277,9 @@ overwrite any standalone `pi5*` JSON file.
 ### Phase 5 MCP and agent-skill extension reference
 
 > [!IMPORTANT]
-> This section specifies the approved Phase 5 interface. The commands in this
-> section are not available in the Phase 4 release yet. Do not use them as part
-> of the current numbered installation workflow. This notice will be removed
-> only after Phase 5 implementation and Raspberry Pi validation pass.
+> These commands are implemented. MCP connections can send queries and tool
+> arguments to an external service. Review every server and allowlist before
+> enabling it. A live service must be restarted after its MCP catalog changes.
 
 MCP means Model Context Protocol. It lets NinjaRobotAgent discover tools from a
 separate local program or hosted service without rebuilding the agent. An agent
@@ -1033,10 +1298,9 @@ The Phase 5 extension design keeps three boundaries:
 Tavily is the approved default because its
 [official hosted MCP server](https://github.com/tavily-ai/tavily-mcp) is
 designed for real-time agent search and does not consume Pi resources by
-running a local search server. Tavily currently documents
-[1,000 free API credits per month](https://docs.tavily.com/documentation/api-credits)
-without a credit card. This is an external service, so its price, quota,
-availability, and terms can change.
+running a local search server. Tavily may provide a free allowance; check its
+[current API-credit documentation](https://docs.tavily.com/documentation/api-credits)
+before registering because price, quota, availability, and terms can change.
 
 1. Create a free account at
    [Tavily](https://app.tavily.com/) and copy your personal API key.
@@ -1061,6 +1325,7 @@ uv run --frozen ninjarobot-agent \
 The preset uses:
 
 ```toml
+[[servers]]
 id = "tavily"
 enabled = true
 transport = "streamable_http"
@@ -1068,11 +1333,11 @@ url = "https://mcp.tavily.com/mcp"
 authentication = "bearer_environment"
 token_environment = "TAVILY_API_KEY"
 allowed_tools = ["tavily-search"]
-trust = "external_untrusted"
-timeout_seconds = 20
+timeout_seconds = 20.0
 max_result_bytes = 131072
+preset = "tavily"
 
-[default_parameters]
+[servers.default_parameters]
 search_depth = "basic"
 max_results = 5
 include_images = false
@@ -1123,15 +1388,16 @@ agent must say that it could not verify a current answer.
 
 #### Manage installed MCP servers
 
-The Phase 5 interactive agent tool will provide an **MCP Tools** menu. Advanced
-users can use the equivalent scriptable commands:
+The interactive agent tool displays the configured MCP catalog. Advanced users
+use these scriptable commands:
 
 ```bash
 # Show configured servers
 uv run --frozen ninjarobot-agent mcp list
 
-# Open the guided add-server workflow
-uv run --frozen ninjarobot-agent mcp add
+# Add the reviewed Tavily preset
+uv run --frozen ninjarobot-agent \
+  mcp add --preset tavily --id tavily
 
 # Review one server and the tools it advertised
 uv run --frozen ninjarobot-agent mcp inspect SERVER_ID
@@ -1145,20 +1411,21 @@ uv run --frozen ninjarobot-agent mcp disable SERVER_ID
 uv run --frozen ninjarobot-agent mcp enable SERVER_ID
 
 # Reload validated configuration
-uv run --frozen ninjarobot-agent mcp reload
+uv run --frozen ninjarobot-agent mcp reload SERVER_ID
 
 # Remove one server after an interactive confirmation
-uv run --frozen ninjarobot-agent mcp remove SERVER_ID
+uv run --frozen ninjarobot-agent mcp remove SERVER_ID --confirm
 ```
 
-Adding a server never enables every tool automatically. The user first
-connects, inspects the discovered names and descriptions, chooses a minimal
-allowlist, runs a harmless test, and then enables it.
+The current guided preset is Tavily. Add any other server by carefully editing
+the single catalog at `~/.config/ninjarobot_pi5/mcp.toml`, then run `mcp
+inspect`, `mcp health`, and `mcp tools` before restarting the agent service.
+Adding a server never enables every tool automatically.
 
 Remote server files use this format:
 
 ```toml
-schema_version = 1
+[[servers]]
 id = "example-remote"
 enabled = false
 transport = "streamable_http"
@@ -1166,23 +1433,21 @@ url = "https://mcp.example.com/mcp"
 authentication = "bearer_environment"
 token_environment = "EXAMPLE_MCP_TOKEN"
 allowed_tools = ["search"]
-trust = "external_untrusted"
-timeout_seconds = 20
+timeout_seconds = 20.0
 max_result_bytes = 131072
 ```
 
 Local server files use this format:
 
 ```toml
-schema_version = 1
+[[servers]]
 id = "example-local"
 enabled = false
 transport = "stdio"
 command = "/absolute/path/to/example-mcp-server"
 args = []
 allowed_tools = ["lookup"]
-trust = "external_untrusted"
-timeout_seconds = 20
+timeout_seconds = 20.0
 max_result_bytes = 131072
 ```
 
@@ -1191,10 +1456,20 @@ standard input and output. Use an absolute command path and a pinned server
 version. The agent starts the command directly; configuration cannot contain a
 shell pipeline, redirection, or command substitution.
 
-Validated user server files are stored under:
+The validated server catalog is stored at:
 
 ```text
-~/.config/ninjarobot_pi5/mcp/
+~/.config/ninjarobot_pi5/mcp.toml
+```
+
+After changing this file, restart the running agent so its owned MCP sessions
+use the new catalog:
+
+```bash
+uv run --frozen ninjarobot-agent service stop
+uv run --frozen --extra hardware ninjarobot-agent \
+  --config "$HOME/.config/ninjarobot_pi5/config.toml" \
+  service start --real
 ```
 
 Before adding any MCP server:
@@ -1248,8 +1523,8 @@ current-news-greeting/
   ],
   "allowed_tools": [
     "mcp.tavily.tavily-search",
-    "robot.behavior.greeting",
-    "robot.display.text"
+    "robot.behavior.run",
+    "robot.display.show_text"
   ],
   "input_schema": {
     "type": "object",
@@ -1302,7 +1577,7 @@ The optional `examples.json` contains simulation examples:
       },
       "expected_tools": [
         "mcp.tavily.tavily-search",
-        "robot.behavior.greeting"
+        "robot.behavior.run"
       ],
       "simulation_only": true
     }
@@ -1356,6 +1631,17 @@ uv run --frozen ninjarobot-agent \
   skill install /absolute/path/to/current-news-greeting
 ```
 
+For a skill proposed by an AI system, the stricter command requires the
+reviewed simulation input and confirmation:
+
+```bash
+uv run --frozen ninjarobot-agent \
+  skill install /absolute/path/to/current-news-greeting \
+  --ai-proposed \
+  --simulation-input '{"topic":"Raspberry Pi"}' \
+  --confirm
+```
+
 6. Inspect and simulate the installed copy:
 
 ```bash
@@ -1381,7 +1667,8 @@ To disable, re-enable, or remove a user skill:
 ```bash
 uv run --frozen ninjarobot-agent skill disable current-news-greeting
 uv run --frozen ninjarobot-agent skill enable current-news-greeting
-uv run --frozen ninjarobot-agent skill remove current-news-greeting
+uv run --frozen ninjarobot-agent \
+  skill remove current-news-greeting --confirm
 ```
 
 Bundled skills are read-only and cannot be removed through the user-skill

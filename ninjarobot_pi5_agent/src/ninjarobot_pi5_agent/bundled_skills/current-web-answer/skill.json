@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "id": "current-web-answer",
+  "version": "1.0.0",
+  "name": "Current Web Answer",
+  "description": "Search current public information and answer with source links.",
+  "activation_examples": [
+    "Search the web for the latest Raspberry Pi news"
+  ],
+  "allowed_tools": [
+    "mcp.tavily.tavily-search"
+  ],
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 300
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  },
+  "limits": {
+    "max_model_turns": 4,
+    "max_tool_calls": 3,
+    "timeout_seconds": 60.0
+  },
+  "safety": {
+    "external_content": "untrusted",
+    "physical_motion": "session_armed"
+  }
+}

@@ -6,9 +6,9 @@ layers:
 
 - `ninjarobot_pi5_ide`: deterministic middleware that exposes safe, standardized
   robot capabilities.
-- `ninjarobot_pi5_agent`: currently provides provider-neutral contracts and the
-  unified CLI. Phase 5 will add the bounded local agent service, Ollama,
-  conversational interfaces, MCP tools, and validated agent skills.
+- `ninjarobot_pi5_agent`: provides the bounded local agent service, Ollama
+  adapter, conversational CLI, HTTPS web controller, MCP tools, and validated
+  non-executable agent skills.
 
 The implementation follows
 [`NinjaRobotPi5V4_ImplementationPlan.md`](NinjaRobotPi5V4_ImplementationPlan.md),
@@ -18,8 +18,11 @@ which is the single source of truth.
 
 Phase 0, Phase 1, Phase 2, Phase 3.1 through Phase 3.5, and Phase 4 are
 implemented and the operator reports the complete Phase 4 and installation
-workflow passed. Phase 5 is approved architecture and has not been implemented
-yet.
+workflow passed. Phase 5.0 through Phase 5.7 are now implemented and pass the
+local software gate. Raspberry Pi acceptance—including the Qwen3:4B
+performance benchmark, live Tavily search, LAN browser checks, camera,
+microphone, and raised-wheel motion—still requires the operator checklist in
+[`docs/validation/phase-5-agent-validation-2026-07-28.md`](docs/validation/phase-5-agent-validation-2026-07-28.md).
 Phase 0 established project governance and preserved the
 original import hashes for the six existing Pi5 hardware libraries. Phase 1
 added strict IDE and agent contracts, deterministic fakes, V4-owned
@@ -141,28 +144,35 @@ its hardware root cause was not established.
 2. **NinjaRobotPi5 IDE** — owns capability registration, hardware
    initialization, resource scheduling, standardized results, action history,
    and the manual CLI.
-3. **NinjaRobotPi5 Agent** — will own user interaction, bounded planning, model
-   providers, memory, policy, and IDE tool calls. It will never import hardware
-   drivers directly.
+3. **NinjaRobotPi5 Agent** — owns user interaction, bounded planning, the local
+   model provider, seven-day transcripts, policy, MCP connections, validated
+   skills, and IDE tool calls. It never imports hardware drivers directly.
 
-### Approved Phase 5 direction
+### Implemented Phase 5 agent
 
-Phase 5 will keep Ollama and the selected language model on the Raspberry Pi,
-subject Qwen3:4B to measured acceptance benchmarks, and add a conversational
-`ninjarobot-agent` CLI plus an HTTPS FastAPI web interface for the local
-network. One browser will hold the exclusive controller lease at a time.
+Phase 5 keeps Ollama and the selected language model on the Raspberry Pi.
+Qwen3:4B is the installed candidate, not an accepted default until it passes
+the recorded Raspberry Pi benchmark. The `ninjarobot-agent` command provides
+streaming chat, session history, service lifecycle, MCP and skill management,
+and an interactive menu. A FastAPI HTTPS interface serves the local network,
+and one browser holds the exclusive controller lease at a time.
 
-The agent will also become an MCP host. MCP means Model Context Protocol, a
-standard connection for separately installed tools. The official hosted Tavily
-MCP server is the planned default real-time web-search provider after the owner
-adds a personal free-tier API key. Search output remains untrusted and cannot
-bypass the IDE or robot safety policy.
+The agent is also an MCP host. MCP means Model Context Protocol, a standard
+connection for separately installed tools. The official hosted Tavily MCP
+server is the bundled real-time web-search preset after the owner adds a
+personal API key. Search output remains untrusted and cannot bypass the IDE or
+robot safety policy.
 
-Validated agent skills will be confined data-and-instruction packages, not
-executable code. The exact future MCP and skill formats are recorded in the
+Validated agent skills are confined data-and-instruction packages, not
+executable code. The exact MCP and skill formats are recorded in the
 [Phase 5 extension appendix](InstallationGuide.md#phase-5-mcp-and-agent-skill-extension-reference).
-That appendix is marked as planned and its commands must not be treated as
-available until Phase 5 passes validation.
+
+The HTTPS controller provides direct D-pad movement, Level 2 Emergency Stop,
+confirmed Resume, Greeting, Celebrate, temporary camera preview, local
+whisper.cpp USB-microphone transcription, English/Japanese browser speech
+recognition, AI chat, and live events. A second browser receives `423 Locked`.
+Missed heartbeats revoke the lease and request a motor stop without waiting for
+the model.
 
 ## Implemented CLI functions
 
@@ -237,6 +247,34 @@ Simulation is always the default. A real movement also requires
 `--confirm-motion`. Private behaviors are stored under
 `~/.config/ninjarobot_pi5/behaviors`, validated before use, previewed in
 simulation before saving, and never overwrite an existing action silently.
+
+The `ninjarobot-agent` additionally provides:
+
+- `service run|start|status|stop` for the single owner process
+- streaming `chat`, reconnectable sessions, seven-day transcripts, and
+  `/help`, `/exit`, `/clear`, `/status`, `/arm`, and `/disarm`
+- `web start|status|stop` for the HTTPS local-network interface
+- `motion arm --confirm` for one CLI chat session's physical-motion consent
+- `mcp` commands for the Tavily preset and approved `stdio` or Streamable HTTP
+  servers
+- `skill` validation, simulation, non-overwriting installation, enable,
+  disable, inspection, and confirmed removal
+- `benchmark ollama` for the required Qwen3:4B Raspberry Pi acceptance report
+
+Simulation remains the service default. Start the physical service only after
+all Phase 4 hardware checks pass:
+
+```bash
+uv run --frozen --extra hardware ninjarobot-agent \
+  --config "$HOME/.config/ninjarobot_pi5/config.toml" \
+  service start --real
+
+uv run --frozen ninjarobot-agent web start
+```
+
+Quitting a CLI disconnects only that terminal. Use `web stop` to stop the web
+interface and `service stop` to release the model, IDE, hardware, MCP, database,
+socket, and web resources.
 
 The contracts reject unknown fields and unsafe type conversion. They cover
 capabilities, actions, results, errors, provider turns, tool calls, sessions,
@@ -471,7 +509,10 @@ not perform face recognition, video, streaming, or agent-controlled capture.
 The Phase 3.5 microphone path is also classified as `privacy`, requires
 explicit real-recording confirmation, and deletes audio unless retention is
 requested. It performs no transcription, wake-word detection, cloud request,
-or agent handoff.
+or agent handoff. Phase 5 adds a separate IDE
+`microphone.transcribe` capability: it records a bounded temporary WAV, runs
+local whisper.cpp, returns text, and deletes the WAV and transcript staging
+files even after cancellation or failure.
 
 Phase 4 never moves physical motors in simulation. Real integrated movement
 requires the private configuration to enable both motion gates, valid
@@ -485,3 +526,8 @@ silent clear space; a communication failure or generic null result still
 blocks guarded startup because it is not proof of clear space.
 Model output is treated as an untrusted proposal; the
 deterministic IDE control plane retains final authority over robot actions.
+Browser control is HTTPS but intentionally has no pairing authentication in
+Phase 5. The first device on the local network can acquire the only controller
+lease. Do not expose port 8443 to the internet or configure router port
+forwarding. The browser's self-signed-certificate warning is expected during
+initial local setup.

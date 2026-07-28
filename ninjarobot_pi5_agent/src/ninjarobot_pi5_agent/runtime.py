@@ -1,0 +1,219 @@
+"""Single-owner in-process agent application used by CLI and web interfaces."""
+
+from __future__ import annotations
+
+import uuid
+from typing import Any
+
+from .agent_loop import AgentLoop, AgentReply, TextDeltaHandler
+from .events import AgentEventType, EventBroker
+from .models import ProviderHealth, ToolCall, ToolExecutionResult, ToolInvocation
+from .persistence import ConversationStore
+from .policy import MotionArmManager, PolicyContext, PolicyEngine
+from .providers import LLMProvider
+from .skills import SkillRepository
+from .tools import CancellationToken, ToolRegistry
+
+
+class AgentRuntime:
+    """Own model, tools, transcript, motion arms, and shared events exactly once."""
+
+    def __init__(
+        self,
+        *,
+        provider: LLMProvider,
+        tools: ToolRegistry,
+        store: ConversationStore,
+        loop: AgentLoop,
+        policy: PolicyEngine,
+        motion_arms: MotionArmManager,
+        skills: SkillRepository,
+        events: EventBroker,
+    ) -> None:
+        self.provider = provider
+        self.tools = tools
+        self.store = store
+        self.loop = loop
+        self.policy = policy
+        self.motion_arms = motion_arms
+        self.skills = skills
+        self.events = events
+        self._started = False
+        self._closed = False
+
+    async def start(self) -> None:
+        """Start persistence and all tool providers transactionally."""
+        if self._closed:
+            raise RuntimeError("agent runtime is closed")
+        if self._started:
+            return
+        await self.store.start()
+        try:
+            await self.tools.start()
+        except BaseException:
+            await self.store.close()
+            raise
+        self._started = True
+
+    async def chat(
+        self,
+        *,
+        session_id: str,
+        text: str,
+        skill_id: str | None = None,
+        lease_id: str | None = None,
+        confirmed: bool = False,
+        cancellation: CancellationToken | None = None,
+        on_text_delta: TextDeltaHandler | None = None,
+    ) -> AgentReply:
+        """Run one chat through the bounded loop."""
+        self._ensure_started()
+        skill = (
+            self.skills.get(
+                skill_id,
+                available_tools={tool.name for tool in self.tools.list_tools()},
+            )
+            if skill_id is not None
+            else None
+        )
+        return await self.loop.chat(
+            session_id=session_id,
+            text=text,
+            skill=skill,
+            lease_id=lease_id,
+            confirmed=confirmed,
+            cancellation=cancellation,
+            on_text_delta=on_text_delta,
+        )
+
+    async def status(self) -> dict[str, Any]:
+        """Return provider, tool-provider, session, and motion-arm status."""
+        self._ensure_started()
+        provider = await self.provider.health()
+        tool_health = await self.tools.health()
+        sessions = await self.store.sessions()
+        return {
+            "started": True,
+            "provider": provider.model_dump(mode="json"),
+            "tool_providers": [report.model_dump(mode="json") for report in tool_health],
+            "tools": [tool.name for tool in self.tools.list_tools()],
+            "session_count": len(sessions),
+        }
+
+    async def history(self, session_id: str) -> list[dict[str, Any]]:
+        """Return one ordered transcript."""
+        self._ensure_started()
+        return [
+            message.model_dump(mode="json") for message in await self.store.messages(session_id)
+        ]
+
+    async def sessions(self) -> list[dict[str, Any]]:
+        """Return recent session metadata."""
+        self._ensure_started()
+        return [session.model_dump(mode="json") for session in await self.store.sessions()]
+
+    async def clear(self, session_id: str) -> int:
+        """Clear one transcript without deleting its session identity."""
+        self._ensure_started()
+        return await self.store.clear_session(session_id)
+
+    def arm_motion(
+        self,
+        session_id: str,
+        *,
+        confirmed: bool,
+        lease_id: str | None = None,
+    ) -> None:
+        """Arm physical motion for one bounded session."""
+        self._ensure_started()
+        self.motion_arms.arm(
+            session_id,
+            confirmed=confirmed,
+            lease_id=lease_id,
+        )
+
+    def disarm_motion(self, session_id: str) -> None:
+        """Revoke one session's physical-motion consent."""
+        self.motion_arms.disarm(session_id)
+
+    async def execute_tool(
+        self,
+        *,
+        tool_name: str,
+        arguments: dict[str, Any],
+        session_id: str,
+        lease_id: str | None = None,
+        confirmed: bool = False,
+        requested_by: str = "local-controller",
+        cancellation: CancellationToken | None = None,
+    ) -> ToolExecutionResult:
+        """Execute one catalog tool through the same non-bypassable policy boundary."""
+        self._ensure_started()
+        definition = self.tools.get(tool_name)
+        decision = self.policy.evaluate(
+            definition,
+            PolicyContext(
+                session_id=session_id,
+                lease_id=lease_id,
+                confirmed=confirmed,
+            ),
+        )
+        if not decision.allowed:
+            raise PermissionError(decision.reason)
+        call_id = f"control-{uuid.uuid4().hex}"
+        await self.events.publish(
+            AgentEventType.TOOL,
+            f"Starting {tool_name}.",
+            session_id=session_id,
+            correlation_id=call_id,
+            data={"tool": tool_name},
+        )
+        result = await self.tools.call(
+            ToolInvocation(
+                call=ToolCall(
+                    call_id=call_id,
+                    name=tool_name,
+                    arguments=arguments,
+                ),
+                session_id=session_id,
+                requested_by=requested_by,
+                lease_id=lease_id,
+            ),
+            cancellation,
+        )
+        event_type = (
+            AgentEventType.TOOL if result.status.value == "succeeded" else AgentEventType.ERROR
+        )
+        await self.events.publish(
+            event_type,
+            f"{tool_name} {result.status.value}.",
+            session_id=session_id,
+            correlation_id=call_id,
+            data={
+                "tool": tool_name,
+                "status": result.status.value,
+                "error": result.error,
+            },
+        )
+        return result
+
+    async def close(self) -> None:
+        """Disarm and close tools, provider, and persistence once."""
+        if self._closed:
+            return
+        self._closed = True
+        self.motion_arms.disarm_all()
+        await self.tools.close()
+        await self.provider.close()
+        await self.store.close()
+        self._started = False
+
+    async def provider_health(self) -> ProviderHealth:
+        """Return model health for lightweight UI checks."""
+        return await self.provider.health()
+
+    def _ensure_started(self) -> None:
+        if self._closed:
+            raise RuntimeError("agent runtime is closed")
+        if not self._started:
+            raise RuntimeError("agent runtime is not started")

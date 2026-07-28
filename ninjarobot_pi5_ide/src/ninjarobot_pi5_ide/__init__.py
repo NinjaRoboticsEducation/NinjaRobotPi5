@@ -14,7 +14,12 @@ from .behavior_models import (
 )
 from .behavior_runtime import BehaviorRunner, Melody, StageResult, load_pi5buzzer_melody
 from .buzzer import BuzzerDevice, BuzzerStopAdapter, BuzzerToneAdapter
-from .camera import CameraCaptureAdapter, CameraDevice, CameraStatusAdapter
+from .camera import (
+    CameraCaptureAdapter,
+    CameraDevice,
+    CameraPreviewAdapter,
+    CameraStatusAdapter,
+)
 from .config import RobotConfig, load_robot_config
 from .display import (
     DisplayBrightnessAdapter,
@@ -25,12 +30,17 @@ from .display import (
 from .distance import VL53L0XDistanceAdapter
 from .engine import ExecutionEngine
 from .errors import IDEError
+from .integrated import RobotIDEClient, build_robot_ide_client
 from .ledger import ActionLedger
 from .microphone import (
     MicrophoneBackend,
     MicrophoneCaptureAdapter,
     MicrophoneDevice,
     MicrophoneStatusAdapter,
+    MicrophoneTranscribeAdapter,
+    SimulatedSpeechTranscriber,
+    SpeechTranscriber,
+    WhisperCppTranscriber,
 )
 from .models import (
     ActionRecord,
@@ -83,6 +93,7 @@ __all__ = [
     "BehaviorRunner",
     "CameraCaptureAdapter",
     "CameraDevice",
+    "CameraPreviewAdapter",
     "CameraStatusAdapter",
     "DisplayBrightnessAdapter",
     "DisplayClearAdapter",
@@ -100,6 +111,7 @@ __all__ = [
     "MicrophoneBackend",
     "MicrophoneDevice",
     "MicrophoneStatusAdapter",
+    "MicrophoneTranscribeAdapter",
     "Melody",
     "MelodyOperation",
     "MotionController",
@@ -111,6 +123,7 @@ __all__ = [
     "RiskLevel",
     "RobotAssembly",
     "RobotConfig",
+    "RobotIDEClient",
     "SafetySnapshot",
     "SafetyStateStore",
     "ServoDevice",
@@ -118,12 +131,16 @@ __all__ = [
     "ServoRuntime",
     "ServoStatusAdapter",
     "ServoStopAdapter",
+    "SimulatedSpeechTranscriber",
+    "SpeechTranscriber",
     "SystemSafetyController",
     "TextOperation",
+    "WhisperCppTranscriber",
     "VL53L0XDistanceAdapter",
     "WaitOperation",
     "StageResult",
     "load_pi5buzzer_melody",
+    "build_robot_ide_client",
     "raspberry_pi_undervoltage_active",
     "load_robot_config",
 ]

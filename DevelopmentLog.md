@@ -1,5 +1,102 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-28 — Phase 5.0–5.7 agent implementation
+
+### Summary
+
+Implemented the bounded NinjaRobotAgent through the complete approved Phase 5
+software scope. The result is one reconnectable owner service shared by the
+conversational CLI and optional FastAPI HTTPS web interface. Robot operations
+remain confined to the NinjaRobotPi5 IDE; no agent module imports a managed
+`pi5*` driver.
+
+Implemented:
+
+- owner-only process lock, Unix-domain IPC socket, bounded event broker, and
+  SQLite transcripts with seven-day retention
+- provider-neutral model, message, tool, policy, recovery, and cancellation
+  contracts
+- IDE tool discovery under `robot.*`, collision-safe MCP tools under
+  `mcp.<server-id>.*`, and non-bypassable risk evaluation
+- official MCP SDK connections over `stdio` and Streamable HTTP, owner-only
+  secret storage, result limits, optional-provider degradation, and the
+  search-only Tavily preset
+- strict non-executable skills with `skill.json`, `instructions.md`, optional
+  `examples.json`, prompt-order protection, atomic installation, simulation,
+  and explicit approval for AI-proposed skills
+- loopback-only Ollama adapter, Qwen3:4B candidate profile, streaming,
+  normalized tool calls, bounded turns/tools/time, and a hardware-free model
+  benchmark that never executes tools
+- reconnectable `ninjarobot-agent` chat, interactive menu, service lifecycle,
+  session, motion-arm, MCP, skill, and benchmark commands
+- FastAPI HTTPS web UI with one exclusive controller lease, `423 Locked`
+  second-client rejection, heartbeat stop, short refresh reconnection, direct
+  D-pad control, Emergency Stop, confirmed Resume, Greeting, Celebrate, AI
+  chat, and live events
+- temporary IDE camera previews and local whisper.cpp USB-microphone
+  transcription, with media cleanup on success, failure, and cancellation
+- browser speech recognition for English and Japanese; recognized text is sent
+  to the agent, while spoken robot responses remain outside Phase 5
+
+### Safety and privacy decisions
+
+- The first browser on the LAN wins the unauthenticated controller lease, as
+  explicitly accepted by the owner. The web interface is HTTPS-only and must
+  never be internet-exposed or port-forwarded.
+- Direct controls use fixed server mappings. The browser cannot submit an
+  arbitrary tool name.
+- Direct D-pad and approved buttons use the controller session arm. Natural
+  language motion uses a separate, explicitly confirmed chat-session arm.
+- Emergency Stop remains model-independent. Lost heartbeats and controller
+  shutdown cancel active movement and request zero servo pulse.
+- Camera preview has a five-megabyte bound, is not retained on disk, and is
+  redacted from the durable action ledger.
+- USB audio and whisper.cpp transcript staging are removed after the text is
+  produced or the operation is interrupted.
+- External MCP metadata and results remain untrusted and cannot grant robot
+  authority.
+
+### Validation
+
+- Managed-driver verification passed: 222 tracked files across six drivers
+  match the import baseline plus 25 authorized repairs.
+- Python compilation passed.
+- Ruff lint and format checks passed.
+- Strict mypy passed for 55 V4 source files.
+- Automated suite passed: 259 tests.
+- JavaScript syntax validation passed for the packaged web application.
+- Wheel build inspection confirmed `index.html`, `styles.css`, and `app.js`
+  are included.
+- A real simulated-service smoke test started the owner process, started HTTPS
+  on `127.0.0.1:18443`, returned ready health, stopped the web server, stopped
+  the service, removed the IPC socket, and left no service process.
+- A live Qwen3:4B greeting attempt streamed output but exceeded the 90-second
+  development timeout. This is not an acceptance result; the model remains a
+  candidate until the documented Pi benchmark passes.
+
+No GPIO, PWM, I2C, SPI, camera, microphone, actuator, or live Tavily check was
+performed during the local implementation gate.
+
+### Files changed
+
+- `ninjarobot_pi5_agent/`: agent loop, providers, tools, policy, MCP, skills,
+  persistence, service, CLI, web server, web controller, TLS generation, static
+  interface, tests, and package dependencies
+- `ninjarobot_pi5_ide/`: integrated agent client plus temporary camera-preview
+  and local microphone-transcription capabilities
+- `README.md`, `DevelopmentGuide.md`, `InstallationGuide.md`,
+  `NinjaRobotPi5V4_ImplementationPlan.md`: implemented behavior and workflows
+- `docs/validation/phase-5-agent-validation-2026-07-28.md`: operator checklist
+- `pyproject.toml`: exact strict-mypy discovery scope for V4 sources
+- `uv.lock`: locked FastAPI and direct Phase 5 dependencies
+
+### Next step
+
+Run the Phase 5 Raspberry Pi checklist in order. Accept Qwen3:4B only if its
+saved benchmark meets every threshold. Complete network and privacy tests
+before raised-wheel motion, then report results so Phase 5 can be marked
+operator-validated.
+
 ## 2026-07-28 — Phase 5 MCP, Tavily search, and agent-skill plan
 
 ### Summary

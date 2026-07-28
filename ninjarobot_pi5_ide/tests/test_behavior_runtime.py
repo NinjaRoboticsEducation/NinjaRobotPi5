@@ -263,7 +263,7 @@ def test_robot_assembly_shares_expression_devices_and_blocks_unsafe_motion_start
 
         assert health == {"display": "ready", "buzzer": "ready"}
         assert result["name"] == "thinking"
-        with pytest.raises(Exception, match="did not start"):
+        with pytest.raises(Exception, match="motion is disabled"):
             await robot.run_behavior("move_forward")
         await robot.close()
 

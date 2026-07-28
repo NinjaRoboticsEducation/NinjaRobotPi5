@@ -306,7 +306,12 @@ class ExecutionEngine:
                     retry_safety=RetrySafety.SAFE,
                     status=ActionStatus.REJECTED,
                 )
-            self._ledger.finish(result)
+            ledger_result = (
+                result.model_copy(update={"data": None})
+                if not descriptor.persist_result_data and result.data is not None
+                else result
+            )
+            self._ledger.finish(ledger_result)
             return result
         except asyncio.CancelledError:
             record = self._ledger.get(request.action_id)

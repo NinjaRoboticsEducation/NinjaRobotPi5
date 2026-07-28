@@ -15,7 +15,7 @@ from pydantic import (
     model_validator,
 )
 
-from ninjarobot_pi5_ide import RiskLevel
+from ninjarobot_pi5_ide import RetrySafety, RiskLevel
 
 Identifier = Annotated[
     str,
@@ -30,7 +30,7 @@ ToolName = Annotated[
     StringConstraints(
         min_length=3,
         max_length=128,
-        pattern=r"^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$",
+        pattern=r"^[a-z][a-z0-9_-]*(?:\.[a-z][a-z0-9_-]*)+$",
     ),
 ]
 NonEmptyText = Annotated[str, StringConstraints(min_length=1, max_length=20_000)]
@@ -78,13 +78,46 @@ class MemoryKind(StrEnum):
     EPISODIC_SUMMARY = "episodic_summary"
 
 
+class ToolTrust(StrEnum):
+    """Whether tool output originates inside or outside the robot boundary."""
+
+    TRUSTED = "trusted"
+    EXTERNAL_UNTRUSTED = "external_untrusted"
+
+
+class ToolExecutionStatus(StrEnum):
+    """Normalized terminal state for one agent tool invocation."""
+
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    DENIED = "denied"
+    TIMED_OUT = "timed_out"
+
+
+class StreamEventType(StrEnum):
+    """Provider-neutral streaming event kinds."""
+
+    TEXT_DELTA = "text_delta"
+    DONE = "done"
+
+
+class ToolCall(AgentContractModel):
+    """Normalized model-proposed tool call."""
+
+    call_id: Identifier
+    name: ToolName
+    arguments: dict[str, Any]
+
+
 class ModelMessage(AgentContractModel):
     """One provider-neutral conversation message."""
 
     role: MessageRole
-    content: NonEmptyText
+    content: Annotated[str, StringConstraints(max_length=20_000)]
     name: Identifier | None = None
     tool_call_id: Identifier | None = None
+    tool_calls: tuple[ToolCall, ...] = ()
 
     @model_validator(mode="after")
     def tool_messages_require_call_identity(self) -> ModelMessage:
@@ -93,11 +126,15 @@ class ModelMessage(AgentContractModel):
             raise ValueError("tool messages require tool_call_id")
         if self.role is not MessageRole.TOOL and self.tool_call_id is not None:
             raise ValueError("tool_call_id is valid only for tool messages")
+        if self.role is not MessageRole.ASSISTANT and self.tool_calls:
+            raise ValueError("tool_calls are valid only for assistant messages")
+        if not self.content and not (self.role is MessageRole.ASSISTANT and self.tool_calls):
+            raise ValueError("message content must not be empty")
         return self
 
 
 class ToolDefinition(AgentContractModel):
-    """Agent-facing view of one enabled IDE capability."""
+    """Agent-facing view of one IDE or external capability."""
 
     name: ToolName
     version: Identifier
@@ -109,14 +146,39 @@ class ToolDefinition(AgentContractModel):
     idempotent: bool
     cancellable: bool
     confirmation_required: bool
+    source: Identifier = "ide"
+    trust: ToolTrust = ToolTrust.TRUSTED
 
 
-class ToolCall(AgentContractModel):
-    """Normalized model-proposed tool call."""
+class ToolInvocation(AgentContractModel):
+    """One tool call bound to its user session and request identity."""
+
+    call: ToolCall
+    session_id: Identifier
+    requested_by: Identifier = "agent"
+    lease_id: Identifier | None = None
+
+
+class ToolExecutionResult(AgentContractModel):
+    """Provider-neutral result with conservative retry evidence."""
 
     call_id: Identifier
-    name: ToolName
-    arguments: dict[str, Any]
+    tool_name: ToolName
+    status: ToolExecutionStatus
+    data: dict[str, Any] | None = None
+    error: Annotated[str, StringConstraints(min_length=1, max_length=2000)] | None = None
+    definitely_not_executed: bool = False
+    retry_safety: RetrySafety = RetrySafety.UNKNOWN
+    action_id: Identifier | None = None
+
+    @model_validator(mode="after")
+    def status_and_error_are_consistent(self) -> ToolExecutionResult:
+        """Require errors for every non-success terminal state."""
+        if self.status is ToolExecutionStatus.SUCCEEDED and self.error is not None:
+            raise ValueError("successful tool results must not include an error")
+        if self.status is not ToolExecutionStatus.SUCCEEDED and self.error is None:
+            raise ValueError("non-successful tool results require an error")
+        return self
 
 
 class ProviderCapabilities(AgentContractModel):
@@ -181,6 +243,25 @@ class ModelTurn(AgentContractModel):
             raise ValueError("tool_calls finish reason requires at least one tool call")
         if self.finish_reason is not FinishReason.TOOL_CALLS and self.tool_calls:
             raise ValueError("tool calls require the tool_calls finish reason")
+        return self
+
+
+class ModelStreamEvent(AgentContractModel):
+    """One text delta or final normalized provider turn."""
+
+    request_id: Identifier
+    event: StreamEventType
+    text: str = ""
+    turn: ModelTurn | None = None
+
+    @model_validator(mode="after")
+    def event_payload_is_consistent(self) -> ModelStreamEvent:
+        """Keep partial text separate from the terminal turn."""
+        if self.event is StreamEventType.TEXT_DELTA:
+            if not self.text or self.turn is not None:
+                raise ValueError("text delta events require text and no turn")
+        elif self.turn is None or self.text:
+            raise ValueError("done events require a turn and no delta text")
         return self
 
 

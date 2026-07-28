@@ -24,6 +24,7 @@ dev = [
     "pytest>=8.0,<10",
     "pytest-cov>=5.0,<8",
     "ruff==0.15.5",
+    "types-jsonschema>=4.26,<5",
 ]
 
 [tool.uv]
@@ -69,6 +70,22 @@ markers = [
 python_version = "3.11"
 strict = true
 warn_unused_configs = true
+exclude = """(?x)^(
+    \\.venv/
+    | NinjaClawBot/
+    | pi5buzzer/
+    | pi5camera/
+    | pi5disp/
+    | pi5mic/
+    | pi5servo/
+    | pi5vl53l0x/
+    | reachy_mini/
+    | reachy_mini_conversation_app/
+    | scripts/
+    | tests/
+    | ninjarobot_pi5_agent/tests/
+    | ninjarobot_pi5_ide/tests/
+)"""
 files = [
     "ninjarobot_pi5_ide/src",
     "ninjarobot_pi5_agent/src",

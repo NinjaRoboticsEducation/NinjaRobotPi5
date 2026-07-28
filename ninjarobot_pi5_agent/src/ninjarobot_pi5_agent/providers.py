@@ -5,7 +5,13 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Protocol
 
-from .models import ModelRequest, ModelTurn, ProviderCapabilities, ProviderHealth
+from .models import (
+    ModelRequest,
+    ModelStreamEvent,
+    ModelTurn,
+    ProviderCapabilities,
+    ProviderHealth,
+)
 
 
 class LLMProvider(Protocol):
@@ -18,7 +24,7 @@ class LLMProvider(Protocol):
     async def generate(self, request: ModelRequest) -> ModelTurn:
         """Generate one bounded, normalized model turn."""
 
-    def stream(self, request: ModelRequest) -> AsyncIterator[ModelTurn]:
+    def stream(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
         """Stream normalized model events when supported."""
 
     async def health(self) -> ProviderHealth:

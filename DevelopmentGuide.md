@@ -8,9 +8,9 @@ incomplete or conflicts with it.
 
 - `ninjarobot_pi5_ide/`: deterministic robot contracts, scheduler, action
   ledger, and managed-driver adapters.
-- `ninjarobot_pi5_agent/`: current provider-neutral agent contracts and unified
-  CLI; Phase 5 adds the single-owner service, providers, MCP host, skills, and
-  user interfaces.
+- `ninjarobot_pi5_agent/`: provider-neutral agent contracts, single-owner
+  service, Ollama and MCP providers, skills, conversational CLI, and FastAPI
+  HTTPS user interface.
 - `config/`: V4-owned configuration examples; never driver-local runtime state.
 - `pi5*/`: independently testable hardware libraries copied from the historical
   project and maintained under the managed-driver policy.
@@ -782,11 +782,10 @@ uv run --frozen ninjarobot-ide-tool behavior delete my_success --confirm
 
 Bundled assets refuse deletion.
 
-## Approved Phase 5 extension contracts
+## Implemented Phase 5 agent and extension contracts
 
-This section is a development contract for the upcoming phase, not a statement
-that Phase 5 commands already work. The implementation plan remains
-authoritative.
+Phase 5.0 through Phase 5.7 implement these contracts. The software gate
+passes; the Raspberry Pi acceptance checklist remains operator work.
 
 ### Agent and service boundaries
 
@@ -816,18 +815,16 @@ class ToolProvider(Protocol):
 
     async def call(
         self,
-        call: ToolCall,
-        *,
+        invocation: ToolInvocation,
         cancellation: CancellationToken,
-    ) -> ToolResult: ...
+    ) -> ToolExecutionResult: ...
 
-    async def health(self) -> ToolProviderHealth: ...
+    async def health(self) -> ProviderHealth: ...
 
     async def close(self) -> None: ...
 ```
 
-The exact implementation types may evolve during Phase 5, but these properties
-are required:
+The implemented boundary requires:
 
 - deterministic lifecycle and idempotent close
 - collision-safe names
@@ -847,17 +844,17 @@ The MCP manager supports local `stdio` and remote Streamable HTTP transports.
 Each configured server owns one client session. A failed server degrades only
 its own tools and must not stop the IDE or agent service.
 
-User server definitions live under:
+The complete server catalog lives in one owner-only file:
 
 ```text
-~/.config/ninjarobot_pi5/mcp/
+~/.config/ninjarobot_pi5/mcp.toml
 ```
 
 Remote bearer credentials name an environment secret; they never contain the
 secret:
 
 ```toml
-schema_version = 1
+[[servers]]
 id = "example"
 enabled = false
 transport = "streamable_http"
@@ -865,8 +862,7 @@ url = "https://mcp.example.com/mcp"
 authentication = "bearer_environment"
 token_environment = "EXAMPLE_MCP_TOKEN"
 allowed_tools = ["search"]
-trust = "external_untrusted"
-timeout_seconds = 20
+timeout_seconds = 20.0
 max_result_bytes = 131072
 ```
 
@@ -875,7 +871,7 @@ pass the configuration through a shell. Reject pipes, redirection, command
 substitution, relative executable paths, and unapproved inherited
 environment variables.
 
-The official Tavily remote MCP server is the default search preset. Its key is
+The official Tavily remote MCP server is the bundled search preset. Its key is
 resolved from `TAVILY_API_KEY` and sent in an authorization header. Only
 `tavily-search` is initially allowed. Search uses basic depth, at most five
 results, no images, and no raw page content. Live tests require an explicitly
@@ -927,10 +923,45 @@ AI-proposed skills require validation, simulation, and explicit approval before
 saving. Deterministic physical choreography remains an IDE behavior rather
 than an agent skill.
 
+### Agent service, model, and web implementation
+
+`AgentIPCServer` binds an owner-only Unix-domain socket. Unix-domain means the
+socket is a local filesystem endpoint, not a network port. CLI processes can
+reconnect to the same service; quitting a CLI never releases service resources.
+The service owns Ollama, the in-process IDE client, the tool registry, MCP
+sessions, SQLite transcripts, motion arms, events, and the optional FastAPI
+server.
+
+Ollama accepts only loopback base URLs. The Qwen3:4B candidate uses a 4,096
+token context, 512 output-token limit, temperature 0.1, disabled model
+thinking, bounded model turns, bounded tool calls, and a per-turn deadline.
+The benchmark command never executes a tool. Qwen3:4B becomes accepted only
+when the Raspberry Pi report meets every recorded latency, memory, temperature,
+throttling, correctness, and safety threshold.
+
+The web server is started and stopped through IPC, so it cannot create a
+second IDE or hardware owner. It uses a generated owner-only self-signed TLS
+key, static package assets, and one WebSocket controller lease. TLS means the
+HTTPS encryption layer. Every control message carries the active lease ID.
+The first browser wins; another receives HTTP `423 Locked`. A refresh can
+reclaim the lease during a short grace period using a reconnect token. A
+missed heartbeat revokes it and requests `robot.servo.stop`.
+
+The browser protocol exposes only fixed operations. It never accepts an
+arbitrary tool name or arbitrary robot capability. Camera preview calls
+`robot.camera.preview`; the JPEG is base64-encoded only long enough to return
+it, the staging file is removed, and the capability marks its result data as
+transient so the durable action ledger stores the outcome but not the JPEG.
+USB speech calls
+`robot.microphone.transcribe`; the IDE captures a temporary WAV, invokes local
+`whisper-cli` without a shell, and removes both audio and transcript staging.
+Browser speech recognition stays in the browser and sends only recognized
+English or Japanese text.
+
 ### Phase 5 developer validation
 
 Every Phase 5 subphase runs the root quality gate and immutable-driver check.
-Additional required suites include:
+Implemented suites include:
 
 - fake MCP server contract and transport tests
 - skill confinement and schema tests
@@ -940,7 +971,21 @@ Additional required suites include:
 - fake-provider and Ollama contract tests
 - opt-in Tavily and Raspberry Pi acceptance tests
 
-The complete future user setup and file examples are in the
+Run the configured project scope with:
+
+```bash
+uv run --frozen python scripts/verify_immutable_drivers.py
+uv run --frozen python -m compileall .
+uv run --frozen ruff check .
+uv run --frozen ruff format --check .
+uv run --frozen mypy .
+uv run --frozen pytest -q
+node --check \
+  ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/app.js
+git diff --check
+```
+
+The complete user setup and file examples are in the
 [Phase 5 extension appendix](InstallationGuide.md#phase-5-mcp-and-agent-skill-extension-reference).
 
 ## Driver package validation commands

@@ -1,11 +1,12 @@
 # NinjaRobotPi5V4 Implementation Plan
 
-Status: Approved architecture and delivery plan
-Last updated: 2026-07-28 (Phase 5 agent, web, MCP, and skill decisions incorporated)
+Status: Approved architecture and active delivery record
+Last updated: 2026-07-28 (Phase 5.0–5.7 software implementation completed)
 Primary development computer: Raspberry Pi 5, 8 GB RAM
 Target computer: Raspberry Pi 5, 8 GB RAM
-Implementation status: Phases 0–4 implemented and operator-validated; Phase 5
-architecture approved and awaiting implementation
+Implementation status: Phases 0–4 implemented and operator-validated; Phase
+5.0–5.7 implemented with the local software gate passing and Raspberry Pi
+operator acceptance pending
 
 ## 1. Purpose of this document
 
@@ -817,7 +818,7 @@ system instructions before it is sent to a model.
 The default Phase 5 server is the official hosted Tavily MCP server:
 
 ```toml
-[[mcp.servers]]
+[[servers]]
 id = "tavily"
 enabled = true
 transport = "streamable_http"
@@ -825,11 +826,11 @@ url = "https://mcp.tavily.com/mcp"
 authentication = "bearer_environment"
 token_environment = "TAVILY_API_KEY"
 allowed_tools = ["tavily-search"]
-trust = "external_untrusted"
-timeout_seconds = 20
+timeout_seconds = 20.0
 max_result_bytes = 131072
+preset = "tavily"
 
-[mcp.servers.default_parameters]
+[servers.default_parameters]
 search_depth = "basic"
 max_results = 5
 include_images = false
@@ -1730,6 +1731,16 @@ managed-driver provenance. The operator subsequently reported the complete
 installation-guide workflow passed on Raspberry Pi 5.
 
 ### Phase 5: Agent core, local interfaces, MCP, and skills
+
+**Implementation record — 2026-07-28**
+
+Phase 5.0 through Phase 5.7 are implemented. The immutable-driver check, Python
+compilation, Ruff lint and formatting, strict mypy, 259 automated tests,
+JavaScript syntax check, wheel-package asset inspection, and simulated
+single-owner service/HTTPS lifecycle smoke test pass. No managed driver changed
+during Phase 5. Qwen3:4B remains a candidate until the Raspberry Pi benchmark
+passes. Live Tavily, camera, microphone, browser, network-loss, and raised-wheel
+motion checks remain operator validation and are not represented as completed.
 
 **Objective**
 
