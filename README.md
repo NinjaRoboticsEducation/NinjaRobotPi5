@@ -261,7 +261,16 @@ The observed CSI camera is an OV5647 used at 1280×720. CSI is the Raspberry
 Pi's flat camera connection. OV5647 is fixed-focus, so V4 uses autofocus mode
 `none`.
 
-## Developer setup
+## Installation and developer setup
+
+For a new Raspberry Pi 5, follow the complete
+[`InstallationGuide.md`](InstallationGuide.md). It starts with Raspberry Pi OS
+Lite 64-bit, then covers headless system setup, hardware dependencies,
+standalone module initialization and calibration, IDE configuration import,
+simulation, physical testing, and troubleshooting in one ordered workflow.
+Raspberry Pi OS Lite is the default recommendation because it avoids desktop
+overhead and leaves more memory and processing capacity for robot control and
+future local AI models.
 
 Python 3.11 is the project baseline. Install the locked, hardware-free root
 development environment:

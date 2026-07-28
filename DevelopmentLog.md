@@ -1,5 +1,77 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-28 — Beginner installation and configuration-sync guide
+
+### Summary
+
+Reorganized the installation documentation into one complete workflow for a
+new Raspberry Pi 5. Raspberry Pi OS Lite 64-bit is now the default
+recommendation because the command-line-only system avoids desktop overhead
+and leaves more memory and processing capacity for robot control and future
+local AI models.
+
+The guide now proceeds in this order:
+
+1. install and preconfigure Raspberry Pi OS Lite 64-bit
+2. configure I2C, SPI, GPIO12/GPIO13 hardware PWM, and system packages
+3. clone and install NinjaRobotPi5 with the locked hardware environment
+4. initialize and calibrate all six standalone `pi5*` modules
+5. preview, apply, validate, and maintain the private IDE configuration
+6. run simulation, safe health checks, and progressively riskier physical tests
+
+### Files changed
+
+- `InstallationGuide.md`
+  - added the project, hardware, software, and directory overview
+  - added copy-paste-ready headless Raspberry Pi OS Lite installation
+  - documented explicit canonical configuration paths for every standalone
+    hardware tool
+  - separated the streamlined installation from testing and troubleshooting
+  - added configuration ownership, resynchronization, update, and uninstall
+    references
+- `README.md`
+  - made the complete installation guide the entry point for new Pi users
+  - recorded why Lite 64-bit is preferred for the local-AI target
+- `DevelopmentGuide.md`
+  - documented preview-first import, explicit destinations, overwrite
+    behavior, configuration ownership, and the fields imported from each
+    standalone module
+
+### Rationale
+
+Some standalone tools default to JSON files in the current working directory,
+while the integrated IDE prefers the corresponding files under
+`~/.config/pi5*`. That difference allowed a correctly calibrated
+project-root `servo.json` or configured `buzzer.json` to be missed in normal
+IDE discovery. The installation now passes every standalone configuration
+path explicitly and explains that standalone JSON and integrated TOML files
+are not continuously synchronized.
+
+### Validation
+
+- managed-driver verification: passed; 222 tracked files match the baseline
+  plus 25 authorized repairs
+- Python compilation: passed
+- Ruff lint: passed
+- Ruff format check: passed; 61 files already formatted
+- mypy strict type check: passed for 34 source files
+- pytest: passed; 213 tests
+- documentation whitespace and local-link checks: passed
+- `git diff --check`: passed
+
+### Raspberry Pi status
+
+No hardware was opened or moved because this was a documentation-only change.
+The documented commands were checked against the current command help and
+configuration-import implementation. A clean-device walkthrough on Raspberry
+Pi OS Lite 64-bit remains the recommended final operator validation.
+
+### Follow-up
+
+Perform the new guide from a freshly imaged card, record any prompts that
+differ on the current Raspberry Pi OS release, and keep all module JSON files
+at the documented canonical paths.
+
 ## 2026-07-27 — Phase 4 animated-face, distance, and IDE-tool refinement
 
 ### Summary

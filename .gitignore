@@ -1,5 +1,7 @@
 # Historical reference repository (never shipped or committed with V4)
 /NinjaClawBot/
+/reachy_mini/
+/reachy_mini_conversation_app/
 
 # Local tooling and environments
 /.serena/

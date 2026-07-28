@@ -656,7 +656,8 @@ asynchronous servo ramp.
 uv run --frozen ninjarobot-ide-tool
 uv run --frozen ninjarobot-ide-tool hardware status
 uv run --frozen ninjarobot-ide-tool config discover
-uv run --frozen ninjarobot-ide-tool config import
+uv run --frozen ninjarobot-ide-tool config import \
+  --destination "$HOME/.config/ninjarobot_pi5/config.toml"
 uv run --frozen ninjarobot-ide-tool behavior list
 uv run --frozen ninjarobot-ide-tool behavior show greeting
 uv run --frozen ninjarobot-ide-tool behavior health
@@ -701,6 +702,75 @@ The tool validates and simulates the action before saving it. A complete
 multi-stage action can instead be supplied with `--from-file`. Any future
 AI-proposed action uses the same preview and confirmation path; it cannot save
 or physically run itself without user approval.
+
+### Standalone configuration import and synchronization
+
+The complete beginner workflow is in
+[`InstallationGuide.md`](InstallationGuide.md). The key developer rule is that
+the standalone JSON files and the integrated TOML file have separate
+ownership. A standalone `pi5*` tool never rewrites the integrated
+`config.toml`, and the IDE importer never rewrites a standalone JSON file.
+There is no continuous two-way synchronization.
+
+Use these canonical standalone paths:
+
+| Library | Canonical runtime configuration |
+|---|---|
+| `pi5buzzer` | `~/.config/pi5buzzer/buzzer.json` |
+| `pi5camera` | `~/.config/pi5camera/camera.json` |
+| `pi5disp` | `~/.config/pi5disp/display.json` |
+| `pi5mic` | `~/.config/pi5mic/mic.json` |
+| `pi5servo` | `~/.config/pi5servo/servo.json` |
+| `pi5vl53l0x` | `~/.config/pi5vl53l0x/vl53l0x.json` |
+
+Several standalone tools otherwise default to a JSON file in the current
+directory. Always pass the explicit path when the library is being configured
+for integrated NinjaRobotPi5 use. `pi5disp` selects its path through the
+`PI5DISP_CONFIG` environment variable.
+
+For the first import, preview and then apply:
+
+```bash
+export NINJAROBOT_CONFIG="$HOME/.config/ninjarobot_pi5/config.toml"
+
+uv run --frozen ninjarobot-ide-tool config discover
+
+uv run --frozen ninjarobot-ide-tool config import \
+  --destination "$NINJAROBOT_CONFIG"
+
+uv run --frozen ninjarobot-ide-tool config import \
+  --destination "$NINJAROBOT_CONFIG" \
+  --apply
+```
+
+The preview returns `"applied": false` by design. That value means no file was
+written; it is not an import failure.
+
+After changing a standalone configuration, exit the IDE tool and use the
+current integrated TOML as the import base:
+
+```bash
+uv run --frozen ninjarobot-ide-tool \
+  --config "$NINJAROBOT_CONFIG" \
+  config import \
+  --destination "$NINJAROBOT_CONFIG"
+
+uv run --frozen ninjarobot-ide-tool \
+  --config "$NINJAROBOT_CONFIG" \
+  config import \
+  --destination "$NINJAROBOT_CONFIG" \
+  --apply \
+  --overwrite
+
+uv run --frozen ninjarobot_pi5_cli config validate \
+  --config "$NINJAROBOT_CONFIG"
+```
+
+The importer copies the buzzer pin; display wiring and presentation settings;
+camera capture profile; and microphone input profile. For servos, it stores a
+reference to the calibration JSON, so a new IDE process reads recalibrated
+contents from the same file. VL53L0X calibration remains driver-owned; the
+integrated adapter takes the sensor bus and address from V4 TOML.
 
 Delete a private behavior without using the interactive menu:
 
