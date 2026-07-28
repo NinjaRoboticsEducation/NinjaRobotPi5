@@ -1,5 +1,100 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-28 — Phase 5 MCP, Tavily search, and agent-skill plan
+
+### Summary
+
+Refined the approved Phase 5 architecture so NinjaRobotAgent can gain new MCP
+tools and validated agent skills without rebuilding its core. MCP means Model
+Context Protocol, the client-server connection used to discover and call tools
+from separate programs or hosted services.
+
+The revised plan now includes:
+
+- one single-owner agent service shared by reconnectable CLI and FastAPI web
+  clients
+- the new planned `ninjarobot-agent` conversational and interactive command
+  while preserving `ninjarobot_pi5_cli` and `ninjarobot-ide-tool`
+- a provider-neutral tool registry for IDE and MCP tool providers
+- local `stdio` and remote Streamable HTTP MCP connections
+- the official hosted Tavily MCP server as the default real-time search
+  integration
+- a strict search-only Tavily allowlist with environment-based secret loading,
+  bounded output, citations, and explicit network/quota failures
+- confined `skill.json`, `instructions.md`, and optional `examples.json` agent
+  skill packages
+- immutable safety-prompt ordering and rejection of executable-code skills
+- the previously approved benchmark-first Qwen3:4B policy, seven-day
+  transcript retention, exclusive browser lease, mobile web controls, camera,
+  USB microphone, and English/Japanese browser speech requirements
+
+### Files changed
+
+- `NinjaRobotPi5V4_ImplementationPlan.md`
+  - reconciled older CLI-only and no-HTTP statements with the approved
+    single-owner FastAPI service
+  - added MCP, tool-provider, Tavily, skill, prompt-composition, secret, and
+    namespace requirements
+  - divided Phase 5 into independently validated subphases with files,
+    validation, hardware risk, and documentation gates
+- `InstallationGuide.md`
+  - added a clearly marked future Phase 5 extension appendix
+  - documented default Tavily enrollment, secret handling, health, discovery,
+    and harmless search testing
+  - documented generic remote and local MCP server formats and management
+  - documented the complete agent-skill directory, JSON manifest,
+    instructions, examples, validation, simulation, installation, removal, and
+    troubleshooting workflow
+- `DevelopmentGuide.md`
+  - added the planned tool-provider contract, MCP trust boundary, skill
+    confinement, prompt ordering, and required test suites
+- `README.md`
+  - clarified that Phase 5 is planned rather than currently implemented
+  - summarized the approved Ollama, Tavily, MCP, skill, CLI, and web direction
+
+### Rationale
+
+The existing provider-neutral `ToolDefinition` and planned tool registry are a
+sound base, but the older plan assumed only IDE-generated tools and no first
+release HTTP service. Adding explicit tool-provider, MCP lifecycle, namespace,
+trust, secret, and skill contracts now prevents future web search or Maps tools
+from forcing a new agent loop or bypassing the IDE boundary.
+
+Tavily was selected over the community DuckDuckGo MCP server because Tavily
+maintains an official hosted MCP server designed for real-time agent search and
+currently offers 1,000 free monthly API credits without requiring a credit
+card. The project will not bundle a shared key, and external service terms or
+quotas are not treated as project guarantees.
+
+### Validation
+
+- managed-driver verification: passed; 222 tracked files across six drivers
+  match the import baseline plus 25 authorized repairs
+- Python compilation: passed
+- Ruff lint: passed
+- Ruff format check: passed; 61 files already formatted
+- strict mypy: passed for 34 source files
+- pytest: passed; 213 tests
+- documentation contradiction search: passed after removing old no-HTTP and
+  pending-Phase-4 statements
+- `git diff --check`: passed before the log update and will be repeated in the
+  final documentation gate
+
+### Raspberry Pi status
+
+No GPIO, PWM, I2C, SPI, servo, sensor, display, buzzer, camera, microphone,
+Ollama, web server, or external MCP tool was opened or executed. This task
+changes approved plans and future setup documentation only. Tavily and the
+documented `ninjarobot-agent` commands require Phase 5 implementation and
+Raspberry Pi validation before the guide's planned-feature notice can be
+removed.
+
+### Follow-up
+
+Review and approve the fully revised Phase 5 plan, then implement Phase 5.0
+through Phase 5.7 in order. After each subphase, pass the complete quality gate
+and immutable-driver verification before continuing.
+
 ## 2026-07-28 — Beginner installation and configuration-sync guide
 
 ### Summary

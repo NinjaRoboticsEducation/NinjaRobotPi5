@@ -8,7 +8,9 @@ incomplete or conflicts with it.
 
 - `ninjarobot_pi5_ide/`: deterministic robot contracts, scheduler, action
   ledger, and managed-driver adapters.
-- `ninjarobot_pi5_agent/`: provider-neutral agent contracts and unified CLI.
+- `ninjarobot_pi5_agent/`: current provider-neutral agent contracts and unified
+  CLI; Phase 5 adds the single-owner service, providers, MCP host, skills, and
+  user interfaces.
 - `config/`: V4-owned configuration examples; never driver-local runtime state.
 - `pi5*/`: independently testable hardware libraries copied from the historical
   project and maintained under the managed-driver policy.
@@ -779,6 +781,167 @@ uv run --frozen ninjarobot-ide-tool behavior delete my_success --confirm
 ```
 
 Bundled assets refuse deletion.
+
+## Approved Phase 5 extension contracts
+
+This section is a development contract for the upcoming phase, not a statement
+that Phase 5 commands already work. The implementation plan remains
+authoritative.
+
+### Agent and service boundaries
+
+Phase 5 adds a `ninjarobot-agent` entry point without removing
+`ninjarobot_pi5_cli` or `ninjarobot-ide-tool`. One service process owns the
+agent loop, in-process IDE client, hardware resources, model provider, MCP
+sessions, memory, and optional FastAPI web server. CLI clients may disconnect
+and reconnect; quitting one CLI does not implicitly stop the service.
+
+No code under `ninjarobot_pi5_agent` may import a `pi5*` package. Robot tools
+come only from IDE capability descriptors and execute only through the IDE
+client, policy engine, resource scheduler, and durable action ledger.
+
+### Tool-provider contract
+
+The unified registry accepts normalized definitions from separate
+`ToolProvider` implementations:
+
+```python
+class ToolProvider(Protocol):
+    @property
+    def provider_id(self) -> str: ...
+
+    async def start(self) -> None: ...
+
+    async def list_tools(self) -> tuple[ToolDefinition, ...]: ...
+
+    async def call(
+        self,
+        call: ToolCall,
+        *,
+        cancellation: CancellationToken,
+    ) -> ToolResult: ...
+
+    async def health(self) -> ToolProviderHealth: ...
+
+    async def close(self) -> None: ...
+```
+
+The exact implementation types may evolve during Phase 5, but these properties
+are required:
+
+- deterministic lifecycle and idempotent close
+- collision-safe names
+- strict input and result validation
+- bounded time and result size
+- cancellation propagation
+- declared source and trust level
+- no permission derived solely from provider-supplied metadata
+
+IDE tools use `robot.*`. External tools use
+`mcp.<configured-server-id>.*`. The configured ID is validated locally; an MCP
+server's self-reported name is not trusted as a global namespace.
+
+### MCP client and configuration rules
+
+The MCP manager supports local `stdio` and remote Streamable HTTP transports.
+Each configured server owns one client session. A failed server degrades only
+its own tools and must not stop the IDE or agent service.
+
+User server definitions live under:
+
+```text
+~/.config/ninjarobot_pi5/mcp/
+```
+
+Remote bearer credentials name an environment secret; they never contain the
+secret:
+
+```toml
+schema_version = 1
+id = "example"
+enabled = false
+transport = "streamable_http"
+url = "https://mcp.example.com/mcp"
+authentication = "bearer_environment"
+token_environment = "EXAMPLE_MCP_TOKEN"
+allowed_tools = ["search"]
+trust = "external_untrusted"
+timeout_seconds = 20
+max_result_bytes = 131072
+```
+
+For `stdio`, store an absolute executable path and an argument array. Never
+pass the configuration through a shell. Reject pipes, redirection, command
+substitution, relative executable paths, and unapproved inherited
+environment variables.
+
+The official Tavily remote MCP server is the default search preset. Its key is
+resolved from `TAVILY_API_KEY` and sent in an authorization header. Only
+`tavily-search` is initially allowed. Search uses basic depth, at most five
+results, no images, and no raw page content. Live tests require an explicitly
+supplied key and are excluded from the default test suite.
+
+MCP tool descriptions, annotations, resources, prompts, and results are
+untrusted. Tests must cover prompt injection, malicious schemas, name
+collisions, oversized content, timeouts, cancellation, secret redaction,
+authentication failure, quota exhaustion, and connection loss.
+
+### Agent-skill package
+
+A skill is a directory containing strict metadata and instructions:
+
+```text
+skill-id/
+├── skill.json
+├── instructions.md
+└── examples.json
+```
+
+`examples.json` is optional. `skill.json` contains schema version, ID, semantic
+version, description, activation examples, input JSON Schema, allowed tool
+names, bounded turn/tool/time limits, and safety metadata. `instructions.md`
+contains task guidance only.
+
+Built-in skills are read-only package assets. User skills live under:
+
+```text
+~/.config/ninjarobot_pi5/skills/
+```
+
+Validation rejects unknown fields where the schema forbids them, executable
+code, symlinks, absolute paths, parent traversal, oversized files, excessive
+directory depth, unknown tools, and attempts to weaken safety. Installation is
+atomic and never overwrites an existing skill silently. A skill restricts the
+active global profile; it cannot add a permission.
+
+The prompt composer orders content as:
+
+1. immutable safety rules
+2. robot identity
+3. current health, lease, and arming state
+4. selected skill instructions
+5. conversation context
+
+External text and skill instructions cannot precede or replace safety rules.
+AI-proposed skills require validation, simulation, and explicit approval before
+saving. Deterministic physical choreography remains an IDE behavior rather
+than an agent skill.
+
+### Phase 5 developer validation
+
+Every Phase 5 subphase runs the root quality gate and immutable-driver check.
+Additional required suites include:
+
+- fake MCP server contract and transport tests
+- skill confinement and schema tests
+- system-prompt ordering and override-resistance tests
+- tool policy and unknown-outcome recovery tests
+- FastAPI and exclusive WebSocket lease tests
+- fake-provider and Ollama contract tests
+- opt-in Tavily and Raspberry Pi acceptance tests
+
+The complete future user setup and file examples are in the
+[Phase 5 extension appendix](InstallationGuide.md#phase-5-mcp-and-agent-skill-extension-reference).
 
 ## Driver package validation commands
 

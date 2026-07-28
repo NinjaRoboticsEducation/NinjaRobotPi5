@@ -6,8 +6,9 @@ layers:
 
 - `ninjarobot_pi5_ide`: deterministic middleware that exposes safe, standardized
   robot capabilities.
-- `ninjarobot_pi5_agent`: a bounded AI agent that supports interchangeable local
-  and cloud model providers, tool calling, and persistent personalization.
+- `ninjarobot_pi5_agent`: currently provides provider-neutral contracts and the
+  unified CLI. Phase 5 will add the bounded local agent service, Ollama,
+  conversational interfaces, MCP tools, and validated agent skills.
 
 The implementation follows
 [`NinjaRobotPi5V4_ImplementationPlan.md`](NinjaRobotPi5V4_ImplementationPlan.md),
@@ -16,7 +17,9 @@ which is the single source of truth.
 ## Current status
 
 Phase 0, Phase 1, Phase 2, Phase 3.1 through Phase 3.5, and Phase 4 are
-implemented.
+implemented and the operator reports the complete Phase 4 and installation
+workflow passed. Phase 5 is approved architecture and has not been implemented
+yet.
 Phase 0 established project governance and preserved the
 original import hashes for the six existing Pi5 hardware libraries. Phase 1
 added strict IDE and agent contracts, deterministic fakes, V4-owned
@@ -141,6 +144,25 @@ its hardware root cause was not established.
 3. **NinjaRobotPi5 Agent** — will own user interaction, bounded planning, model
    providers, memory, policy, and IDE tool calls. It will never import hardware
    drivers directly.
+
+### Approved Phase 5 direction
+
+Phase 5 will keep Ollama and the selected language model on the Raspberry Pi,
+subject Qwen3:4B to measured acceptance benchmarks, and add a conversational
+`ninjarobot-agent` CLI plus an HTTPS FastAPI web interface for the local
+network. One browser will hold the exclusive controller lease at a time.
+
+The agent will also become an MCP host. MCP means Model Context Protocol, a
+standard connection for separately installed tools. The official hosted Tavily
+MCP server is the planned default real-time web-search provider after the owner
+adds a personal free-tier API key. Search output remains untrusted and cannot
+bypass the IDE or robot safety policy.
+
+Validated agent skills will be confined data-and-instruction packages, not
+executable code. The exact future MCP and skill formats are recorded in the
+[Phase 5 extension appendix](InstallationGuide.md#phase-5-mcp-and-agent-skill-extension-reference).
+That appendix is marked as planned and its commands must not be treated as
+available until Phase 5 passes validation.
 
 ## Implemented CLI functions
 

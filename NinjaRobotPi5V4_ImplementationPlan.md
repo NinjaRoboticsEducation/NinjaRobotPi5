@@ -1,11 +1,11 @@
 # NinjaRobotPi5V4 Implementation Plan
 
 Status: Approved architecture and delivery plan
-Last updated: 2026-07-27 (Phase 4 expression and IDE-tool refinements incorporated)
-Primary development computer: Raspberry Pi 5, 8 GM RAM
+Last updated: 2026-07-28 (Phase 5 agent, web, MCP, and skill decisions incorporated)
+Primary development computer: Raspberry Pi 5, 8 GB RAM
 Target computer: Raspberry Pi 5, 8 GB RAM
-Implementation status: Phases 0–4 implemented; Phase 4 physical validation is
-pending operator review
+Implementation status: Phases 0–4 implemented and operator-validated; Phase 5
+architecture approved and awaiting implementation
 
 ## 1. Purpose of this document
 
@@ -42,8 +42,22 @@ The terms below are used throughout this plan.
 - **Tool**: A typed operation that the model may request, such as reading the
   distance sensor or moving a servo. A tool request is only a proposal until
   deterministic application code validates and executes it.
+- **Tool provider**: An adapter that supplies tools to the unified tool
+  registry. The IDE and each connected MCP server are separate tool providers.
 - **Capability**: An operation offered by `ninjarobot_pi5_ide`. Tools are the
   agent-facing view of capabilities.
+- **MCP**: Model Context Protocol, an open client-server protocol that lets an
+  agent discover and call tools supplied by separate local or remote programs.
+- **MCP host**: NinjaRobotAgent's component that owns MCP connections and
+  decides which discovered tools may be shown to the model.
+- **MCP server**: A separate program or hosted service that exposes tools,
+  resources, or prompt templates through MCP.
+- **Agent skill**: A validated, reusable task workflow that combines
+  instructions with a strict allowlist of existing tools. A skill cannot grant
+  itself new permissions.
+- **Controller lease**: A short-lived exclusive permission held by one browser
+  connection. It prevents two browser devices from controlling the robot at the
+  same time.
 - **Middleware**: Software between the agent and device drivers. It gives the
   agent one consistent interface even though each device has a different
   low-level API.
@@ -111,15 +125,32 @@ open design options:
 - Middleware import package: `ninjarobot_pi5_ide`
 - Agent import package: `ninjarobot_pi5_agent`
 - Unified command-line entry point: `ninjarobot_pi5_cli`
+- Phase 5 agent command-line entry point: `ninjarobot-agent`. It provides
+  conversational, interactive, service, MCP, and skill commands without
+  replacing the existing unified IDE-oriented CLI.
 - Python baseline: Python 3.11
-- Runtime topology: agent and IDE in one Python process
-- Network topology: no HTTP daemon in the first release
-- Interaction order: text CLI first, voice after the safety loop is stable
+- Runtime topology: one single-owner service process owns the agent, IDE,
+  hardware resources, MCP connections, session state, and optional web server
+- User interfaces: a conversational CLI, an interactive CLI menu, and an HTTPS
+  FastAPI web interface for the local network
+- Web control: one exclusive browser controller lease; a second device is
+  refused until the first lease is released or expires
+- LAN security: HTTPS only, no public-internet exposure or router port
+  forwarding, and no pairing authentication in Phase 5. The owner accepts the
+  residual risk that another device on the same LAN could connect first.
+- Interaction order: text CLI and web text chat in Phase 5; spoken robot
+  responses remain deferred
 - Default model service: Ollama running directly on the Raspberry Pi 5
+- Initial model candidate: Qwen3:4B in a Pi-suitable quantization, accepted as
+  the default only after the Phase 5 benchmark meets the recorded latency,
+  memory, temperature, and tool-call thresholds
 - Default target: Raspberry Pi 5 with 8 GB RAM, 256 GB NVMe, active cooling,
   Raspberry Pi OS Lite 64-bit, headless operation, and normal internet access
-- Persistent memory: single local user, SQLite on the Pi, no raw microphone
-  retention, and no camera-media retention unless explicitly requested
+- Persistent memory: single local user, SQLite on the Pi, seven-day
+  conversation transcript retention, no raw microphone retention, and no
+  camera-media retention unless explicitly requested
+- Default current-information tool: the official hosted Tavily MCP server,
+  using the robot owner's free Tavily API key and a search-only allowlist
 - Startup: manual by default; optional managed auto-start may be enabled later
 - Hardware expansion board: DFRobot DFR0566 is mandatory
 - Existing `pi5*` directories: independently usable hardware libraries.
@@ -289,15 +320,21 @@ The following rules are mandatory.
 
 ```mermaid
 flowchart TB
-    U["User: text first, voice later"]
-    UI["CLI / future UI"]
+    U["Local user"]
+    CLI["Conversational and interactive CLI"]
+    WEB["FastAPI HTTPS web UI"]
+    LEASE["Exclusive browser controller lease"]
 
     subgraph A["ninjarobot_pi5_agent"]
+        SV["Single-owner agent service"]
         S["Session manager"]
         C["Context builder"]
         L["Bounded agent loop"]
         PR["Provider registry"]
         TR["Tool registry"]
+        MP["MCP client manager"]
+        SK["Skill registry"]
+        PC["System-prompt composer"]
         SG["Policy and safety gate"]
         M["Memory service"]
     end
@@ -327,14 +364,27 @@ flowchart TB
         AN["Anthropic Claude"]
     end
 
-    U --> UI --> S --> C --> L
+    subgraph External["External MCP servers"]
+        TV["Tavily web search"]
+        XM["Future approved MCP servers"]
+    end
+
+    U --> CLI --> SV
+    U --> WEB --> LEASE --> SV
+    SV --> S --> C --> L
     C <--> M
+    C <--> PC
+    PC <--> SK
     L <--> PR
     PR <--> OL
     PR <--> OA
     PR <--> GE
     PR <--> AN
-    L --> TR --> SG --> IC
+    L <--> TR
+    MP --> TR
+    MP <--> TV
+    MP <--> XM
+    TR --> SG --> IC
     IC --> CR --> EX
     EX --> RL
     EX --> AD
@@ -346,7 +396,9 @@ flowchart TB
     AD --> MI
     AD --> DS
     EV --> IC --> TR --> L
-    L --> S --> UI --> U
+    L --> S --> SV
+    SV --> CLI --> U
+    SV --> WEB --> U
 ```
 
 There are two important planes:
@@ -470,10 +522,10 @@ results as simulated. Production servo control remains hardware-backed.
 It is a clean implementation; it does not depend on the historical
 `ninjaclawbot` runtime.
 
-The first implementation should be an in-process Python API plus a CLI. The API
-must remain transport-neutral, but the first release has no HTTP daemon or
-separate IDE process. A future transport requires a demonstrated need and an
-approved ADR.
+The IDE remains an in-process Python API plus its own CLI; it is not a separate
+network service. During Phase 5, the single-owner agent service may expose the
+approved FastAPI HTTPS interface and call the IDE in-process. Web clients never
+receive a direct IDE or driver endpoint.
 
 ### 11.2 Core components
 
@@ -705,11 +757,13 @@ model reasoning. A plan contains:
 The application validates the structured plan. Free-form model text never
 becomes a hardware command.
 
-### 12.4 Tool registry
+### 12.4 Unified tool registry
 
-The tool registry converts enabled IDE capability descriptors into
-provider-neutral tool definitions. It normalizes each provider's tool-call
-format back into the same `ToolCall` object.
+The tool registry accepts tools from multiple `ToolProvider` implementations.
+The IDE provider converts enabled IDE capability descriptors into robot tool
+definitions. Each MCP provider converts the tools discovered from one approved
+MCP server into the same provider-neutral definition. Model-provider-specific
+tool-call formats are normalized back into the same `ToolCall` object.
 
 A tool definition contains:
 
@@ -721,6 +775,8 @@ A tool definition contains:
 - availability
 - timeout
 - idempotency and cancellation information
+- source provider and trust level
+- tool namespace and collision-safe external name
 
 Profiles can enable a safe subset, for example:
 
@@ -730,6 +786,109 @@ observer: read-only camera and sensors
 maintenance: calibration and diagnostics with confirmation
 voice: microphone plus default capabilities
 ```
+
+Robot tools use the `robot.*` namespace. MCP tools use
+`mcp.<configured-server-id>.*`. Server IDs, rather than self-reported MCP server
+names, provide collision-resistant namespaces. Duplicate names are rejected.
+The registry never gives an MCP server direct access to an IDE client or a
+hardware driver.
+
+### 12.4.1 MCP client manager
+
+NinjaRobotAgent is the MCP host. It owns one client session per configured
+server and supports:
+
+- local `stdio` transport, meaning messages exchanged with a child process
+  through standard input and output
+- remote Streamable HTTP transport over HTTPS
+- connection initialization and capability negotiation
+- dynamic tool discovery and explicit refresh
+- independent health, timeout, cancellation, and shutdown handling per server
+- per-server tool allowlists, result-size limits, and risk-policy overlays
+- secrets resolved from environment variables rather than URLs or checked-in
+  configuration
+
+MCP tool descriptions, annotations, prompt templates, resources, and returned
+web content are untrusted input unless a project-owned policy says otherwise.
+They cannot change risk levels, session arming, confirmations, emergency-stop
+behavior, or the IDE boundary. External content is clearly separated from
+system instructions before it is sent to a model.
+
+The default Phase 5 server is the official hosted Tavily MCP server:
+
+```toml
+[[mcp.servers]]
+id = "tavily"
+enabled = true
+transport = "streamable_http"
+url = "https://mcp.tavily.com/mcp"
+authentication = "bearer_environment"
+token_environment = "TAVILY_API_KEY"
+allowed_tools = ["tavily-search"]
+trust = "external_untrusted"
+timeout_seconds = 20
+max_result_bytes = 131072
+
+[mcp.servers.default_parameters]
+search_depth = "basic"
+max_results = 5
+include_images = false
+include_raw_content = false
+```
+
+The project does not bundle or share an API key. During installation, each
+owner creates a Tavily account and supplies `TAVILY_API_KEY`. Tavily currently
+documents 1,000 free API credits per month with no credit card required; this
+external price and quota are not guaranteed by NinjaRobotPi5. The key is sent
+in an `Authorization: Bearer` header and is never placed in the server URL,
+logs, prompts, transcripts, or configuration inspection output.
+
+Only `tavily-search` is enabled by default. Extract, map, and crawl tools require
+an explicit allowlist change. The agent searches when the answer depends on
+current information or the user requests a search, not for every conversation.
+Search-based answers include source links. Quota exhaustion, authentication
+failure, or network loss produces a clear unavailability result; the agent
+must not present an unverified current claim as verified.
+
+### 12.4.2 Agent skills and system prompts
+
+System prompts and skills have different responsibilities:
+
+- The immutable safety prompt states non-overridable robot rules.
+- The identity prompt defines NinjaRobot's voice and normal interaction style.
+- Runtime context states current health, configuration, controller lease, and
+  motion-arming state.
+- A selected skill supplies task-specific workflow instructions.
+- Conversation context contains the current user interaction.
+
+The prompt composer always uses that order. A skill cannot replace or precede
+the safety prompt.
+
+Each skill is a confined directory containing:
+
+```text
+skill-id/
+├── skill.json
+├── instructions.md
+└── examples.json        # optional
+```
+
+`skill.json` is a strict, versioned manifest containing identity, activation
+examples, JSON input schema, allowed tool names, turn/tool/time limits, and
+safety metadata. `instructions.md` contains the plain-language workflow.
+`examples.json` may contain simulation-only examples. Skills cannot contain
+executable Python or shell code, symlinks, absolute paths, or parent-directory
+traversal. File sizes and directory depth are bounded.
+
+Bundled skills are read-only package assets. User skills live in
+`~/.config/ninjarobot_pi5/skills/`. Installation validates the complete
+directory before an atomic, non-overwriting copy. AI-proposed skills require a
+simulation preview and explicit user approval before saving or execution.
+
+A fixed display, buzzer, and servo choreography remains an IDE behavior. An
+agent skill is used when a task needs reasoning, conditions, external tools, or
+several existing behaviors. All robot steps still call IDE tools through the
+normal registry and safety policy.
 
 ### 12.5 Safety policy
 
@@ -835,8 +994,15 @@ max_loaded_models = 1
 model = "configured-by-user"
 api_key_env = "OPENAI_API_KEY"
 
+[mcp]
+user_server_directory = "~/.config/ninjarobot_pi5/mcp"
+
+[skills]
+user_directory = "~/.config/ninjarobot_pi5/skills"
+
 [memory]
-database_path = "./data/ninjarobot_pi5.sqlite3"
+database_path = "~/.local/share/ninjarobot_pi5/agent.sqlite3"
+transcript_retention_days = 7
 
 [profile]
 name = "default"
@@ -1075,15 +1241,20 @@ The deployment baseline is:
 - headless operation
 - normal internet access
 - Ollama running locally on the Pi
-- agent and IDE running in one Python process
+- one single-owner service process for agent, IDE, hardware, MCP sessions, and
+  the optional FastAPI web server
+- locally generated or administrator-supplied HTTPS certificate for LAN access
+- exclusive browser controller lease with heartbeat and reconnect-token expiry
+- no router port forwarding or public-internet exposure
 - writable application data on the NVMe drive
 - explicit device permissions
 - shutdown hooks that cancel work and close adapters
 
 The application starts manually by default. An optional systemd service may be
 provided and enabled manually, but installation must not silently enable
-auto-start. A separate IDE service, HTTP daemon, or other network transport
-requires a later ADR and contract tests.
+auto-start. The CLI can reconnect to an already-running service, stop only the
+web interface, or request an orderly stop of the complete agent service. Quitting
+one CLI client does not stop the service.
 
 ## 18. Clean-build and reference strategy
 
@@ -1550,33 +1721,325 @@ historical runtime or OpenClaw code is imported.
 
 **Implementation result**
 
-The original Phase 4 physical checklist was reported passed by the operator.
-The 2026-07-27 refinement is complete in software. The full root suite passes
-with 213 tests, strict mypy, Ruff lint and formatting, and unchanged
-managed-driver provenance. The new 20-face, direct-menu, sentinel, emergency
-sign, and resume refinements require the ordered Raspberry Pi revalidation in
-`docs/validation/phase-4-refinement-validation-2026-07-27.md`.
+The original Phase 4 physical checklist and the 2026-07-27 refinement checklist
+were reported passed by the operator. The refinement completed the 20-face
+catalog, direct interactive menu, distance sentinel handling, persistent
+emergency sign, resume path, and configuration workflow. Its recorded software
+gate passed 213 tests, strict mypy, Ruff lint and formatting, and unchanged
+managed-driver provenance. The operator subsequently reported the complete
+installation-guide workflow passed on Raspberry Pi 5.
 
-### Phase 5: Agent core and Ollama adapter
+### Phase 5: Agent core, local interfaces, MCP, and skills
 
 **Objective**
 
 Implement the bounded agent state machine with Ollama running locally on the
-confirmed 8 GB Raspberry Pi 5 and no required cloud dependency.
+confirmed 8 GB Raspberry Pi 5. Provide conversational CLI and local-network web
+interfaces, default real-time Tavily search through MCP, and safe extension
+contracts for future MCP servers and agent skills. Language generation remains
+local by default, while web search intentionally requires internet access.
 
-**Deliverables**
+#### Phase 5.0 — Close Phase 4 and freeze contracts
+
+**Objective**
+
+- Record the completed Phase 4 operator validation.
+- Re-run the full workspace gate and immutable-driver verification.
+- Freeze the IDE capability, action-ledger, cancellation, and two-level-stop
+  contracts used by the agent.
+
+**Likely files**
+
+- Phase 4 validation records
+- `NinjaRobotPi5V4_ImplementationPlan.md`
+- `DevelopmentLog.md`
+
+**Validation**
+
+- Immutable-driver verification before and after the phase.
+- Ruff lint and format checks, strict mypy, and the full pytest suite.
+
+**Hardware risk**
+
+None. This is evidence and contract work.
+
+**Documentation**
+
+Close the Phase 4 validation status before agent implementation begins.
+
+#### Phase 5.1 — Agent contracts, service ownership, and persistence
+
+**Objective**
 
 - Session manager and context builder.
 - Plan/tool/result normalized models.
-- Tool registry generated from IDE descriptors.
+- Bounded state machine with model-turn, tool-call, wall-clock, and context
+  limits.
+- Single-owner service lifecycle and reconnectable client contract.
+- Seven-day conversation transcript retention and deletion.
+- Structured event stream for chat, service state, tool execution, warnings,
+  recovery, and errors.
+- Quit-CLI, stop-web-interface, and stop-agent-service remain distinct actions.
+
+**Likely files**
+
+- `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/`
+- agent migrations and tests
+- root configuration examples
+
+**Validation**
+
+- Deterministic lifecycle, restart, retention, cancellation, corruption, and
+  concurrent-client tests.
+- A second service owner must be rejected without touching hardware.
+- Standard workspace quality gate and immutable-driver verification.
+
+**Hardware risk**
+
+None. Use fake IDE clients only.
+
+**Documentation**
+
+Document data locations, seven-day retention, service ownership, and shutdown.
+
+#### Phase 5.2 — Unified tool registry and deterministic policy
+
+**Objective**
+
+- Introduce a `ToolProvider` contract.
+- Register IDE capabilities through an IDE tool provider.
+- Namespace every tool and reject collisions.
 - Policy and confirmation engine.
-- Fake provider and Ollama adapter.
-- Text CLI.
 - Recovery matrix implementation.
+- Preserve the durable action ledger across model or client failures.
+- Implement one-time physical-motion session arming. Direct web D-pad commands,
+  the Celebrate button, and natural-language motion can execute without a
+  second per-action dialog only while the session is armed and healthy.
+- Emergency stop remains independent of model availability.
+
+**Likely files**
+
+- agent tool registry, policy, and recovery modules
+- IDE capability-adapter boundary
+- policy and scenario tests
+
+**Validation**
+
+- Table and property tests for risk, arming, privacy, cancellation,
+  idempotency, unknown outcomes, and emergency stop.
+- Prove that no agent or provider module imports a `pi5*` driver.
+- Standard workspace quality gate and immutable-driver verification.
+
+**Hardware risk**
+
+None during this subphase; all actions use deterministic fakes.
+
+**Documentation**
+
+Document tool namespaces, profiles, session arming, and recovery rules.
+
+#### Phase 5.3 — MCP host and default Tavily web search
+
+**Objective**
+
+- Implement MCP client sessions over local `stdio` and remote Streamable HTTP.
+- Discover and normalize MCP tools through the unified registry.
+- Add server configuration, allowlists, health, inspect, test, enable, disable,
+  remove, reload, timeout, cancellation, and result-size controls.
+- Add environment-based bearer-token resolution with redaction.
+- Add `ninjarobot-agent secret set NAME`, using hidden input and an owner-only
+  secret file, so keys do not enter shell history or ordinary configuration.
+- Ship Tavily as the default configured search provider after
+  `TAVILY_API_KEY` setup.
+- Enable only `tavily-search` by default, with basic depth, at most five
+  results, no images, and no raw page content.
+- Require source links in search-grounded answers.
+- Treat all MCP metadata and output as external untrusted content.
+- Refuse any attempt by MCP content to change safety policy or invoke hardware
+  outside an independently validated agent tool call.
+
+**Likely files**
+
+- MCP client manager and transport adapters
+- MCP configuration and secret resolver
+- fake MCP server and protocol fixtures
+- agent CLI MCP-management commands
+
+**Validation**
+
+- Fake-server initialization, discovery, call, list-change, cancellation,
+  timeout, malformed result, oversized result, collision, and shutdown tests.
+- Prompt-injection and secret-redaction tests.
+- Optional live Tavily search test, excluded unless a key is deliberately set.
+- Pi network-loss, quota, authentication, and clean-shutdown tests.
+- Standard workspace quality gate and immutable-driver verification.
+
+**Hardware risk**
+
+None. MCP servers have no direct IDE or driver reference.
+
+**Documentation**
+
+Update `InstallationGuide.md` with default Tavily setup, health testing, MCP
+server installation, configuration formats, security rules, and
+troubleshooting. Update `DevelopmentGuide.md` with the `ToolProvider` contract.
+
+#### Phase 5.4 — Agent skills and system-prompt composition
+
+**Objective**
+
+- Implement strict `skill.json`, confined `instructions.md`, and optional
+  `examples.json` loading.
+- Provide read-only bundled skills and a confined user skill directory.
+- Validate tool allowlists, inputs, limits, paths, sizes, and schema versions.
+- Compose prompts in immutable-safety, identity, runtime-state, skill, and
+  conversation order.
+- Add list, inspect, validate, install, simulate, enable/disable, and remove
+  commands.
+- Require preview and explicit approval before saving an AI-proposed skill.
+- Include one offline demonstration skill and one Tavily search skill.
+
+**Likely files**
+
+- skill manifest models, repository, prompt composer, and CLI
+- bundled example skill assets
+- validation and scenario tests
+
+**Validation**
+
+- Path traversal, symlink, overwrite, oversized asset, unknown schema, forbidden
+  tool, prompt-override, atomic install, cancellation, and simulation tests.
+- Verify that fixed hardware choreography remains inside IDE behaviors.
+- Standard workspace quality gate and immutable-driver verification.
+
+**Hardware risk**
+
+None. New skills validate and simulate before any physical test.
+
+**Documentation**
+
+Document the exact skill directory and file formats, installation workflow,
+simulation, approval, troubleshooting, and behavior-versus-skill distinction.
+
+#### Phase 5.5 — Fake provider, Ollama adapter, and model benchmark
+
+**Objective**
+
+- Fake provider and Ollama adapter.
+- Provider-neutral streaming and structured tool-call handling.
 - Pi-oriented model configuration with bounded context, output, concurrency,
   and memory use.
 - Benchmark command that records model load time, first-token latency,
   tool-call correctness, peak memory, temperature, and throttling.
+- Benchmark Qwen3:4B in candidate quantizations before choosing the default.
+- Reject or replace Qwen3:4B if it does not meet the accepted Pi thresholds;
+  model selection must not change agent, tool, MCP, skill, or IDE contracts.
+
+**Likely files**
+
+- provider adapters and provider registry
+- benchmark command, reports, and fixtures
+- model profile configuration
+
+**Validation**
+
+- Provider contract, malformed output, streaming cancellation, timeout,
+  unavailable model, and bounded-loop tests.
+- Sustained Pi benchmark under active cooling with no memory exhaustion or
+  thermal throttling.
+- Standard workspace quality gate and immutable-driver verification.
+
+**Hardware risk**
+
+None to actuators. This phase creates substantial CPU, memory, and thermal load.
+
+**Documentation**
+
+Record tested model tags, quantization, context, latency, memory, temperature,
+and acceptance thresholds without claiming unmeasured performance.
+
+#### Phase 5.6 — Conversational and interactive CLI
+
+**Objective**
+
+- Add streaming chat, history, status, execution logs, and clear error reports.
+- Support `/help`, `/exit`, `/clear`, and `/status`.
+- Provide scriptable service, web, MCP, skill, session, and health commands.
+- Add the `ninjarobot-agent` package entry point while preserving
+  `ninjarobot_pi5_cli` and `ninjarobot-ide-tool`.
+- Provide an interactive menu consistent with `ninjarobot-ide-tool`.
+- Allow a new CLI process to reconnect and stop an already-running web
+  interface or agent service.
+
+**Likely files**
+
+- agent CLI, service client, interactive UI, and tests
+
+**Validation**
+
+- Scriptable and interactive command parity.
+- Reconnect, Ctrl+C, terminal loss, streaming, cancellation, and orderly
+  service-stop tests.
+- Standard workspace quality gate and immutable-driver verification.
+
+**Hardware risk**
+
+None for simulated acceptance; later physical conversation tests use the
+existing IDE safeguards.
+
+**Documentation**
+
+Add complete start, reconnect, chat, stop-web, stop-service, MCP, skill, and
+troubleshooting instructions.
+
+#### Phase 5.7 — FastAPI HTTPS web interface
+
+**Objective**
+
+- Serve a mobile-landscape-first interface that also works on desktop.
+- Display AI chat, system status, tool execution logs, robot actions, warnings,
+  errors, and recovery events.
+- Provide D-pad Move Forward, Move Backward, Turn Left, and Turn Right controls.
+- Provide X Emergency Stop, Y Resume with confirmation, A Greeting, and
+  B Celebrate controls.
+- Capture and temporarily preview a camera image without retaining it by
+  default.
+- Start/stop USB microphone capture and send completed audio into the approved
+  Phase 5 text workflow without adding spoken robot responses.
+- Use browser speech recognition for English and Japanese and send recognized
+  text to the agent.
+- Enforce one exclusive browser WebSocket controller lease. A second connection
+  receives `423 Locked`.
+- Require the active lease identifier on control requests.
+- Revoke the lease and stop movement after missed heartbeats.
+- Permit short-lived reconnect-token recovery after browser refresh.
+- Refuse control endpoints when no active WebSocket lease exists.
+- Use HTTPS on the LAN and clearly document the accepted first-device risk.
+
+**Likely files**
+
+- FastAPI application, WebSocket lease manager, HTTPS setup, static web assets,
+  event bridge, and tests
+
+**Validation**
+
+- FastAPI contract, WebSocket lease, second-client rejection, heartbeat,
+  reconnect, refresh, malformed request, camera lifetime, microphone
+  cancellation, language selection, and service-shutdown tests.
+- Browser checks in mobile landscape and desktop layouts.
+- Network interruption must stop active movement without waiting for a model.
+- Standard workspace quality gate and immutable-driver verification.
+
+**Hardware risk**
+
+Camera and microphone privacy risk plus actuator risk during final Pi
+acceptance. Start with simulated controls, then camera/microphone, then one
+unloaded motion test with the existing stop path available.
+
+**Documentation**
+
+Add HTTPS certificate setup, LAN URL, one-device lease behavior, browser
+microphone permissions, English/Japanese selection, privacy, and recovery.
 
 **Pi validation**
 
@@ -1586,9 +2049,17 @@ confirmed 8 GB Raspberry Pi 5 and no required cloud dependency.
 - Provider unavailability and cancellation tests.
 - Full workspace gates.
 - Text request to safe read-only capability.
-- Confirmed motion request.
+- One-time motion-session arming followed by physical motion and stop.
 - Model failure before and after a hardware action.
 - Emergency stop without model availability.
+- Default Tavily health check and one cited current-information search.
+- MCP network loss and quota-exhaustion behavior.
+- Skill validation, simulation, and one approved bundled skill.
+- CLI reconnect and orderly service shutdown.
+- HTTPS LAN access, exclusive lease, second-client rejection, heartbeat loss,
+  and refresh reconnection.
+- Temporary camera preview, USB microphone flow, and browser speech recognition
+  in English and Japanese.
 - Sustained local Ollama run under active cooling with no thermal throttling or
   memory exhaustion.
 
@@ -1597,6 +2068,13 @@ confirmed 8 GB Raspberry Pi 5 and no required cloud dependency.
 - Local Ollama on the 8 GB Pi can complete safe tool tasks within the accepted
   benchmark thresholds recorded during this phase.
 - The loop always terminates within configured bounds.
+- Current-information requests can use the configured Tavily MCP server and
+  present source links, while network or quota failures remain explicit.
+- A validated new MCP server and a validated new skill can be installed by
+  following `InstallationGuide.md` without changing the agent core.
+- CLI and web clients observe the same service, policy, tool registry, action
+  ledger, and safety state.
+- Only one browser controls the robot, and loss of its lease stops movement.
 - No provider code imports a driver.
 
 ### Phase 6: Cloud provider adapters
@@ -1790,7 +2268,12 @@ The first release will not attempt:
 - automatic retries when physical action outcome is uncertain
 - full robot simulation before deterministic fakes provide sufficient coverage
 - modifying any copied `pi5*` library or its documentation
-- a separate IDE process or HTTP daemon
+- a separate IDE process
+- a public-internet robot-control service or router port forwarding
+- browser pairing authentication in Phase 5
+- spoken robot responses in Phase 5
+- enabling Tavily extract, crawl, or map tools by default
+- executable-code agent skills
 - automatic startup immediately after installation
 - LAN-hosted Ollama as a first-release requirement
 
