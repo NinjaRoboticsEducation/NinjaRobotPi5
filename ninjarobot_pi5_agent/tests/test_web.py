@@ -368,6 +368,8 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert 'id="armAiCameraButton"' in html
     assert 'if (text === "/camera")' in javascript
     assert 'send("grant_chat_camera", { confirmed: true })' in javascript
+    assert "data.grant_sequence" in javascript
+    assert "use /camera again after it succeeds" in javascript
     assert 'event.event_type === "media"' in javascript
     assert "showCameraPreview(event.data.jpeg_base64)" in javascript
     assert "AI motion remains disarmed" in javascript

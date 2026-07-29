@@ -1,5 +1,55 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-30 — Repeatable one-photo AI camera grants
+
+### Summary
+
+Fixed the model-side refusal that occurred after the first successful AI photo
+in a chat session:
+
+- Every `/camera` command or **AI camera** button press now issues a fresh,
+  numbered one-photo grant.
+- The current trusted runtime authorization explicitly overrides stale
+  conversation messages that describe an older consumed grant.
+- The agent is instructed to use temporary `robot.camera.preview`, not retained
+  `robot.camera.capture`, for this permission.
+- A successful preview consumes only its current grant. A failed preview keeps
+  that grant available for retry. The user may grant another photo repeatedly
+  without restarting or clearing the chat.
+
+### Main files changed
+
+- Agent camera policy, runtime state, prompts, service IPC, terminal/web
+  controller responses, and browser feedback.
+- Camera-policy, prompt, IPC, agent-loop, CLI, and web regression tests.
+- README, installation guide, developer guide, implementation plan, this log,
+  and the Raspberry Pi camera validation checklist.
+
+No managed `pi5*` driver or nested `NinjaClawBot/` file changed.
+
+### Why
+
+Physical test history showed that the first preview succeeded, but later
+requests were refused by the local model before any camera tool call. The
+backend could already replace a consumed grant; older assistant text such as
+“one preview per session” incorrectly overruled the newer button or `/camera`
+action. Numbered trusted grants make the newest permission unambiguous.
+
+### Validation
+
+- Pre-change and Phase 1 immutable-driver verification passed.
+- Phase 1 compilation, Ruff, formatting, strict MyPy, and all 314 tests passed.
+- The new same-conversation regression executes two successful previews with
+  grant sequences 1 and 2 and confirms that JPEG bytes are not stored.
+- Final documentation-phase validation is recorded at task handoff.
+- Physical Raspberry Pi acceptance remains pending using the updated checklist.
+
+### Recommended next step
+
+On the Raspberry Pi, grant and capture three temporary photos in one unchanged
+browser chat, verifying that every new grant succeeds once and an ungranted
+fourth request is refused.
+
 ## 2026-07-30 — Restartable Resume, deterministic Idle, and one-shot AI camera
 
 ### Summary

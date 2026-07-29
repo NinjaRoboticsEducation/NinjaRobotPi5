@@ -8,7 +8,7 @@ This checklist verifies:
 - web X Emergency Stop followed by terminal-chat `/resume`
 - distance, camera, and microphone restart in the same agent service
 - Greeting and Celebrate returning to looping Idle
-- one-shot AI camera permission from `/camera` and **AI camera**
+- repeatable one-photo AI camera permission from `/camera` and **AI camera**
 - the `3`, `2`, `1` countdown and animated camera icon
 - temporary preview cleanup and transcript redaction
 
@@ -138,7 +138,7 @@ Enter `/exit` to leave the terminal without stopping the service.
 Expected result: the display does not remain on the last Greeting frame. It
 starts the looping Idle face.
 
-### 4.4 Test one-shot AI camera
+### 4.4 Test repeatable one-photo AI camera grants
 
 First verify that camera permission is required:
 
@@ -169,14 +169,33 @@ Ask for another photo without pressing **AI camera** again.
 Expected result: the second capture is refused. Pressing **AI camera** grants
 exactly one new preview.
 
+Now prove that new grants work repeatedly in this same browser chat:
+
+1. Press **AI camera** again and approve the confirmation.
+2. Confirm the message reports a newer grant number.
+3. Ask: `Take a second temporary photo now.`
+4. Wait for the preview and for the button to turn off.
+5. Press **AI camera** a third time and approve the confirmation.
+6. Ask: `Take a third temporary photo now.`
+
+Expected result:
+
+- both newly authorized photos succeed without restarting the service,
+  refreshing the browser, or clearing the chat
+- the reported grant number increases each time
+- every successful photo turns **AI camera ready** off
+- requesting another photo without a fourth grant is refused
+- each completed request returns the display to looping Idle
+
 You can also grant from terminal chat:
 
 ```text
 /camera
 ```
 
-A failed camera attempt keeps the grant ready. A successful preview consumes
-it.
+A failed camera attempt keeps the current grant ready. A successful preview
+consumes only that numbered grant. Enter `/camera` again for the next photo;
+there is no one-photo-per-session limit.
 
 ### 4.5 Check that preview bytes were not retained
 
@@ -255,6 +274,8 @@ the robot and confirming all modules are healthy.
 - Emergency Stop presentation is not replaced by Idle before Resume.
 - AI camera access is separate from AI motion permission.
 - One successful temporary preview consumes exactly one camera grant.
+- A later explicit grant works in the same conversation and authorizes one
+  additional preview.
 - A failed preview does not consume the grant.
 - Preview JPEG bytes remain live-only and are not stored in transcripts or
   durable events.
@@ -275,6 +296,9 @@ the robot and confirming all modules are healthy.
 | Camera icon loops during capture |  |  |
 | Successful preview consumes the grant |  |  |
 | Second ungranted capture is refused |  |  |
+| Second grant succeeds in the same chat |  |  |
+| Third grant succeeds in the same chat |  |  |
+| Grant number increases for each permission |  |  |
 | Preview data is absent from retained state |  |  |
 | Raised-wheel Celebrate returns to Idle |  |  |
 | Chrome mobile flow passes |  |  |

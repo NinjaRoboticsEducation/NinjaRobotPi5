@@ -107,7 +107,20 @@ def test_one_shot_camera_grant_survives_failure_and_is_consumed_by_success() -> 
     with pytest.raises(PermissionError, match="explicit confirmation"):
         grants.grant("camera-session", confirmed=False, lease_id="lease-1")
 
-    grants.grant("camera-session", confirmed=True, lease_id="lease-1")
+    first_sequence = grants.grant(
+        "camera-session",
+        confirmed=True,
+        lease_id="lease-1",
+    )
+    assert first_sequence == 1
+    assert grants.status("camera-session", lease_id="lease-1") == {
+        "authorized_for_next_preview": True,
+        "captures_remaining": 1,
+        "capture_in_progress": False,
+        "current_grant_sequence": 1,
+        "last_issued_grant_sequence": 1,
+        "repeatable_after_user_regrant": True,
+    }
     assert policy.evaluate(camera, context).allowed
     assert not policy.evaluate(
         camera,
@@ -121,3 +134,20 @@ def test_one_shot_camera_grant_survives_failure_and_is_consumed_by_success() -> 
     assert grants.claim("camera-session", lease_id="lease-1")
     grants.finish("camera-session", lease_id="lease-1", succeeded=True)
     assert not grants.is_granted("camera-session", lease_id="lease-1")
+    assert grants.status("camera-session", lease_id="lease-1") == {
+        "authorized_for_next_preview": False,
+        "captures_remaining": 0,
+        "capture_in_progress": False,
+        "current_grant_sequence": None,
+        "last_issued_grant_sequence": 1,
+        "repeatable_after_user_regrant": True,
+    }
+
+    second_sequence = grants.grant(
+        "camera-session",
+        confirmed=True,
+        lease_id="lease-1",
+    )
+    assert second_sequence == 2
+    assert grants.is_granted("camera-session", lease_id="lease-1")
+    assert grants.status("camera-session", lease_id="lease-1")["current_grant_sequence"] == 2

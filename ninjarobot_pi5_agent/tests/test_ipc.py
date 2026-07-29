@@ -221,8 +221,18 @@ def test_ipc_allows_reconnect_stream_history_clear_arm_and_stop(tmp_path) -> Non
         )
         assert camera_grant["data"] == {
             "ai_camera_granted": True,
+            "authorized_for_next_preview": True,
             "captures_remaining": 1,
+            "grant_sequence": 1,
         }
+        second_camera_grant = await second_client.request(
+            {
+                "command": "grant_camera",
+                "session_id": "session-1",
+                "confirmed": True,
+            }
+        )
+        assert second_camera_grant["data"]["grant_sequence"] == 2
         camera_revoke = await second_client.request(
             {
                 "command": "revoke_camera",

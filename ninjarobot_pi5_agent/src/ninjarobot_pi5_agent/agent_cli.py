@@ -550,7 +550,8 @@ async def _chat_repl(arguments: argparse.Namespace, *, session_id: str) -> int:
             )
             print(
                 "AI camera access is ready for one temporary photo. "
-                "Ask NinjaRobot to take a photo; a failed capture keeps the grant available."
+                "Ask NinjaRobot to take a photo; a failed capture keeps the grant "
+                "available. After success, use /camera again for another photo."
             )
             continue
         if text == "/arm":

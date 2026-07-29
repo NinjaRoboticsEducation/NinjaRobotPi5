@@ -416,9 +416,14 @@ class WebRobotController:
     def disarm_chat_motion(self, lease_id: str) -> None:
         self._runtime.disarm_motion(self.chat_session(lease_id))
 
-    def grant_chat_camera(self, lease_id: str, *, confirmed: bool) -> None:
-        """Grant one temporary AI photo to the active browser chat."""
-        self._runtime.grant_camera(
+    def grant_chat_camera(
+        self,
+        lease_id: str,
+        *,
+        confirmed: bool,
+    ) -> dict[str, bool | int | None]:
+        """Grant one fresh temporary AI photo to the active browser chat."""
+        return self._runtime.grant_camera(
             self.chat_session(lease_id),
             confirmed=confirmed,
             lease_id=lease_id,

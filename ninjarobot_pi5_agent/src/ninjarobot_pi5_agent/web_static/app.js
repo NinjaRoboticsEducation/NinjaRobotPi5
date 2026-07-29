@@ -369,9 +369,9 @@
       return;
     }
     send("grant_chat_camera", { confirmed: true })
-      .then(() => {
+      .then((data) => {
         updateAiCamera(true);
-        toast("AI camera is ready for one photo.");
+        toast(`AI camera grant #${data.grant_sequence} is ready for one photo.`);
       })
       .catch(() => {});
   });
@@ -506,11 +506,12 @@
     }
     if (text === "/camera") {
       send("grant_chat_camera", { confirmed: true })
-        .then(() => {
+        .then((data) => {
           updateAiCamera(true);
           addMessage(
             "assistant",
-            "AI camera access is ready for one temporary photo. Ask me to take a photo.",
+            `AI camera grant #${data.grant_sequence} is ready for one temporary photo. ` +
+              "Ask me to take a photo. You can use /camera again after it succeeds.",
           );
         })
         .catch(() => {});

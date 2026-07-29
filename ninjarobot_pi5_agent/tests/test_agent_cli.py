@@ -98,6 +98,7 @@ def test_chat_camera_grants_one_temporary_capture(monkeypatch, capsys) -> None:
     output = capsys.readouterr().out
     assert "one temporary photo" in output
     assert "failed capture keeps the grant" in output
+    assert "use /camera again" in output
 
 
 def test_agent_cli_manages_tavily_configuration(tmp_path, capsys) -> None:

@@ -979,14 +979,18 @@ controller lease loss, model replacement, or service shutdown. Runtime
 disarm also cancels registered in-flight motion tokens and requests
 `robot.servo.stop`; it does not merely block the next tool call.
 
-`CameraGrantManager` separately owns one-shot AI camera consent. The grant is
-bound to the chat session and, for web use, its controller lease. Only
-`robot.camera.preview` can use it; retained capture remains protected by the
-normal privacy-confirmation path. The agent claims the grant immediately
-before capture, releases it after a failed attempt, and consumes it only after
-a successful preview has been published. The Base64 JPEG is sent through a
-non-retained live event and removed from the tool result before it enters the
-conversation transcript or returns to the model.
+`CameraGrantManager` separately owns repeatable one-photo AI camera consent.
+Each explicit `/camera` command or **AI camera** button press replaces any
+unused grant with a newly numbered grant for that chat session and, for web
+use, its controller lease. Only `robot.camera.preview` can use it; retained
+capture remains protected by the normal privacy-confirmation path. The agent
+claims the current grant immediately before capture, releases it after a failed
+attempt, and consumes it only after a successful preview has been published.
+Issuing another grant in the same conversation increments the sequence number.
+The trusted runtime state tells the model that a currently authorized newer
+grant overrides stale transcript messages about an older consumed grant. The
+Base64 JPEG is sent through a non-retained live event and removed from the tool
+result before it enters the conversation transcript or returns to the model.
 
 The model receives unambiguous trusted service facts:
 
@@ -1119,11 +1123,14 @@ After web recovery, deterministic D-pad control is reactivated for the active
 lease, but the separate AI chat session remains disarmed until the operator
 uses **Arm AI Motion**. Terminal users likewise run `/arm` after `/resume`.
 
-Terminal and web chat also intercept `/camera` locally. It grants one temporary
-preview without sending the slash command to Ollama. The robot presentation
-boundary displays a three-second countdown followed by an animated camera
-icon. After the tool finishes, the normal agent lifecycle continues through
-Thinking or Speaking and ends in Idle.
+Terminal and web chat also intercept `/camera` locally. Every invocation grants
+one new temporary preview without sending the slash command to Ollama. The IPC
+(inter-process communication) and web responses include the new grant sequence
+number. The robot presentation boundary displays a three-second countdown
+followed by an animated camera icon. After the tool finishes, the normal agent
+lifecycle continues through Thinking or Speaking and ends in Idle. A successful
+preview consumes only that numbered grant; the user can invoke `/camera` again
+immediately in the same conversation.
 
 Conversation presentation also stays behind `RobotIDEClient`. The agent may
 request only silent ambient faces; it never receives a display driver.

@@ -2464,6 +2464,48 @@ accessible Emergency Stop.
 Update the core project documents and
 `docs/validation/phase-5-recovery-idle-camera-validation-2026-07-30.md`.
 
+#### Phase 5.14 — Repeatable one-photo AI camera grants
+
+**Status**
+
+Implemented on 2026-07-30. Automated validation passes; repeatable physical
+camera acceptance remains operator work.
+
+**Objective**
+
+Allow the user to issue a new one-photo camera grant after every successful
+preview without restarting, clearing, or replacing the active chat session.
+
+**Deliverables**
+
+- Monotonically numbered camera grants per chat session.
+- Trusted runtime facts for the current grant, remaining captures, in-flight
+  state, and last issued sequence.
+- Prompt rules that make a fresh runtime grant override stale assistant text
+  about an older consumed grant.
+- An explicit requirement to use `robot.camera.preview`, never retained
+  `robot.camera.capture`, for this authorization.
+- IPC and web responses that report the fresh grant number.
+- Same-conversation regression coverage for two independently authorized
+  successful previews.
+
+**Validation**
+
+- Immutable managed drivers remain unchanged.
+- Compilation, Ruff, formatting, strict MyPy, and the full pytest suite pass.
+- Tests cover successful consumption, failure retry, lease binding, sequence
+  increments, repeated grants, and JPEG redaction.
+
+**Hardware risk**
+
+Each accepted grant takes one real photograph. It does not move an actuator or
+retain a file, but everyone in view must consent before each capture.
+
+**Documentation**
+
+Update the core project documents and the Phase 5 recovery, Idle, and AI camera
+validation checklist with a three-grant same-session acceptance test.
+
 ### Phase 6: Cloud provider adapters
 
 **Objective**

@@ -187,7 +187,9 @@ overwriting an existing or bundled behavior. Microphone operations and retained
 camera files keep separate privacy confirmation. Entering `/camera` or pressing
 **AI camera** grants the active chat one temporary, non-retained photograph.
 The grant remains available after a failed attempt and is consumed only after a
-successful preview is delivered.
+successful preview is delivered. Each later `/camera` command or button press
+issues a fresh numbered grant, so the same chat can take as many photos as the
+user explicitly authorizes—one grant and one photo at a time.
 
 The agent is also an MCP host. MCP means Model Context Protocol, a standard
 connection for separately installed tools. The official hosted Tavily MCP
@@ -206,8 +208,8 @@ returns a correctable `BEHAVIOR_DRAFT_INVALID` error before touching hardware
 when a field is invalid.
 
 The HTTPS controller provides direct D-pad movement, Level 2 Emergency Stop,
-confirmed Resume, Greeting, Celebrate, direct temporary camera preview, one-shot
-AI camera access, local
+confirmed Resume, Greeting, Celebrate, direct temporary camera preview,
+repeatable one-photo AI camera access, local
 whisper.cpp USB-microphone transcription, English/Japanese browser speech
 recognition, AI chat, and live events. A second browser receives `423 Locked`.
 Missed heartbeats revoke the lease and request a motor stop without waiting for
@@ -376,7 +378,8 @@ To authorize one AI photo, enter `/camera` or press **AI camera**, then ask the
 agent to take a photograph. A successful capture appears in the temporary web
 preview and consumes the grant. A failed capture keeps the same grant so the
 operator can correct the camera and try again. Retained files are never created
-by this one-shot path.
+by this one-photo path. After a successful photo, enter `/camera` or press
+**AI camera** again to issue a new grant in the same chat session.
 
 Quitting a CLI disconnects only that terminal. Use `web stop` to stop the web
 interface and `service stop` to release the model, IDE, hardware, MCP, database,

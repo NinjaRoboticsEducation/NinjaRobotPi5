@@ -172,14 +172,20 @@ class AgentRuntime:
         *,
         confirmed: bool,
         lease_id: str | None = None,
-    ) -> None:
-        """Grant the model one temporary, non-retained camera preview."""
+    ) -> dict[str, bool | int | None]:
+        """Grant the model one fresh temporary, non-retained camera preview."""
         self._ensure_started()
-        self.camera_grants.grant(
+        sequence = self.camera_grants.grant(
             session_id,
             confirmed=confirmed,
             lease_id=lease_id,
         )
+        return {
+            "ai_camera_granted": True,
+            "authorized_for_next_preview": True,
+            "captures_remaining": 1,
+            "grant_sequence": sequence,
+        }
 
     def revoke_camera(self, session_id: str) -> None:
         """Revoke one session's pending or active camera grant."""

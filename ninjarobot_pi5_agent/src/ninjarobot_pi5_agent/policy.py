@@ -35,14 +35,16 @@ class _MotionArm:
 @dataclass(slots=True)
 class _CameraGrant:
     lease_id: str | None
+    sequence: int
     claimed: bool = False
 
 
 class CameraGrantManager:
-    """Hold one-shot consent for a temporary AI camera preview."""
+    """Hold repeatable one-photo consents for temporary AI camera previews."""
 
     def __init__(self) -> None:
         self._grants: dict[str, _CameraGrant] = {}
+        self._last_sequences: dict[str, int] = {}
 
     def grant(
         self,
@@ -50,11 +52,42 @@ class CameraGrantManager:
         *,
         confirmed: bool,
         lease_id: str | None = None,
-    ) -> None:
-        """Grant one preview only after an explicit user action."""
+    ) -> int:
+        """Issue a fresh one-photo grant after an explicit user action."""
         if not confirmed:
             raise PermissionError("explicit confirmation is required for AI camera access")
-        self._grants[session_id] = _CameraGrant(lease_id=lease_id)
+        sequence = self._last_sequences.get(session_id, 0) + 1
+        self._last_sequences[session_id] = sequence
+        self._grants[session_id] = _CameraGrant(
+            lease_id=lease_id,
+            sequence=sequence,
+        )
+        return sequence
+
+    def status(
+        self,
+        session_id: str,
+        *,
+        lease_id: str | None = None,
+    ) -> dict[str, bool | int | None]:
+        """Return trusted facts about the current and most recent grant."""
+        grant = self._grants.get(session_id)
+        matching_grant = (
+            grant
+            if grant is not None and (grant.lease_id is None or grant.lease_id == lease_id)
+            else None
+        )
+        authorized = matching_grant is not None and not matching_grant.claimed
+        return {
+            "authorized_for_next_preview": authorized,
+            "captures_remaining": 1 if authorized else 0,
+            "capture_in_progress": (matching_grant is not None and matching_grant.claimed),
+            "current_grant_sequence": (
+                matching_grant.sequence if matching_grant is not None else None
+            ),
+            "last_issued_grant_sequence": self._last_sequences.get(session_id),
+            "repeatable_after_user_regrant": True,
+        }
 
     def is_granted(self, session_id: str, *, lease_id: str | None = None) -> bool:
         """Return whether an unused matching grant is available."""
@@ -103,6 +136,7 @@ class CameraGrantManager:
     def revoke_all(self) -> None:
         """Revoke all grants during shutdown or model replacement."""
         self._grants.clear()
+        self._last_sequences.clear()
 
 
 class MotionArmManager:

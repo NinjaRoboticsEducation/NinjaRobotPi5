@@ -238,7 +238,7 @@ class AgentIPCServer:
             return
         if command == "grant_camera":
             session_id = _required_text(payload, "session_id")
-            self._runtime.grant_camera(
+            grant_result = self._runtime.grant_camera(
                 session_id,
                 confirmed=payload.get("confirmed") is True,
                 lease_id=_optional_text(payload, "lease_id"),
@@ -247,7 +247,7 @@ class AgentIPCServer:
                 writer,
                 {
                     "type": "result",
-                    "data": {"ai_camera_granted": True, "captures_remaining": 1},
+                    "data": grant_result,
                 },
             )
             return

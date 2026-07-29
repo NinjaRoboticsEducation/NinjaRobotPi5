@@ -148,21 +148,14 @@ async def run_service(arguments: argparse.Namespace) -> None:
     camera_grants = CameraGrantManager()
     events = EventBroker()
     policy = PolicyEngine(arms, camera_grants)
-    loop = AgentLoop(
-        provider=model,
-        tools=tools,
-        policy=policy,
-        recovery=RecoveryPolicy(),
-        store=store,
-        prompts=PromptComposer(),
-        events=events,
-        config=AgentLoopConfig(
-            max_model_turns=config.agent.max_model_turns,
-            max_tool_calls=config.agent.max_tool_calls,
-            request_timeout_seconds=config.agent.request_timeout_seconds,
-            model_inactivity_timeout_seconds=(config.agent.model_inactivity_timeout_seconds),
-        ),
-        runtime_state=lambda session_id, lease_id: {
+
+    def runtime_state(
+        session_id: str,
+        lease_id: str | None,
+    ) -> dict[str, object]:
+        camera_status = camera_grants.status(session_id, lease_id=lease_id)
+        camera_authorized = bool(camera_status["authorized_for_next_preview"])
+        return {
             "session_id": session_id,
             "controller_lease": lease_id,
             "execution_mode": "real" if arguments.real else "simulation",
@@ -177,18 +170,34 @@ async def run_service(arguments: argparse.Namespace) -> None:
             },
             "motion_armed": arms.is_armed(session_id, lease_id=lease_id),
             "ai_camera": {
-                "one_shot_granted": camera_grants.is_granted(
-                    session_id,
-                    lease_id=lease_id,
-                ),
+                **camera_status,
                 "meaning": (
-                    "robot.camera.preview may capture one temporary photo"
-                    if camera_grants.is_granted(session_id, lease_id=lease_id)
-                    else "AI camera capture is not authorized"
+                    "The newest numbered grant authorizes robot.camera.preview "
+                    "to capture one temporary photo now."
+                    if camera_authorized
+                    else "AI camera preview is not currently authorized. The user "
+                    "may issue another one-photo grant in this same session."
                 ),
+                "required_tool": "robot.camera.preview",
             },
             "simulated": not arguments.real,
-        },
+        }
+
+    loop = AgentLoop(
+        provider=model,
+        tools=tools,
+        policy=policy,
+        recovery=RecoveryPolicy(),
+        store=store,
+        prompts=PromptComposer(),
+        events=events,
+        config=AgentLoopConfig(
+            max_model_turns=config.agent.max_model_turns,
+            max_tool_calls=config.agent.max_tool_calls,
+            request_timeout_seconds=config.agent.request_timeout_seconds,
+            model_inactivity_timeout_seconds=(config.agent.model_inactivity_timeout_seconds),
+        ),
+        runtime_state=runtime_state,
         presentation=RobotPresentationController(ide),
     )
     runtime = AgentRuntime(

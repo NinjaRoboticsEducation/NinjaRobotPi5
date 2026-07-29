@@ -504,8 +504,7 @@ async def _dispatch_web_message(
     if kind == "grant_chat_camera":
         if message.get("confirmed") is not True:
             raise PermissionError("AI camera access requires explicit confirmation")
-        controller.grant_chat_camera(lease_id, confirmed=True)
-        return {"ai_camera_granted": True, "captures_remaining": 1}
+        return controller.grant_chat_camera(lease_id, confirmed=True)
     if kind == "revoke_chat_camera":
         controller.revoke_chat_camera(lease_id)
         return {"ai_camera_granted": False, "captures_remaining": 0}
