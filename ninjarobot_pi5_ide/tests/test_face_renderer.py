@@ -59,6 +59,12 @@ def test_every_face_loop_has_time_varying_frames(expression: str) -> None:
     assert digest(frame(expression, 0.1)) != digest(frame(expression, 0.85))
 
 
+def test_private_camera_indicator_is_animated_but_not_in_the_emotion_catalog() -> None:
+    assert "camera" not in FACE_EXPRESSIONS
+    assert normalize_face_name("camera") == "camera"
+    assert digest(frame("camera", 0.1)) != digest(frame("camera", 0.85))
+
+
 def test_invalid_face_and_frame_arguments_are_rejected() -> None:
     with pytest.raises(ValueError, match="unknown face"):
         frame("not-a-face")

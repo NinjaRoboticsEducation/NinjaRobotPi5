@@ -66,7 +66,13 @@ from .ollama import (
     OllamaUnavailableError,
 )
 from .persistence import ConversationStore, StoredMessage
-from .policy import MotionArmManager, PolicyContext, PolicyDecision, PolicyEngine
+from .policy import (
+    CameraGrantManager,
+    MotionArmManager,
+    PolicyContext,
+    PolicyDecision,
+    PolicyEngine,
+)
 from .presentation import (
     EMOTION_FACES,
     NullPresentationController,
@@ -120,6 +126,7 @@ __all__ = [
     "MCPToolProvider",
     "MCPTransport",
     "MCPUnavailableError",
+    "CameraGrantManager",
     "IDENTITY_PROMPT",
     "IMMUTABLE_SAFETY_PROMPT",
     "LLMProvider",

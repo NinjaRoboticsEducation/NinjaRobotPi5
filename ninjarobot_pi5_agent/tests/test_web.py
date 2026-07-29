@@ -365,6 +365,11 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert "certificate-status" in javascript
     assert 'if (text === "/resume")' in javascript
     assert 'send("resume", { confirmed: true })' in javascript
+    assert 'id="armAiCameraButton"' in html
+    assert 'if (text === "/camera")' in javascript
+    assert 'send("grant_chat_camera", { confirmed: true })' in javascript
+    assert 'event.event_type === "media"' in javascript
+    assert "showCameraPreview(event.data.jpeg_base64)" in javascript
     assert "AI motion remains disarmed" in javascript
     assert "updateAiMotion(false)" in javascript
     assert (static / "manifest.webmanifest").is_file()

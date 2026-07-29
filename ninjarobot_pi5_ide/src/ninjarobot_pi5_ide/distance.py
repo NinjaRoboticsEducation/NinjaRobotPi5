@@ -152,6 +152,16 @@ class VL53L0XDistanceAdapter:
                 return ResourceHealth.UNAVAILABLE
         return ResourceHealth.READY if healthy else ResourceHealth.DEGRADED
 
+    async def suspend(self) -> None:
+        """Release I2C resources while allowing a later start."""
+        async with self._lock:
+            if self._closed:
+                return
+            sensor, self._sensor = self._sensor, None
+            self._startup_error = None
+            if sensor is not None:
+                await asyncio.to_thread(sensor.close)
+
     async def close(self) -> None:
         """Close the managed sensor safely and idempotently."""
         async with self._lock:

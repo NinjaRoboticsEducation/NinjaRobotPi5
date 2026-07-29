@@ -23,6 +23,7 @@
   const elements = {
     badge: document.querySelector("#connectionBadge"),
     armAi: document.querySelector("#armAiButton"),
+    armAiCamera: document.querySelector("#armAiCameraButton"),
     chatMessages: document.querySelector("#chatMessages"),
     chatForm: document.querySelector("#chatForm"),
     chatInput: document.querySelector("#chatInput"),
@@ -122,6 +123,7 @@
       window.clearInterval(state.heartbeatTimer);
       state.heartbeatTimer = null;
       state.leaseId = null;
+      updateAiCamera(false);
       setConnection(event.code === 4423 ? "Controller locked" : "Disconnected", "badge-wait");
       log(
         event.code === 4423
@@ -189,6 +191,14 @@
     }
     if (message.type === "event") {
       const event = message.event || {};
+      if (
+        event.event_type === "media" &&
+        event.data?.kind === "camera_preview" &&
+        typeof event.data?.jpeg_base64 === "string"
+      ) {
+        showCameraPreview(event.data.jpeg_base64);
+        updateAiCamera(false);
+      }
       log(event.message || "Agent event", event.event_type === "error" ? "error" : "info");
       return;
     }
@@ -278,6 +288,7 @@
     send("emergency_stop")
       .then(() => {
         updateAiMotion(false);
+        updateAiCamera(false);
         toast("Emergency stop completed.");
       })
       .catch(() => {});
@@ -342,16 +353,50 @@
     button.setAttribute("aria-pressed", String(armed));
   }
 
-  document.querySelector("#cameraButton").addEventListener("click", () => {
-    send("camera")
-      .then((data) => {
-        elements.cameraImage.src = `data:image/jpeg;base64,${data.jpeg_base64}`;
-        elements.preview.classList.remove("hidden");
-        window.clearTimeout(state.previewTimer);
-        state.previewTimer = window.setTimeout(clearPreview, 15000);
+  document.querySelector("#armAiCameraButton").addEventListener("click", (event) => {
+    const granted = event.currentTarget.dataset.granted === "true";
+    if (granted) {
+      send("revoke_chat_camera")
+        .then(() => updateAiCamera(false))
+        .catch(() => {});
+      return;
+    }
+    if (
+      !window.confirm(
+        "Allow NinjaRobotAgent to take one temporary photo? The photo is not retained.",
+      )
+    ) {
+      return;
+    }
+    send("grant_chat_camera", { confirmed: true })
+      .then(() => {
+        updateAiCamera(true);
+        toast("AI camera is ready for one photo.");
       })
       .catch(() => {});
   });
+
+  function updateAiCamera(granted) {
+    const button = elements.armAiCamera;
+    button.dataset.granted = String(granted);
+    button.textContent = granted ? "AI camera ready" : "AI camera";
+    button.setAttribute("aria-pressed", String(granted));
+  }
+
+  document.querySelector("#cameraButton").addEventListener("click", () => {
+    send("camera")
+      .then((data) => {
+        showCameraPreview(data.jpeg_base64);
+      })
+      .catch(() => {});
+  });
+
+  function showCameraPreview(jpegBase64) {
+    elements.cameraImage.src = `data:image/jpeg;base64,${jpegBase64}`;
+    elements.preview.classList.remove("hidden");
+    window.clearTimeout(state.previewTimer);
+    state.previewTimer = window.setTimeout(clearPreview, 15000);
+  }
 
   function clearPreview() {
     window.clearTimeout(state.previewTimer);
@@ -457,6 +502,18 @@
     addMessage("user", text);
     if (text === "/resume") {
       resumeRobot(true).catch(() => {});
+      return;
+    }
+    if (text === "/camera") {
+      send("grant_chat_camera", { confirmed: true })
+        .then(() => {
+          updateAiCamera(true);
+          addMessage(
+            "assistant",
+            "AI camera access is ready for one temporary photo. Ask me to take a photo.",
+          );
+        })
+        .catch(() => {});
       return;
     }
     send("chat", { text }).catch(() => {});

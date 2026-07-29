@@ -62,6 +62,7 @@ class FakeDistance:
         self.index = 0
         self.start_calls = 0
         self.close_calls = 0
+        self.suspend_calls = 0
 
     async def start(self) -> None:
         self.start_calls += 1
@@ -80,6 +81,9 @@ class FakeDistance:
     async def close(self) -> None:
         self.close_calls += 1
 
+    async def suspend(self) -> None:
+        self.suspend_calls += 1
+
 
 def out_of_range() -> IDEError:
     return IDEError(
@@ -94,12 +98,12 @@ def out_of_range() -> IDEError:
     )
 
 
-class FakeClosable:
+class FakeSuspendable:
     def __init__(self) -> None:
-        self.close_calls = 0
+        self.suspend_calls = 0
 
-    async def close(self) -> None:
-        self.close_calls += 1
+    async def suspend(self) -> None:
+        self.suspend_calls += 1
 
 
 def behavior_config(tmp_path: Path, **updates: Any) -> BehaviorConfig:
@@ -353,7 +357,7 @@ def test_missing_readings_do_not_block_motion_start_or_latch(tmp_path: Path) -> 
     asyncio.run(exercise())
 
 
-def test_full_stop_closes_sensors_and_driver_failure_latches_system(
+def test_full_stop_suspends_sensors_and_driver_failure_latches_system(
     tmp_path: Path,
 ) -> None:
     async def exercise() -> None:
@@ -361,8 +365,8 @@ def test_full_stop_closes_sensors_and_driver_failure_latches_system(
             tmp_path,
             readings=[200],
         )
-        camera = FakeClosable()
-        microphone = FakeClosable()
+        camera = FakeSuspendable()
+        microphone = FakeSuspendable()
         calls: list[str] = []
 
         async def silence() -> None:
@@ -386,9 +390,9 @@ def test_full_stop_closes_sensors_and_driver_failure_latches_system(
         assert result["cleanup_errors"] == []
         assert state.read().system_latched is True
         assert servo.stop_calls == 1
-        assert distance.close_calls == 1
-        assert camera.close_calls == 1
-        assert microphone.close_calls == 1
+        assert distance.suspend_calls == 1
+        assert camera.suspend_calls == 1
+        assert microphone.suspend_calls == 1
         assert calls == ["silence", "display"]
         with pytest.raises(ValueError, match="explicit confirmation"):
             await system.resume_system(confirmed=False, health_checks=())

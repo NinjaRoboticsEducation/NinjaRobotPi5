@@ -34,11 +34,11 @@ class DistanceReader(Protocol):
         """Stop ranging and release I2C."""
 
 
-class AsyncClosable(Protocol):
-    """Device that can be closed during a full system stop."""
+class AsyncSuspendable(Protocol):
+    """Device that can release active resources and later be restarted."""
 
-    async def close(self) -> None:
-        """Release the device."""
+    async def suspend(self) -> None:
+        """Release active resources without ending the device lifecycle."""
 
 
 class MotionSafetyError(RuntimeError):
@@ -455,7 +455,7 @@ class SystemSafetyController:
         state: SafetyStateStore,
         silence_buzzer: FullStopCallback,
         show_stopped: FullStopCallback,
-        sensors: Sequence[AsyncClosable],
+        sensors: Sequence[AsyncSuspendable],
         display_hold_seconds: float = 2.0,
     ) -> None:
         self._motion = motion
@@ -482,7 +482,7 @@ class SystemSafetyController:
             results = await asyncio.gather(
                 self._motion.stop_motion(reason, latch=False),
                 self._silence_buzzer(),
-                *(sensor.close() for sensor in self._sensors),
+                *(sensor.suspend() for sensor in self._sensors),
                 return_exceptions=True,
             )
             try:

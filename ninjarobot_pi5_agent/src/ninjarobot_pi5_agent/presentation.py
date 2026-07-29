@@ -39,6 +39,9 @@ class AgentFaceClient(Protocol):
     async def restore_idle_face(self) -> bool:
         """Restore the normal silent idle face."""
 
+    async def show_camera_capture(self) -> bool:
+        """Show a privacy-visible countdown and camera icon."""
+
 
 class PresentationController(Protocol):
     """Conversation lifecycle presentation surface."""
@@ -91,7 +94,10 @@ class RobotPresentationController:
         await self._client.show_agent_face(face or "speaking")
 
     async def action_started(self, tool_name: str) -> None:
-        await self._client.show_agent_face("curious")
+        if tool_name == "robot.camera.preview":
+            await self._client.show_camera_capture()
+        else:
+            await self._client.show_agent_face("curious")
 
     async def action_finished(self, tool_name: str) -> None:
         await self._client.show_agent_face("thinking")

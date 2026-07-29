@@ -414,6 +414,19 @@ class AgentLoop:
                 status=ToolExecutionStatus.DENIED,
                 error=decision.reason,
             )
+        camera_claimed = False
+        if call.name == "robot.camera.preview" and not confirmed:
+            camera_claimed = self._policy.camera_grants.claim(
+                session_id,
+                lease_id=lease_id,
+            )
+            if not camera_claimed:
+                return ToolExecutionResult(
+                    call_id=call.call_id,
+                    tool_name=call.name,
+                    status=ToolExecutionStatus.DENIED,
+                    error="The one-shot AI camera grant is unavailable or already in use.",
+                )
         invocation = ToolInvocation(
             call=call,
             session_id=session_id,
@@ -424,6 +437,17 @@ class AgentLoop:
             lambda: self._presentation.action_started(call.name),
             session_id=session_id,
         )
+        if camera_claimed and not self._policy.camera_grants.claim_is_active(
+            session_id,
+            lease_id=lease_id,
+        ):
+            return ToolExecutionResult(
+                call_id=call.call_id,
+                tool_name=call.name,
+                status=ToolExecutionStatus.DENIED,
+                error="AI camera access was revoked before capture began.",
+            )
+        camera_preview_delivered = False
         try:
             result = await self._tools.call(invocation, cancellation)
             recovery = self._recovery.decide(
@@ -433,7 +457,47 @@ class AgentLoop:
             )
             if recovery.action is RecoveryAction.RETRY:
                 result = await self._tools.call(invocation, cancellation)
+            if (
+                call.name == "robot.behavior.stop"
+                and result.status is ToolExecutionStatus.SUCCEEDED
+            ):
+                self._policy.camera_grants.revoke(session_id)
+            if (
+                call.name == "robot.camera.preview"
+                and result.status is ToolExecutionStatus.SUCCEEDED
+                and isinstance(result.data, dict)
+            ):
+                preview = result.data.get("jpeg_base64")
+                camera_preview_delivered = (
+                    result.data.get("captured") is True
+                    and isinstance(preview, str)
+                    and bool(preview)
+                )
+                if camera_preview_delivered:
+                    await self._events.publish(
+                        AgentEventType.MEDIA,
+                        "Temporary AI camera preview is ready.",
+                        session_id=session_id,
+                        correlation_id=call.call_id,
+                        data={
+                            "kind": "camera_preview",
+                            "jpeg_base64": preview,
+                            "width": result.data.get("width"),
+                            "height": result.data.get("height"),
+                            "format": result.data.get("format"),
+                        },
+                        retain=False,
+                    )
+                safe_data = dict(result.data)
+                safe_data.pop("jpeg_base64", None)
+                result = result.model_copy(update={"data": safe_data})
         finally:
+            if camera_claimed:
+                self._policy.camera_grants.finish(
+                    session_id,
+                    lease_id=lease_id,
+                    succeeded=camera_preview_delivered,
+                )
             await self._present(
                 "thinking",
                 lambda: self._presentation.action_finished(call.name),

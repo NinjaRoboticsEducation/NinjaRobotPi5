@@ -39,6 +39,8 @@ from .simulation import (
     simulated_servo_runtime,
 )
 
+CAMERA_COUNTDOWN_INTERVAL_SECONDS = 1.0
+
 
 class RobotAssembly:
     """Share configured device instances across all integrated behavior work."""
@@ -178,6 +180,7 @@ class RobotAssembly:
         self._foreground_behaviors = 0
         self._idle_task: asyncio.Task[None] | None = None
         self._idle_lock = asyncio.Lock()
+        self._idle_error: str | None = None
         self._closing = False
 
     async def start(self) -> None:
@@ -215,15 +218,45 @@ class RobotAssembly:
         self._ambient_face = face
         await self._stop_idle()
         await self._start_idle_if_safe()
-        return not self.system_safety.stopped
+        return (
+            not self.system_safety.stopped
+            and self._idle_task is not None
+            and not self._idle_task.done()
+        )
 
     async def restore_idle_face(self) -> bool:
         """Restore the normal silent idle loop after an agent interaction."""
         return await self.show_agent_face("idle")
 
+    async def show_camera_capture(self) -> bool:
+        """Count down clearly, then loop the camera icon during capture."""
+        if self.system_safety.stopped:
+            return False
+        self._ambient_face = "camera"
+        await self._stop_idle()
+        for count in ("3", "2", "1"):
+            if self.system_safety.stopped:
+                return False
+            await self.display.show_text(
+                text=count,
+                font_size=128,
+                foreground="#FFFFFF",
+                background="#00152E",
+            )
+            await asyncio.sleep(CAMERA_COUNTDOWN_INTERVAL_SECONDS)
+        await self._start_idle_if_safe()
+        return (
+            not self.system_safety.stopped
+            and self._idle_task is not None
+            and not self._idle_task.done()
+        )
+
     async def health(self) -> dict[str, str]:
         """Return integrated expression component health."""
-        return await self.behaviors.health()
+        health = await self.behaviors.health()
+        if self._liveliness_enabled:
+            health["idle"] = "degraded" if self._idle_error is not None else "ready"
+        return health
 
     async def stop(self) -> dict[str, Any]:
         """Perform a non-latching full stop requested by the operator."""
@@ -294,6 +327,7 @@ class RobotAssembly:
             if self._idle_task is not None and not self._idle_task.done():
                 return
             definition = self._silent_face_definition(self._ambient_face)
+            self._idle_error = None
             self._idle_task = asyncio.create_task(
                 self._run_idle(definition),
                 name=f"ninjarobot-silent-{self._ambient_face}",
@@ -308,6 +342,8 @@ class RobotAssembly:
     async def _end_foreground_behavior(self) -> None:
         async with self._idle_lock:
             self._foreground_behaviors = max(0, self._foreground_behaviors - 1)
+            if self._foreground_behaviors == 0:
+                self._ambient_face = "idle"
         await self._start_idle_if_safe()
 
     async def _run_idle(self, definition: BehaviorDefinition) -> None:
@@ -316,7 +352,8 @@ class RobotAssembly:
             await self.behaviors.run(definition)
         except asyncio.CancelledError:
             raise
-        except Exception:
+        except Exception as exc:
+            self._idle_error = f"{type(exc).__name__}: {exc}"
             return
         finally:
             async with self._idle_lock:
@@ -334,13 +371,23 @@ class RobotAssembly:
         await asyncio.gather(task, return_exceptions=True)
 
     def _silent_face_definition(self, expression: str) -> BehaviorDefinition:
-        configured = self.assets.load(expression)
-        source = next(
-            operation
-            for stage in configured.stages
-            for operation in stage.operations
-            if isinstance(operation, FaceOperation)
-        )
+        if expression == "camera":
+            source = FaceOperation(
+                kind="face",
+                expression="camera",
+                background="#00152E",
+                foreground="#FFFFFF",
+                accent="#00BFFF",
+                hold_seconds=None,
+            )
+        else:
+            configured = self.assets.load(expression)
+            source = next(
+                operation
+                for stage in configured.stages
+                for operation in stage.operations
+                if isinstance(operation, FaceOperation)
+            )
         return BehaviorDefinition(
             schema_version=1,
             name=f"agent_{expression}",
@@ -379,7 +426,10 @@ class RobotAssembly:
     async def _expression_health(self) -> bool:
         await self.behaviors.start()
         health = await self.behaviors.health()
-        return all(value == ResourceHealth.READY.value for value in health.values())
+        return all(
+            health.get(component) == ResourceHealth.READY.value
+            for component in ("display", "buzzer")
+        )
 
     async def _servo_health(self) -> bool:
         await self.servo.start()

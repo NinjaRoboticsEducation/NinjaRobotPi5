@@ -830,6 +830,24 @@ Emergency Stop latch clears and Idle returns. AI motion remains disarmed, so
 enter `/arm` or use **Arm AI Motion** separately before asking the model to
 move a servo.
 
+To allow one AI-controlled photograph, enter:
+
+```text
+/camera
+```
+
+In the web interface, you can press **AI camera** instead. Then ask:
+
+```text
+Take one photo now.
+```
+
+The robot display counts down `3`, `2`, `1`, then shows an animated camera
+icon while capturing. The temporary photograph appears in the web preview and
+is not retained on disk. A successful preview uses the permission. If capture
+fails, the permission remains ready so you can correct the camera problem and
+try again.
+
 Try a non-moving creative expression first:
 
 ```text
@@ -873,8 +891,13 @@ uv run --frozen ninjarobot-agent motion disarm \
   --session dynamic-test
 ```
 
-`--confirmed` approves sensitive work only for that one chat request. Camera
-and microphone actions still need their separate privacy confirmation.
+`--confirmed` approves sensitive work only for that one chat request.
+Microphone actions and retained camera files still need separate privacy
+confirmation. Temporary AI camera preview can instead use the one-shot
+`/camera` permission documented above.
+
+For the complete recovery, Idle, and AI camera test sequence, follow the
+[Phase 5 recovery, Idle, and AI camera validation guide](docs/validation/phase-5-recovery-idle-camera-validation-2026-07-30.md).
 Generated definitions cannot contain GPIO numbers or file paths; movement uses
 configured logical roles such as `left_motor` and `right_motor`.
 

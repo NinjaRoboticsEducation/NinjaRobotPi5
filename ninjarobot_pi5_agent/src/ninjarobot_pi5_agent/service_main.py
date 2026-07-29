@@ -23,7 +23,7 @@ from .model_selection import (
 )
 from .ollama import OllamaConfig, OllamaProvider
 from .persistence import ConversationStore
-from .policy import MotionArmManager, PolicyEngine
+from .policy import CameraGrantManager, MotionArmManager, PolicyEngine
 from .presentation import RobotPresentationController
 from .prompts import PromptComposer
 from .recovery import RecoveryPolicy
@@ -145,8 +145,9 @@ async def run_service(arguments: argparse.Namespace) -> None:
     )
     store = ConversationStore(arguments.database, retention_days=7)
     arms = MotionArmManager()
+    camera_grants = CameraGrantManager()
     events = EventBroker()
-    policy = PolicyEngine(arms)
+    policy = PolicyEngine(arms, camera_grants)
     loop = AgentLoop(
         provider=model,
         tools=tools,
@@ -175,6 +176,17 @@ async def run_service(arguments: argparse.Namespace) -> None:
                 ),
             },
             "motion_armed": arms.is_armed(session_id, lease_id=lease_id),
+            "ai_camera": {
+                "one_shot_granted": camera_grants.is_granted(
+                    session_id,
+                    lease_id=lease_id,
+                ),
+                "meaning": (
+                    "robot.camera.preview may capture one temporary photo"
+                    if camera_grants.is_granted(session_id, lease_id=lease_id)
+                    else "AI camera capture is not authorized"
+                ),
+            },
             "simulated": not arguments.real,
         },
         presentation=RobotPresentationController(ide),

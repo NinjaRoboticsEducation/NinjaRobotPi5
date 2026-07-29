@@ -20,7 +20,10 @@
         <section class="panel controls-panel" aria-label="Direct robot controls">
           <div class="control-status">
             <span id="connectionBadge" class="badge badge-wait">Not connected</span>
-            <button id="armAiButton" class="small-button motion-arm" aria-pressed="false">Arm AI motion</button>
+            <div class="ai-permissions">
+              <button id="armAiButton" class="small-button motion-arm" aria-pressed="false">Arm AI motion</button>
+              <button id="armAiCameraButton" class="small-button camera-arm" aria-pressed="false">AI camera</button>
+            </div>
           </div>
 
           <div class="dpad" aria-label="Movement controls">

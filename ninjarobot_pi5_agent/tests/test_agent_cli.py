@@ -73,6 +73,33 @@ def test_chat_resume_cancellation_sends_no_service_request(monkeypatch, capsys) 
     assert "System resume was cancelled." in capsys.readouterr().out
 
 
+def test_chat_camera_grants_one_temporary_capture(monkeypatch, capsys) -> None:
+    inputs = iter(("/camera", "/exit"))
+    monkeypatch.setattr("builtins.input", lambda _prompt="": next(inputs))
+    service_request = AsyncMock(return_value=0)
+    monkeypatch.setattr(agent_cli, "_service_request", service_request)
+
+    result = asyncio.run(
+        agent_cli._chat_repl(  # noqa: SLF001
+            SimpleNamespace(),
+            session_id="local-cli",
+        )
+    )
+
+    assert result == 0
+    service_request.assert_awaited_once_with(
+        SimpleNamespace(),
+        {
+            "command": "grant_camera",
+            "session_id": "local-cli",
+            "confirmed": True,
+        },
+    )
+    output = capsys.readouterr().out
+    assert "one temporary photo" in output
+    assert "failed capture keeps the grant" in output
+
+
 def test_agent_cli_manages_tavily_configuration(tmp_path, capsys) -> None:
     config = tmp_path / "mcp.toml"
     secrets = tmp_path / "secrets.env"

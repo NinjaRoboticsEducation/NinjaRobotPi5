@@ -1,5 +1,64 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-30 — Restartable Resume, deterministic Idle, and one-shot AI camera
+
+### Summary
+
+Repaired three Phase 5 issues found during physical testing:
+
+- Level 2 Emergency Stop now suspends the distance sensor, camera, and
+  microphone instead of permanently closing their IDE adapters. `/resume` and
+  web Y can restart and health-check those devices in the same agent service.
+- Every normally completed foreground behavior resets the supervised ambient
+  face to looping Idle. Idle-task failures are visible as degraded health
+  instead of being ignored.
+- Terminal and web `/camera`, plus the **AI camera** button, grant one
+  temporary AI photo. The robot shows `3`, `2`, `1`, then an animated camera
+  icon. Successful preview delivery consumes the grant; a failed capture keeps
+  it available.
+- Preview JPEG bytes are broadcast only to the active live browser and are
+  removed before the tool result enters model context, transcripts, retained
+  event history, or the durable IDE action ledger.
+
+### Main files changed
+
+- IDE device lifecycle, Level 2 safety controller, robot Idle supervisor,
+  camera presentation, and embedded face renderer.
+- Agent policy, runtime, loop, prompt, IPC, terminal chat, web controller, and
+  ephemeral event delivery.
+- Mobile web AI-camera control, temporary preview handling, and regression
+  tests.
+- README, installation guide, developer guide, implementation plan, this log,
+  and a dated Raspberry Pi validation guide.
+
+No managed `pi5*` driver or nested `NinjaClawBot/` file changed.
+
+### Why
+
+The action ledger showed `RuntimeError: distance adapter is closed` after
+Emergency Stop. Level 2 had used terminal adapter shutdown for a recoverable
+runtime stop. The old foreground lifecycle also resumed whichever ambient
+emotion was previously selected and silently discarded Idle-task exceptions.
+Finally, the agent had no bounded way to use temporary camera preview without
+confirming an entire conversational turn.
+
+### Validation
+
+- Phase 1: immutable-driver verification, compilation, Ruff, format, MyPy, and
+  309 tests passed.
+- Phase 2: the same gate passed with 309 tests.
+- Phase 3: JavaScript syntax and the complete Python gate passed with 313
+  tests. One existing Starlette/httpx deprecation warning remains and does not
+  affect runtime behavior.
+- Physical Raspberry Pi acceptance is pending using the dated validation
+  checklist.
+
+### Recommended next step
+
+Run the Emergency Stop/Resume, Greeting/Idle, Celebrate/Idle with raised
+wheels, and one-shot AI camera checks in
+`docs/validation/phase-5-recovery-idle-camera-validation-2026-07-30.md`.
+
 ## 2026-07-29 — Health-checked `/resume` in agent chat
 
 ### Summary

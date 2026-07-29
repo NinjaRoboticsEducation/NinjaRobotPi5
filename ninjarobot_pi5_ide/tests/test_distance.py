@@ -85,6 +85,40 @@ def test_valid_distance_lifecycle_and_health(tmp_path: Path) -> None:
     asyncio.run(exercise())
 
 
+def test_distance_can_restart_after_emergency_suspend() -> None:
+    async def exercise() -> None:
+        sensors: list[FakeSensor] = []
+
+        def factory(_bus: int, _address: int) -> FakeSensor:
+            sensor = FakeSensor(
+                {
+                    "distance_mm": 250,
+                    "raw_value": 250,
+                    "is_valid": True,
+                    "timestamp": 123.5,
+                }
+            )
+            sensors.append(sensor)
+            return sensor
+
+        adapter = VL53L0XDistanceAdapter(sensor_factory=factory)
+        await adapter.start()
+        assert await adapter.health() is ResourceHealth.READY
+
+        await adapter.suspend()
+        assert sensors[0].closed == 1
+        assert await adapter.health() is ResourceHealth.UNAVAILABLE
+
+        await adapter.start()
+        assert await adapter.health() is ResourceHealth.READY
+        assert len(sensors) == 2
+
+        await adapter.close()
+        assert sensors[1].closed == 1
+
+    asyncio.run(exercise())
+
+
 def test_8191_sentinel_is_a_structured_out_of_range_result(tmp_path: Path) -> None:
     async def exercise() -> None:
         sensor = FakeSensor(

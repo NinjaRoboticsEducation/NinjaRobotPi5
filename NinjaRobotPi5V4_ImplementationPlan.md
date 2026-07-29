@@ -1,7 +1,7 @@
 # NinjaRobotPi5V4 Implementation Plan
 
 Status: Approved architecture and active delivery record
-Last updated: 2026-07-29 (Phase 5 agent/web refinement implemented)
+Last updated: 2026-07-30 (Phase 5 recovery, Idle, and one-shot camera refinement)
 Primary development computer: Raspberry Pi 5, 8 GB RAM
 Target computer: Raspberry Pi 5, 8 GB RAM
 Implementation status: Phases 0–4 implemented and operator-validated; Phase
@@ -2408,6 +2408,61 @@ Emergency Stop.
 Update `README.md`, `InstallationGuide.md`, `DevelopmentGuide.md`,
 `DevelopmentLog.md`, this plan, and
 `docs/validation/phase-5-agent-chat-resume-validation-2026-07-29.md`.
+
+#### Phase 5.13 — Restartable recovery, deterministic Idle, and one-shot AI camera
+
+**Status**
+
+Implemented on 2026-07-30. Automated validation passes; physical Raspberry Pi
+acceptance remains operator work.
+
+**Objective**
+
+- Repair Level 2 Resume after the distance, camera, and microphone services
+  have been stopped.
+- Make looping Idle the deterministic post-condition of every normally
+  completed foreground behavior.
+- Add an explicitly granted, one-shot, temporary AI camera preview.
+- Show a visible `3`, `2`, `1` countdown and animated camera icon before and
+  during AI capture.
+
+**Deliverables**
+
+- Restartable IDE `suspend()` lifecycle separate from terminal `close()`.
+- Health-checked device reinitialization before Resume clears Level 2.
+- Canonical Idle restoration for web buttons, agent actions, and generated
+  behaviors, with degraded health for an unexpected Idle-task failure.
+- Session-and-lease-bound `CameraGrantManager`.
+- Terminal and web `/camera`, plus an **AI camera** web button.
+- Ephemeral browser preview delivery with JPEG removal from transcripts,
+  event history, and model-visible tool results.
+- Failed camera attempts keep the grant; a successful delivered preview
+  consumes it.
+
+**Validation**
+
+- Immutable drivers unchanged.
+- Restart tests cover distance, camera, and microphone suspension.
+- Greeting, Celebrate, camera presentation, and foreground behavior tests end
+  in Idle.
+- Camera policy tests cover confirmation, lease matching, failed-attempt
+  release, and successful consumption.
+- Agent tests verify that preview bytes are live-only and redacted from
+  durable/model context.
+- JavaScript syntax, compilation, Ruff, formatting, strict MyPy, and the full
+  pytest suite pass.
+
+**Hardware risk**
+
+Resume initializes configured devices but does not intentionally record or
+move. AI camera validation takes one temporary photograph. Celebrate may move
+the wheel servos, so its physical acceptance requires raised wheels and an
+accessible Emergency Stop.
+
+**Documentation**
+
+Update the core project documents and
+`docs/validation/phase-5-recovery-idle-camera-validation-2026-07-30.md`.
 
 ### Phase 6: Cloud provider adapters
 

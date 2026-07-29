@@ -32,6 +32,79 @@ class _MotionArm:
     lease_id: str | None
 
 
+@dataclass(slots=True)
+class _CameraGrant:
+    lease_id: str | None
+    claimed: bool = False
+
+
+class CameraGrantManager:
+    """Hold one-shot consent for a temporary AI camera preview."""
+
+    def __init__(self) -> None:
+        self._grants: dict[str, _CameraGrant] = {}
+
+    def grant(
+        self,
+        session_id: str,
+        *,
+        confirmed: bool,
+        lease_id: str | None = None,
+    ) -> None:
+        """Grant one preview only after an explicit user action."""
+        if not confirmed:
+            raise PermissionError("explicit confirmation is required for AI camera access")
+        self._grants[session_id] = _CameraGrant(lease_id=lease_id)
+
+    def is_granted(self, session_id: str, *, lease_id: str | None = None) -> bool:
+        """Return whether an unused matching grant is available."""
+        grant = self._grants.get(session_id)
+        if grant is None or grant.claimed:
+            return False
+        if grant.lease_id is not None and grant.lease_id != lease_id:
+            return False
+        return True
+
+    def claim(self, session_id: str, *, lease_id: str | None = None) -> bool:
+        """Reserve the grant while one preview attempt is in progress."""
+        if not self.is_granted(session_id, lease_id=lease_id):
+            return False
+        self._grants[session_id].claimed = True
+        return True
+
+    def claim_is_active(self, session_id: str, *, lease_id: str | None = None) -> bool:
+        """Return whether the same session still owns the in-flight claim."""
+        grant = self._grants.get(session_id)
+        if grant is None or not grant.claimed:
+            return False
+        if grant.lease_id is not None and grant.lease_id != lease_id:
+            return False
+        return True
+
+    def finish(
+        self,
+        session_id: str,
+        *,
+        succeeded: bool,
+        lease_id: str | None = None,
+    ) -> None:
+        """Consume a successful preview; release a failed attempt for retry."""
+        if not self.claim_is_active(session_id, lease_id=lease_id):
+            return
+        if succeeded:
+            self._grants.pop(session_id, None)
+        else:
+            self._grants[session_id].claimed = False
+
+    def revoke(self, session_id: str) -> None:
+        """Revoke one session's unused or in-flight grant."""
+        self._grants.pop(session_id, None)
+
+    def revoke_all(self) -> None:
+        """Revoke all grants during shutdown or model replacement."""
+        self._grants.clear()
+
+
 class MotionArmManager:
     """Hold explicit motion consent until a deterministic revocation event."""
 
@@ -71,8 +144,18 @@ class MotionArmManager:
 class PolicyEngine:
     """Apply non-bypassable risk and external-content rules."""
 
-    def __init__(self, motion_arms: MotionArmManager) -> None:
+    def __init__(
+        self,
+        motion_arms: MotionArmManager,
+        camera_grants: CameraGrantManager | None = None,
+    ) -> None:
         self._motion_arms = motion_arms
+        self._camera_grants = camera_grants or CameraGrantManager()
+
+    @property
+    def camera_grants(self) -> CameraGrantManager:
+        """Return the service-owned camera consent manager."""
+        return self._camera_grants
 
     def evaluate(
         self,
@@ -103,6 +186,14 @@ class PolicyEngine:
                 allowed=False,
                 reason="Motion is not armed for this session.",
                 confirmation_required=True,
+            )
+        if definition.name == "robot.camera.preview" and self._camera_grants.is_granted(
+            context.session_id,
+            lease_id=context.lease_id,
+        ):
+            return PolicyDecision(
+                allowed=True,
+                reason="One temporary AI camera preview is granted for this session.",
             )
         requires_confirmation = definition.confirmation_required or definition.risk in {
             RiskLevel.PRIVACY,

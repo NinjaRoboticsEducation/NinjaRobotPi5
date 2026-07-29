@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from ninjarobot_pi5_agent import (
+    CameraGrantManager,
     MotionArmManager,
     PolicyContext,
     PolicyEngine,
@@ -15,11 +16,12 @@ from ninjarobot_pi5_ide import RiskLevel
 def tool(
     risk: RiskLevel,
     *,
+    name: str = "robot.behavior.run",
     confirmation_required: bool = False,
     trust: ToolTrust = ToolTrust.TRUSTED,
 ) -> ToolDefinition:
     return ToolDefinition(
-        name="robot.behavior.run",
+        name=name,
         version="1.0.0",
         description="Run a behavior.",
         input_schema={"type": "object"},
@@ -89,3 +91,33 @@ def test_external_tools_cannot_claim_physical_risk() -> None:
 
     assert not decision.allowed
     assert "read-only" in decision.reason
+
+
+def test_one_shot_camera_grant_survives_failure_and_is_consumed_by_success() -> None:
+    grants = CameraGrantManager()
+    policy = PolicyEngine(MotionArmManager(), grants)
+    camera = tool(
+        RiskLevel.PRIVACY,
+        name="robot.camera.preview",
+        confirmation_required=True,
+    )
+    context = PolicyContext(session_id="camera-session", lease_id="lease-1")
+
+    assert not policy.evaluate(camera, context).allowed
+    with pytest.raises(PermissionError, match="explicit confirmation"):
+        grants.grant("camera-session", confirmed=False, lease_id="lease-1")
+
+    grants.grant("camera-session", confirmed=True, lease_id="lease-1")
+    assert policy.evaluate(camera, context).allowed
+    assert not policy.evaluate(
+        camera,
+        PolicyContext(session_id="camera-session", lease_id="wrong-lease"),
+    ).allowed
+
+    assert grants.claim("camera-session", lease_id="lease-1")
+    grants.finish("camera-session", lease_id="lease-1", succeeded=False)
+    assert grants.is_granted("camera-session", lease_id="lease-1")
+
+    assert grants.claim("camera-session", lease_id="lease-1")
+    grants.finish("camera-session", lease_id="lease-1", succeeded=True)
+    assert not grants.is_granted("camera-session", lease_id="lease-1")

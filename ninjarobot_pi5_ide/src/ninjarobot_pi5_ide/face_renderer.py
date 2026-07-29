@@ -89,6 +89,7 @@ def render_face(
         "success": _success,
         "warning": _warning,
         "error": _error,
+        "camera": _camera,
     }
     renderers[name](draw, geometry, elapsed_seconds, bg, fg, highlight)
     return image
@@ -252,6 +253,55 @@ def _symbol(
         fill=color,
         font=font,
         anchor="mm",
+    )
+
+
+def _camera(
+    draw: ImageDraw.ImageDraw,
+    g: _FaceGeometry,
+    t: float,
+    bg: RGB,
+    fg: RGB,
+    accent: RGB,
+) -> None:
+    """Draw a clear animated camera icon while a private capture is active."""
+    del bg
+    pulse = 0.82 + 0.18 * (0.5 + 0.5 * math.sin(t * 5.0))
+    body = (
+        int(g.width * 0.20),
+        int(g.height * 0.27),
+        int(g.width * 0.80),
+        int(g.height * 0.74),
+    )
+    draw.rounded_rectangle(
+        body,
+        radius=max(10, int(min(g.width, g.height) * 0.06)),
+        outline=fg,
+        width=g.stroke,
+    )
+    draw.polygon(
+        (
+            (int(g.width * 0.31), int(g.height * 0.27)),
+            (int(g.width * 0.38), int(g.height * 0.17)),
+            (int(g.width * 0.58), int(g.height * 0.17)),
+            (int(g.width * 0.65), int(g.height * 0.27)),
+        ),
+        fill=fg,
+    )
+    lens_radius = max(g.stroke * 2, int(g.eye_radius * pulse))
+    draw.ellipse(
+        _box(g.center_x, int(g.height * 0.50), lens_radius),
+        outline=accent,
+        width=g.stroke,
+    )
+    draw.ellipse(
+        _box(g.center_x, int(g.height * 0.50), max(g.stroke, lens_radius // 3)),
+        fill=accent,
+    )
+    indicator = cast(RGB, ImageColor.getrgb("#FF5252"))
+    draw.ellipse(
+        _box(int(g.width * 0.72), int(g.height * 0.36), max(4, g.stroke)),
+        fill=indicator,
     )
 
 

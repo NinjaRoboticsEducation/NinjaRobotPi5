@@ -131,6 +131,33 @@ class FakeBackend:
                 self.active_calls -= 1
 
 
+def test_microphone_can_restart_after_emergency_suspend(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        backends: list[FakeBackend] = []
+
+        def factory() -> FakeBackend:
+            backend = FakeBackend()
+            backends.append(backend)
+            return backend
+
+        device = MicrophoneDevice(
+            media_directory=tmp_path / "microphone",
+            backend_factory=factory,
+        )
+        await device.start()
+        assert await device.health() is ResourceHealth.READY
+
+        await device.suspend()
+        assert await device.health() is ResourceHealth.UNAVAILABLE
+
+        await device.start()
+        assert await device.health() is ResourceHealth.READY
+        assert len(backends) == 2
+        await device.close()
+
+    asyncio.run(exercise())
+
+
 def request(
     action_id: str,
     capability: str,

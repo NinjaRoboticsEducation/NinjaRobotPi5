@@ -306,7 +306,10 @@ def test_robot_assembly_shares_expression_devices_and_blocks_unsafe_motion_start
     asyncio.run(exercise())
 
 
-def test_robot_liveliness_runs_greeting_then_supervises_silent_idle(tmp_path: Path) -> None:
+def test_robot_liveliness_runs_greeting_then_supervises_silent_idle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     async def exercise() -> None:
         display = FakeDisplayDriver()
         buzzer = FakeBuzzerDriver()
@@ -383,22 +386,37 @@ def test_robot_liveliness_runs_greeting_then_supervises_silent_idle(tmp_path: Pa
         assert robot._idle_task is not None  # type: ignore[attr-defined]
         assert robot._idle_task.get_name() == "ninjarobot-silent-thinking"  # type: ignore[attr-defined]
 
-        await robot.run_definition(expression_definition(hold_seconds=0.05))
+        monkeypatch.setattr(
+            "ninjarobot_pi5_ide.robot.CAMERA_COUNTDOWN_INTERVAL_SECONDS",
+            0.0,
+        )
+        assert await robot.show_camera_capture() is True
+        assert robot._idle_task is not None  # type: ignore[attr-defined]
+        assert robot._idle_task.get_name() == "ninjarobot-silent-camera"  # type: ignore[attr-defined]
+
+        celebrate = expression_definition(hold_seconds=0.05).model_copy(
+            update={"name": "celebrate"}
+        )
+        await robot.run_definition(celebrate)
         frame_count = len(display.frames)
         await asyncio.sleep(0.12)
         assert len(display.frames) > frame_count
         assert robot._idle_task is not None  # type: ignore[attr-defined]
-        assert robot._idle_task.get_name() == "ninjarobot-silent-thinking"  # type: ignore[attr-defined]
-
-        assert await robot.restore_idle_face() is True
-        await asyncio.sleep(0)
-        assert robot._idle_task is not None  # type: ignore[attr-defined]
         assert robot._idle_task.get_name() == "ninjarobot-silent-idle"  # type: ignore[attr-defined]
+        assert (await robot.health())["idle"] == "ready"
 
         await robot.stop()
         frame_count = len(display.frames)
         await asyncio.sleep(0.12)
         assert len(display.frames) == frame_count
+
+        robot._idle_error = "OSError: previous idle frame failed"  # type: ignore[attr-defined]
+        resumed = await robot.resume_system(confirmed=True)
+        assert resumed.system_latched is False
+        await asyncio.sleep(0)
+        assert robot._idle_task is not None  # type: ignore[attr-defined]
+        assert robot._idle_task.get_name() == "ninjarobot-silent-idle"  # type: ignore[attr-defined]
+        assert (await robot.health())["idle"] == "ready"
         await robot.close()
 
     asyncio.run(exercise())

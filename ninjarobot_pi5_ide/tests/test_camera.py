@@ -143,6 +143,33 @@ def test_preview_returns_jpeg_data_without_retaining_a_file(tmp_path: Path) -> N
     asyncio.run(exercise())
 
 
+def test_camera_can_restart_after_emergency_suspend(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        captures: list[FakeCapture] = []
+
+        def factory() -> FakeCapture:
+            capture = FakeCapture()
+            captures.append(capture)
+            return capture
+
+        device = CameraDevice(
+            media_directory=tmp_path / "camera",
+            camera_factory=factory,
+        )
+        await device.start()
+        assert await device.health() is ResourceHealth.READY
+
+        await device.suspend()
+        assert await device.health() is ResourceHealth.UNAVAILABLE
+
+        await device.start()
+        assert await device.health() is ResourceHealth.READY
+        assert len(captures) == 2
+        await device.close()
+
+    asyncio.run(exercise())
+
+
 def test_loader_uses_system_python_when_current_picamera_import_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

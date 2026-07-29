@@ -19,7 +19,7 @@ from .models import (
     ToolInvocation,
 )
 from .persistence import ConversationStore
-from .policy import MotionArmManager, PolicyContext, PolicyEngine
+from .policy import CameraGrantManager, MotionArmManager, PolicyContext, PolicyEngine
 from .providers import LLMProvider
 from .skills import SkillRepository
 from .tools import CancellationToken, ToolRegistry
@@ -47,6 +47,7 @@ class AgentRuntime:
         self.loop = loop
         self.policy = policy
         self.motion_arms = motion_arms
+        self.camera_grants: CameraGrantManager = policy.camera_grants
         self.skills = skills
         self.events = events
         self.models = model_manager
@@ -164,6 +165,34 @@ class AgentRuntime:
         self.loop.cancel_session(session_id)
         for token in self._motion_cancellations.pop(session_id, set()):
             token.cancel()
+
+    def grant_camera(
+        self,
+        session_id: str,
+        *,
+        confirmed: bool,
+        lease_id: str | None = None,
+    ) -> None:
+        """Grant the model one temporary, non-retained camera preview."""
+        self._ensure_started()
+        self.camera_grants.grant(
+            session_id,
+            confirmed=confirmed,
+            lease_id=lease_id,
+        )
+
+    def revoke_camera(self, session_id: str) -> None:
+        """Revoke one session's pending or active camera grant."""
+        self.camera_grants.revoke(session_id)
+
+    def camera_granted(
+        self,
+        session_id: str,
+        *,
+        lease_id: str | None = None,
+    ) -> bool:
+        """Return whether one unused camera preview is authorized."""
+        return self.camera_grants.is_granted(session_id, lease_id=lease_id)
 
     async def stop_and_disarm_motion(
         self,
@@ -312,6 +341,7 @@ class AgentRuntime:
             return
         self._closed = True
         self._disarm_all_motion()
+        self.camera_grants.revoke_all()
         await self.tools.close()
         await self.provider.close()
         await self.store.close()
@@ -352,6 +382,7 @@ class AgentRuntime:
         try:
             selected = await self.models.select(provider_id, model)
             self._disarm_all_motion()
+            self.camera_grants.revoke_all()
             await self.events.publish(
                 AgentEventType.SERVICE,
                 f"Agent model changed to {provider_id}/{model}.",

@@ -10,10 +10,13 @@ from ninjarobot_pi5_agent.testing import FakeProvider
 from ninjarobot_pi5_ide.testing import FakeIDEClient
 
 from ninjarobot_pi5_agent import (
+    AgentEventType,
     AgentLoop,
     AgentLoopConfig,
     AgentLoopError,
+    CameraGrantManager,
     ConversationStore,
+    EventBroker,
     FinishReason,
     IDEToolProvider,
     ModelRequest,
@@ -235,6 +238,93 @@ async def build_streaming_loop(
         id_factory=_IDs(),
     )
     return loop, store, registry
+
+
+def test_one_shot_ai_camera_preview_is_ephemeral_and_redacted(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        store = ConversationStore(tmp_path / "camera-conversation.sqlite3")
+        await store.start()
+        ide = FakeIDEClient(
+            (
+                descriptor(
+                    risk=RiskLevel.PRIVACY,
+                    name="camera.preview",
+                ),
+            )
+        )
+        original_execute = ide.execute
+
+        async def execute_camera(request):
+            result = await original_execute(request)
+            return result.model_copy(
+                update={
+                    "data": {
+                        "captured": True,
+                        "width": 320,
+                        "height": 240,
+                        "format": "jpeg",
+                        "jpeg_base64": "ZmFrZS1qcGVn",
+                    }
+                }
+            )
+
+        ide.execute = execute_camera  # type: ignore[method-assign]
+        registry = ToolRegistry((IDEToolProvider(ide),))
+        await registry.start()
+        grants = CameraGrantManager()
+        grants.grant("camera-session", confirmed=True)
+        policy = PolicyEngine(MotionArmManager(), grants)
+        events = EventBroker()
+        queue = await events.subscribe()
+        loop = AgentLoop(
+            provider=FakeProvider(
+                [
+                    ModelTurn(
+                        request_id="id-2",
+                        finish_reason=FinishReason.TOOL_CALLS,
+                        tool_calls=(
+                            ToolCall(
+                                call_id="camera-call",
+                                name="robot.camera.preview",
+                                arguments={},
+                            ),
+                        ),
+                    ),
+                    ModelTurn(
+                        request_id="id-5",
+                        text="The temporary photo is ready.",
+                        finish_reason=FinishReason.STOP,
+                    ),
+                ]
+            ),
+            tools=registry,
+            policy=policy,
+            recovery=RecoveryPolicy(),
+            store=store,
+            events=events,
+            id_factory=_IDs(),
+        )
+
+        reply = await loop.chat(session_id="camera-session", text="Take a photo")
+
+        assert reply.tool_calls == 1
+        assert not grants.is_granted("camera-session")
+        transcript = await store.messages("camera-session")
+        tool_message = next(
+            item.message for item in transcript if item.message.role.value == "tool"
+        )
+        assert "jpeg_base64" not in tool_message.content
+        assert "ZmFrZS1qcGVn" not in tool_message.content
+        assert not any(event.event_type is AgentEventType.MEDIA for event in await events.history())
+        ephemeral = [queue.get_nowait() for _ in range(queue.qsize())]
+        media = next(event for event in ephemeral if event.event_type is AgentEventType.MEDIA)
+        assert media.data["jpeg_base64"] == "ZmFrZS1qcGVn"
+
+        await events.unsubscribe(queue)
+        await registry.close()
+        await store.close()
+
+    asyncio.run(exercise())
 
 
 def test_agent_loop_private_activity_resets_model_inactivity_timeout(tmp_path) -> None:

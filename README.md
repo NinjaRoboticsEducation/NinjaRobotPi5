@@ -183,8 +183,11 @@ safety-latch authority.
 
 Generated behaviors are transient by default. Saving one requires an explicit
 confirmed request and uses the confined user behavior directory without
-overwriting an existing or bundled behavior. Camera and microphone operations
-keep separate privacy confirmation.
+overwriting an existing or bundled behavior. Microphone operations and retained
+camera files keep separate privacy confirmation. Entering `/camera` or pressing
+**AI camera** grants the active chat one temporary, non-retained photograph.
+The grant remains available after a failed attempt and is consumed only after a
+successful preview is delivered.
 
 The agent is also an MCP host. MCP means Model Context Protocol, a standard
 connection for separately installed tools. The official hosted Tavily MCP
@@ -203,7 +206,8 @@ returns a correctable `BEHAVIOR_DRAFT_INVALID` error before touching hardware
 when a field is invalid.
 
 The HTTPS controller provides direct D-pad movement, Level 2 Emergency Stop,
-confirmed Resume, Greeting, Celebrate, temporary camera preview, local
+confirmed Resume, Greeting, Celebrate, direct temporary camera preview, one-shot
+AI camera access, local
 whisper.cpp USB-microphone transcription, English/Japanese browser speech
 recognition, AI chat, and live events. A second browser receives `423 Locked`.
 Missed heartbeats revoke the lease and request a motor stop without waiting for
@@ -214,7 +218,10 @@ through any robot action, and back to Idle. Face selection is display-only and
 cannot authorize a tool or movement. The portrait-first controller supports
 mobile Chrome and Safari, prevents D-pad text selection, keeps Live Activity
 in a bottom drawer, and places browser speech in the message box for review
-before Send. A start gesture requests fullscreen where the browser supports
+before Send. AI camera capture shows `3`, `2`, `1` on the robot display and then
+loops a camera icon until capture completes. The JPEG reaches only the live
+preview; it is removed from the model transcript, event history, and durable
+action data. A start gesture requests fullscreen where the browser supports
 it; iPhone and iPad users can add the controller to the Home Screen for the
 most reliable standalone view. The D-pad scales to the browser's actual
 visible height so it remains above the camera and microphone controls when
@@ -298,7 +305,7 @@ The `ninjarobot-agent` additionally provides:
 
 - `service run|start|status|stop` for the single owner process
 - streaming `chat`, reconnectable sessions, seven-day transcripts, and
-  `/help`, `/exit`, `/clear`, `/status`, `/resume`, `/arm`, `/disarm`, and
+  `/help`, `/exit`, `/clear`, `/status`, `/resume`, `/camera`, `/arm`, `/disarm`, and
   `/confirm <request>`
 - `web start|status|stop` for the HTTPS local-network interface
 - `motion arm --confirm` for one CLI chat session's physical-motion consent
@@ -364,6 +371,12 @@ module is health-checked before the safety latch clears. A successful resume
 restores the looping Idle face but deliberately leaves AI motion disarmed.
 Enter `/arm` separately before requesting another servo movement. If any
 health check fails, the latch and Emergency Stop display remain active.
+
+To authorize one AI photo, enter `/camera` or press **AI camera**, then ask the
+agent to take a photograph. A successful capture appears in the temporary web
+preview and consumes the grant. A failed capture keeps the same grant so the
+operator can correct the camera and try again. Retained files are never created
+by this one-shot path.
 
 Quitting a CLI disconnects only that terminal. Use `web stop` to stop the web
 interface and `service stop` to release the model, IDE, hardware, MCP, database,
@@ -560,6 +573,9 @@ For camera integration, follow
 Real capture requires consent from everyone nearby.
 For microphone integration, follow
 [`docs/validation/phase-3-5-microphone-validation-2026-07-26.md`](docs/validation/phase-3-5-microphone-validation-2026-07-26.md).
+For Level 2 recovery, deterministic Idle, and one-shot AI camera acceptance,
+follow
+[`docs/validation/phase-5-recovery-idle-camera-validation-2026-07-30.md`](docs/validation/phase-5-recovery-idle-camera-validation-2026-07-30.md).
 Real recording also requires consent from everyone nearby.
 For Phase 4 integrated behaviors and movements, follow
 [`docs/validation/phase-4-integrated-behavior-validation-2026-07-26.md`](docs/validation/phase-4-integrated-behavior-validation-2026-07-26.md).

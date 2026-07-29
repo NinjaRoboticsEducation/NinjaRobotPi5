@@ -40,6 +40,7 @@ def test_prompt_order_keeps_safety_before_skill_and_conversation(tmp_path) -> No
     assert "Do not invent an operations wrapper" in messages[1].content
     assert "must use" in messages[1].content
     assert "execution_mode='simulation'" in messages[2].content
-    assert "Camera and microphone tools retain" in messages[1].content
+    assert "granted one-shot camera preview" in messages[1].content
+    assert "retained camera captures and microphone" in messages[1].content
     assert "subordinate workflow" in messages[3].content
     assert messages[-1] == conversation[0]

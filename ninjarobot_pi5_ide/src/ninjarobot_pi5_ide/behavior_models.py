@@ -47,6 +47,7 @@ FaceName = Literal[
     "success",
     "warning",
     "error",
+    "camera",
 ]
 FACE_EXPRESSIONS: tuple[FaceName, ...] = (
     "idle",
@@ -70,6 +71,7 @@ FACE_EXPRESSIONS: tuple[FaceName, ...] = (
     "warning",
     "error",
 )
+EMBEDDED_FACE_EXPRESSIONS: tuple[FaceName, ...] = (*FACE_EXPRESSIONS, "camera")
 FACE_ALIASES: dict[str, FaceName] = {
     "embarrassing": "shy",
     "embarrassed": "shy",
@@ -117,7 +119,7 @@ def normalize_face_name(value: str) -> FaceName:
     alias = FACE_ALIASES.get(normalized)
     if alias is not None:
         return alias
-    if normalized not in FACE_EXPRESSIONS:
+    if normalized not in EMBEDDED_FACE_EXPRESSIONS:
         raise ValueError(f"unknown face expression: {value!r}")
     return normalized
 

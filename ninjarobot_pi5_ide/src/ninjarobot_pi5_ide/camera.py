@@ -408,6 +408,15 @@ class CameraDevice:
                 return ResourceHealth.UNAVAILABLE
             return ResourceHealth.READY
 
+    async def suspend(self) -> None:
+        """Release the capture backend while allowing a later start."""
+        async with self._lock:
+            if self._closed:
+                return
+            self._capture = None
+            self._startup_error = None
+            self._start_attempted = False
+
     async def close(self) -> None:
         """Prevent new captures after any in-flight worker has cleaned up."""
         async with self._lock:

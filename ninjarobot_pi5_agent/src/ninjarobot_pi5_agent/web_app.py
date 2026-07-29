@@ -501,6 +501,14 @@ async def _dispatch_web_message(
         await controller.stop_motion(lease_id)
         controller.disarm_chat_motion(lease_id)
         return {"motion_armed": False}
+    if kind == "grant_chat_camera":
+        if message.get("confirmed") is not True:
+            raise PermissionError("AI camera access requires explicit confirmation")
+        controller.grant_chat_camera(lease_id, confirmed=True)
+        return {"ai_camera_granted": True, "captures_remaining": 1}
+    if kind == "revoke_chat_camera":
+        controller.revoke_chat_camera(lease_id)
+        return {"ai_camera_granted": False, "captures_remaining": 0}
     raise ValueError(f"unsupported web request type: {kind}")
 
 

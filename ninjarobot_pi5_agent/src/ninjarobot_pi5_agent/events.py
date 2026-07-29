@@ -23,6 +23,7 @@ class AgentEventType(StrEnum):
     WARNING = "warning"
     ERROR = "error"
     RECOVERY = "recovery"
+    MEDIA = "media"
     LOG = "log"
 
 
@@ -60,8 +61,9 @@ class EventBroker:
         session_id: str | None = None,
         correlation_id: str | None = None,
         data: dict[str, Any] | None = None,
+        retain: bool = True,
     ) -> AgentEvent:
-        """Store and broadcast one event, dropping only stale client backlog."""
+        """Broadcast one event and optionally retain its redaction-safe history."""
         async with self._lock:
             event = AgentEvent(
                 event_id=f"event-{self._next_id:08d}",
@@ -73,7 +75,8 @@ class EventBroker:
                 data=data or {},
             )
             self._next_id += 1
-            self._history.append(event)
+            if retain:
+                self._history.append(event)
             for queue in self._subscribers:
                 if queue.full():
                     queue.get_nowait()

@@ -236,6 +236,31 @@ class AgentIPCServer:
                 {"type": "result", "data": result.model_dump(mode="json")},
             )
             return
+        if command == "grant_camera":
+            session_id = _required_text(payload, "session_id")
+            self._runtime.grant_camera(
+                session_id,
+                confirmed=payload.get("confirmed") is True,
+                lease_id=_optional_text(payload, "lease_id"),
+            )
+            await _write_message(
+                writer,
+                {
+                    "type": "result",
+                    "data": {"ai_camera_granted": True, "captures_remaining": 1},
+                },
+            )
+            return
+        if command == "revoke_camera":
+            self._runtime.revoke_camera(_required_text(payload, "session_id"))
+            await _write_message(
+                writer,
+                {
+                    "type": "result",
+                    "data": {"ai_camera_granted": False, "captures_remaining": 0},
+                },
+            )
+            return
         if command == "web_start":
             if self._web is None:
                 raise AgentIPCError("web interface is not configured")

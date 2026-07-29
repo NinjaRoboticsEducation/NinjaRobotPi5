@@ -792,7 +792,7 @@ Bundled assets refuse deletion.
 
 ## Implemented Phase 5 agent and extension contracts
 
-Phase 5.0 through Phase 5.11 implement these contracts. The software gate
+Phase 5.0 through Phase 5.13 implement these contracts. The software gate
 passes; the Raspberry Pi acceptance checklist remains operator work.
 
 ### Agent and service boundaries
@@ -979,6 +979,15 @@ controller lease loss, model replacement, or service shutdown. Runtime
 disarm also cancels registered in-flight motion tokens and requests
 `robot.servo.stop`; it does not merely block the next tool call.
 
+`CameraGrantManager` separately owns one-shot AI camera consent. The grant is
+bound to the chat session and, for web use, its controller lease. Only
+`robot.camera.preview` can use it; retained capture remains protected by the
+normal privacy-confirmation path. The agent claims the grant immediately
+before capture, releases it after a failed attempt, and consumes it only after
+a successful preview has been published. The Base64 JPEG is sent through a
+non-retained live event and removed from the tool result before it enters the
+conversation transcript or returns to the model.
+
 The model receives unambiguous trusted service facts:
 
 ```json
@@ -1079,9 +1088,18 @@ recommended and is normally required by Safari and reliable browser speech.
 The default URL is `https://ninjarobotpi5.local:8443/`.
 
 The agent service invokes the IDE-owned startup Greeting exactly once and then
-enables its silent Idle supervisor. Normal behaviors preempt Idle and restore
-it when they finish. Level 1, Level 2, driver-failure, and shutdown screens are
-never overwritten by Idle; a successful Resume re-enables it.
+enables its silent Idle supervisor. Normal foreground behaviors reset the
+ambient expression to canonical Idle when they finish, even if the preceding
+agent presentation was Thinking or another emotion. Idle-task failures appear
+as degraded health instead of being discarded silently. Level 1, Level 2,
+driver-failure, and shutdown screens are never overwritten by Idle; a
+successful Resume re-enables it.
+
+Level 2 uses restartable `suspend()` operations for the distance, camera, and
+microphone services. Suspension releases active hardware resources but does
+not permanently end their lifecycle. Resume calls `start()` and health-checks
+the same IDE-owned services before clearing the stop. Final process shutdown
+still uses terminal `close()` operations, so closed objects are never reused.
 
 Agent chat recovery uses the same IDE-owned `system.resume` capability as the
 interactive IDE tool. `AgentRuntime.resume_system()` first requires explicit
@@ -1100,6 +1118,12 @@ runtime boundary and now includes the IDE's required confirmation argument.
 After web recovery, deterministic D-pad control is reactivated for the active
 lease, but the separate AI chat session remains disarmed until the operator
 uses **Arm AI Motion**. Terminal users likewise run `/arm` after `/resume`.
+
+Terminal and web chat also intercept `/camera` locally. It grants one temporary
+preview without sending the slash command to Ollama. The robot presentation
+boundary displays a three-second countdown followed by an animated camera
+icon. After the tool finishes, the normal agent lifecycle continues through
+Thinking or Speaking and ends in Idle.
 
 Conversation presentation also stays behind `RobotIDEClient`. The agent may
 request only silent ambient faces; it never receives a display driver.
@@ -1146,6 +1170,7 @@ Implemented suites include:
 - model discovery, persistence, hot-switch, informational benchmark, and
   explicit motion-arm tests
 - presentation-directive filtering and IDE face-lifecycle tests
+- restartable Level 2 device lifecycle and one-shot camera redaction tests
 - opt-in Tavily and Raspberry Pi acceptance tests
 
 Run the configured project scope with:

@@ -306,6 +306,7 @@ class WebRobotController:
             )
         self._runtime.disarm_motion(self.control_session(lease_id))
         self._runtime.disarm_motion(self.chat_session(lease_id))
+        self._runtime.revoke_camera(self.chat_session(lease_id))
         return result.model_dump(mode="json")
 
     async def resume(self, lease_id: str) -> dict[str, Any]:
@@ -415,6 +416,18 @@ class WebRobotController:
     def disarm_chat_motion(self, lease_id: str) -> None:
         self._runtime.disarm_motion(self.chat_session(lease_id))
 
+    def grant_chat_camera(self, lease_id: str, *, confirmed: bool) -> None:
+        """Grant one temporary AI photo to the active browser chat."""
+        self._runtime.grant_camera(
+            self.chat_session(lease_id),
+            confirmed=confirmed,
+            lease_id=lease_id,
+        )
+
+    def revoke_chat_camera(self, lease_id: str) -> None:
+        """Revoke the browser chat's pending camera grant."""
+        self._runtime.revoke_camera(self.chat_session(lease_id))
+
     async def lease_revoked(self, lease_id: str, reason: str) -> None:
         try:
             async with self._motion_command_lock:
@@ -432,6 +445,7 @@ class WebRobotController:
             finally:
                 self._runtime.disarm_motion(self.control_session(lease_id))
                 self._runtime.disarm_motion(self.chat_session(lease_id))
+                self._runtime.revoke_camera(self.chat_session(lease_id))
 
     async def _cancel_movement(self) -> None:
         async with self._movement_lock:

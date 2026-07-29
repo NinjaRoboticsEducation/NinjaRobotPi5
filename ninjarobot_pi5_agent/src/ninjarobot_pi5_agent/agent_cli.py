@@ -523,7 +523,7 @@ async def _chat_repl(arguments: argparse.Namespace, *, session_id: str) -> int:
             return 0
         if text == "/help":
             print(
-                "/help  /exit  /clear  /status  /resume  /arm  /disarm  "
+                "/help  /exit  /clear  /status  /resume  /camera  /arm  /disarm  "
                 "/confirm <request>\nOrdinary text is sent to NinjaRobot."
             )
             continue
@@ -538,6 +538,20 @@ async def _chat_repl(arguments: argparse.Namespace, *, session_id: str) -> int:
             continue
         if text == "/resume":
             await _resume_from_chat(arguments, session_id=session_id)
+            continue
+        if text == "/camera":
+            await _service_request(
+                arguments,
+                {
+                    "command": "grant_camera",
+                    "session_id": session_id,
+                    "confirmed": True,
+                },
+            )
+            print(
+                "AI camera access is ready for one temporary photo. "
+                "Ask NinjaRobot to take a photo; a failed capture keeps the grant available."
+            )
             continue
         if text == "/arm":
             confirmation = (

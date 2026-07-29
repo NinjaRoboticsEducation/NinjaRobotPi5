@@ -14,6 +14,7 @@ class _FaceClient:
     def __init__(self) -> None:
         self.faces: list[str] = []
         self.idle_count = 0
+        self.camera_count = 0
 
     async def show_agent_face(self, expression: str) -> bool:
         self.faces.append(expression)
@@ -21,6 +22,10 @@ class _FaceClient:
 
     async def restore_idle_face(self) -> bool:
         self.idle_count += 1
+        return True
+
+    async def show_camera_capture(self) -> bool:
+        self.camera_count += 1
         return True
 
 
@@ -68,6 +73,7 @@ def test_robot_presentation_maps_lifecycle_to_ide_faces() -> None:
         await presentation.responding()
         await presentation.responding("success")
         await presentation.action_started("robot.behavior.run")
+        await presentation.action_started("robot.camera.preview")
         await presentation.action_finished("robot.behavior.run")
         await presentation.idle()
 
@@ -79,5 +85,6 @@ def test_robot_presentation_maps_lifecycle_to_ide_faces() -> None:
             "thinking",
         ]
         assert client.idle_count == 1
+        assert client.camera_count == 1
 
     asyncio.run(exercise())

@@ -578,6 +578,19 @@ class MicrophoneDevice:
                 return ResourceHealth.UNAVAILABLE
             return ResourceHealth.READY
 
+    async def suspend(self) -> None:
+        """Release the audio backend while allowing a later start."""
+        async with self._lock:
+            if self._closed:
+                return
+            self._backend = None
+            self._devices = []
+            self._selected_device = None
+            self._actual_sample_rate_hz = None
+            self._sample_rate_warning = None
+            self._startup_error = None
+            self._start_attempted = False
+
     async def close(self) -> None:
         """Prevent new recordings after any in-flight worker has cleaned up."""
         async with self._lock:

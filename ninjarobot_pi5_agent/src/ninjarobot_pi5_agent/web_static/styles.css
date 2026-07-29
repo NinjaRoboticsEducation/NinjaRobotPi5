@@ -116,6 +116,18 @@ h2 {
   background: var(--green);
 }
 
+.camera-arm[aria-pressed="true"] {
+  border-color: rgba(0, 191, 255, 0.72);
+  color: #031018;
+  background: var(--cyan);
+}
+
+.ai-permissions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
 .badge {
   max-width: 45vw;
   overflow: hidden;
