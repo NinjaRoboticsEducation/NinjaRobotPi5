@@ -224,6 +224,18 @@ class AgentIPCServer:
                 {"type": "result", "data": {"motion_armed": False}},
             )
             return
+        if command == "resume_system":
+            result = await self._runtime.resume_system(
+                _required_text(payload, "session_id"),
+                confirmed=payload.get("confirmed") is True,
+                lease_id=_optional_text(payload, "lease_id"),
+                requested_by="ipc-resume",
+            )
+            await _write_message(
+                writer,
+                {"type": "result", "data": result.model_dump(mode="json")},
+            )
+            return
         if command == "web_start":
             if self._web is None:
                 raise AgentIPCError("web interface is not configured")

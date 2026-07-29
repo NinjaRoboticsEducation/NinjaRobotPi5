@@ -283,11 +283,28 @@
       .catch(() => {});
   });
 
+  function resumeRobot(showInChat = false) {
+    if (!window.confirm("Health-check and resume all robot modules after the emergency stop?")) {
+      if (showInChat) addMessage("assistant", "System resume was cancelled.");
+      return Promise.resolve(false);
+    }
+    return send("resume", { confirmed: true })
+      .then(() => {
+        updateAiMotion(false);
+        const message =
+          "Robot modules resumed and Idle restored. AI motion remains disarmed; use Arm AI Motion before requesting servo movement.";
+        if (showInChat) addMessage("assistant", message);
+        toast("Robot modules resumed.");
+        return true;
+      })
+      .catch((error) => {
+        if (showInChat) addMessage("assistant", `Resume failed: ${error.message}`);
+        throw error;
+      });
+  }
+
   document.querySelector("#resumeButton").addEventListener("click", () => {
-    if (!window.confirm("Resume all robot modules after the emergency stop?")) return;
-    send("resume", { confirmed: true })
-      .then(() => toast("Robot modules resumed."))
-      .catch(() => {});
+    resumeRobot().catch(() => {});
   });
 
   document.querySelector("#greetingButton").addEventListener("click", () => {
@@ -438,6 +455,10 @@
     if (!text) return;
     elements.chatInput.value = "";
     addMessage("user", text);
+    if (text === "/resume") {
+      resumeRobot(true).catch(() => {});
+      return;
+    }
     send("chat", { text }).catch(() => {});
   }
 

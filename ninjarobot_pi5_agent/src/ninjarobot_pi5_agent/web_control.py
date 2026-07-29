@@ -309,9 +309,8 @@ class WebRobotController:
         return result.model_dump(mode="json")
 
     async def resume(self, lease_id: str) -> dict[str, Any]:
-        result = await self._runtime.execute_tool(
-            tool_name="robot.system.resume",
-            arguments={},
+        self._runtime.disarm_motion(self.chat_session(lease_id))
+        result = await self._runtime.resume_system(
             session_id=self.control_session(lease_id),
             lease_id=lease_id,
             confirmed=True,

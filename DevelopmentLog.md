@@ -1,5 +1,62 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-29 — Health-checked `/resume` in agent chat
+
+### Summary
+
+Added a direct recovery command to both NinjaRobotAgent chat interfaces:
+
+- terminal chat recognizes `/resume`, asks the operator to type `RESUME`, and
+  sends a dedicated local service request instead of involving Ollama
+- web chat recognizes `/resume`, shows the existing browser confirmation
+  dialog, and sends the fixed Resume operation instead of an AI prompt
+- the shared runtime calls `robot.system.resume` with the IDE-required
+  `{"confirmed": true}` argument and confirmation policy
+- the existing web Y Resume path now uses the same shared boundary; its former
+  empty arguments could fail strict IDE validation
+- successful recovery restores the IDE-owned Idle loop
+- failed health checks keep the Level 2 latch and controls inactive
+- AI chat motion remains disarmed after recovery and still requires `/arm` or
+  **Arm AI Motion**
+
+### Main files changed
+
+- Agent runtime, Unix-socket IPC protocol, terminal chat, and web controller.
+- Mobile web chat JavaScript and recovery messages.
+- Agent IPC, CLI, and web regression tests.
+- Project, installation, developer, implementation-plan, log, and Raspberry
+  Pi validation documentation.
+
+No managed `pi5*` driver or nested NinjaClawBot file changed. Hardware access
+continues exclusively through `ninjarobot_pi5_ide`.
+
+### Why
+
+The IDE already had the correct confirmed Level 2 recovery: it probes the
+display/expression system, servos, distance sensor, camera, and microphone,
+clears the latch only when all probes pass, and restores Idle. The agent chat
+had no route to that capability, so the operator had to stop the single-owner
+service or use another interface. The web controller also sent an empty
+argument object even though the IDE schema requires `confirmed=true`.
+
+### Validation
+
+- Phase-focused Ruff, format, joint Agent+IDE MyPy, JavaScript syntax, IPC,
+  CLI, and web tests passed.
+- The complete gate passed with 306 tests and one known Starlette test-client
+  deprecation warning.
+- All 222 managed-driver files plus 25 authorized repairs matched the
+  immutable manifests.
+- Automated tests were simulation-only and did not energize hardware.
+
+### Raspberry Pi status
+
+Follow
+`docs/validation/phase-5-agent-chat-resume-validation-2026-07-29.md`.
+Test the health-check-only recovery first. Keep AI motion disarmed until Idle
+has returned, then raise both wheels before a separate `/arm` and one-second
+movement test.
+
 ## 2026-07-29 — Generated-behavior compiler and local-model recovery
 
 ### Summary

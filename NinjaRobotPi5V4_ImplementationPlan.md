@@ -2352,6 +2352,63 @@ Update `README.md`, `InstallationGuide.md`, `DevelopmentGuide.md`,
 `DevelopmentLog.md`, this plan, and
 `docs/validation/phase-5-behavior-generation-repair-validation-2026-07-29.md`.
 
+#### Phase 5.12 — Agent chat system recovery
+
+**Status**
+
+Implemented on 2026-07-29. Automated validation passes; health-check-only and
+raised-wheel Raspberry Pi acceptance remain operator work.
+
+**Objective**
+
+- Recover a Level 2 Emergency Stop without restarting the single-owner agent
+  service.
+- Support `/resume` in both terminal and web chat.
+- Reuse the IDE's existing confirmed, all-module health-checked system resume.
+- Restore Idle only after successful recovery.
+- Keep AI physical-motion authorization separate and disarmed.
+- Repair the existing web Y Resume path so it supplies the strict IDE
+  confirmation argument and never reports success after a failed probe.
+
+**Deliverables**
+
+- `AgentRuntime.resume_system()` as the shared non-bypassable recovery
+  boundary.
+- A dedicated owner-only IPC request for terminal chat.
+- Terminal `RESUME` confirmation and updated `/help`.
+- Web-chat command interception and browser confirmation without an Ollama
+  turn.
+- Clear success, cancellation, and failed-health-check messages.
+- Direct web controls reactivate only after success; AI chat still requires
+  `/arm` or **Arm AI Motion**.
+
+**Validation**
+
+- Missing confirmation refuses recovery.
+- Runtime submits `{"confirmed": true}` and policy confirmation.
+- Successful resume stays AI-disarmed.
+- Failed health result raises a clear error and does not reactivate controls.
+- IPC routes the exact session to the shared boundary.
+- Terminal cancellation sends no service request.
+- Terminal and web `/resume` do not become model prompts.
+- Web Y Resume shares the corrected path.
+- Full compilation, Ruff, formatting, strict MyPy, JavaScript syntax, 306-test
+  pytest, package-build, wheel-content, immutable-driver, and diff checks.
+
+**Hardware risk**
+
+Automated tests are simulation-only. A real resume initializes and probes
+configured modules but does not intentionally move servos, take a photograph,
+or record audio. A separate movement acceptance test must use raised wheels,
+explicit `/arm`, a one-second command, and an immediately accessible
+Emergency Stop.
+
+**Documentation**
+
+Update `README.md`, `InstallationGuide.md`, `DevelopmentGuide.md`,
+`DevelopmentLog.md`, this plan, and
+`docs/validation/phase-5-agent-chat-resume-validation-2026-07-29.md`.
+
 ### Phase 6: Cloud provider adapters
 
 **Objective**

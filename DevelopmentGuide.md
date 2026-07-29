@@ -1083,6 +1083,24 @@ enables its silent Idle supervisor. Normal behaviors preempt Idle and restore
 it when they finish. Level 1, Level 2, driver-failure, and shutdown screens are
 never overwritten by Idle; a successful Resume re-enables it.
 
+Agent chat recovery uses the same IDE-owned `system.resume` capability as the
+interactive IDE tool. `AgentRuntime.resume_system()` first requires explicit
+confirmation, revokes the requesting session's motion authorization, and
+submits both policy confirmation and `{"confirmed": true}` through the tool
+registry. The IDE then probes expressions/display, servos, the forward
+distance sensor, camera, and microphone. Only a successful result clears the
+Level 2 latch and restarts Idle. A failed result is raised to the caller,
+leaves controls inactive, and never reports a false recovery.
+
+Terminal and web chat treat the exact `/resume` command as local control input,
+not conversation text. The terminal requires the operator to type `RESUME`;
+the web interface uses a confirmation dialog. Neither path sends the command
+to Ollama or persists it as model context. The web Y button shares this
+runtime boundary and now includes the IDE's required confirmation argument.
+After web recovery, deterministic D-pad control is reactivated for the active
+lease, but the separate AI chat session remains disarmed until the operator
+uses **Arm AI Motion**. Terminal users likewise run `/arm` after `/resume`.
+
 Conversation presentation also stays behind `RobotIDEClient`. The agent may
 request only silent ambient faces; it never receives a display driver.
 Concurrent chat turns are serialized. The normal state order is Idle,

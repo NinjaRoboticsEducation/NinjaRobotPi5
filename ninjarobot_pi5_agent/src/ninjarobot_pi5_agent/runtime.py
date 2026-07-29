@@ -11,7 +11,13 @@ from ninjarobot_pi5_ide import RiskLevel
 from .agent_loop import AgentLoop, AgentReply, TextDeltaHandler
 from .events import AgentEventType, EventBroker
 from .model_selection import ModelCatalogEntry, ModelManager
-from .models import ProviderHealth, ToolCall, ToolExecutionResult, ToolInvocation
+from .models import (
+    ProviderHealth,
+    ToolCall,
+    ToolExecutionResult,
+    ToolExecutionStatus,
+    ToolInvocation,
+)
 from .persistence import ConversationStore
 from .policy import MotionArmManager, PolicyContext, PolicyEngine
 from .providers import LLMProvider
@@ -175,6 +181,32 @@ class AgentRuntime:
             lease_id=lease_id,
             requested_by=requested_by,
         )
+
+    async def resume_system(
+        self,
+        session_id: str,
+        *,
+        confirmed: bool,
+        lease_id: str | None = None,
+        requested_by: str = "local-controller",
+    ) -> ToolExecutionResult:
+        """Health-check and clear the system latch without re-arming AI motion."""
+        self._ensure_started()
+        if not confirmed:
+            raise PermissionError("system resume requires explicit confirmation")
+        self.disarm_motion(session_id)
+        result = await self.execute_tool(
+            tool_name="robot.system.resume",
+            arguments={"confirmed": True},
+            session_id=session_id,
+            lease_id=lease_id,
+            confirmed=True,
+            requested_by=requested_by,
+        )
+        if result.status is not ToolExecutionStatus.SUCCEEDED:
+            detail = result.error or "a required robot health check failed"
+            raise RuntimeError(f"system resume failed: {detail}")
+        return result
 
     async def execute_tool(
         self,

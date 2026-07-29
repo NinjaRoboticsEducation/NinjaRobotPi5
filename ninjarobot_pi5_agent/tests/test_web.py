@@ -102,6 +102,38 @@ class _RacingRuntime:
         return
 
 
+class _ResumeRuntime:
+    def __init__(self, *, fail: bool = False) -> None:
+        self.fail = fail
+        self.disarmed: list[str] = []
+        self.armed: list[tuple[str, str | None]] = []
+        self.resume_calls: list[dict[str, Any]] = []
+
+    def disarm_motion(self, session_id: str) -> None:
+        self.disarmed.append(session_id)
+
+    def arm_motion(
+        self,
+        session_id: str,
+        *,
+        confirmed: bool,
+        lease_id: str | None = None,
+    ) -> None:
+        assert confirmed is True
+        self.armed.append((session_id, lease_id))
+
+    async def resume_system(self, session_id: str, **arguments: Any) -> ToolExecutionResult:
+        self.resume_calls.append({"session_id": session_id, **arguments})
+        if self.fail:
+            raise RuntimeError("system resume failed: camera health check failed")
+        return ToolExecutionResult(
+            call_id="resume-web",
+            tool_name="robot.system.resume",
+            status=ToolExecutionStatus.SUCCEEDED,
+            data={"system_latched": False, "motion_latched": False},
+        )
+
+
 def test_pointer_release_cannot_race_a_pending_movement_start() -> None:
     async def exercise() -> None:
         runtime = _RacingRuntime()
@@ -116,6 +148,42 @@ def test_pointer_release_cannot_race_a_pending_movement_start() -> None:
         await stop
         assert runtime.behavior_cancelled is True
         assert runtime.servo_stop_calls == 2
+
+    asyncio.run(exercise())
+
+
+def test_web_resume_disarms_ai_and_reactivates_direct_control_only_after_success() -> None:
+    async def exercise() -> None:
+        runtime = _ResumeRuntime()
+        controller = WebRobotController(cast(AgentRuntime, runtime))
+
+        result = await controller.resume("lease-test")
+
+        assert result["status"] == "succeeded"
+        assert runtime.disarmed == ["web-chat-test"]
+        assert runtime.resume_calls == [
+            {
+                "session_id": "web-control-test",
+                "lease_id": "lease-test",
+                "confirmed": True,
+                "requested_by": "web-controller",
+            }
+        ]
+        assert runtime.armed == [("web-control-test", "lease-test")]
+
+    asyncio.run(exercise())
+
+
+def test_failed_web_resume_keeps_direct_control_inactive() -> None:
+    async def exercise() -> None:
+        runtime = _ResumeRuntime(fail=True)
+        controller = WebRobotController(cast(AgentRuntime, runtime))
+
+        with pytest.raises(RuntimeError, match="camera health check failed"):
+            await controller.resume("lease-test")
+
+        assert runtime.disarmed == ["web-chat-test"]
+        assert runtime.armed == []
 
     asyncio.run(exercise())
 
@@ -295,4 +363,8 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert "startController()" in javascript
     assert "motionBadge" not in javascript
     assert "certificate-status" in javascript
+    assert 'if (text === "/resume")' in javascript
+    assert 'send("resume", { confirmed: true })' in javascript
+    assert "AI motion remains disarmed" in javascript
+    assert "updateAiMotion(false)" in javascript
     assert (static / "manifest.webmanifest").is_file()

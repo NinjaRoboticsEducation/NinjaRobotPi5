@@ -18,7 +18,7 @@ which is the single source of truth.
 
 Phase 0, Phase 1, Phase 2, Phase 3.1 through Phase 3.5, and Phase 4 are
 implemented and the operator reports the complete Phase 4 and installation
-workflow passed. Phase 5.0 through Phase 5.11 and the 2026-07-29 agent/web and
+workflow passed. Phase 5.0 through Phase 5.12 and the 2026-07-29 agent/web and
 dynamic-behavior refinements are implemented and pass the local software gate.
 Raspberry Pi
 acceptance—including the Qwen3:4B
@@ -29,6 +29,8 @@ and the creative-action checklist in
 [`docs/validation/phase-5-dynamic-behavior-validation-2026-07-29.md`](docs/validation/phase-5-dynamic-behavior-validation-2026-07-29.md).
 The behavior-generation repair has its own focused checklist:
 [`docs/validation/phase-5-behavior-generation-repair-validation-2026-07-29.md`](docs/validation/phase-5-behavior-generation-repair-validation-2026-07-29.md).
+The terminal/web-chat recovery checklist is:
+[`docs/validation/phase-5-agent-chat-resume-validation-2026-07-29.md`](docs/validation/phase-5-agent-chat-resume-validation-2026-07-29.md).
 Phase 0 established project governance and preserved the
 original import hashes for the six existing Pi5 hardware libraries. Phase 1
 added strict IDE and agent contracts, deterministic fakes, V4-owned
@@ -296,7 +298,7 @@ The `ninjarobot-agent` additionally provides:
 
 - `service run|start|status|stop` for the single owner process
 - streaming `chat`, reconnectable sessions, seven-day transcripts, and
-  `/help`, `/exit`, `/clear`, `/status`, `/arm`, `/disarm`, and
+  `/help`, `/exit`, `/clear`, `/status`, `/resume`, `/arm`, `/disarm`, and
   `/confirm <request>`
 - `web start|status|stop` for the HTTPS local-network interface
 - `motion arm --confirm` for one CLI chat session's physical-motion consent
@@ -354,6 +356,14 @@ conservatively rerouted to the movement tool before policy evaluation. It
 still requires motion arming and passes every normal IDE and hardware guard.
 
 Use `/disarm` to revoke authorization and request an immediate servo stop.
+
+After a Level 2 Emergency Stop, enter `/resume` in either the terminal chat or
+the web chat box. Confirm the recovery when prompted. The agent calls the
+IDE-owned system resume directly—without asking Ollama—so every configured
+module is health-checked before the safety latch clears. A successful resume
+restores the looping Idle face but deliberately leaves AI motion disarmed.
+Enter `/arm` separately before requesting another servo movement. If any
+health check fails, the latch and Emergency Stop display remain active.
 
 Quitting a CLI disconnects only that terminal. Use `web stop` to stop the web
 interface and `service stop` to release the model, IDE, hardware, MCP, database,

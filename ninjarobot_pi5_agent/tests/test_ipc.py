@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
+
+import pytest
+from ninjarobot_pi5_agent.models import ToolExecutionResult, ToolExecutionStatus
 
 from ninjarobot_pi5_agent import (
     AgentIPCClient,
@@ -103,6 +107,69 @@ def build_runtime(tmp_path) -> AgentRuntime:
     )
 
 
+def test_runtime_resume_is_confirmed_health_checked_and_does_not_rearm(tmp_path) -> None:
+    async def exercise() -> None:
+        runtime = build_runtime(tmp_path)
+        await runtime.start()
+        runtime.arm_motion("local-cli", confirmed=True)
+        succeeded = ToolExecutionResult(
+            call_id="resume-1",
+            tool_name="robot.system.resume",
+            status=ToolExecutionStatus.SUCCEEDED,
+            data={"system_latched": False, "motion_latched": False},
+        )
+        execute_tool = AsyncMock(return_value=succeeded)
+        runtime.execute_tool = execute_tool
+
+        result = await runtime.resume_system(
+            "local-cli",
+            confirmed=True,
+            requested_by="test-resume",
+        )
+
+        assert result is succeeded
+        assert runtime.motion_arms.is_armed("local-cli") is False
+        execute_tool.assert_awaited_once_with(
+            tool_name="robot.system.resume",
+            arguments={"confirmed": True},
+            session_id="local-cli",
+            lease_id=None,
+            confirmed=True,
+            requested_by="test-resume",
+        )
+
+        runtime.arm_motion("local-cli", confirmed=True)
+        with pytest.raises(PermissionError, match="explicit confirmation"):
+            await runtime.resume_system("local-cli", confirmed=False)
+        assert runtime.motion_arms.is_armed("local-cli") is True
+        await runtime.close()
+
+    asyncio.run(exercise())
+
+
+def test_runtime_resume_failure_stays_disarmed_and_reports_health_error(tmp_path) -> None:
+    async def exercise() -> None:
+        runtime = build_runtime(tmp_path)
+        await runtime.start()
+        runtime.arm_motion("local-cli", confirmed=True)
+        runtime.execute_tool = AsyncMock(
+            return_value=ToolExecutionResult(
+                call_id="resume-failed",
+                tool_name="robot.system.resume",
+                status=ToolExecutionStatus.FAILED,
+                error="a required robot health check failed",
+            )
+        )
+
+        with pytest.raises(RuntimeError, match="required robot health check failed"):
+            await runtime.resume_system("local-cli", confirmed=True)
+
+        assert runtime.motion_arms.is_armed("local-cli") is False
+        await runtime.close()
+
+    asyncio.run(exercise())
+
+
 def test_ipc_allows_reconnect_stream_history_clear_arm_and_stop(tmp_path) -> None:
     async def exercise() -> None:
         socket_path = tmp_path / "agent.sock"
@@ -153,6 +220,50 @@ def test_ipc_allows_reconnect_stream_history_clear_arm_and_stop(tmp_path) -> Non
         await serve_task
         await server.close()
         assert not socket_path.exists()
+
+    asyncio.run(exercise())
+
+
+def test_ipc_resume_routes_to_the_confirmed_runtime_boundary(tmp_path) -> None:
+    async def exercise() -> None:
+        socket_path = tmp_path / "agent.sock"
+        runtime = build_runtime(tmp_path)
+        resumed = ToolExecutionResult(
+            call_id="resume-ipc",
+            tool_name="robot.system.resume",
+            status=ToolExecutionStatus.SUCCEEDED,
+            data={"system_latched": False, "motion_latched": False},
+        )
+        resume_system = AsyncMock(return_value=resumed)
+        runtime.resume_system = resume_system
+        server = AgentIPCServer(
+            runtime=runtime,
+            socket_path=socket_path,
+            ownership=ServiceOwnership(tmp_path / "agent.lock"),
+        )
+        await server.start()
+        serve_task = asyncio.create_task(server.serve())
+        client = AgentIPCClient(socket_path)
+
+        response = await client.request(
+            {
+                "command": "resume_system",
+                "session_id": "local-cli",
+                "confirmed": True,
+            }
+        )
+
+        assert response["data"]["status"] == "succeeded"
+        assert response["data"]["data"]["system_latched"] is False
+        resume_system.assert_awaited_once_with(
+            "local-cli",
+            confirmed=True,
+            lease_id=None,
+            requested_by="ipc-resume",
+        )
+        await client.request({"command": "stop"})
+        await serve_task
+        await server.close()
 
     asyncio.run(exercise())
 

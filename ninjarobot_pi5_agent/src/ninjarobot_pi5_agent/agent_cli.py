@@ -523,7 +523,7 @@ async def _chat_repl(arguments: argparse.Namespace, *, session_id: str) -> int:
             return 0
         if text == "/help":
             print(
-                "/help  /exit  /clear  /status  /arm  /disarm  "
+                "/help  /exit  /clear  /status  /resume  /arm  /disarm  "
                 "/confirm <request>\nOrdinary text is sent to NinjaRobot."
             )
             continue
@@ -535,6 +535,9 @@ async def _chat_repl(arguments: argparse.Namespace, *, session_id: str) -> int:
             continue
         if text == "/status":
             await _service_request(arguments, {"command": "status"})
+            continue
+        if text == "/resume":
+            await _resume_from_chat(arguments, session_id=session_id)
             continue
         if text == "/arm":
             confirmation = (
@@ -591,6 +594,35 @@ async def _chat_repl(arguments: argparse.Namespace, *, session_id: str) -> int:
             )
         except AgentIPCError as exc:
             print(f"Error: {exc}")
+
+
+async def _resume_from_chat(arguments: argparse.Namespace, *, session_id: str) -> None:
+    """Confirm and run health-checked system recovery without invoking the model."""
+    confirmation = (
+        await asyncio.to_thread(
+            input,
+            "Type RESUME to health-check and recover all robot modules: ",
+        )
+    ).strip()
+    if confirmation != "RESUME":
+        print("System resume was cancelled.")
+        return
+    try:
+        await _service_request(
+            arguments,
+            {
+                "command": "resume_system",
+                "session_id": session_id,
+                "confirmed": True,
+            },
+        )
+    except AgentIPCError as exc:
+        print(f"Resume failed: {exc}")
+        return
+    print(
+        "Robot modules resumed and Idle restored. "
+        "AI motion remains disarmed; use /arm before requesting servo movement."
+    )
 
 
 async def _run_service_command(arguments: argparse.Namespace) -> int:

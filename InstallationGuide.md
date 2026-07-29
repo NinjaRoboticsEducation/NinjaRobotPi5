@@ -816,6 +816,20 @@ small local model needs more than five minutes to reason. It ends only when
 you use `/disarm`, trigger Emergency Stop, disconnect the controlling browser,
 change models, or stop the service.
 
+If Emergency Stop is triggered, you do not need to restart the service. In the
+terminal chat, enter:
+
+```text
+/resume
+```
+
+Type `RESUME` when asked. In the web chat box, enter `/resume` and approve the
+browser confirmation dialog. Both paths directly run the IDE's all-module
+health checks; the command is not sent to the AI model. On success, the
+Emergency Stop latch clears and Idle returns. AI motion remains disarmed, so
+enter `/arm` or use **Arm AI Motion** separately before asking the model to
+move a servo.
+
 Try a non-moving creative expression first:
 
 ```text
@@ -1233,6 +1247,27 @@ uv run --frozen --extra hardware ninjarobot-ide-tool \
 ```
 
 Resume only after correcting the cause and making sure the robot is safe.
+
+When the NinjaRobotAgent service owns the hardware, use its chat command
+instead of starting a second IDE process:
+
+```bash
+uv run --frozen ninjarobot-agent
+```
+
+Then enter:
+
+```text
+/resume
+RESUME
+```
+
+Expected result: the command reports a successful `robot.system.resume`,
+restores Idle, and states that AI motion remains disarmed. If display,
+servos, distance sensor, camera, or microphone fails its health check, resume
+is refused and the Emergency Stop state remains active. Correct the reported
+hardware or dependency issue and try `/resume` again. Do not repeatedly retry
+without correcting the failed health check.
 
 #### Agent service is unavailable
 

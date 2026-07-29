@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import json
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 from ninjarobot_pi5_agent.agent_cli import main
@@ -9,6 +12,7 @@ from ninjarobot_pi5_agent.ollama import OllamaModelInfo, OllamaProvider
 from ninjarobot_pi5_agent.secrets import SecretStore
 from ninjarobot_pi5_ide.config_import import default_robot_config, save_robot_config
 
+from ninjarobot_pi5_agent import agent_cli
 from ninjarobot_pi5_ide import load_robot_config
 
 from .test_skills import write_skill
@@ -18,6 +22,55 @@ def run_cli(arguments: list[str]) -> None:
     with pytest.raises(SystemExit) as exit_info:
         main(arguments)
     assert exit_info.value.code == 0
+
+
+def test_chat_resume_requires_confirmation_and_bypasses_the_model(
+    monkeypatch,
+    capsys,
+) -> None:
+    inputs = iter(("/help", "/resume", "RESUME", "/exit"))
+    monkeypatch.setattr("builtins.input", lambda _prompt="": next(inputs))
+    service_request = AsyncMock(return_value=0)
+    monkeypatch.setattr(agent_cli, "_service_request", service_request)
+
+    result = asyncio.run(
+        agent_cli._chat_repl(  # noqa: SLF001
+            SimpleNamespace(),
+            session_id="local-cli",
+        )
+    )
+
+    assert result == 0
+    service_request.assert_awaited_once_with(
+        SimpleNamespace(),
+        {
+            "command": "resume_system",
+            "session_id": "local-cli",
+            "confirmed": True,
+        },
+    )
+    output = capsys.readouterr().out
+    assert "/resume" in output
+    assert "Idle restored" in output
+    assert "AI motion remains disarmed" in output
+
+
+def test_chat_resume_cancellation_sends_no_service_request(monkeypatch, capsys) -> None:
+    inputs = iter(("/resume", "NO", "/exit"))
+    monkeypatch.setattr("builtins.input", lambda _prompt="": next(inputs))
+    service_request = AsyncMock(return_value=0)
+    monkeypatch.setattr(agent_cli, "_service_request", service_request)
+
+    result = asyncio.run(
+        agent_cli._chat_repl(  # noqa: SLF001
+            SimpleNamespace(),
+            session_id="local-cli",
+        )
+    )
+
+    assert result == 0
+    service_request.assert_not_awaited()
+    assert "System resume was cancelled." in capsys.readouterr().out
 
 
 def test_agent_cli_manages_tavily_configuration(tmp_path, capsys) -> None:
