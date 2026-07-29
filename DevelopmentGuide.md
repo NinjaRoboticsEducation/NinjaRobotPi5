@@ -792,7 +792,7 @@ Bundled assets refuse deletion.
 
 ## Implemented Phase 5 agent and extension contracts
 
-Phase 5.0 through Phase 5.10 implement these contracts. The software gate
+Phase 5.0 through Phase 5.11 implement these contracts. The software gate
 passes; the Raspberry Pi acceptance checklist remains operator work.
 
 ### Agent and service boundaries
@@ -945,7 +945,7 @@ sessions, SQLite transcripts, motion arms, events, and the optional FastAPI
 server.
 
 Ollama accepts only loopback base URLs. The Qwen3:4B candidate uses a 4,096
-token context, 512 output-token limit, temperature 0.1, bounded model turns,
+token context, 1,024 output-token limit, temperature 0.1, bounded model turns,
 bounded tool calls, a 600-second complete-request limit, and a 120-second
 inactivity limit. Private thinking chunks reset inactivity without being
 displayed or logged.
@@ -1003,6 +1003,60 @@ stage rules, and configured logical servo roles. The prompt tells the model to
 call a trusted tool for an actionable request instead of explaining an action
 that it can execute. The deterministic policy still decides whether that call
 may reach the IDE.
+
+### Generated-behavior compatibility boundary
+
+`BehaviorDraftCompiler` is the single compatibility boundary between variable
+local-model output and the strict Phase 4 behavior schema. It accepts the
+canonical saved format and a smaller transient draft format:
+
+```json
+{
+  "name": "exciting_forward",
+  "description": "Move briefly while looking excited.",
+  "stages": [
+    {
+      "face": "exciting",
+      "melody": "exciting",
+      "movement": "move_forward",
+      "duration_seconds": 1
+    }
+  ]
+}
+```
+
+The compiler assigns missing stage names, resolves named movement assets
+through configured logical servo roles, converts note names such as `C5` to
+frequency, recognizes documented melody aliases, supplies a finite one-second
+default for transient movement, and separates display or buzzer conflicts into
+ordered stages. It never accepts raw GPIO as a logical role and never changes
+servo calibration or motion limits.
+
+Invalid model output raises `BEHAVIOR_DRAFT_INVALID` with field-specific
+correction guidance, `definitely_not_executed = true`, and safe retry
+classification. The agent can therefore repair the JSON without reporting the
+former generic unexpected-system failure or guessing whether hardware moved.
+The published model schema remains compact and avoids deeply nested JSON
+Schema alternatives that small local models commonly mishandle. The strict
+canonical schema remains authoritative for saved user behaviors.
+
+The bundled `robot-behavior-generation` skill contains the compact workflow
+and expression/movement examples. Essential routing rules also remain in the
+base prompt so normal CLI and web chats do not require manual skill selection.
+If a model explicitly sends movement-bearing JSON to
+`robot.behavior.execute_expression`, the agent changes only the tool name to
+`robot.behavior.execute_movement` before policy evaluation. This correction
+requires an unmistakable structured motion field; it never infers motion from
+prose. Consequently, an unarmed call is still denied and an armed call still
+passes the normal motion policy and IDE safety boundary.
+
+Ollama streaming retries once only when a connection or protocol read fails
+before any visible response text is delivered. It never retries after visible
+output, and model generation completes before a robot tool is executed, so
+this transport retry cannot duplicate a hardware action. The local IPC server
+also treats a disconnected client as a normal connection loss instead of
+raising a second error while trying to write an error response to that same
+closed socket.
 
 The web server is started and stopped through IPC, so it cannot create a
 second IDE or hardware owner. It uses a generated local certificate authority,

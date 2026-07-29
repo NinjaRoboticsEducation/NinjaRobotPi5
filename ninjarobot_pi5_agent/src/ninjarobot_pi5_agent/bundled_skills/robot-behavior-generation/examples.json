@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "examples": [
+    {
+      "input": {
+        "request": "Show a happy face and play a short tone."
+      },
+      "expected_tools": [
+        "robot.behavior.execute_expression"
+      ],
+      "simulation_only": true
+    },
+    {
+      "input": {
+        "request": "Move forward for one second with an exciting face."
+      },
+      "expected_tools": [
+        "robot.behavior.execute_movement"
+      ],
+      "simulation_only": true
+    },
+    {
+      "input": {
+        "request": "Save the behavior after I confirm it.",
+        "save_requested": true
+      },
+      "expected_tools": [
+        "robot.behavior.save_user"
+      ],
+      "simulation_only": true
+    }
+  ]
+}

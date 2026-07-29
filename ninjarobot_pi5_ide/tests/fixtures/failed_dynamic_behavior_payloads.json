@@ -1,0 +1,204 @@
+[
+  {
+    "case": "movement_role_forward",
+    "capability": "behavior.execute_movement",
+    "arguments": {
+      "schema_version": 1,
+      "name": "move_forward_simple",
+      "description": "A simple forward movement.",
+      "category": "movement",
+      "stages": [
+        {
+          "operations": [
+            {
+              "role": "drive",
+              "value": "forward"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "case": "movement_drive_forward_role",
+    "capability": "behavior.execute_movement",
+    "arguments": {
+      "schema_version": 1,
+      "name": "move_forward_attempt",
+      "description": "Moving forward slightly.",
+      "category": "movement",
+      "stages": [
+        {
+          "operations": [
+            {
+              "role": "drive_forward",
+              "value": 10
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "case": "expression_nested_shorthand",
+    "capability": "behavior.execute_expression",
+    "arguments": {
+      "schema_version": 1,
+      "name": "greeting_expression",
+      "description": "Two-stage greeting: happy face with tone, then text with happy melody.",
+      "category": "expression",
+      "stages": [
+        {
+          "operations": [
+            {
+              "face": "happy"
+            },
+            {
+              "tone": {
+                "duration_seconds": 0.2,
+                "frequency_hz": 880
+              }
+            }
+          ]
+        },
+        {
+          "operations": [
+            {
+              "melody": "happy"
+            },
+            {
+              "text": "Hello Ninja"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "case": "expression_unknown_melody",
+    "capability": "behavior.execute_expression",
+    "arguments": {
+      "schema_version": 1,
+      "name": "musical_greeting",
+      "description": "A short musical greeting.",
+      "category": "expression",
+      "stages": [
+        {
+          "operations": [
+            {
+              "face": "happy"
+            },
+            {
+              "melody": "C-major-scale"
+            },
+            {
+              "text": "♪ ♫ ♪"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "case": "movement_servo_role_shorthand",
+    "capability": "behavior.execute_movement",
+    "arguments": {
+      "schema_version": 1,
+      "name": "move_forward_short",
+      "description": "Move forward briefly.",
+      "category": "movement",
+      "stages": [
+        {
+          "operations": [
+            {
+              "face": "exciting"
+            },
+            {
+              "servo_role": "drive_forward"
+            },
+            {
+              "text": "走ります！"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "case": "expression_flat_song",
+    "capability": "behavior.execute_expression",
+    "arguments": {
+      "schema_version": 1,
+      "name": "sing_song",
+      "description": "Singing a happy song",
+      "category": "expression",
+      "stages": [
+        {
+          "face": "happy",
+          "melody": "happy_tune",
+          "text": "La la la! ♪",
+          "tone": "C5"
+        }
+      ]
+    }
+  },
+  {
+    "case": "expression_flat_sad_song",
+    "capability": "behavior.execute_expression",
+    "arguments": {
+      "schema_version": 1,
+      "name": "sad_song",
+      "description": "Singing a sad song with a cry face",
+      "category": "expression",
+      "stages": [
+        {
+          "face": "cry",
+          "melody": "sad_tune",
+          "text": "Boo hoo... ♪",
+          "tone": "G3"
+        }
+      ]
+    }
+  },
+  {
+    "case": "movement_without_drive",
+    "capability": "behavior.execute_movement",
+    "arguments": {
+      "schema_version": 1,
+      "name": "turn_around",
+      "description": "Turning around 360 degrees",
+      "category": "movement",
+      "stages": [
+        {
+          "face": "curious",
+          "text": "Turning around!"
+        }
+      ]
+    }
+  },
+  {
+    "case": "expression_operations_shorthand",
+    "capability": "behavior.execute_expression",
+    "arguments": {
+      "schema_version": 1,
+      "name": "sing_exciting_song",
+      "description": "Singing a song with an exciting face for 10 seconds.",
+      "category": "expression",
+      "stages": [
+        {
+          "operations": [
+            {
+              "face": "exciting"
+            },
+            {
+              "melody": "happy"
+            },
+            {
+              "text": "♪ La la la! I'm NinjaRobot! ♪"
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

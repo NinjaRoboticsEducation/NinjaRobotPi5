@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "id": "robot-behavior-generation",
+  "version": "1.0.0",
+  "name": "Robot Behavior Generation",
+  "description": "Plan and execute safe transient NinjaRobot expressions and movements from natural-language requests.",
+  "activation_examples": [
+    "Create a happy face and melody greeting",
+    "Move forward while showing an exciting face",
+    "Build a multi-stage robot behavior",
+    "Save the behavior we just tested"
+  ],
+  "allowed_tools": [
+    "robot.behavior.list",
+    "robot.behavior.run",
+    "robot.behavior.execute_expression",
+    "robot.behavior.execute_movement",
+    "robot.behavior.save_user",
+    "robot.behavior.stop",
+    "robot.servo.stop"
+  ],
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "request": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      },
+      "save_requested": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "request"
+    ],
+    "additionalProperties": false
+  },
+  "limits": {
+    "max_model_turns": 6,
+    "max_tool_calls": 8,
+    "timeout_seconds": 600.0
+  },
+  "safety": {
+    "external_content": "untrusted",
+    "physical_motion": "session_armed"
+  }
+}

@@ -483,6 +483,106 @@ def test_agent_loop_executes_agent_composed_movement_when_session_is_armed(
     asyncio.run(exercise())
 
 
+def test_agent_loop_corrects_explicit_movement_sent_to_expression_tool(
+    tmp_path,
+) -> None:
+    async def exercise() -> None:
+        draft = {
+            "name": "agent_forward",
+            "description": "Move forward briefly with an excited face.",
+            "stages": [
+                {
+                    "face": "exciting",
+                    "movement": "move_forward",
+                    "duration_seconds": 1.0,
+                }
+            ],
+        }
+        turns = [
+            ModelTurn(
+                request_id="id-2",
+                finish_reason=FinishReason.TOOL_CALLS,
+                tool_calls=(
+                    ToolCall(
+                        call_id="call-1",
+                        name="robot.behavior.execute_expression",
+                        arguments=draft,
+                    ),
+                ),
+            ),
+            ModelTurn(
+                request_id="id-5",
+                text="I moved forward and stopped.",
+                finish_reason=FinishReason.STOP,
+            ),
+        ]
+        loop, store, registry, ide = await build_loop(
+            tmp_path,
+            turns,
+            risk=RiskLevel.MOTION,
+            capability_name="behavior.execute_movement",
+            input_schema={"type": "object"},
+            arm_session="session-1",
+        )
+
+        reply = await loop.chat(session_id="session-1", text="Move forward")
+
+        assert reply.tool_calls == 1
+        assert len(ide.requests) == 1
+        assert ide.requests[0].capability == "behavior.execute_movement"
+        assert ide.requests[0].arguments == draft
+        messages = await store.messages("session-1")
+        assert messages[1].message.tool_calls[0].name == "robot.behavior.execute_movement"
+        await registry.close()
+        await store.close()
+
+    asyncio.run(exercise())
+
+
+def test_corrected_movement_call_still_requires_motion_arming(tmp_path) -> None:
+    async def exercise() -> None:
+        turns = [
+            ModelTurn(
+                request_id="id-2",
+                finish_reason=FinishReason.TOOL_CALLS,
+                tool_calls=(
+                    ToolCall(
+                        call_id="call-1",
+                        name="robot.behavior.execute_expression",
+                        arguments={
+                            "name": "agent_forward",
+                            "stages": [{"movement": "move_forward"}],
+                        },
+                    ),
+                ),
+            ),
+            ModelTurn(
+                request_id="id-5",
+                text="Motion is not armed, so I did not move.",
+                finish_reason=FinishReason.STOP,
+            ),
+        ]
+        loop, store, registry, ide = await build_loop(
+            tmp_path,
+            turns,
+            risk=RiskLevel.MOTION,
+            capability_name="behavior.execute_movement",
+            input_schema={"type": "object"},
+        )
+
+        reply = await loop.chat(session_id="session-1", text="Move forward")
+
+        assert "not armed" in reply.text
+        assert ide.requests == []
+        messages = await store.messages("session-1")
+        assert messages[1].message.tool_calls[0].name == "robot.behavior.execute_movement"
+        assert "Motion is not armed" in messages[2].message.content
+        await registry.close()
+        await store.close()
+
+    asyncio.run(exercise())
+
+
 def test_session_cancellation_prevents_a_delayed_model_motion_call(tmp_path) -> None:
     async def exercise() -> None:
         provider = _DelayedMotionProvider()

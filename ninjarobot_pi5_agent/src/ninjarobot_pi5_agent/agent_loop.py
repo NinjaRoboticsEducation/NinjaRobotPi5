@@ -52,7 +52,7 @@ class AgentLoopConfig(BaseModel):
     max_tool_calls: Annotated[int, Field(ge=0, le=50)] = 8
     request_timeout_seconds: Annotated[float, Field(gt=0, le=600)] = 600.0
     model_inactivity_timeout_seconds: Annotated[float, Field(gt=0, le=600)] = 120.0
-    max_output_tokens: Annotated[int, Field(ge=32, le=4096)] = 512
+    max_output_tokens: Annotated[int, Field(ge=32, le=4096)] = 1024
 
 
 class AgentReply(BaseModel):
@@ -257,6 +257,18 @@ class AgentLoop:
                     tool_calls=completed_tool_calls,
                 )
 
+            available_tool_names = {definition.name for definition in definitions}
+            turn = turn.model_copy(
+                update={
+                    "tool_calls": tuple(
+                        _normalize_behavior_tool_call(
+                            call,
+                            available_tool_names=available_tool_names,
+                        )
+                        for call in turn.tool_calls
+                    )
+                }
+            )
             assistant = ModelMessage(
                 role=MessageRole.ASSISTANT,
                 content=turn.text,
@@ -468,3 +480,45 @@ class AgentLoop:
                 session_id=session_id,
                 data={"error": f"{type(exc).__name__}: {exc}"},
             )
+
+
+def _normalize_behavior_tool_call(
+    call: ToolCall,
+    *,
+    available_tool_names: set[str],
+) -> ToolCall:
+    """Correct a known model routing error without weakening motion policy."""
+    expression_tool = "robot.behavior.execute_expression"
+    movement_tool = "robot.behavior.execute_movement"
+    if (
+        call.name == expression_tool
+        and movement_tool in available_tool_names
+        and _contains_explicit_motion(call.arguments)
+    ):
+        return call.model_copy(update={"name": movement_tool})
+    return call
+
+
+def _contains_explicit_motion(value: Any) -> bool:
+    """Return whether structured arguments explicitly describe servo motion."""
+    if isinstance(value, list):
+        return any(_contains_explicit_motion(item) for item in value)
+    if not isinstance(value, dict):
+        return False
+
+    movement = value.get("movement")
+    if isinstance(movement, str) and movement.strip():
+        return True
+    if isinstance(value.get("drive_targets"), dict):
+        return True
+    if isinstance(value.get("servo_role"), str):
+        return True
+
+    kind = value.get("kind")
+    if isinstance(kind, str) and kind.casefold() in {"drive", "servo"}:
+        return True
+    role = value.get("role")
+    if isinstance(role, str) and role.casefold() in {"drive", "move", "movement", "turn"}:
+        return True
+
+    return any(_contains_explicit_motion(item) for item in value.values())

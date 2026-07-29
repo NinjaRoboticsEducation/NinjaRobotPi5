@@ -2284,6 +2284,74 @@ Update `README.md`, `InstallationGuide.md`, `DevelopmentGuide.md`,
 `DevelopmentLog.md`, this implementation plan, and
 `docs/validation/phase-5-dynamic-behavior-validation-2026-07-29.md`.
 
+#### Phase 5.11 — Generated-behavior compatibility and recovery
+
+**Status**
+
+Implemented on 2026-07-29. The complete local software gate passes; the dated
+Raspberry Pi simulation, expression, and raised-wheel movement checklist
+remains operator work.
+
+**Objective**
+
+- Reproduce the generic failure from the operator's persisted conversation and
+  action history.
+- Give small local models a compact behavior-draft format while preserving the
+  strict canonical format used for saved behaviors.
+- Add a bundled robot-behavior-generation skill with exact expression and
+  movement workflows.
+- Return correctable validation feedback without implying that hardware may
+  have moved when validation failed before execution.
+- Recover conservatively from a known movement/expression tool-name routing
+  error without weakening motion policy.
+- Make pre-output Ollama transport failures and disconnected IPC clients
+  recover cleanly.
+
+**IDE deliverables**
+
+- `BehaviorDraftCompiler` for compact and canonical definitions.
+- Safe stage-name and finite-duration defaults.
+- Named movement resolution through configured logical roles.
+- Note-name conversion and documented melody alias normalization.
+- Ordered splitting of same-stage display or buzzer conflicts.
+- `BEHAVIOR_DRAFT_INVALID`, marked definitely not executed and safe to retry.
+
+**Agent deliverables**
+
+- Bundled `robot-behavior-generation` skill.
+- Essential compact-format and expression-versus-movement rules in the base
+  prompt for normal CLI and web sessions.
+- A 1,024-token output allowance for local models.
+- Structured-only correction of explicit motion sent to the expression tool;
+  the corrected movement call is evaluated by the normal arm and tool policy.
+- One Ollama retry only for connection/read failure before visible output.
+- IPC disconnect handling that avoids secondary write failures.
+
+**Validation**
+
+- Nine real failed payloads preserved as non-sensitive regression fixtures.
+- Compact and canonical expression/movement compiler tests.
+- Invalid-draft pre-execution and safe-retry tests.
+- Bundled-skill validation and simulation tests.
+- Armed correction reaches the movement capability; unarmed correction is
+  denied without an IDE request.
+- Pre-output retry, post-output no-retry, and IPC disconnect tests.
+- Full compilation, Ruff, formatting, strict MyPy, 299-test pytest, package
+  build, wheel-content, immutable-driver, and diff checks.
+
+**Hardware risk**
+
+Automated validation is simulation-only. Physical expression checks energize
+the display and buzzer. Physical movement acceptance must use raised wheels,
+one-second finite movement, an armed matching session, and an immediately
+accessible Emergency Stop. No managed `pi5*` driver changed.
+
+**Documentation**
+
+Update `README.md`, `InstallationGuide.md`, `DevelopmentGuide.md`,
+`DevelopmentLog.md`, this plan, and
+`docs/validation/phase-5-behavior-generation-repair-validation-2026-07-29.md`.
+
 ### Phase 6: Cloud provider adapters
 
 **Objective**

@@ -1,5 +1,68 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-29 — Generated-behavior compiler and local-model recovery
+
+### Summary
+
+Reproduced the reported “I've encountered an unexpected system failure”
+against the operator's real test databases and repaired the behavior-generation
+path without changing any Pi5 hardware library:
+
+- recovered nine failed dynamic-behavior calls from the conversation and
+  action ledgers; every one used model shorthand instead of the IDE's strict
+  canonical behavior schema
+- added a compact behavior-draft compiler that accepts common flat stage
+  fields, canonical definitions, named movement assets, note names, and known
+  melody aliases
+- added the bundled, non-executable `robot-behavior-generation` agent skill
+  with exact expression and movement examples
+- changed pre-execution draft failures to the actionable
+  `BEHAVIOR_DRAFT_INVALID` code with safe retry guidance
+- conservatively corrects an expression-tool call to the movement tool only
+  when its structured JSON explicitly contains motion; policy evaluation
+  occurs after correction, so unarmed motion remains denied
+- increased the local-model output allowance from 512 to 1,024 tokens and
+  strengthened the base prompt to call the correct trusted tool before prose
+- retries an Ollama connection/read failure once only before visible output
+  and hardens IPC cleanup when a client disconnects
+
+### Root cause and safety boundary
+
+Display, buzzer, servo-stop, and simple IDE actions in the same real history
+succeeded. The failure was not a hardware-driver or calibration problem. The
+models omitted required stage names and canonical `operations`/`kind` fields,
+used flat `face`, `melody`, or `movement` keys, and sometimes selected the
+expression tool for movement. Strict IDE validation then failed, and the prior
+agent converted that correct rejection into a generic failure message.
+
+The new compiler runs inside `ninjarobot_pi5_ide`. It never imports or changes
+a driver, never maps movement directly to GPIO, and never bypasses arming,
+calibration, obstacle, latch, resource, cancellation, or servo-limit checks.
+Invalid drafts are rejected before execution. The agent still reaches hardware
+only through the IDE.
+
+### Validation
+
+- immutable-driver verification passed before and after implementation: 222
+  tracked files plus 25 authorized repairs
+- compilation, Ruff lint, Ruff format, and strict MyPy passed
+- 299 automated tests passed; the only warning is the existing Starlette
+  `TestClient` deprecation notice
+- agent and IDE source distributions and wheels built successfully
+- wheel inspection confirmed the compiler and all three bundled skill files
+- hardware-free local-model probes showed Qwen3.5:0.8B produced a usable
+  compact movement draft; Qwen3.5:2B exhibited the corrected tool-name routing
+  case; Qwen3:1.7B and Qwen3:4B did not reliably reach a tool call within the
+  tested output/time bounds and remain model-quality limitations
+
+### Raspberry Pi status
+
+Automated tests did not energize hardware. Follow
+`docs/validation/phase-5-behavior-generation-repair-validation-2026-07-29.md`.
+Run expressions in simulation first, then use raised wheels, a one-second
+movement, the correct armed session, and an immediately accessible Emergency
+Stop for physical acceptance.
+
 ## 2026-07-29 — Session-lived AI motion and creative behavior composition
 
 ### Summary

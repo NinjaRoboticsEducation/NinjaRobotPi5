@@ -70,6 +70,7 @@ def test_bundled_skills_validate_and_simulate_without_execution(tmp_path) -> Non
     assert [skill.manifest.id for skill in skills] == [
         "current-web-answer",
         "offline-robot-check",
+        "robot-behavior-generation",
     ]
     offline = repository.get(
         "offline-robot-check",
@@ -78,6 +79,24 @@ def test_bundled_skills_validate_and_simulate_without_execution(tmp_path) -> Non
     preview = repository.simulate(offline, {})
     assert preview["simulation_only"] is True
     assert preview["allowed_tools"] == ["robot.distance.read"]
+    behavior = repository.get(
+        "robot-behavior-generation",
+        available_tools={
+            "robot.behavior.list",
+            "robot.behavior.run",
+            "robot.behavior.execute_expression",
+            "robot.behavior.execute_movement",
+            "robot.behavior.save_user",
+            "robot.behavior.stop",
+            "robot.servo.stop",
+        },
+    )
+    behavior_preview = repository.simulate(
+        behavior,
+        {"request": "Show a happy face and tone."},
+    )
+    assert behavior_preview["simulation_only"] is True
+    assert "robot.behavior.execute_expression" in behavior_preview["allowed_tools"]
 
 
 def test_skill_rejects_symlinks_unexpected_files_paths_and_prompt_override(

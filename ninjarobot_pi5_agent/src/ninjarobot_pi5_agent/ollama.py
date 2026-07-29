@@ -46,7 +46,7 @@ class OllamaConfig(BaseModel):
     base_url: str = "http://127.0.0.1:11434"
     model: Annotated[str, StringConstraints(min_length=1, max_length=100)] = "qwen3:4b"
     context_window: Annotated[int, Field(ge=1024, le=16_384)] = 4096
-    max_output_tokens: Annotated[int, Field(ge=32, le=4096)] = 512
+    max_output_tokens: Annotated[int, Field(ge=32, le=4096)] = 1024
     temperature: Annotated[float, Field(ge=0, le=1)] = 0.1
     keep_alive: Annotated[str, StringConstraints(min_length=1, max_length=20)] = "30m"
     think: bool = False
@@ -124,59 +124,72 @@ class OllamaProvider:
     async def stream(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
         """Yield private activity, text deltas, then one normalized turn."""
         self._ensure_open()
-        accumulated_text: list[str] = []
-        accumulated_calls: list[dict[str, Any]] = []
-        final_payload: dict[str, Any] | None = None
-        try:
-            async with self._client.stream(
-                "POST",
-                "/api/chat",
-                json=self._payload(request, stream=True),
-                timeout=request.timeout_seconds,
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if not line:
-                        continue
-                    decoded = json.loads(line)
-                    if not isinstance(decoded, dict):
-                        raise OllamaProtocolError("Ollama stream item must be an object")
-                    message = decoded.get("message", {})
-                    if not isinstance(message, dict):
-                        raise OllamaProtocolError("Ollama stream message must be an object")
-                    content = message.get("content", "")
-                    if not isinstance(content, str):
-                        raise OllamaProtocolError("Ollama stream content must be text")
-                    thinking = message.get("thinking", "")
-                    if not isinstance(thinking, str):
-                        raise OllamaProtocolError("Ollama stream thinking must be text")
-                    if thinking:
-                        yield ModelStreamEvent(
-                            request_id=request.request_id,
-                            event=StreamEventType.ACTIVITY,
-                        )
-                    if content:
-                        accumulated_text.append(content)
-                        yield ModelStreamEvent(
-                            request_id=request.request_id,
-                            event=StreamEventType.TEXT_DELTA,
-                            text=content,
-                        )
-                    raw_calls = message.get("tool_calls", [])
-                    if raw_calls:
-                        if not isinstance(raw_calls, list):
-                            raise OllamaProtocolError("Ollama tool_calls must be a list")
-                        accumulated_calls.extend(raw_calls)
-                        if not content:
+        attempts = 0
+        while True:
+            accumulated_text: list[str] = []
+            accumulated_calls: list[dict[str, Any]] = []
+            final_payload: dict[str, Any] | None = None
+            emitted_text = False
+            try:
+                async with self._client.stream(
+                    "POST",
+                    "/api/chat",
+                    json=self._payload(request, stream=True),
+                    timeout=request.timeout_seconds,
+                ) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if not line:
+                            continue
+                        decoded = json.loads(line)
+                        if not isinstance(decoded, dict):
+                            raise OllamaProtocolError("Ollama stream item must be an object")
+                        message = decoded.get("message", {})
+                        if not isinstance(message, dict):
+                            raise OllamaProtocolError("Ollama stream message must be an object")
+                        content = message.get("content", "")
+                        if not isinstance(content, str):
+                            raise OllamaProtocolError("Ollama stream content must be text")
+                        thinking = message.get("thinking", "")
+                        if not isinstance(thinking, str):
+                            raise OllamaProtocolError("Ollama stream thinking must be text")
+                        if thinking:
                             yield ModelStreamEvent(
                                 request_id=request.request_id,
                                 event=StreamEventType.ACTIVITY,
                             )
-                    if decoded.get("done") is True:
-                        final_payload = decoded
-                        break
-        except (httpx.HTTPError, json.JSONDecodeError) as exc:
-            raise OllamaUnavailableError(f"Ollama stream failed: {type(exc).__name__}") from exc
+                        if content:
+                            accumulated_text.append(content)
+                            emitted_text = True
+                            yield ModelStreamEvent(
+                                request_id=request.request_id,
+                                event=StreamEventType.TEXT_DELTA,
+                                text=content,
+                            )
+                        raw_calls = message.get("tool_calls", [])
+                        if raw_calls:
+                            if not isinstance(raw_calls, list):
+                                raise OllamaProtocolError("Ollama tool_calls must be a list")
+                            accumulated_calls.extend(raw_calls)
+                            if not content:
+                                yield ModelStreamEvent(
+                                    request_id=request.request_id,
+                                    event=StreamEventType.ACTIVITY,
+                                )
+                        if decoded.get("done") is True:
+                            final_payload = decoded
+                            break
+            except (httpx.ConnectError, httpx.ReadError, httpx.RemoteProtocolError) as exc:
+                if attempts == 0 and not emitted_text:
+                    attempts += 1
+                    continue
+                raise OllamaUnavailableError(
+                    f"Ollama stream connection failed after {attempts + 1} attempt(s): "
+                    f"{type(exc).__name__}"
+                ) from exc
+            except (httpx.HTTPError, json.JSONDecodeError) as exc:
+                raise OllamaUnavailableError(f"Ollama stream failed: {type(exc).__name__}") from exc
+            break
         if final_payload is None:
             raise OllamaProtocolError("Ollama stream ended without a done event")
         final_payload["message"] = {

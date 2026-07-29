@@ -1302,6 +1302,65 @@ uv run --frozen ninjarobot-agent session clear local-cli
 Restarting the service also clears all motion authorization. Re-arm after a
 restart or model change.
 
+#### Agent reports an unexpected failure while creating a behavior
+
+Update to the release that includes the behavior-draft compiler, resynchronize
+the locked environment, and restart the single owner service:
+
+```bash
+cd "$HOME/NinjaRobotPi5"
+git pull
+uv sync --frozen --extra hardware
+uv run --frozen ninjarobot-agent service stop
+uv run --frozen ninjarobot-agent service start
+```
+
+If the stop command says no service is running, continue. Clear the affected
+conversation so the selected model does not copy its earlier malformed tool
+calls:
+
+```bash
+uv run --frozen ninjarobot-agent session clear local-cli
+```
+
+Inspect the built-in workflow:
+
+```bash
+uv run --frozen ninjarobot-agent \
+  skill inspect robot-behavior-generation
+```
+
+Then perform a hardware-free expression test:
+
+```bash
+uv run --frozen ninjarobot-agent chat \
+  --session behavior-repair-test \
+  --skill robot-behavior-generation \
+  "Create and execute a happy face with one short 880 Hz tone."
+```
+
+Expected result: the agent calls `robot.behavior.execute_expression` and
+reports success. If its JSON is invalid, the tool result now names the field
+to correct and uses error code `BEHAVIOR_DRAFT_INVALID`; it should not collapse
+the problem into “unexpected system failure.” This error means validation
+stopped the request before hardware execution.
+
+For movement, first start the service in real mode, raise both wheels, keep
+Emergency Stop ready, arm the same chat session, and ask for a short finite
+movement. Follow the focused
+[behavior-generation repair checklist](docs/validation/phase-5-behavior-generation-repair-validation-2026-07-29.md)
+rather than testing on the floor.
+
+Small local models do not all have equal tool-calling quality. A model that
+answers in prose without making a tool call has a model capability or
+generation-quality limitation, not an IDE hardware failure. Change models
+from the interactive **Change Agent Model** menu or run:
+
+```bash
+uv run --frozen ninjarobot-agent model list
+uv run --frozen ninjarobot-agent model select MODEL_NAME
+```
+
 #### Browser rejects the HTTPS certificate
 
 The generated private CA and server certificate are stored under:
@@ -1907,6 +1966,46 @@ uv run --frozen ninjarobot-agent \
 
 Bundled skills are read-only and cannot be removed through the user-skill
 command.
+
+#### Use the bundled robot-behavior-generation skill
+
+This skill is installed with NinjaRobotPi5. It gives compatible local models a
+short, exact workflow for translating natural language into the IDE's accepted
+behavior format:
+
+```bash
+uv run --frozen ninjarobot-agent skill inspect robot-behavior-generation
+uv run --frozen ninjarobot-agent \
+  skill simulate robot-behavior-generation \
+  --input '{"request":"Show a happy face and play a short tone.","save_requested":false}'
+```
+
+Use it in a conversation:
+
+```bash
+uv run --frozen ninjarobot-agent chat \
+  --session behavior-demo \
+  --skill robot-behavior-generation \
+  "Create and execute a two-stage happy greeting."
+```
+
+The compact stage fields are:
+
+- `face`: one embedded animated expression
+- `text`: display text; do not combine it with `face` in the same stage
+- `melody`: one Pi5 buzzer melody
+- `tone`: frequency, duration, and volume for one bounded tone
+- `movement`: `move_forward`, `move_backward`, `turn_left`, `turn_right`, or
+  `stop`
+- `drive_targets`: advanced logical-role targets, never raw GPIO numbers
+- `duration_seconds`: how long the stage remains active
+- `wait_seconds`: an optional quiet delay after that stage
+
+Use the expression tool when there is no movement and the movement tool when
+there is any servo operation. Real movement still requires the exact
+conversation session to be armed. Saving remains separate, requires an
+explicit confirmed request, never overwrites another behavior, and stores the
+validated canonical version rather than the model's draft.
 
 #### Skill troubleshooting
 

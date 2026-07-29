@@ -14,6 +14,7 @@ from ninjarobot_pi5_agent import (
     OllamaConfig,
     OllamaProtocolError,
     OllamaProvider,
+    OllamaUnavailableError,
     ProviderHealthStatus,
     StreamEventType,
     ToolDefinition,
@@ -138,6 +139,90 @@ def test_ollama_stream_yields_deltas_then_one_complete_turn() -> None:
         assert all(event.text != "private" for event in events)
         assert events[-1].turn is not None
         assert events[-1].turn.text == "Hello robot"
+        await client.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_ollama_stream_retries_one_read_error_before_visible_output() -> None:
+    class BrokenStream(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            raise httpx.ReadError("connection interrupted")
+            yield b""
+
+    async def exercise() -> None:
+        attempts = 0
+
+        def handler(_request: httpx.Request) -> httpx.Response:
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                return httpx.Response(200, stream=BrokenStream())
+            return httpx.Response(
+                200,
+                content=(
+                    json.dumps(
+                        {
+                            "message": {"role": "assistant", "content": "Recovered"},
+                            "done": True,
+                            "done_reason": "stop",
+                        }
+                    )
+                    + "\n"
+                ),
+            )
+
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            base_url="http://127.0.0.1:11434",
+        )
+        provider = OllamaProvider(client=client)
+
+        events = [event async for event in provider.stream(request())]
+
+        assert attempts == 2
+        assert events[-1].turn is not None
+        assert events[-1].turn.text == "Recovered"
+        await client.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_ollama_stream_does_not_retry_after_visible_output() -> None:
+    class PartialBrokenStream(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            yield (
+                json.dumps(
+                    {
+                        "message": {"role": "assistant", "content": "Partial"},
+                        "done": False,
+                    }
+                )
+                + "\n"
+            ).encode()
+            raise httpx.ReadError("connection interrupted")
+
+    async def exercise() -> None:
+        attempts = 0
+
+        def handler(_request: httpx.Request) -> httpx.Response:
+            nonlocal attempts
+            attempts += 1
+            return httpx.Response(200, stream=PartialBrokenStream())
+
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            base_url="http://127.0.0.1:11434",
+        )
+        provider = OllamaProvider(client=client)
+        events = []
+
+        with pytest.raises(OllamaUnavailableError, match="after 1 attempt"):
+            async for event in provider.stream(request()):
+                events.append(event)
+
+        assert attempts == 1
+        assert [event.text for event in events] == ["Partial"]
         await client.aclose()
 
     asyncio.run(exercise())

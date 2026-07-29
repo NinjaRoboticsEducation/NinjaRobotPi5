@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 
+import pytest
+from ninjarobot_pi5_ide.behavior_assets import BehaviorAssetRepository
+from ninjarobot_pi5_ide.behavior_drafts import BehaviorDraftCompiler, BehaviorDraftError
 from ninjarobot_pi5_ide.config import BehaviorConfig
 
 from ninjarobot_pi5_ide import (
@@ -14,6 +18,39 @@ from ninjarobot_pi5_ide import (
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = ROOT / "config" / "ninjarobot_pi5.toml.example"
+FAILED_DYNAMIC_PAYLOADS = (
+    Path(__file__).parent / "fixtures" / "failed_dynamic_behavior_payloads.json"
+)
+
+
+@pytest.mark.parametrize(
+    "case",
+    json.loads(FAILED_DYNAMIC_PAYLOADS.read_text(encoding="utf-8")),
+    ids=lambda case: case["case"],
+)
+def test_real_local_model_payloads_compile_or_return_specific_draft_errors(
+    tmp_path,
+    case,
+) -> None:
+    """Cover every structural form recovered from the Raspberry Pi action ledger."""
+    compiler = BehaviorDraftCompiler(
+        assets=BehaviorAssetRepository(tmp_path / "behaviors"),
+        servo_roles=("left_motor", "right_motor"),
+    )
+    motion = case["capability"] == "behavior.execute_movement"
+    known_invalid = {
+        "expression_unknown_melody": "unknown melody",
+        "movement_without_drive": "requires movement or drive_targets",
+    }
+    expected_error = known_invalid.get(case["case"])
+    if expected_error is not None:
+        with pytest.raises(BehaviorDraftError, match=expected_error):
+            compiler.compile(case["arguments"], motion=motion)
+        return
+    definition = compiler.compile(case["arguments"], motion=motion)
+    assert definition.category == ("movement" if motion else "expression")
+    assert definition.stages
+    assert definition.contains_motion is motion
 
 
 def test_integrated_agent_ide_exposes_shared_simulated_robot_capabilities(
@@ -66,14 +103,40 @@ def test_integrated_agent_ide_exposes_shared_simulated_robot_capabilities(
             "microphone.transcribe",
         } <= names
         expression_schema = descriptors["behavior.execute_expression"].input_schema
-        expression_mapping = expression_schema["$defs"]["_ExpressionStage"]["properties"][
-            "operations"
-        ]["items"]["discriminator"]["mapping"]
-        assert "drive" not in expression_mapping
+        assert "$defs" not in expression_schema
+        assert "oneOf" not in json.dumps(expression_schema)
+        expression_stage = expression_schema["properties"]["stages"]["items"]
+        assert "movement" not in expression_stage["properties"]
+        assert "drive_targets" not in expression_stage["properties"]
         movement_schema = descriptors["behavior.execute_movement"].input_schema
-        target_schema = movement_schema["$defs"]["DriveOperation"]["properties"]["targets"]
+        assert "$defs" not in movement_schema
+        assert "oneOf" not in json.dumps(movement_schema)
+        movement_stage = movement_schema["properties"]["stages"]["items"]
+        target_schema = movement_stage["properties"]["drive_targets"]
         assert set(target_schema["properties"]) == {"left_motor", "right_motor"}
         assert target_schema["additionalProperties"] is False
+
+        invalid_draft = await client.execute(
+            ActionRequest(
+                action_id="invalid-draft-1",
+                capability="behavior.execute_expression",
+                arguments={
+                    "name": "invalid_melody",
+                    "description": "A draft with an invented melody.",
+                    "stages": [{"face": "happy", "melody": "C-major-scale"}],
+                },
+                requested_by="test",
+                session_id="test-session",
+                idempotency_key="invalid-draft-key-1",
+            )
+        )
+        assert invalid_draft.status is ActionStatus.FAILED
+        assert invalid_draft.error is not None
+        assert invalid_draft.error.code == "BEHAVIOR_DRAFT_INVALID"
+        assert invalid_draft.error.definitely_not_executed is True
+        assert invalid_draft.retry_safety.value == "safe"
+        assert "unknown melody" in invalid_draft.error.message
+        assert "unexpected failure" not in invalid_draft.error.message
 
         result = await client.execute(
             ActionRequest(
@@ -124,6 +187,32 @@ def test_integrated_agent_ide_exposes_shared_simulated_robot_capabilities(
             )
         )
         assert expression.status is ActionStatus.SUCCEEDED
+
+        compact_expression = await client.execute(
+            ActionRequest(
+                action_id="compact-expression-1",
+                capability="behavior.execute_expression",
+                arguments={
+                    "name": "compact_agent_smile",
+                    "description": "A compact transient smile and tone.",
+                    "stages": [
+                        {
+                            "face": "happy",
+                            "tone": {
+                                "frequency_hz": 880,
+                                "duration_seconds": 0.05,
+                                "volume": 32,
+                            },
+                            "duration_seconds": 0.05,
+                        }
+                    ],
+                },
+                requested_by="test",
+                session_id="test-session",
+                idempotency_key="compact-expression-key-1",
+            )
+        )
+        assert compact_expression.status is ActionStatus.SUCCEEDED
 
         saved_definition = {
             "schema_version": 1,
@@ -208,6 +297,34 @@ def test_integrated_agent_ide_exposes_shared_simulated_robot_capabilities(
             )
         )
         assert movement.status is ActionStatus.SUCCEEDED, movement.model_dump(mode="json")
+
+        compact_movement = await client.execute(
+            ActionRequest(
+                action_id="compact-movement-1",
+                capability="behavior.execute_movement",
+                arguments={
+                    "name": "compact_agent_roll",
+                    "description": "A compact configured forward movement.",
+                    "stages": [
+                        {
+                            "face": "exciting",
+                            "tone": {
+                                "frequency_hz": 880,
+                                "duration_seconds": 0.05,
+                            },
+                            "movement": "move_forward",
+                            "duration_seconds": 0.05,
+                        }
+                    ],
+                },
+                requested_by="test",
+                session_id="test-session",
+                idempotency_key="compact-movement-key-1",
+            )
+        )
+        assert compact_movement.status is ActionStatus.SUCCEEDED, compact_movement.model_dump(
+            mode="json"
+        )
 
         preview = await client.execute(
             ActionRequest(

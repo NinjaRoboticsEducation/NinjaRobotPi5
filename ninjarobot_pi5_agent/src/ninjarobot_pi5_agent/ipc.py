@@ -100,24 +100,18 @@ class AgentIPCServer:
             if not isinstance(payload, dict):
                 raise AgentIPCError("request must be a JSON object")
             await self._dispatch(payload, writer, cancellation)
-        except (AgentIPCError, ValueError, KeyError, PermissionError) as exc:
-            await _write_message(
-                writer,
-                {
-                    "type": "error",
-                    "error": f"{type(exc).__name__}: {exc}",
-                },
-            )
-        except Exception as exc:
-            await _write_message(
-                writer,
-                {
-                    "type": "error",
-                    "error": f"{type(exc).__name__}: {exc}",
-                },
-            )
         except (BrokenPipeError, ConnectionResetError):
             cancellation.cancel()
+        except (AgentIPCError, ValueError, KeyError, PermissionError) as exc:
+            await _write_error_if_connected(
+                writer,
+                f"{type(exc).__name__}: {exc}",
+            )
+        except Exception as exc:
+            await _write_error_if_connected(
+                writer,
+                f"{type(exc).__name__}: {exc}",
+            )
         finally:
             cancellation.cancel()
             writer.close()
@@ -313,6 +307,17 @@ async def _write_message(
 ) -> None:
     writer.write(json.dumps(payload, ensure_ascii=False).encode("utf-8") + b"\n")
     await writer.drain()
+
+
+async def _write_error_if_connected(
+    writer: asyncio.StreamWriter,
+    error: str,
+) -> None:
+    """Best-effort error reporting when the requesting client may already be gone."""
+    try:
+        await _write_message(writer, {"type": "error", "error": error})
+    except (BrokenPipeError, ConnectionResetError):
+        return
 
 
 def _required_text(payload: dict[str, Any], name: str) -> str:

@@ -155,3 +155,38 @@ def test_ipc_allows_reconnect_stream_history_clear_arm_and_stop(tmp_path) -> Non
         assert not socket_path.exists()
 
     asyncio.run(exercise())
+
+
+def test_ipc_client_disconnect_during_error_reporting_is_clean(tmp_path) -> None:
+    class DisconnectedWriter:
+        def __init__(self) -> None:
+            self.closed = False
+
+        def write(self, _data: bytes) -> None:
+            return None
+
+        async def drain(self) -> None:
+            raise ConnectionResetError("client disconnected")
+
+        def close(self) -> None:
+            self.closed = True
+
+        async def wait_closed(self) -> None:
+            raise ConnectionResetError("client disconnected")
+
+    async def exercise() -> None:
+        reader = asyncio.StreamReader()
+        reader.feed_data(b"not-json\n")
+        reader.feed_eof()
+        writer = DisconnectedWriter()
+        server = AgentIPCServer(
+            runtime=build_runtime(tmp_path),
+            socket_path=tmp_path / "agent.sock",
+            ownership=ServiceOwnership(tmp_path / "agent.lock"),
+        )
+
+        await server._handle_client(reader, writer)  # type: ignore[arg-type]
+
+        assert writer.closed is True
+
+    asyncio.run(exercise())

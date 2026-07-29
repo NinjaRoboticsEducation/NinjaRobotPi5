@@ -18,7 +18,7 @@ which is the single source of truth.
 
 Phase 0, Phase 1, Phase 2, Phase 3.1 through Phase 3.5, and Phase 4 are
 implemented and the operator reports the complete Phase 4 and installation
-workflow passed. Phase 5.0 through Phase 5.10 and the 2026-07-29 agent/web and
+workflow passed. Phase 5.0 through Phase 5.11 and the 2026-07-29 agent/web and
 dynamic-behavior refinements are implemented and pass the local software gate.
 Raspberry Pi
 acceptance—including the Qwen3:4B
@@ -27,6 +27,8 @@ microphone, and raised-wheel motion—still requires the operator checklist in
 [`docs/validation/phase-5-agent-model-ui-refinement-validation-2026-07-29.md`](docs/validation/phase-5-agent-model-ui-refinement-validation-2026-07-29.md)
 and the creative-action checklist in
 [`docs/validation/phase-5-dynamic-behavior-validation-2026-07-29.md`](docs/validation/phase-5-dynamic-behavior-validation-2026-07-29.md).
+The behavior-generation repair has its own focused checklist:
+[`docs/validation/phase-5-behavior-generation-repair-validation-2026-07-29.md`](docs/validation/phase-5-behavior-generation-repair-validation-2026-07-29.md).
 Phase 0 established project governance and preserved the
 original import hashes for the six existing Pi5 hardware libraries. Phase 1
 added strict IDE and agent contracts, deterministic fakes, V4-owned
@@ -191,6 +193,12 @@ robot safety policy.
 Validated agent skills are confined data-and-instruction packages, not
 executable code. The exact MCP and skill formats are recorded in the
 [Phase 5 extension appendix](InstallationGuide.md#phase-5-mcp-and-agent-skill-extension-reference).
+The bundled `robot-behavior-generation` skill teaches compatible local models
+how to compose expressions and short movements using a compact behavior draft.
+The IDE converts that draft into its strict saved-behavior format, fills safe
+defaults, resolves named movements through configured logical servo roles, and
+returns a correctable `BEHAVIOR_DRAFT_INVALID` error before touching hardware
+when a field is invalid.
 
 The HTTPS controller provides direct D-pad movement, Level 2 Emergency Stop,
 confirmed Resume, Greeting, Celebrate, temporary camera preview, local
@@ -327,6 +335,23 @@ saving the successful definition, use:
 ```text
 /confirm Save that behavior as cheerful_roll.
 ```
+
+For models that benefit from explicit workflow guidance, select the bundled
+skill:
+
+```bash
+uv run --frozen ninjarobot-agent skill inspect robot-behavior-generation
+uv run --frozen ninjarobot-agent chat \
+  --session behavior-demo \
+  --skill robot-behavior-generation \
+  "Create and execute a happy two-stage greeting."
+```
+
+The compact draft accepts fields such as `face`, `text`, `melody`, `tone`,
+`movement`, `drive_targets`, `duration_seconds`, and `wait_seconds`. A model
+that explicitly puts movement fields under the expression tool is
+conservatively rerouted to the movement tool before policy evaluation. It
+still requires motion arming and passes every normal IDE and hardware guard.
 
 Use `/disarm` to revoke authorization and request an immediate servo stop.
 
