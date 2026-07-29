@@ -1,6 +1,7 @@
-"""Public Phase 1 contracts for the bounded NinjaRobotPi5V4 agent."""
+"""Public contracts for the bounded, provider-neutral NinjaRobotPi5V4 agent."""
 
 from .agent_loop import AgentLoop, AgentLoopConfig, AgentLoopError, AgentReply
+from .anthropic_provider import AnthropicConfig, AnthropicProvider
 from .benchmark import (
     BenchmarkCase,
     BenchmarkMetrics,
@@ -10,7 +11,15 @@ from .benchmark import (
     ModelBenchmark,
     SystemSnapshot,
 )
+from .cloud_common import (
+    CloudAuthenticationError,
+    CloudProtocolError,
+    CloudProviderError,
+    CloudUnavailableError,
+)
+from .cloud_registry import ConfiguredProviderRegistry
 from .events import AgentEvent, AgentEventType, EventBroker
+from .gemini_provider import GeminiConfig, GeminiProvider
 from .ipc import AgentIPCClient, AgentIPCError, AgentIPCServer
 from .mcp_client import (
     MCPConnection,
@@ -65,6 +74,7 @@ from .ollama import (
     OllamaProvider,
     OllamaUnavailableError,
 )
+from .openai_provider import OpenAIConfig, OpenAIProvider
 from .persistence import ConversationStore, StoredMessage
 from .policy import (
     CameraGrantManager,
@@ -115,9 +125,18 @@ __all__ = [
     "BenchmarkReport",
     "BenchmarkThresholds",
     "BenchmarkRegistry",
+    "AnthropicConfig",
+    "AnthropicProvider",
+    "CloudAuthenticationError",
+    "CloudProtocolError",
+    "CloudProviderError",
+    "CloudUnavailableError",
+    "ConfiguredProviderRegistry",
     "ConversationStore",
     "EventBroker",
     "FinishReason",
+    "GeminiConfig",
+    "GeminiProvider",
     "MCPAuthentication",
     "MCPConfiguration",
     "MCPConnection",
@@ -148,6 +167,8 @@ __all__ = [
     "OllamaProtocolError",
     "OllamaProvider",
     "OllamaUnavailableError",
+    "OpenAIConfig",
+    "OpenAIProvider",
     "MotionArmManager",
     "NullPresentationController",
     "PolicyContext",

@@ -203,6 +203,7 @@ class ModelRequest(AgentContractModel):
     tools: tuple[ToolDefinition, ...] = ()
     max_output_tokens: Annotated[int, Field(ge=1, le=32_768)] = 1024
     timeout_seconds: Annotated[float, Field(gt=0, le=600)] = 60.0
+    allow_provider_fallback: bool = False
 
     @field_validator("messages")
     @classmethod

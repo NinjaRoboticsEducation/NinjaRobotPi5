@@ -361,12 +361,15 @@ class AgentRuntime:
         finally:
             self._end_operation()
 
-    async def list_models(self) -> tuple[ModelCatalogEntry, ...]:
+    async def list_models(
+        self,
+        provider_id: str | None = None,
+    ) -> tuple[ModelCatalogEntry, ...]:
         """Return available models from every registered provider."""
         self._ensure_started()
         if self.models is None:
             raise RuntimeError("runtime model selection is not configured")
-        return await self.models.catalog()
+        return await self.models.catalog(provider_id)
 
     def current_model(self) -> dict[str, object]:
         """Return the active provider/model and benchmark acceptance."""

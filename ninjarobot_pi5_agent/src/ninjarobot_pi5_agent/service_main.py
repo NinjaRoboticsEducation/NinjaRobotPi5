@@ -10,18 +10,16 @@ from pathlib import Path
 from ninjarobot_pi5_ide import build_robot_ide_client, load_robot_config
 
 from .agent_loop import AgentLoop, AgentLoopConfig
+from .cloud_registry import ConfiguredProviderRegistry
 from .events import AgentEventType, EventBroker
 from .ipc import AgentIPCServer
 from .mcp_client import MCPToolProvider
 from .mcp_config import load_mcp_configuration
 from .model_selection import (
     BenchmarkRegistry,
-    ModelCatalogEntry,
     ModelManager,
-    ProviderRegistration,
     persist_model_selection,
 )
-from .ollama import OllamaConfig, OllamaProvider
 from .persistence import ConversationStore
 from .policy import CameraGrantManager, MotionArmManager, PolicyEngine
 from .presentation import RobotPresentationController
@@ -91,45 +89,18 @@ async def run_service(arguments: argparse.Namespace) -> None:
     )
     provider_id = config.agent.default_provider
     provider_config = config.providers[provider_id]
-    if provider_config.kind != "ollama":
-        raise RuntimeError(
-            f"provider kind '{provider_config.kind}' is configured but not implemented"
-        )
     active_model = arguments.model or provider_config.model
-    base_url = arguments.base_url or provider_config.base_url or "http://127.0.0.1:11434"
-
-    def ollama_factory(model_name: str) -> OllamaProvider:
-        return OllamaProvider(OllamaConfig(model=model_name, base_url=base_url))
-
-    async def ollama_catalog() -> tuple[ModelCatalogEntry, ...]:
-        catalog_provider = ollama_factory(active_model)
-        try:
-            return tuple(
-                ModelCatalogEntry(
-                    provider=provider_id,
-                    name=model.name,
-                    size_bytes=model.size_bytes,
-                    parameter_size=model.parameter_size,
-                    quantization=model.quantization,
-                    family=model.family,
-                    modified_at=model.modified_at,
-                )
-                for model in await catalog_provider.list_models()
-            )
-        finally:
-            await catalog_provider.close()
+    provider_registry = ConfiguredProviderRegistry(
+        arguments.config,
+        secrets,
+        ollama_base_url_override=arguments.base_url,
+    )
 
     model = ModelManager(
         active_provider_id=provider_id,
         active_model=active_model,
-        active_provider=ollama_factory(active_model),
-        registrations=(
-            ProviderRegistration(
-                provider_id=provider_id,
-                factory=ollama_factory,
-                catalog=ollama_catalog,
-            ),
-        ),
+        active_provider=provider_registry.create(provider_id, active_model),
+        registrations=provider_registry.registrations(),
         benchmarks=BenchmarkRegistry(
             getattr(
                 arguments,
@@ -142,6 +113,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
             selected_provider,
             selected_model,
         ),
+        fallback_provider_ids=config.agent.fallback_providers,
     )
     store = ConversationStore(arguments.database, retention_days=7)
     arms = MotionArmManager()

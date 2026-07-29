@@ -33,7 +33,29 @@ def default_robot_config() -> RobotConfig:
                     "kind": "ollama",
                     "model": "configured-by-user",
                     "enabled": True,
-                }
+                },
+                "openai": {
+                    "kind": "openai",
+                    "model": "gpt-5-mini",
+                    "enabled": True,
+                    "auth_method": "api_key",
+                    "api_key_env": "OPENAI_API_KEY",
+                },
+                "gemini": {
+                    "kind": "gemini",
+                    "model": "gemini-2.5-flash",
+                    "enabled": True,
+                    "auth_method": "api_key",
+                    "api_key_env": "GEMINI_API_KEY",
+                },
+                "anthropic": {
+                    "kind": "anthropic",
+                    "model": "claude-sonnet-4-5",
+                    "enabled": True,
+                    "auth_method": "api_key",
+                    "api_key_env": "ANTHROPIC_API_KEY",
+                    "oauth_profile": "default",
+                },
             },
         }
     )
@@ -274,6 +296,7 @@ def robot_config_to_toml(config: RobotConfig) -> str:
             f"max_tool_calls = {config.agent.max_tool_calls}",
             f"request_timeout_seconds = {config.agent.request_timeout_seconds}",
             f"model_inactivity_timeout_seconds = {config.agent.model_inactivity_timeout_seconds}",
+            f"fallback_providers = {_toml(list(config.agent.fallback_providers))}",
         ]
     )
     for name, provider in config.providers.items():
@@ -284,12 +307,17 @@ def robot_config_to_toml(config: RobotConfig) -> str:
                 f"kind = {_toml(provider.kind)}",
                 f"model = {_toml(provider.model)}",
                 f"enabled = {_toml(provider.enabled)}",
+                f"auth_method = {_toml(provider.auth_method)}",
             ]
         )
         if provider.base_url is not None:
             lines.append(f"base_url = {_toml(provider.base_url)}")
         if provider.api_key_env is not None:
             lines.append(f"api_key_env = {_toml(provider.api_key_env)}")
+        if provider.oauth_profile is not None:
+            lines.append(f"oauth_profile = {_toml(provider.oauth_profile)}")
+        if provider.project_id is not None:
+            lines.append(f"project_id = {_toml(provider.project_id)}")
     return "\n".join(lines) + "\n"
 
 

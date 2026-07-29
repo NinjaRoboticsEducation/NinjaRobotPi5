@@ -243,6 +243,7 @@ class AgentLoop:
                 tools=definitions,
                 max_output_tokens=self._config.max_output_tokens,
                 timeout_seconds=self._config.model_inactivity_timeout_seconds,
+                allow_provider_fallback=(model_turn_number == 1 and completed_tool_calls == 0),
             )
             turn = await self._model_turn(
                 request,

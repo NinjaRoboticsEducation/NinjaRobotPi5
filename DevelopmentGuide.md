@@ -9,8 +9,8 @@ incomplete or conflicts with it.
 - `ninjarobot_pi5_ide/`: deterministic robot contracts, scheduler, action
   ledger, and managed-driver adapters.
 - `ninjarobot_pi5_agent/`: provider-neutral agent contracts, single-owner
-  service, Ollama and MCP providers, skills, conversational CLI, and FastAPI
-  HTTPS user interface.
+  service, Ollama/OpenAI/Gemini/Anthropic and MCP providers, skills,
+  conversational CLI, and FastAPI HTTPS user interface.
 - `config/`: V4-owned configuration examples; never driver-local runtime state.
 - `pi5*/`: independently testable hardware libraries copied from the historical
   project and maintained under the managed-driver policy.
@@ -955,13 +955,108 @@ throttling, correctness, and safety threshold.
 
 `ModelManager` is the provider-neutral selection boundary. An Ollama catalog
 comes from loopback `GET /api/tags` and records installed name, byte size,
-parameter size, quantization, family, and modification time. Provider
-registrations keep future cloud adapters outside the core selection logic.
+parameter size, quantization, family, and modification time. OpenAI, Gemini,
+and Anthropic catalogs come from their official model-list endpoints and keep
+only models suitable for the adapter's conversational generation endpoint.
+Provider registrations keep every adapter outside the core selection logic.
 Selection is permitted only when the runtime has no active response or robot
 action. The candidate is health-checked first, then the TOML configuration is
 atomically saved, the provider reference is replaced, and the previous
 provider is closed. A stopped service uses the same persistent workflow
 offline. Switching disarms every previous AI motion session.
+
+### Phase 6 cloud-provider adapter contract
+
+Phase 6 implements `OpenAIProvider`, `GeminiProvider`, and
+`AnthropicProvider` behind the same `LLMProvider` protocol used by
+`OllamaProvider`. The common boundary remains:
+
+```text
+PromptComposer + selected Skill
+              |
+ToolRegistry: robot.* + allowlisted mcp.*
+              |
+          ModelRequest
+              |
+     selected LLMProvider adapter
+              |
+           ModelTurn
+              |
+PolicyEngine -> ToolRegistry -> IDE or MCP provider
+```
+
+The adapter boundary has four important consequences:
+
+- Cloud providers receive the same safety, identity, trusted runtime state,
+  selected Skill instructions, conversation, and tool definitions.
+- Adapters can propose tools but cannot execute them. The existing policy and
+  registry remain the only execution path.
+- Dotted canonical names such as `mcp.tavily.tavily-search` are replaced by a
+  deterministic provider-safe wire alias. An unknown alias is rejected, and a
+  valid alias is restored before policy evaluation.
+- Tool results return through provider-neutral `ModelMessage` records, so an
+  MCP result remains untrusted regardless of the selected model.
+
+The adapters use documented HTTPS JSON and Server-Sent Events endpoints
+through the existing `httpx` dependency:
+
+- OpenAI uses the Responses API with `store=false`, manual function calls,
+  streamed text deltas, usage normalization, and `GET /v1/models`.
+- Gemini uses `generateContent`/`streamGenerateContent`, explicitly sends
+  function declarations without installing callable Python functions, and
+  filters `models.list` to `generateContent` models.
+- Anthropic uses the Messages API, accumulates streamed content blocks and
+  `tool_use` JSON, and paginates the Models API.
+
+`ConfiguredProviderRegistry` reloads the private TOML configuration when it
+creates a candidate. This lets terminal authentication changes take effect
+when a provider/model is selected without rebuilding the service. Candidate
+health must be ready before a manual hot switch is persisted. Switching is
+still refused while a chat or robot action is active.
+
+#### Authentication boundary
+
+`ProviderConfig` stores references and non-secret metadata only:
+
+- `auth_method = "api_key"` resolves `api_key_env` from the process
+  environment first, then `~/.config/ninjarobot_pi5/secrets.env`.
+- Gemini `auth_method = "oauth"` resolves an access token with the official
+  `gcloud auth application-default print-access-token` command and requires a
+  configured Google Cloud `project_id`.
+- Anthropic `auth_method = "oauth"` resolves a refreshed bearer token with
+  `ant auth print-credentials --access-token` under `oauth_profile`.
+- OpenAI account/ChatGPT web login is not a supported authentication method
+  for third-party OpenAI API inference, so the schema rejects it.
+
+The web interface never accepts provider secrets. The terminal uses hidden,
+double-entry prompts. Errors report provider/type/status categories and do not
+include response bodies or authorization headers. `SecretStore` writes with
+mode `0600`, reports presence without values, supports deletion, and redacts
+known values from nested diagnostics. Cloud adapter validators accept only
+HTTPS and the official `api.openai.com`,
+`generativelanguage.googleapis.com`, or `api.anthropic.com` host, preventing a
+configuration change from forwarding provider credentials to another server.
+
+#### Optional safe provider fallback
+
+`agent.fallback_providers` is empty by default. When explicitly populated,
+automatic fallback is allowed only on the first model turn before that user
+request has executed a tool and before any public text delta was emitted. A
+fallback candidate receives the same `ModelRequest`, including MCP tools and
+Skill instructions. It is closed after the attempt and does not replace or
+persist the selected provider. Failures after a tool result never fall back,
+which prevents replaying a physical or non-idempotent action.
+
+#### Adding MCP tools or Agent Skills for cloud models
+
+No provider-specific installation is required. Add and validate MCP servers
+with `ninjarobot-agent mcp ...`, or install a validated Skill with
+`ninjarobot-agent skill install ...`. Restart the service after changing the
+MCP catalog. Select the Skill through the normal chat `--skill` option. The
+same registry and prompt composer expose them to Ollama, OpenAI, Gemini, and
+Anthropic. Do not add SDK calls or provider credentials to a Skill; Skills are
+declarative Markdown plus strict JSON metadata and can only reduce the
+allowlisted tools and execution budget.
 
 `BenchmarkRegistry` reads bounded, non-symbolic-link reports and accepts only a
 report whose exact model name matches and whose `accepted` field is true.

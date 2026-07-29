@@ -2553,6 +2553,33 @@ validation checklist with explicit model-independence checks.
 
 ### Phase 6: Cloud provider adapters
 
+**Implementation status — 2026-07-30**
+
+Implemented in software and ready for opt-in Raspberry Pi/account validation.
+The implementation uses one configuration-driven registry for Ollama, OpenAI,
+Google Gemini, and Anthropic. All adapters consume the existing
+provider-neutral `ModelRequest`, including MCP tools and selected Agent Skill
+instructions, and return normalized `ModelTurn` values. No adapter executes a
+tool or imports a hardware driver.
+
+Authentication support follows official provider constraints:
+
+- OpenAI API key only; ChatGPT account web login is not exposed as API
+  authentication.
+- Gemini API key or Google Application Default Credentials created through the
+  official `gcloud` browser/no-browser flow.
+- Anthropic API key or the official `ant auth login --no-browser` profile.
+
+The provider-first interactive model selector, scriptable provider
+authentication/health commands, dynamic model catalogs, safe idle-time
+selection, owner-private secrets, provider-safe tool aliases, and optional
+pre-tool fallback are implemented. Fallback is disabled by default, never
+persists an automatic switch, stops after public output begins, and is not
+allowed after a tool has executed in the current request. Recorded/fake
+OpenAI, Gemini, and Anthropic responses are part of the default suite. Live
+provider tests remain opt-in because they use owner credentials, network
+access, and potentially billable API calls.
+
 **Objective**
 
 Add OpenAI, Gemini, and Anthropic without changing the agent or IDE contracts.

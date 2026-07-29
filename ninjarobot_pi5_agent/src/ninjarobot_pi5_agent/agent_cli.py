@@ -1,4 +1,4 @@
-"""Phase 5 conversational-agent CLI and MCP administration entry point."""
+"""Conversational agent, provider, MCP, Skill, and web administration CLI."""
 
 from __future__ import annotations
 
@@ -16,6 +16,8 @@ from pydantic import ValidationError
 from ninjarobot_pi5_ide import RiskLevel, load_robot_config
 
 from .benchmark import BenchmarkCase, ModelBenchmark
+from .cloud_common import CloudProviderError
+from .cloud_registry import ConfiguredProviderRegistry
 from .ipc import AgentIPCClient, AgentIPCError
 from .mcp_client import (
     MCPProtocolError,
@@ -35,8 +37,9 @@ from .model_selection import (
     ModelSelectionError,
     persist_model_selection,
 )
-from .models import ToolCall, ToolDefinition, ToolInvocation
+from .models import ProviderHealthStatus, ToolCall, ToolDefinition, ToolInvocation
 from .ollama import OllamaConfig, OllamaError, OllamaProvider
+from .provider_auth import persist_auth_method, web_login, web_logout
 from .secrets import SecretStore
 from .service_main import run_service
 from .skills import LoadedSkill, SkillRepository, SkillValidationError
@@ -194,11 +197,42 @@ def build_parser() -> argparse.ArgumentParser:
 
     model = commands.add_parser("model", help="List or select an agent model.")
     model_commands = model.add_subparsers(dest="model_command", required=True)
-    model_commands.add_parser("list", help="List locally installed provider models.")
+    list_models = model_commands.add_parser("list", help="List available provider models.")
+    list_models.add_argument("--provider")
     model_commands.add_parser("current", help="Show the active provider and model.")
     select_model = model_commands.add_parser("select", help="Select an installed model.")
     select_model.add_argument("model_name")
     select_model.add_argument("--provider")
+
+    provider = commands.add_parser("provider", help="Configure cloud provider access.")
+    provider_commands = provider.add_subparsers(dest="provider_command", required=True)
+    provider_commands.add_parser("list", help="List configured model providers.")
+    provider_status = provider_commands.add_parser(
+        "status",
+        help="Show non-secret authentication status.",
+    )
+    provider_status.add_argument("provider_id")
+    provider_health = provider_commands.add_parser(
+        "health",
+        help="Check provider credentials, service, and selected model.",
+    )
+    provider_health.add_argument("provider_id")
+    provider_login = provider_commands.add_parser(
+        "login",
+        help="Run an official provider web login.",
+    )
+    provider_login.add_argument("provider_id")
+    provider_login.add_argument("--client-id-file", type=Path)
+    provider_key = provider_commands.add_parser(
+        "set-api-key",
+        help="Save an API key using a hidden terminal prompt.",
+    )
+    provider_key.add_argument("provider_id")
+    provider_logout = provider_commands.add_parser(
+        "logout",
+        help="Remove configured provider credentials.",
+    )
+    provider_logout.add_argument("provider_id")
 
     secret = commands.add_parser("secret", help="Manage agent secrets safely.")
     secret_commands = secret.add_subparsers(dest="secret_command", required=True)
@@ -294,6 +328,7 @@ def main(argv: list[str] | None = None) -> None:
         AgentIPCError,
         ModelSelectionError,
         OllamaError,
+        CloudProviderError,
     ) as exc:
         parser.error(_safe_error(exc))
     raise SystemExit(exit_code)
@@ -314,6 +349,8 @@ async def _run(arguments: argparse.Namespace) -> int:
         return await _run_motion_command(arguments)
     if arguments.command == "model":
         return await _run_model_command(arguments)
+    if arguments.command == "provider":
+        return await _run_provider_command(arguments)
     if arguments.command == "web":
         if arguments.web_command == "certificate-status":
             certificate, key = ensure_local_ca_certificate(
@@ -805,7 +842,14 @@ async def _run_motion_command(arguments: argparse.Namespace) -> int:
 
 async def _run_model_command(arguments: argparse.Namespace) -> int:
     if arguments.model_command == "list":
-        _print_json({"models": await _available_models(arguments)})
+        _print_json(
+            {
+                "models": await _available_models(
+                    arguments,
+                    provider=arguments.provider,
+                )
+            }
+        )
         return 0
     if arguments.model_command == "current":
         _print_json(await _current_model(arguments))
@@ -821,12 +865,126 @@ async def _run_model_command(arguments: argparse.Namespace) -> int:
     raise AssertionError(f"unhandled model command: {arguments.model_command}")
 
 
-async def _available_models(arguments: argparse.Namespace) -> list[dict[str, Any]]:
+async def _run_provider_command(arguments: argparse.Namespace) -> int:
+    config = load_robot_config(arguments.config)
+    secrets = SecretStore(arguments.secret_file)
+    registry = ConfiguredProviderRegistry(arguments.config, secrets)
+    if arguments.provider_command == "list":
+        providers: list[dict[str, object]] = []
+        for provider_id, provider in sorted(config.providers.items()):
+            item: dict[str, object] = {
+                "id": provider_id,
+                "kind": provider.kind,
+                "enabled": provider.enabled,
+                "auth_method": ("local" if provider.kind == "ollama" else provider.auth_method),
+                "current": provider_id == config.agent.default_provider,
+            }
+            if provider.enabled:
+                adapter = registry.create(provider_id, provider.model)
+                try:
+                    item["capabilities"] = adapter.capabilities.model_dump(mode="json")
+                finally:
+                    await adapter.close()
+            providers.append(item)
+        _print_json(
+            {
+                "providers": providers,
+            }
+        )
+        return 0
+    try:
+        provider = config.providers[arguments.provider_id]
+    except KeyError as exc:
+        raise ValueError(f"unknown configured provider: {arguments.provider_id}") from exc
+    if arguments.provider_command == "status":
+        _print_json(
+            {
+                "provider": arguments.provider_id,
+                "kind": provider.kind,
+                **registry.credential_status(arguments.provider_id),
+            }
+        )
+        return 0
+    if arguments.provider_command == "health":
+        adapter = registry.create(arguments.provider_id, provider.model)
+        try:
+            health = await adapter.health()
+        finally:
+            await adapter.close()
+        _print_json(health.model_dump(mode="json"))
+        return 0 if health.status is ProviderHealthStatus.READY else 1
+    if arguments.provider_command == "login":
+        await web_login(
+            arguments.config,
+            arguments.provider_id,
+            client_id_file=arguments.client_id_file,
+        )
+        _print_json(
+            {
+                "provider": arguments.provider_id,
+                "authenticated": True,
+                "method": "oauth",
+            }
+        )
+        return 0
+    if arguments.provider_command == "set-api-key":
+        if provider.kind == "ollama" or provider.api_key_env is None:
+            raise ValueError(f"{provider.kind} does not have an API-key configuration")
+        value = getpass.getpass(f"Enter {provider.api_key_env}: ")
+        confirmation = getpass.getpass(f"Enter {provider.api_key_env} again: ")
+        if value != confirmation:
+            raise ValueError("API key values did not match")
+        secrets.set(provider.api_key_env, value)
+        persist_auth_method(arguments.config, arguments.provider_id, "api_key")
+        _print_json(
+            {
+                "provider": arguments.provider_id,
+                "authenticated": True,
+                "method": "api_key",
+                "secret_name": provider.api_key_env,
+            }
+        )
+        return 0
+    if arguments.provider_command == "logout":
+        if provider.auth_method == "oauth":
+            await web_logout(arguments.config, arguments.provider_id)
+            removed = True
+        elif provider.api_key_env is not None:
+            removed = secrets.delete(provider.api_key_env)
+        else:
+            raise ValueError(f"{provider.kind} does not have removable credentials")
+        _print_json(
+            {
+                "provider": arguments.provider_id,
+                "credentials_removed": removed,
+                "environment_override_may_remain": (
+                    provider.api_key_env is not None
+                    and secrets.get(provider.api_key_env) is not None
+                ),
+            }
+        )
+        return 0
+    raise AssertionError(f"unhandled provider command: {arguments.provider_command}")
+
+
+async def _available_models(
+    arguments: argparse.Namespace,
+    *,
+    provider: str | None = None,
+) -> list[dict[str, Any]]:
     client = AgentIPCClient(arguments.service_socket)
     try:
-        response = await client.request({"command": "models"})
+        response = await client.request(
+            {
+                "command": "models",
+                "provider": provider,
+            }
+        )
     except AgentIPCError:
-        return [entry.model_dump(mode="json") for entry in await _offline_ollama_catalog(arguments)]
+        return [
+            entry.model_dump(mode="json")
+            for entry in await _offline_provider_catalog(arguments, provider=provider)
+        ]
     data = response["data"]
     if not isinstance(data, list):
         raise AgentIPCError("agent service model catalog is malformed")
@@ -871,7 +1029,10 @@ async def _select_model(
     except AgentIPCError as exc:
         if "agent service is not running" not in str(exc):
             raise
-        catalog = await _offline_ollama_catalog(arguments)
+        catalog = await _offline_provider_catalog(
+            arguments,
+            provider=selected_provider,
+        )
         selected = next(
             (
                 entry
@@ -884,6 +1045,19 @@ async def _select_model(
             raise ModelSelectionError(
                 f"model '{model}' is not installed for provider '{selected_provider}'"
             )
+        registry = ConfiguredProviderRegistry(
+            arguments.config,
+            SecretStore(arguments.secret_file),
+        )
+        candidate = registry.create(selected_provider, model)
+        try:
+            health = await candidate.health()
+        finally:
+            await candidate.close()
+        if health.status is not ProviderHealthStatus.READY:
+            raise ModelSelectionError(
+                health.detail or "selected model did not pass its provider health check"
+            )
         persist_model_selection(arguments.config, selected_provider, model)
         return {
             **selected.model_copy(update={"current": True}).model_dump(mode="json"),
@@ -895,38 +1069,35 @@ async def _select_model(
     return {**data, "service_running": True}
 
 
-async def _offline_ollama_catalog(
+async def _offline_provider_catalog(
     arguments: argparse.Namespace,
+    *,
+    provider: str | None = None,
 ) -> tuple[ModelCatalogEntry, ...]:
-    provider_id, provider_config = _configured_provider(arguments)
-    if provider_config.kind != "ollama":
-        raise ModelSelectionError(
-            f"provider kind '{provider_config.kind}' is configured but not implemented"
-        )
-    provider = OllamaProvider(
-        OllamaConfig(
-            model=provider_config.model,
-            base_url=provider_config.base_url or "http://127.0.0.1:11434",
-        )
+    configured_id, _provider_config = _configured_provider(arguments)
+    provider_id = provider or configured_id
+    registry = ConfiguredProviderRegistry(
+        arguments.config,
+        SecretStore(arguments.secret_file),
     )
     benchmarks = BenchmarkRegistry(arguments.benchmark_dir)
+    config = load_robot_config(arguments.config)
     try:
-        return tuple(
-            ModelCatalogEntry(
-                provider=provider_id,
-                name=model.name,
-                size_bytes=model.size_bytes,
-                parameter_size=model.parameter_size,
-                quantization=model.quantization,
-                family=model.family,
-                modified_at=model.modified_at,
-                current=model.name == provider_config.model,
-                accepted=benchmarks.accepted(model.name),
-            )
-            for model in await provider.list_models()
+        provider_config = config.providers[provider_id]
+    except KeyError as exc:
+        raise ModelSelectionError(f"unknown configured provider: {provider_id}") from exc
+    return tuple(
+        entry.model_copy(
+            update={
+                "current": (
+                    provider_id == config.agent.default_provider
+                    and entry.name == provider_config.model
+                ),
+                "accepted": benchmarks.accepted(entry.name),
+            }
         )
-    finally:
-        await provider.close()
+        for entry in await registry.catalog(provider_id)
+    )
 
 
 def _configured_provider(arguments: argparse.Namespace) -> tuple[str, Any]:
@@ -1032,6 +1203,7 @@ async def _interactive(arguments: argparse.Namespace) -> int:
                 print("Please choose a number from 1 through 13.")
         except (
             AgentIPCError,
+            CloudProviderError,
             KeyError,
             ModelSelectionError,
             OllamaError,
@@ -1041,9 +1213,94 @@ async def _interactive(arguments: argparse.Namespace) -> int:
 
 
 async def _interactive_model_selection(arguments: argparse.Namespace) -> None:
-    models = await _available_models(arguments)
+    config = load_robot_config(arguments.config)
+    provider_order = {"ollama": 0, "openai": 1, "gemini": 2, "anthropic": 3}
+    providers = sorted(
+        (
+            (provider_id, provider)
+            for provider_id, provider in config.providers.items()
+            if provider.enabled
+        ),
+        key=lambda item: (provider_order[item[1].kind], item[0]),
+    )
+    if not providers:
+        print("No model providers are enabled in the robot configuration.")
+        return
+    print("\nChoose an Agent Provider")
+    for index, (provider_id, provider) in enumerate(providers, start=1):
+        current = " [current]" if provider_id == config.agent.default_provider else ""
+        label = "Google" if provider.kind == "gemini" else provider.kind.title()
+        print(f"{index}. {label} ({provider_id}){current}")
+    print("0. Back")
+    provider_choice = (await asyncio.to_thread(input, "Select a provider: ")).strip()
+    if provider_choice == "0":
+        return
+    try:
+        provider_id, provider = providers[int(provider_choice) - 1]
+    except (ValueError, IndexError):
+        print("Please select one of the displayed provider numbers.")
+        return
+    if provider.kind != "ollama":
+        registry = ConfiguredProviderRegistry(
+            arguments.config,
+            SecretStore(arguments.secret_file),
+        )
+        status = registry.credential_status(provider_id)
+        configured = status.get("configured") is True or (
+            status.get("method") == "oauth" and status.get("cli_installed") is True
+        )
+        print(
+            f"\n{provider_id} authentication is set to {provider.auth_method}. "
+            f"Credential source ready: {'yes' if configured else 'not confirmed'}."
+        )
+        web_label = (
+            "Web Login (not supported for OpenAI API inference)"
+            if provider.kind == "openai"
+            else "Web Login"
+        )
+        print(f"1. {web_label}")
+        print("2. Enter API Key")
+        print("3. Continue with Current Authentication")
+        print("0. Back")
+        auth_choice = (await asyncio.to_thread(input, "Select authentication: ")).strip()
+        if auth_choice == "0":
+            return
+        if auth_choice == "1":
+            client_id_file: Path | None = None
+            if provider.kind == "gemini":
+                raw_path = (
+                    await asyncio.to_thread(
+                        input,
+                        "Google OAuth client JSON path (blank for gcloud default): ",
+                    )
+                ).strip()
+                client_id_file = Path(raw_path) if raw_path else None
+            await web_login(
+                arguments.config,
+                provider_id,
+                client_id_file=client_id_file,
+            )
+        elif auth_choice == "2":
+            if provider.api_key_env is None:
+                raise ValueError(f"{provider_id} has no API-key secret reference")
+            secret = await asyncio.to_thread(
+                getpass.getpass,
+                f"Enter {provider.api_key_env}: ",
+            )
+            confirmation = await asyncio.to_thread(
+                getpass.getpass,
+                f"Enter {provider.api_key_env} again: ",
+            )
+            if secret != confirmation:
+                raise ValueError("API key values did not match")
+            SecretStore(arguments.secret_file).set(provider.api_key_env, secret)
+            persist_auth_method(arguments.config, provider_id, "api_key")
+        elif auth_choice != "3":
+            print("Please choose 0, 1, 2, or 3.")
+            return
+    models = await _available_models(arguments, provider=provider_id)
     if not models:
-        print("No local Ollama models are installed.")
+        print(f"No compatible {provider_id} models are available.")
         return
     print("\nAvailable Agent Models")
     for index, model in enumerate(models, start=1):
@@ -1072,7 +1329,7 @@ async def _interactive_model_selection(arguments: argparse.Namespace) -> None:
     result = await _select_model(
         arguments,
         model=str(selected["name"]),
-        provider=str(selected["provider"]),
+        provider=provider_id,
     )
     print(f"Agent model changed to {result['provider']}/{result['name']}.")
     if result.get("accepted") is not True:

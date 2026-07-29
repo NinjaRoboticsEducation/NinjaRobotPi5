@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import UTC, datetime
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 from ninjarobot_pi5_agent.agent_cli import main
 from ninjarobot_pi5_agent.mcp_config import load_mcp_configuration
+from ninjarobot_pi5_agent.models import ProviderHealth, ProviderHealthStatus
 from ninjarobot_pi5_agent.ollama import OllamaModelInfo, OllamaProvider
 from ninjarobot_pi5_agent.secrets import SecretStore
 from ninjarobot_pi5_ide.config_import import default_robot_config, save_robot_config
@@ -229,7 +232,16 @@ def test_agent_cli_lists_and_persists_an_offline_ollama_selection(
             OllamaModelInfo(name="small:2b", size_bytes=1_200_000_000),
         )
 
+    async def health(provider: OllamaProvider) -> ProviderHealth:
+        return ProviderHealth(
+            provider="ollama",
+            status=ProviderHealthStatus.READY,
+            checked_at=datetime.now(UTC),
+            detail=f"{provider.config.model} is ready",
+        )
+
     monkeypatch.setattr(OllamaProvider, "list_models", list_models)
+    monkeypatch.setattr(OllamaProvider, "health", health)
     common = [
         "--config",
         str(config),
@@ -247,3 +259,27 @@ def test_agent_cli_lists_and_persists_an_offline_ollama_selection(
     selected = json.loads(capsys.readouterr().out)
     assert selected["service_running"] is False
     assert load_robot_config(config).providers["ollama"].model == "small:2b"
+
+
+def test_agent_cli_lists_cloud_capabilities_without_requiring_credentials(
+    tmp_path,
+    capsys,
+) -> None:
+    example = Path(__file__).resolve().parents[2] / "config" / "ninjarobot_pi5.toml.example"
+
+    run_cli(
+        [
+            "--config",
+            str(example),
+            "--secret-file",
+            str(tmp_path / "secrets.env"),
+            "provider",
+            "list",
+        ]
+    )
+
+    listed = json.loads(capsys.readouterr().out)
+    by_id = {provider["id"]: provider for provider in listed["providers"]}
+    assert set(by_id) == {"ollama", "openai", "gemini", "anthropic"}
+    assert all(provider["capabilities"]["native_tools"] for provider in by_id.values())
+    assert all(provider["capabilities"]["streaming"] for provider in by_id.values())

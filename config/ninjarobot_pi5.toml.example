@@ -70,9 +70,34 @@ max_model_turns = 6
 max_tool_calls = 8
 request_timeout_seconds = 600.0
 model_inactivity_timeout_seconds = 120.0
+# Optional provider failover is disabled by default. Add configured provider IDs
+# only when you accept their network cost and data handling.
+fallback_providers = []
 
 [providers.ollama]
 kind = "ollama"
 model = "configured-by-user"
 enabled = true
 base_url = "http://127.0.0.1:11434"
+
+[providers.openai]
+kind = "openai"
+model = "gpt-5-mini"
+enabled = true
+auth_method = "api_key"
+api_key_env = "OPENAI_API_KEY"
+
+[providers.gemini]
+kind = "gemini"
+model = "gemini-2.5-flash"
+enabled = true
+auth_method = "api_key"
+api_key_env = "GEMINI_API_KEY"
+
+[providers.anthropic]
+kind = "anthropic"
+model = "claude-sonnet-4-5"
+enabled = true
+auth_method = "api_key"
+api_key_env = "ANTHROPIC_API_KEY"
+oauth_profile = "default"

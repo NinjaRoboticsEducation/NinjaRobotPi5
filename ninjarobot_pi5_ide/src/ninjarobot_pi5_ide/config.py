@@ -216,6 +216,24 @@ class AgentConfig(ConfigModel):
     max_tool_calls: Annotated[int, Field(ge=0, le=50)] = 8
     request_timeout_seconds: Annotated[float, Field(gt=0, le=600)] = 600.0
     model_inactivity_timeout_seconds: Annotated[float, Field(gt=0, le=600)] = 120.0
+    fallback_providers: tuple[NonEmptyText, ...] = ()
+
+    @field_validator("fallback_providers", mode="before")
+    @classmethod
+    def normalize_fallback_array(cls, value: object) -> object:
+        if isinstance(value, list):
+            return tuple(value)
+        return value
+
+    @field_validator("fallback_providers")
+    @classmethod
+    def fallback_providers_must_be_unique(
+        cls,
+        value: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        if len(value) != len(set(value)):
+            raise ValueError("agent fallback providers must be unique")
+        return value
 
     @model_validator(mode="before")
     @classmethod
@@ -237,13 +255,24 @@ class ProviderConfig(ConfigModel):
     model: NonEmptyText
     enabled: bool = False
     base_url: Annotated[str, StringConstraints(min_length=8, max_length=500)] | None = None
+    auth_method: Literal["api_key", "oauth"] = "api_key"
     api_key_env: EnvironmentVariable | None = None
+    oauth_profile: NonEmptyText | None = None
+    project_id: NonEmptyText | None = None
 
     @model_validator(mode="after")
     def enabled_cloud_provider_requires_secret_reference(self) -> ProviderConfig:
-        """Require an environment-variable reference for enabled cloud providers."""
-        if self.enabled and self.kind != "ollama" and self.api_key_env is None:
-            raise ValueError("enabled cloud providers require api_key_env")
+        """Require the metadata needed by the selected cloud authentication mode."""
+        if self.kind == "ollama":
+            if self.auth_method != "api_key":
+                raise ValueError("Ollama does not support cloud OAuth authentication")
+            return self
+        if self.auth_method == "api_key" and self.api_key_env is None:
+            raise ValueError("cloud providers using API keys require api_key_env")
+        if self.kind == "openai" and self.auth_method == "oauth":
+            raise ValueError("OpenAI API inference does not support ChatGPT web login")
+        if self.kind == "gemini" and self.auth_method == "oauth" and self.project_id is None:
+            raise ValueError("Gemini OAuth requires project_id")
         return self
 
 
@@ -275,6 +304,12 @@ class RobotConfig(ConfigModel):
             raise ValueError("agent.default_provider must name a configured provider")
         if not provider.enabled:
             raise ValueError("agent.default_provider must be enabled")
+        for fallback_id in self.agent.fallback_providers:
+            fallback = self.providers.get(fallback_id)
+            if fallback is None or not fallback.enabled:
+                raise ValueError("agent fallback providers must name configured enabled providers")
+            if fallback_id == self.agent.default_provider:
+                raise ValueError("agent fallback providers must not include the default provider")
         return self
 
 

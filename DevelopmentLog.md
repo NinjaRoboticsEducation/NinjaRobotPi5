@@ -1,5 +1,62 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-30 — Phase 6 cloud-provider adapters
+
+### Summary
+
+Implemented OpenAI, Google Gemini, and Anthropic model providers without
+changing the agent, MCP, Skill, policy, or IDE execution boundaries:
+
+- added HTTPS adapters for OpenAI Responses, Gemini generateContent, and
+  Anthropic Messages, including text streaming, usage, health, dynamic model
+  catalogs, and normalized tool calls
+- added deterministic provider-safe aliases for dotted `robot.*` and `mcp.*`
+  tool names; unknown aliases are rejected before policy evaluation
+- added terminal-only API-key management for all three providers, Google
+  Application Default Credential login through `gcloud`, and Anthropic profile
+  login through `ant`
+- explicitly rejected unsupported ChatGPT account login as OpenAI API
+  authentication
+- expanded the interactive Change Agent Model menu to Ollama, OpenAI, Google,
+  and Anthropic, while preserving scriptable provider/model commands
+- kept model switching idle-only, health-checked, atomic, motion-disarming,
+  and configuration-persistent
+- added optional provider fallback, disabled by default and allowed only
+  before tool execution and visible output; automatic fallback never persists
+  a provider change
+- preserved the shared MCP registry and Agent Skill prompt assembly for every
+  provider
+- updated private configuration serialization for authentication metadata and
+  fallback provider IDs
+
+### Validation
+
+- managed-driver verification passed before and after every implementation
+  group: 222 baseline files plus 25 authorized repairs
+- 348 repository tests passed after the documentation and validation pass
+- `ruff check` and `ruff format --check` passed for the changed source and
+  tests
+- strict typing passed: `mypy .` reported no issues in 64 source files
+- recorded-response tests covered OpenAI, Gemini, and Anthropic text/tool
+  normalization without making a live or billable provider request
+- cross-provider fixtures verified that MCP tool definitions and subordinate
+  Skill instructions survive each adapter's wire translation
+- secret-status tests verified that stored values never appear in CLI metadata
+
+No managed `pi5*` driver or nested `NinjaClawBot/` file changed. Live provider
+authentication and one read-only/one confirmed robot action per provider are
+deferred to the owner's Raspberry Pi checklist because they require private
+accounts, credentials, network access, and may incur charges.
+
+### Main files changed
+
+- cloud adapter, credential, registry, model-selection, service, and CLI
+  modules under `ninjarobot_pi5_agent`
+- provider and fallback configuration under `ninjarobot_pi5_ide`
+- recorded-response, registry, secret, fallback, CLI, and configuration tests
+- README, installation guide, developer guide, implementation plan, this log,
+  and the Phase 6 Raspberry Pi validation guide
+
 ## 2026-07-30 — Deterministic granted camera requests
 
 ### Summary

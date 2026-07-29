@@ -47,7 +47,11 @@ def test_example_configuration_matches_confirmed_wiring() -> None:
     assert config.behaviors.stop_on_invalid_distance is False
     assert config.agent.request_timeout_seconds == 600.0
     assert config.agent.model_inactivity_timeout_seconds == 120.0
+    assert config.agent.fallback_providers == ()
     assert config.providers["ollama"].api_key_env is None
+    assert config.providers["openai"].api_key_env == "OPENAI_API_KEY"
+    assert config.providers["gemini"].api_key_env == "GEMINI_API_KEY"
+    assert config.providers["anthropic"].api_key_env == "ANTHROPIC_API_KEY"
 
 
 def test_configuration_path_expands_home_directory(tmp_path, monkeypatch) -> None:
@@ -189,4 +193,31 @@ def test_enabled_cloud_provider_requires_environment_secret_reference() -> None:
     }
 
     with pytest.raises(ValidationError, match="require api_key_env"):
+        RobotConfig.model_validate(payload)
+
+
+def test_cloud_oauth_configuration_rejects_unsupported_or_incomplete_login() -> None:
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["providers"]["openai"]["auth_method"] = "oauth"
+    with pytest.raises(ValidationError, match="does not support ChatGPT web login"):
+        RobotConfig.model_validate(payload)
+
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["providers"]["gemini"]["auth_method"] = "oauth"
+    with pytest.raises(ValidationError, match="requires project_id"):
+        RobotConfig.model_validate(payload)
+
+    payload["providers"]["gemini"]["project_id"] = "robot-cloud-project"
+    config = RobotConfig.model_validate(payload)
+    assert config.providers["gemini"].auth_method == "oauth"
+
+
+def test_fallback_providers_must_be_enabled_and_exclude_the_primary() -> None:
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["agent"]["fallback_providers"] = ("openai", "gemini")
+    config = RobotConfig.model_validate(payload)
+    assert config.agent.fallback_providers == ("openai", "gemini")
+
+    payload["agent"]["fallback_providers"] = ("ollama",)
+    with pytest.raises(ValidationError, match="must not include the default"):
         RobotConfig.model_validate(payload)

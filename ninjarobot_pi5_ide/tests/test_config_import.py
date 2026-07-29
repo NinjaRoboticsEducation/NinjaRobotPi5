@@ -8,12 +8,20 @@ import pytest
 from ninjarobot_pi5_ide.config import load_robot_config
 from ninjarobot_pi5_ide.config_import import (
     DiscoveredConfig,
+    default_robot_config,
     import_pi5_configs,
     save_robot_config,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = ROOT / "config" / "ninjarobot_pi5.toml.example"
+
+
+def test_new_private_config_includes_local_and_cloud_provider_choices() -> None:
+    config = default_robot_config()
+
+    assert set(config.providers) == {"ollama", "openai", "gemini", "anthropic"}
+    assert config.agent.default_provider == "ollama"
 
 
 def write_json(path: Path, payload: object) -> None:

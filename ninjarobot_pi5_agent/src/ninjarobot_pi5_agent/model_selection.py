@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 from ninjarobot_pi5_ide import load_robot_config, save_robot_config
 
 from .benchmark import BenchmarkReport
+from .cloud_common import CloudProviderError
 from .models import (
     ModelRequest,
     ModelStreamEvent,
@@ -21,6 +22,7 @@ from .models import (
     ProviderHealth,
     ProviderHealthStatus,
 )
+from .ollama import OllamaUnavailableError
 from .providers import LLMProvider
 
 ProviderFactory = Callable[[str], LLMProvider]
@@ -55,6 +57,7 @@ class ProviderRegistration:
     provider_id: str
     factory: ProviderFactory
     catalog: CatalogLoader
+    default_model: str = ""
 
 
 class BenchmarkRegistry:
@@ -91,6 +94,7 @@ class ModelManager:
         registrations: tuple[ProviderRegistration, ...],
         benchmarks: BenchmarkRegistry,
         selection_writer: SelectionWriter,
+        fallback_provider_ids: tuple[str, ...] = (),
     ) -> None:
         registrations_by_id = {
             registration.provider_id: registration for registration in registrations
@@ -105,6 +109,12 @@ class ModelManager:
         self._registrations = registrations_by_id
         self._benchmarks = benchmarks
         self._selection_writer = selection_writer
+        unknown_fallbacks = sorted(set(fallback_provider_ids) - set(registrations_by_id))
+        if unknown_fallbacks:
+            raise ValueError(
+                "unknown fallback provider registrations: " + ", ".join(unknown_fallbacks)
+            )
+        self._fallback_provider_ids = fallback_provider_ids
         self._closed = False
 
     @property
@@ -126,12 +136,50 @@ class ModelManager:
 
     async def generate(self, request: ModelRequest) -> ModelTurn:
         self._ensure_open()
-        return await self._provider.generate(request)
+        try:
+            return await self._provider.generate(request)
+        except (CloudProviderError, OllamaUnavailableError):
+            if not request.allow_provider_fallback:
+                raise
+        for provider_id in self._fallback_provider_ids:
+            registration = self._registrations[provider_id]
+            candidate = registration.factory(registration.default_model)
+            try:
+                return await candidate.generate(request)
+            except (CloudProviderError, OllamaUnavailableError):
+                continue
+            finally:
+                await candidate.close()
+        raise ModelSelectionError("every configured provider failed before tool execution")
 
     async def stream(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
         self._ensure_open()
-        async for event in self._provider.stream(request):
-            yield event
+        emitted_public_output = False
+        try:
+            async for event in self._provider.stream(request):
+                if event.event.value == "text_delta" and event.text:
+                    emitted_public_output = True
+                yield event
+            return
+        except (CloudProviderError, OllamaUnavailableError):
+            if not request.allow_provider_fallback or emitted_public_output:
+                raise
+        for provider_id in self._fallback_provider_ids:
+            registration = self._registrations[provider_id]
+            candidate = registration.factory(registration.default_model)
+            emitted_candidate_output = False
+            try:
+                async for event in candidate.stream(request):
+                    if event.event.value == "text_delta" and event.text:
+                        emitted_candidate_output = True
+                    yield event
+                return
+            except (CloudProviderError, OllamaUnavailableError):
+                if emitted_candidate_output:
+                    raise
+            finally:
+                await candidate.close()
+        raise ModelSelectionError("every configured provider failed before tool execution")
 
     async def health(self) -> ProviderHealth:
         self._ensure_open()
@@ -149,7 +197,13 @@ class ModelManager:
                 registration = self._registrations[identifier]
             except KeyError as exc:
                 raise ModelSelectionError(f"unknown model provider: {identifier}") from exc
-            for entry in await registration.catalog():
+            try:
+                catalog_entries = await registration.catalog()
+            except (CloudProviderError, KeyError, ValueError):
+                if provider_id is not None:
+                    raise
+                continue
+            for entry in catalog_entries:
                 entries.append(
                     entry.model_copy(
                         update={

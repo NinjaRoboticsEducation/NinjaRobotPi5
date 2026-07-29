@@ -4,6 +4,8 @@ import asyncio
 from datetime import UTC, datetime
 
 import pytest
+from ninjarobot_pi5_agent.cloud_common import CloudUnavailableError
+from ninjarobot_pi5_agent.secrets import SecretStore
 
 from ninjarobot_pi5_agent import (
     AgentLoop,
@@ -15,8 +17,10 @@ from ninjarobot_pi5_agent import (
     ConversationStore,
     EventBroker,
     FinishReason,
+    MessageRole,
     ModelCatalogEntry,
     ModelManager,
+    ModelMessage,
     ModelRequest,
     ModelStreamEvent,
     ModelTurn,
@@ -88,6 +92,78 @@ class _BlockingProvider(_Provider):
         await self.release.wait()
         async for event in super().stream(request):
             yield event
+
+
+class _FailingCloudProvider(_Provider):
+    async def generate(self, request: ModelRequest) -> ModelTurn:
+        raise CloudUnavailableError("provider unavailable")
+
+    async def stream(self, request: ModelRequest):
+        raise CloudUnavailableError("provider unavailable")
+        yield
+
+
+def test_secret_store_can_report_and_remove_file_backed_secret(tmp_path) -> None:
+    store = SecretStore(tmp_path / "secrets.env")
+
+    assert store.contains("OPENAI_API_KEY") is False
+    assert store.delete("OPENAI_API_KEY") is False
+
+    store.set("OPENAI_API_KEY", "test-secret")
+    assert store.contains("OPENAI_API_KEY") is True
+    assert store.delete("OPENAI_API_KEY") is True
+    assert store.contains("OPENAI_API_KEY") is False
+    assert not store.path.exists()
+
+
+def test_model_fallback_is_opt_in_and_never_persists_an_automatic_switch(
+    tmp_path,
+) -> None:
+    async def exercise() -> None:
+        persisted: list[tuple[str, str]] = []
+
+        async def catalog() -> tuple[ModelCatalogEntry, ...]:
+            return ()
+
+        manager = ModelManager(
+            active_provider_id="openai",
+            active_model="primary",
+            active_provider=_FailingCloudProvider("primary"),
+            registrations=(
+                ProviderRegistration(
+                    provider_id="openai",
+                    factory=_FailingCloudProvider,
+                    catalog=catalog,
+                    default_model="primary",
+                ),
+                ProviderRegistration(
+                    provider_id="ollama",
+                    factory=_Provider,
+                    catalog=catalog,
+                    default_model="fallback",
+                ),
+            ),
+            benchmarks=BenchmarkRegistry(tmp_path / "reports"),
+            selection_writer=lambda provider, model: persisted.append((provider, model)),
+            fallback_provider_ids=("ollama",),
+        )
+        request = ModelRequest(
+            request_id="fallback-request",
+            session_id="fallback-session",
+            messages=(ModelMessage(role=MessageRole.USER, content="Hello"),),
+            allow_provider_fallback=True,
+        )
+
+        turn = await manager.generate(request)
+
+        assert turn.text == "fallback"
+        assert manager.provider_id == "openai"
+        assert persisted == []
+        with pytest.raises(CloudUnavailableError):
+            await manager.generate(request.model_copy(update={"allow_provider_fallback": False}))
+        await manager.close()
+
+    asyncio.run(exercise())
 
 
 def test_model_manager_lists_acceptance_and_switches_after_persistence(tmp_path) -> None:

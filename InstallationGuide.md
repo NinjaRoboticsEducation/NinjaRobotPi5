@@ -16,8 +16,9 @@ available for robot control and future local AI models.
 NinjaRobotPi5 is Python software for a Raspberry Pi 5 robot. It brings the
 display, buzzer, wheel servos, distance sensor, camera, and microphone together
 behind one consistent robot interface. NinjaRobotAgent adds local Ollama chat,
-approved web search, reusable skills, and an HTTPS controller for a desktop or
-mobile browser on the same local network.
+optional OpenAI, Google Gemini, and Anthropic models, approved web search,
+reusable skills, and an HTTPS controller for a desktop or mobile browser on the
+same local network.
 
 Each `pi5*` library can still configure and test its own hardware independently.
 The NinjaRobotPi5 IDE then uses selected settings from those standalone
@@ -61,6 +62,7 @@ physical 45-degree position.
 - Raspberry Pi camera packages
 - PortAudio and ALSA audio tools for the USB microphone
 - Ollama for the local language model
+- Optional OpenAI, Google Gemini, or Anthropic cloud model accounts
 - whisper.cpp for local English and Japanese speech-to-text
 - FastAPI and HTTPS for the local browser controller
 - NinjaRobotPi5 and its six managed `pi5*` hardware libraries
@@ -72,7 +74,7 @@ After installation, the important project folders are:
 ```text
 NinjaRobotPi5/
 ├── ninjarobot_pi5_ide/       Coordinates robot hardware and behaviors
-├── ninjarobot_pi5_agent/     Local AI agent, MCP, skills, CLI, and web UI
+├── ninjarobot_pi5_agent/     Local/cloud AI agent, MCP, skills, CLI, and web UI
 ├── pi5buzzer/                Standalone buzzer library
 ├── pi5camera/                Standalone camera library
 ├── pi5disp/                  Standalone display library
@@ -678,6 +680,141 @@ recommended before real movement because it reveals slow, unreliable, or
 thermally unsuitable models, but benchmark acceptance is informational rather
 than a permission requirement. Direct operator controls such as the browser
 D-pad remain independent of the selected model.
+
+#### Optional — connect a cloud AI provider
+
+You can skip this section and keep using Ollama. Cloud providers need an
+internet connection, send the conversation and selected tool descriptions to
+the provider, and may charge your account. Robot tools still run locally
+through NinjaRobotPi5 IDE; the cloud adapter cannot access a Pi5 library
+directly.
+
+First list the configured providers:
+
+```bash
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" provider list
+```
+
+New configurations created by `config import` or from
+`config/ninjarobot_pi5.toml.example` already contain credential-gated
+entries for OpenAI, Google Gemini, and Anthropic. They are safe to leave in the
+file because Ollama remains the default and cloud credentials are resolved
+only when that provider is used. If your configuration was created before
+Phase 6, copy the matching provider block from the example into
+`$NINJAROBOT_CONFIG`.
+
+The easiest authentication method on Raspberry Pi is an API key. Enter it
+through the hidden terminal prompt; do not put it in a shell command, browser,
+Skill, MCP file, or Git repository.
+
+OpenAI:
+
+```bash
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" provider set-api-key openai
+
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" provider health openai
+
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" model list --provider openai
+```
+
+OpenAI API inference uses an API key. A ChatGPT subscription or ChatGPT web
+login is not a reusable login for this application. See OpenAI's
+[API authentication reference](https://developers.openai.com/api/reference/overview#authentication).
+
+Google Gemini:
+
+```bash
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" provider set-api-key gemini
+
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" provider health gemini
+
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" model list --provider gemini
+```
+
+Anthropic:
+
+```bash
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" provider set-api-key anthropic
+
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" provider health anthropic
+
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" model list --provider anthropic
+```
+
+Choose an exact model ID returned by the selected provider:
+
+```bash
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" \
+  model select MODEL_ID --provider PROVIDER_ID
+
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" model current
+```
+
+For example, replace `PROVIDER_ID` with `openai`, `gemini`, or `anthropic`.
+Do not copy a model name from an old guide because provider model catalogs and
+account access change over time.
+
+The interactive alternative is:
+
+```bash
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG"
+```
+
+Choose **3. Change Agent Model**, select Ollama, OpenAI, Google, or Anthropic,
+choose the terminal authentication method, then select a numbered model.
+
+Google and Anthropic also support their official web-login tools:
+
+- Gemini needs the Google Cloud CLI, Application Default Credentials, a
+  Desktop OAuth client JSON file, and `project_id` in the Gemini provider
+  block. See Google's
+  [Gemini OAuth guide](https://ai.google.dev/gemini-api/docs/oauth), then run:
+
+  ```bash
+  uv run --frozen ninjarobot-agent \
+    --config "$NINJAROBOT_CONFIG" \
+    provider login gemini \
+    --client-id-file "$HOME/path/to/client_secret.json"
+  ```
+
+- Anthropic needs the official `ant` CLI. Install it by following Anthropic's
+  [current CLI quickstart](https://platform.claude.com/docs/en/cli-sdks-libraries/cli/quickstart),
+  then run:
+
+  ```bash
+  uv run --frozen ninjarobot-agent \
+    --config "$NINJAROBOT_CONFIG" provider login anthropic
+  ```
+
+Both commands print a URL/code workflow suitable for a Raspberry Pi without a
+desktop. The resulting OAuth credentials stay in the official provider CLI
+store, not the NinjaRobot secret file. Use `provider logout PROVIDER_ID` to
+remove the selected credential source.
+
+Optional automatic provider fallback is off by default. To enable it, add
+configured provider IDs to the private TOML file:
+
+```toml
+[agent]
+fallback_providers = ["ollama"]
+```
+
+Fallback happens only before the current request executes any tool and before
+the user sees model text. It never retries after a robot or MCP action and
+never silently changes the saved provider.
 
 Start the agent in simulation:
 
@@ -1652,6 +1789,15 @@ The Phase 5 extension design keeps three boundaries:
 - MCP servers provide external tools but never receive an IDE or driver object.
 - Skills can use allowed tools but cannot create permissions or change safety
   rules.
+
+These boundaries are model-provider independent. After switching to OpenAI,
+Gemini, or Anthropic, keep using the same MCP and Skill commands below. The
+selected cloud adapter receives the same allowlisted tool definitions and
+selected Skill instructions. It returns proposed calls to the local policy
+engine; it does not connect to Tavily, execute a Skill, or control hardware on
+its own. Restart the agent service after changing an MCP server so the shared
+registry is rebuilt. A model change alone does not require reinstalling an MCP
+server or Skill.
 
 #### Set up the default Tavily web-search MCP server
 

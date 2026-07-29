@@ -52,6 +52,28 @@ class SecretStore:
             raise KeyError(f"required secret is not configured: {name}")
         return value
 
+    def contains(self, name: str) -> bool:
+        """Report whether a secret resolves without revealing its value."""
+        return self.get(name) is not None
+
+    def delete(self, name: str) -> bool:
+        """Remove one file-backed secret without changing the process environment."""
+        _validate_name(name)
+        secrets = self._read_file()
+        if name not in secrets:
+            return False
+        secrets.pop(name)
+        if not secrets:
+            self._path.unlink(missing_ok=True)
+            return True
+        temporary = self._path.with_suffix(f"{self._path.suffix}.tmp")
+        body = "".join(f"{key}={secrets[key]}\n" for key in sorted(secrets))
+        temporary.write_text(body, encoding="utf-8")
+        temporary.chmod(0o600)
+        temporary.replace(self._path)
+        self._path.chmod(0o600)
+        return True
+
     def redact(self, value: Any) -> Any:
         """Recursively replace known secret values in diagnostics."""
         known = tuple(secret for secret in self._read_file().values() if secret)

@@ -153,12 +153,16 @@ class AgentIPCServer:
             )
             return
         if command == "models":
+            provider_id = payload.get("provider")
+            if provider_id is not None and not isinstance(provider_id, str):
+                raise ValueError("provider must be text or null")
             await _write_message(
                 writer,
                 {
                     "type": "result",
                     "data": [
-                        model.model_dump(mode="json") for model in await self._runtime.list_models()
+                        model.model_dump(mode="json")
+                        for model in await self._runtime.list_models(provider_id)
                     ],
                 },
             )

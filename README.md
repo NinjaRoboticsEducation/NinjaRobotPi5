@@ -6,9 +6,9 @@ layers:
 
 - `ninjarobot_pi5_ide`: deterministic middleware that exposes safe, standardized
   robot capabilities.
-- `ninjarobot_pi5_agent`: provides the bounded local agent service, Ollama
-  adapter, conversational CLI, HTTPS web controller, MCP tools, and validated
-  non-executable agent skills.
+- `ninjarobot_pi5_agent`: provides the bounded agent service, Ollama, OpenAI,
+  Google Gemini, and Anthropic adapters, conversational CLI, HTTPS web
+  controller, MCP tools, and validated non-executable agent skills.
 
 The implementation follows
 [`NinjaRobotPi5V4_ImplementationPlan.md`](NinjaRobotPi5V4_ImplementationPlan.md),
@@ -20,6 +20,11 @@ Phase 0, Phase 1, Phase 2, Phase 3.1 through Phase 3.5, and Phase 4 are
 implemented and the operator reports the complete Phase 4 and installation
 workflow passed. Phase 5.0 through Phase 5.12 and the 2026-07-29 agent/web and
 dynamic-behavior refinements are implemented and pass the local software gate.
+Phase 6 cloud-provider adapters are implemented and pass recorded-response,
+tool-normalization, fallback, secret-redaction, lint, format, typing, and
+hardware-free integration tests. Live OpenAI, Gemini, and Anthropic checks
+remain opt-in because they require the owner's account, credentials, network,
+and may incur provider charges.
 Raspberry Pi
 acceptance—including the Qwen3:4B
 performance benchmark, live Tavily search, LAN browser checks, camera,
@@ -314,14 +319,39 @@ The `ninjarobot-agent` additionally provides:
   `/confirm <request>`
 - `web start|status|stop` for the HTTPS local-network interface
 - `motion arm --confirm` for one CLI chat session's physical-motion consent
-- `model list|current|select` for installed Ollama model discovery, persistent
-  selection, and idle-time hot switching
+- `provider list|status|health|login|set-api-key|logout` for terminal-only
+  OpenAI, Google Gemini, and Anthropic authentication
+- provider-scoped `model list|current|select` for dynamic model discovery,
+  persistent selection, and idle-time hot switching across Ollama and cloud
+  providers
 - `mcp` commands for the Tavily preset and approved `stdio` or Streamable HTTP
   servers
 - `skill` validation, simulation, non-overwriting installation, enable,
   disable, inspection, and confirmed removal
 - `benchmark ollama` for a recommended Raspberry Pi performance and quality
   report
+
+Every provider receives the same provider-neutral request assembled by the
+agent. That request includes the same allowlisted `robot.*` and `mcp.*` tools
+and the same selected Agent Skill instructions. Cloud adapters only translate
+and normalize model traffic; they never execute a tool or access a Pi5 driver.
+API keys are entered only in the terminal and stored in the owner-private
+secret file. OpenAI API inference supports API keys, not ChatGPT account
+login. Gemini supports API keys or Google Application Default Credentials.
+Anthropic supports API keys or the official `ant` CLI web login.
+
+For example:
+
+```bash
+uv run --frozen ninjarobot-agent provider set-api-key openai
+uv run --frozen ninjarobot-agent provider health openai
+uv run --frozen ninjarobot-agent model list --provider openai
+uv run --frozen ninjarobot-agent model select MODEL_ID --provider openai
+```
+
+See the
+[Phase 6 cloud-provider validation guide](docs/validation/phase-6-cloud-provider-validation-2026-07-30.md)
+before live use.
 
 Simulation remains the service default. Start the physical service only after
 all Phase 4 hardware checks pass:
