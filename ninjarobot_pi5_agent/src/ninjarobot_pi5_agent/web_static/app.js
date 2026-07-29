@@ -17,6 +17,7 @@
     activeMoveButton: null,
     drawerDragged: false,
     controllerStarted: false,
+    certificateHelpLogged: false,
   };
 
   const elements = {
@@ -134,12 +135,21 @@
     });
     socket.addEventListener("error", () => {
       log("Could not establish the HTTPS WebSocket connection.", "error");
+      if (!state.certificateHelpLogged) {
+        state.certificateHelpLogged = true;
+        log(
+          "Chrome: accept the HTTPS warning for this exact address, then reload. Safari: install and trust the NinjaRobotPi5 Local CA. Run 'ninjarobot-agent web certificate-status' on the Pi for details.",
+          "error",
+        );
+        toast("Secure connection failed. Open Live Activity for certificate help.");
+      }
     });
   }
 
   function handleMessage(message) {
     if (message.type === "lease") {
       state.leaseId = message.lease_id;
+      state.certificateHelpLogged = false;
       state.reconnectToken = message.reconnect_token;
       sessionStorage.setItem("ninjarobotReconnectToken", state.reconnectToken);
       setConnection("Controller active", "badge-ok");

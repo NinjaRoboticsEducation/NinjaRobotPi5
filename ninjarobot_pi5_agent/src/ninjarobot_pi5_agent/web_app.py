@@ -61,6 +61,7 @@ def ensure_local_ca_certificate(
             if existing.issuer != ca.subject:
                 return certificate, key
             if _certificate_dns_names(existing) >= _required_dns_names():
+                _ensure_served_certificate_chain(certificate, existing, ca)
                 return certificate, key
             certificate.unlink()
             key.unlink()
@@ -148,7 +149,7 @@ def ensure_local_ca_certificate(
         .sign(authority_key, hashes.SHA256())
     )
     _atomic_private_key(key, private_key)
-    _atomic_certificate(certificate, built, mode=0o644)
+    _atomic_certificate_chain(certificate, built, authority, mode=0o644)
     return certificate, key
 
 
@@ -201,6 +202,39 @@ def _atomic_certificate(path: Path, certificate: x509.Certificate, *, mode: int)
         os.replace(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def _atomic_certificate_chain(
+    path: Path,
+    leaf: x509.Certificate,
+    authority: x509.Certificate,
+    *,
+    mode: int,
+) -> None:
+    """Write the server leaf followed by its local authority for TLS clients."""
+    temporary = path.with_name(f".{path.name}.tmp")
+    try:
+        temporary.write_bytes(
+            leaf.public_bytes(serialization.Encoding.PEM)
+            + authority.public_bytes(serialization.Encoding.PEM)
+        )
+        os.chmod(temporary, mode)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _ensure_served_certificate_chain(
+    path: Path,
+    leaf: x509.Certificate,
+    authority: x509.Certificate,
+) -> None:
+    """Upgrade an existing leaf-only file without replacing its private key."""
+    expected = leaf.public_bytes(serialization.Encoding.PEM) + authority.public_bytes(
+        serialization.Encoding.PEM
+    )
+    if path.read_bytes() != expected:
+        _atomic_certificate_chain(path, leaf, authority, mode=0o644)
 
 
 def mdns_hostname() -> str:

@@ -152,7 +152,7 @@ def test_model_manager_lists_acceptance_and_switches_after_persistence(tmp_path)
     asyncio.run(exercise())
 
 
-def test_runtime_refuses_model_switch_and_motion_arm_while_unaccepted_or_busy(
+def test_runtime_allows_confirmed_motion_arm_but_refuses_model_switch_while_busy(
     tmp_path,
 ) -> None:
     async def exercise() -> None:
@@ -205,8 +205,10 @@ def test_runtime_refuses_model_switch_and_motion_arm_while_unaccepted_or_busy(
         )
         await runtime.start()
 
-        with pytest.raises(PermissionError, match="accepted benchmark"):
-            runtime.arm_motion("session-1", confirmed=True)
+        with pytest.raises(PermissionError, match="explicit confirmation"):
+            runtime.arm_motion("session-1", confirmed=False)
+        runtime.arm_motion("session-1", confirmed=True)
+        assert arms.is_armed("session-1") is True
 
         chat = asyncio.create_task(
             runtime.chat(

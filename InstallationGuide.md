@@ -670,11 +670,14 @@ service, and saves the choice. It refuses to switch during an active response
 or robot action. The interactive tool provides the same workflow under
 **Change Agent Model** and shows models by number.
 
-The selected model does not need an accepted benchmark to chat or run
-simulation. Until a benchmark report for that exact model name says
-`"accepted": true`, natural-language physical motion cannot be armed. Direct
-operator controls such as the browser D-pad remain independent of model
-acceptance.
+Any installed model that passes the normal Ollama health check can chat,
+simulate, and arm natural-language physical motion. Arming still requires the
+operator's explicit session confirmation, and every movement still passes
+through the NinjaRobotPi5 IDE safety boundary. A benchmark is strongly
+recommended before real movement because it reveals slow, unreliable, or
+thermally unsuitable models, but benchmark acceptance is informational rather
+than a permission requirement. Direct operator controls such as the browser
+D-pad remain independent of the selected model.
 
 Start the agent in simulation:
 
@@ -709,7 +712,9 @@ from the fixed allowlist. The selection is removed from chat text and cannot
 grant motion or tool permission. Normal completion returns to Idle;
 safety-stop displays remain visible until Resume.
 
-Start the HTTPS web interface:
+Start the HTTPS web interface. Restarting it after this software update also
+upgrades an older leaf-only generated certificate into the complete
+leaf-and-local-CA chain without changing its private key:
 
 ```bash
 uv run --frozen ninjarobot-agent web certificate-status
@@ -718,6 +723,16 @@ uv run --frozen ninjarobot-agent web export-ca \
 uv run --frozen ninjarobot-agent web start
 ```
 
+Confirm that the generated server certificate now contains two certificates:
+
+```bash
+grep -c 'BEGIN CERTIFICATE' \
+  "$HOME/.config/ninjarobot_pi5/tls/agent-cert.pem"
+```
+
+Expected result: `2`. A custom administrator-supplied certificate may have a
+different chain length.
+
 Open the printed URL from one browser on the same local network. If the bare
 hostname does not resolve, use:
 
@@ -725,14 +740,21 @@ hostname does not resolve, use:
 https://ninjarobotpi5.local:8443/
 ```
 
-Before opening the controller, copy `ninjarobotpi5-local-ca.pem` to the phone
-or computer and install it as a trusted root certificate. This exported file
-contains no private key. On iPhone or iPad, install the downloaded profile,
-then open **Settings → General → About → Certificate Trust Settings** and
-enable full trust for **NinjaRobotPi5 Local CA**. On macOS, import it into the
-System keychain and set it to Always Trust. Android and desktop Chrome use the
-device or operating-system certificate settings. Restart the browser after
-changing trust.
+Installing the public CA is recommended, but it is optional for a Chrome
+version that offers **Advanced → Proceed** on the certificate warning. After
+proceeding, reload the page and confirm that the controller connection becomes
+active. If Chrome does not offer that choice, or the HTTPS WebSocket still
+fails, install the CA.
+
+For Safari and reliable browser microphone access, copy
+`ninjarobotpi5-local-ca.pem` to the phone or computer and install it as a
+trusted root certificate. This exported file contains no private key. On
+iPhone or iPad, install the downloaded profile, then open
+**Settings → General → About → Certificate Trust Settings** and enable full
+trust for **NinjaRobotPi5 Local CA**. On macOS, import it into the System
+keychain and set it to Always Trust. Android and desktop Chrome use the device
+or operating-system certificate settings. Restart the browser after changing
+trust.
 
 The first browser receives the only controller lease. A second browser is
 rejected with HTTP `423 Locked`; some browsers show only a generic connection
@@ -749,7 +771,9 @@ In simulation, check:
 
 1. Chat sends and streams a response.
 2. Tap or slide the **Live Activity** bottom tab to see service and tool events.
-3. D-pad buttons report simulated movement and stop when released.
+3. D-pad buttons report simulated movement and stop when released. When
+   fullscreen is unavailable, the D-pad must remain above the camera and
+   microphone buttons without overlap.
 4. X performs simulated Emergency Stop.
 5. Y asks for confirmation before Resume.
 6. A runs Greeting and B runs Celebrate.
@@ -1194,7 +1218,23 @@ The generated private CA and server certificate are stored under:
 ~/.config/ninjarobot_pi5/tls/
 ```
 
-Do not rely on bypassing a browser warning. Export the public CA certificate:
+First restart the web interface so an older generated leaf-only certificate is
+upgraded to the complete served chain:
+
+```bash
+uv run --frozen ninjarobot-agent web stop
+uv run --frozen ninjarobot-agent web start
+grep -c 'BEGIN CERTIFICATE' \
+  "$HOME/.config/ninjarobot_pi5/tls/agent-cert.pem"
+```
+
+The final command should print `2` for the generated certificate. Chrome
+versions that display **Advanced → Proceed** may accept the warning without CA
+installation. Proceed, reload the controller, and confirm that it reports an
+active connection. This exception is browser-dependent; if the option is
+absent or the HTTPS WebSocket still fails, install the public CA.
+
+Export the public CA certificate:
 
 ```bash
 uv run --frozen ninjarobot-agent web export-ca \
@@ -1202,9 +1242,11 @@ uv run --frozen ninjarobot-agent web export-ca \
 ```
 
 Install and trust that public certificate on the controlling device, then use
-`https://ninjarobotpi5.local:8443/`. Safari requires the additional iPhone or
-iPad full-trust switch described in Step 7. Browser microphone access requires
-a trusted HTTPS page. Never share `agent-key.pem` or `local-ca-key.pem`.
+`https://ninjarobotpi5.local:8443/`. This is recommended for every browser and
+normally required by Safari. Safari also requires the iPhone or iPad
+full-trust switch described in Step 7. Browser microphone access is most
+reliable from a trusted HTTPS page. Never share `agent-key.pem` or
+`local-ca-key.pem`.
 
 #### USB microphone transcription is unavailable
 

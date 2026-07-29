@@ -2112,8 +2112,10 @@ Pi checklist remains operator work.
   without rebuilding the agent loop.
 - Permit idle-time hot switching and persistent stopped-service selection,
   while blocking switches during responses or robot actions.
-- Require an accepted exact-model benchmark before natural-language physical
-  motion can be armed.
+- Record exact-model benchmark acceptance as recommended performance and
+  quality evidence, without using it as a physical-motion permission gate.
+- Continue to require explicit session arming and every existing IDE safety
+  check for natural-language physical motion.
 - Coordinate silent Idle, Thinking, Speaking, emotion, and action presentation
   only through the IDE-owned robot assembly.
 - Keep model-selected emotion display-only, strictly allowlisted, stripped
@@ -2129,7 +2131,8 @@ Pi checklist remains operator work.
 
 - Ollama `/api/tags` catalog parsing and strict metadata tests.
 - Offline persistence, running-service hot switch, busy rejection, previous
-  provider cleanup, motion-disarm, and benchmark-gating tests.
+  provider cleanup, motion-disarm, informational benchmark, and confirmed-arm
+  tests.
 - Split-stream presentation directive, invalid face, persisted-text, and IDE
   lifecycle tests.
 - Tavily legacy migration, raw/public name mapping, live health, and tool
@@ -2150,6 +2153,59 @@ No managed `pi5*` driver changes are authorized or required.
 Updated `README.md`, `InstallationGuide.md`, `DevelopmentGuide.md`,
 `DevelopmentLog.md`, this implementation plan, and the dated Phase 5 model and
 controller Raspberry Pi validation checklist.
+
+#### Phase 5.9 — Post-validation motion, HTTPS, and viewport repair
+
+**Status**
+
+Implemented on 2026-07-29. Automated validation passes; Chrome, Safari, and
+raised-wheel Raspberry Pi checks remain operator work.
+
+**Objective**
+
+- Let every installed and healthy selected model arm natural-language
+  physical motion after the operator's explicit session confirmation.
+- Preserve the motion arm, controller lease, policy, IDE motion guards, and
+  emergency-stop boundaries independently of benchmark status.
+- Serve the generated HTTPS server leaf and local CA as a complete chain.
+- Atomically upgrade a valid older generated leaf-only certificate without
+  changing its private key.
+- Keep CA installation optional where Chrome explicitly permits warning
+  bypass, while documenting CA trust as recommended and normally necessary
+  for Safari and reliable browser speech.
+- Size the D-pad from its allocated grid height so it cannot overlap camera
+  and microphone controls in short non-fullscreen mobile viewports.
+
+**Files**
+
+- Agent runtime and interactive model guidance.
+- FastAPI certificate generation and migration.
+- Browser connection guidance and responsive controller styles.
+- Model-selection and web regression tests.
+- Project, installation, developer, log, and Raspberry Pi validation
+  documentation.
+
+**Validation**
+
+- Unbenchmarked-model confirmed arm and unconfirmed-arm refusal tests.
+- Complete-chain creation and leaf-only migration tests that verify private-key
+  preservation.
+- Static browser contract tests for connection recovery guidance and
+  allocation-bounded D-pad sizing.
+- Full compile, Ruff, formatting, MyPy, pytest, JavaScript syntax, package
+  build, immutable-driver, and diff checks.
+
+**Hardware risk**
+
+Automated validation is simulation-only. Manual natural-language motion and
+D-pad checks move actuators and must use raised wheels with Emergency Stop
+ready. Certificate and layout checks do not move hardware.
+
+**Documentation**
+
+Update `README.md`, `InstallationGuide.md`, `DevelopmentGuide.md`,
+`DevelopmentLog.md`, this plan, and the dated Phase 5 Raspberry Pi validation
+checklist.
 
 ### Phase 6: Cloud provider adapters
 

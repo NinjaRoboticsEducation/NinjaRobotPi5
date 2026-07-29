@@ -30,7 +30,7 @@ This checklist covers:
 - the complete software quality gate
 - installed Ollama model discovery and persistent selection
 - refusal to switch models while the agent is busy
-- benchmark status and natural-language motion gating
+- benchmark reporting and confirmed natural-language motion arming
 - Idle, Thinking, Speaking or emotion, tool action, and return-to-Idle faces
 - current raw Tavily tool name `tavily_search` and stable public name
   `mcp.tavily.tavily-search`
@@ -169,7 +169,7 @@ after Terminal A completes; the idle switch should then succeed.
 
 Restore the intended model before continuing.
 
-### 3.6 Verify benchmark gating
+### 3.6 Verify benchmark reporting and motion arming
 
 ```bash
 uv run --frozen ninjarobot-agent model current
@@ -179,10 +179,12 @@ uv run --frozen ninjarobot-agent motion arm \
 
 Expected result:
 
-- an accepted model arms the named session
-- an unaccepted or unbenchmarked model is refused with a clear benchmark
-  message
-- chat and simulation still work with an unaccepted model
+- any installed selected model that passes provider health arms the named
+  session after `--confirm`
+- `model current` still reports the exact model's benchmark status for
+  performance and quality review
+- benchmark acceptance does not grant or remove motion permission
+- omitting explicit confirmation must still refuse motion arming
 
 Disarm afterward:
 
@@ -259,18 +261,21 @@ tool action has priority, the agent returns to Thinking before its final
 answer, and then returns to Idle. A presentation failure may be logged, but it
 must not crash chat or bypass safety.
 
-### 4.3 Start the trusted web controller
+### 4.3 Start the HTTPS web controller
 
 ```bash
+uv run --frozen ninjarobot-agent web stop
+uv run --frozen ninjarobot-agent web start
+grep -c 'BEGIN CERTIFICATE' \
+  "$HOME/.config/ninjarobot_pi5/tls/agent-cert.pem"
 uv run --frozen ninjarobot-agent web certificate-status
 uv run --frozen ninjarobot-agent web export-ca \
   --output "$HOME/ninjarobotpi5-local-ca.pem"
-uv run --frozen ninjarobot-agent web start
 ```
 
-Install and fully trust only the exported public CA as described in
-`InstallationGuide.md`. Never copy either private key from
-`~/.config/ninjarobot_pi5/tls/`.
+Expected result: the generated certificate count is `2`. This proves the
+server file contains its leaf certificate and local CA chain. Never copy
+either private key from `~/.config/ninjarobot_pi5/tls/`.
 
 Open:
 
@@ -278,7 +283,20 @@ Open:
 https://ninjarobotpi5.local:8443/
 ```
 
-Expected result: no certificate warning appears after trust is configured.
+Chrome path without CA installation:
+
+1. If Chrome offers **Advanced → Proceed**, accept the warning.
+2. Reload the controller.
+3. Confirm the connection becomes active and Live Activity does not report an
+   HTTPS WebSocket failure.
+
+This warning bypass is optional and browser-dependent. If Chrome offers no
+bypass or the WebSocket remains disconnected, install and trust only the
+exported public CA as described in `InstallationGuide.md`.
+
+Safari path: install and fully trust the exported CA before testing. Expected
+result: no certificate warning appears after trust is configured. The trusted
+path is also the recommended browser-microphone setup.
 
 ### 4.4 Validate Android Chrome
 
@@ -295,7 +313,9 @@ In portrait Chrome:
 7. Open and close Live Activity by tapping and sliding its tab.
 8. Hold each D-pad direction briefly with wheels raised; no text selection,
    callout, or stuck pressed state should occur.
-9. Rotate to landscape; the rotate-back screen should hide live controls.
+9. Leave Chrome outside fullscreen or show its browser controls. Confirm the
+   D-pad remains above the camera and USB microphone buttons with no overlap.
+10. Rotate to landscape; the rotate-back screen should hide live controls.
 
 ### 4.5 Validate iPhone or iPad Safari
 
@@ -362,14 +382,27 @@ further test.
 
 ### 5.3 Natural-language motion
 
-Run this only when `model current` reports `"accepted": true`.
-
 Arm AI motion for the active chat session, request one brief movement, and keep
-Emergency Stop ready. Expected result: policy permits the accepted model's
-request through the existing IDE motion and obstacle guards. An unaccepted
-model must remain blocked.
+Emergency Stop ready. Expected result: any installed healthy selected model
+can request motion after the explicit arm. The request still passes through
+the existing IDE motion and obstacle guards. Repeat once with a model whose
+benchmark reports `"accepted": false` or has no report; benchmark state must
+not block the confirmed session.
 
-## 6. Power-risk model benchmark
+## 6. Expected outcomes
+
+- Model selection and chat work independently of benchmark acceptance.
+- Explicit confirmation is still required before natural-language motion.
+- The generated HTTPS server file contains a two-certificate chain.
+- Chrome can control the robot after either its supported warning-bypass flow
+  or CA trust; Safari works after local CA trust.
+- The controller receives one exclusive lease, and lost heartbeats stop
+  movement.
+- D-pad controls remain visible and separated from media controls in
+  fullscreen and short non-fullscreen portrait layouts.
+- All physical actions continue through the IDE safety boundary.
+
+### 6.1 Optional power-risk model benchmark
 
 This test can heat the Pi and consume substantial memory. Use active cooling,
 stable power, and no simultaneous wheel test.
@@ -382,10 +415,36 @@ uv run --frozen ninjarobot-agent benchmark ollama \
 
 Expected result: a complete JSON report records latency, correctness, memory,
 temperature, throttling, and final acceptance. Stop immediately for
-undervoltage, thermal throttling, or unsafe temperature. Do not describe a
-model as accepted unless its exact report says `"accepted": true`.
+undervoltage, thermal throttling, or unsafe temperature. The report is
+decision evidence and does not change motion permission.
 
-## 7. Cleanup and rollback
+## 7. Pass/fail report
+
+Record one row for every test:
+
+| Check | Pass/Fail/Skipped | Actual result and evidence |
+|---|---|---|
+| Software gate |  |  |
+| Model list/current/offline selection |  |  |
+| Idle hot switch and busy refusal |  |  |
+| Benchmark reporting and confirmed motion arm |  |  |
+| Tavily health, tools, and search |  |  |
+| Startup Greeting and Idle |  |  |
+| Thinking, response/emotion, action, Idle |  |  |
+| Android Chrome portrait/fullscreen |  |  |
+| iOS Safari portrait/Home Screen |  |  |
+| English browser microphone |  |  |
+| Japanese browser microphone |  |  |
+| Exclusive lease and refresh |  |  |
+| Raised-wheel D-pad and network-loss stop |  |  |
+| Any installed-model natural-language motion |  |  |
+| Thermal benchmark |  |  |
+
+Overall result is **Pass** only when every applicable safety and functional
+check passes. A Skipped browser-speech check must name the unsupported browser
+and version; it does not validate that platform.
+
+## 8. Cleanup and rollback
 
 Stop resources in this order:
 
@@ -408,28 +467,14 @@ Tavily is unavailable, disable it without affecting IDE tools:
 uv run --frozen ninjarobot-agent mcp disable tavily
 ```
 
-## 8. Pass/fail report
+If Chrome cannot bypass the warning, install the exported CA instead of
+disabling HTTPS. To recover from an unsuccessful software update, stop the
+service, restore the previous Git commit, run the following command, and start
+the service again:
 
-Record one row for every test:
+```bash
+uv sync --frozen --extra hardware
+```
 
-| Check | Pass/Fail/Skipped | Actual result and evidence |
-|---|---|---|
-| Software gate |  |  |
-| Model list/current/offline selection |  |  |
-| Idle hot switch and busy refusal |  |  |
-| Benchmark motion gate |  |  |
-| Tavily health, tools, and search |  |  |
-| Startup Greeting and Idle |  |  |
-| Thinking, response/emotion, action, Idle |  |  |
-| Android Chrome portrait/fullscreen |  |  |
-| iOS Safari portrait/Home Screen |  |  |
-| English browser microphone |  |  |
-| Japanese browser microphone |  |  |
-| Exclusive lease and refresh |  |  |
-| Raised-wheel D-pad and network-loss stop |  |  |
-| Accepted-model natural-language motion |  |  |
-| Thermal benchmark |  |  |
-
-Overall result is **Pass** only when every applicable safety and functional
-check passes. A Skipped browser-speech check must name the unsupported browser
-and version; it does not validate that platform.
+Do not delete the TLS directory unless you intentionally want every
+controlling device to trust a newly generated local CA.

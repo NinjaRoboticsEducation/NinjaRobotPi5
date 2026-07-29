@@ -1007,8 +1007,9 @@ async def _interactive_model_selection(arguments: argparse.Namespace) -> None:
     print(f"Agent model changed to {result['provider']}/{result['name']}.")
     if result.get("accepted") is not True:
         print(
-            "This model can chat and simulate, but AI physical motion remains "
-            "disabled until its benchmark is accepted."
+            "This model has no accepted benchmark report. Benchmark status is "
+            "informational; explicitly armed AI motion remains available through "
+            "the normal IDE safety boundary."
         )
 
 

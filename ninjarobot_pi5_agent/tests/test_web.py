@@ -9,6 +9,7 @@ from typing import Any, cast
 
 import pytest
 from cryptography import x509
+from cryptography.hazmat.primitives import serialization
 from ninjarobot_pi5_agent.events import EventBroker
 from ninjarobot_pi5_agent.models import (
     ProviderHealth,
@@ -220,6 +221,7 @@ def test_local_ca_certificate_is_reused_named_and_private(tmp_path: Path) -> Non
     assert first == second == (certificate, key)
     assert certificate.read_bytes() == first_bytes
     assert certificate.read_text(encoding="ascii").startswith("-----BEGIN CERTIFICATE-----")
+    assert certificate.read_bytes().count(b"-----BEGIN CERTIFICATE-----") == 2
     assert key.read_text(encoding="ascii").startswith("-----BEGIN PRIVATE KEY-----")
     assert os.stat(key).st_mode & 0o777 == 0o600
     ca_certificate, ca_key = local_ca_paths(certificate)
@@ -235,6 +237,22 @@ def test_local_ca_certificate_is_reused_named_and_private(tmp_path: Path) -> Non
     assert {hostname, f"{hostname}.local", "localhost"} <= names
     assert authority.extensions.get_extension_for_class(x509.BasicConstraints).value.ca is True
     assert os.stat(ca_key).st_mode & 0o777 == 0o600
+
+
+def test_existing_leaf_only_certificate_is_upgraded_without_replacing_key(
+    tmp_path: Path,
+) -> None:
+    certificate = tmp_path / "tls" / "cert.pem"
+    key = tmp_path / "tls" / "key.pem"
+    ensure_self_signed_certificate(certificate, key)
+    leaf = x509.load_pem_x509_certificate(certificate.read_bytes())
+    original_key = key.read_bytes()
+    certificate.write_bytes(leaf.public_bytes(serialization.Encoding.PEM))
+
+    ensure_self_signed_certificate(certificate, key)
+
+    assert key.read_bytes() == original_key
+    assert certificate.read_bytes().count(b"-----BEGIN CERTIFICATE-----") == 2
 
 
 def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> None:
@@ -260,6 +278,10 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert "-webkit-touch-callout: none" in css
     assert "overscroll-behavior: none" in css
     assert "max(44px, calc(env(safe-area-inset-bottom) + 38px))" in css
+    assert "grid-template-rows: auto minmax(0, 1fr) auto auto" in css
+    assert "height: 100%" in css
+    assert "grid-template-rows: repeat(3, minmax(0, 1fr))" in css
+    assert "clamp(43px, 12.5vh, 66px)" not in css
     assert "event.preventDefault()" in javascript
     assert "elements.chatInput.focus()" in recognition_handler
     assert "submitChat(" not in recognition_handler
@@ -272,4 +294,5 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert 'window.matchMedia("(display-mode: standalone)")' in javascript
     assert "startController()" in javascript
     assert "motionBadge" not in javascript
+    assert "certificate-status" in javascript
     assert (static / "manifest.webmanifest").is_file()

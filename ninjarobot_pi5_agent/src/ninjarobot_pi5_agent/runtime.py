@@ -143,11 +143,6 @@ class AgentRuntime:
     ) -> None:
         """Arm physical motion for one bounded session."""
         self._ensure_started()
-        if self.models is not None and not self.models.accepted:
-            raise PermissionError(
-                "natural-language physical motion requires an accepted benchmark "
-                f"for model '{self.models.model}'"
-            )
         self.motion_arms.arm(
             session_id,
             confirmed=confirmed,

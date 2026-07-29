@@ -1,5 +1,58 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-29 — Model-arm, HTTPS chain, and mobile viewport repair
+
+### Summary
+
+Completed the owner-approved repair for three issues found during Raspberry Pi
+and mobile Chrome testing:
+
+- removed benchmark acceptance as a natural-language motion permission, so
+  every installed selected model that passes provider health can arm after
+  explicit operator confirmation
+- retained session arming, the exclusive browser lease, tool policy, IDE
+  motion checks, obstacle handling, and Emergency Stop
+- changed generated HTTPS serving from a leaf-only PEM file to a leaf-plus-CA
+  chain and added an atomic migration that preserves the existing private key
+- made Chrome CA installation optional when that browser offers its own
+  certificate-warning bypass, while retaining CA trust as the recommended
+  path and the normal requirement for Safari and reliable browser speech
+- added actionable WebSocket recovery guidance to Live Activity
+- changed D-pad row sizing to obey its allocated grid height, preventing
+  overlap with camera and USB microphone controls in short, non-fullscreen
+  portrait viewports
+
+### Cause and boundaries
+
+The benchmark block was an intentional earlier policy that no longer matched
+the owner's approved model-selection behavior. The generated certificate was
+validly signed by the local CA but Uvicorn received only the leaf PEM file.
+The D-pad used intrinsic clamped row heights that could exceed the parent grid
+track when mobile browser controls reduced the visible height.
+
+No managed `pi5*` driver changed. Agent hardware access still passes only
+through `ninjarobot_pi5_ide`.
+
+### Validation
+
+Regression tests cover confirmed arming with an unaccepted model, explicit
+confirmation, complete-chain generation, leaf-only migration with exact
+private-key preservation, WebSocket guidance, and allocation-bounded D-pad
+sizing. The final gate passed immutable verification for 222 driver files and
+25 authorized repairs, compilation, Ruff lint and format checks, strict MyPy
+for 57 source files, all 279 pytest tests, JavaScript syntax, web-manifest
+validation, both agent and IDE source/wheel builds, packaged-web-asset
+inspection, and `git diff --check`. Pytest reported one known Starlette
+test-client deprecation warning.
+
+### Raspberry Pi status
+
+Automated validation does not prove mobile trust behavior or actuator
+clearance. Follow
+`docs/validation/phase-5-agent-model-ui-refinement-validation-2026-07-29.md`
+with wheels raised. Test Chrome first without CA trust only when it offers
+**Advanced → Proceed**, then test the trusted-CA route required for Safari.
+
 ## 2026-07-29 — Local model, expressive-agent, Tavily, and controller refinement
 
 ### Summary
@@ -16,8 +69,9 @@ implementation phases:
   selection, scriptable `model list|current|select`, atomic persistence, and
   idle-only hot switching
 - closed the old provider after a successful switch, disarmed previous AI
-  motion sessions, and blocked natural-language physical motion until the
-  selected exact model has an accepted benchmark report
+  motion sessions, and initially gated natural-language physical motion on an
+  accepted benchmark; the newer repair entry above records the owner-approved
+  removal of that benchmark gate
 - serialized conversations and added the IDE-owned Idle, Thinking,
   Speaking/emotion, tool-action, and return-to-Idle presentation lifecycle
 - added a strict display-only emotion directive that is removed before

@@ -953,9 +953,12 @@ offline. Switching disarms every previous AI motion session.
 
 `BenchmarkRegistry` reads bounded, non-symbolic-link reports and accepts only a
 report whose exact model name matches and whose `accepted` field is true.
-Unaccepted models retain chat and simulation but cannot arm
-natural-language physical motion. Direct deterministic controller commands do
-not inherit model permissions.
+Benchmark acceptance is performance and quality evidence; it is not a motion
+permission. Any installed model that passes provider health can arm
+natural-language physical motion after explicit session confirmation.
+`MotionArmManager`, tool policy, the exclusive browser lease, and all IDE
+motion and obstacle checks remain mandatory. Direct deterministic controller
+commands do not inherit model permissions.
 
 The web server is started and stopped through IPC, so it cannot create a
 second IDE or hardware owner. It uses a generated local certificate authority,
@@ -969,8 +972,13 @@ missed heartbeat revokes it and requests `robot.servo.stop`.
 The default certificate chain is created under
 `~/.config/ninjarobot_pi5/tls/`. `local-ca-key.pem` and `agent-key.pem` remain
 owner-only. `ninjarobot-agent web export-ca` copies only the public CA
-certificate for one-time Chrome or Safari trust onboarding. The default URL is
-`https://ninjarobotpi5.local:8443/`.
+certificate for Chrome or Safari trust onboarding. `agent-cert.pem` contains
+the server leaf followed by its local CA so Uvicorn serves the complete chain.
+Startup atomically upgrades a valid older leaf-only generated certificate
+without replacing its private key. A Chrome user may accept the browser's
+warning when that Chrome version permits it; CA installation remains
+recommended and is normally required by Safari and reliable browser speech.
+The default URL is `https://ninjarobotpi5.local:8443/`.
 
 The agent service invokes the IDE-owned startup Greeting exactly once and then
 enables its silent Idle supervisor. Normal behaviors preempt Idle and restore
@@ -1004,7 +1012,9 @@ gesture required by fullscreen APIs. Chrome requests fullscreen directly;
 standalone Progressive Web App mode bypasses the overlay. Mobile Safari may
 decline page fullscreen, so the controller remains usable and recommends
 Add to Home Screen. Safe-area padding reserves the collapsed drawer-tab height
-so it cannot cover the chat form.
+so it cannot cover the chat form. The D-pad rows use the height allocated by
+the parent grid instead of intrinsic fixed-size rows, preventing overlap with
+camera and microphone controls in short non-fullscreen viewports.
 
 ### Phase 5 developer validation
 
@@ -1017,7 +1027,8 @@ Implemented suites include:
 - tool policy and unknown-outcome recovery tests
 - FastAPI and exclusive WebSocket lease tests
 - fake-provider and Ollama contract tests
-- model discovery, persistence, hot-switch, and benchmark-gating tests
+- model discovery, persistence, hot-switch, informational benchmark, and
+  explicit motion-arm tests
 - presentation-directive filtering and IDE face-lifecycle tests
 - opt-in Tavily and Raspberry Pi acceptance tests
 

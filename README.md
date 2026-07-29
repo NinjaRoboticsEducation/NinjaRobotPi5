@@ -157,9 +157,12 @@ the recorded Raspberry Pi benchmark. The `ninjarobot-agent` command provides
 streaming chat, session history, service lifecycle, MCP and skill management,
 local Ollama model discovery and selection, and an interactive menu. A model
 can be changed while the service is idle or saved before the service starts.
-An unaccepted model can chat and simulate, but cannot arm natural-language
-physical motion. A FastAPI HTTPS interface serves the local network, and one
-browser holds the exclusive controller lease at a time.
+Any installed model that passes the normal provider health check can arm
+natural-language physical motion after the operator explicitly confirms that
+session. Benchmark reports remain strongly recommended performance and
+quality evidence, but they are not a motion permission gate. A FastAPI HTTPS
+interface serves the local network, and one browser holds the exclusive
+controller lease at a time.
 
 The agent is also an MCP host. MCP means Model Context Protocol, a standard
 connection for separately installed tools. The official hosted Tavily MCP
@@ -185,7 +188,9 @@ mobile Chrome and Safari, prevents D-pad text selection, keeps Live Activity
 in a bottom drawer, and places browser speech in the message box for review
 before Send. A start gesture requests fullscreen where the browser supports
 it; iPhone and iPad users can add the controller to the Home Screen for the
-most reliable standalone view.
+most reliable standalone view. The D-pad scales to the browser's actual
+visible height so it remains above the camera and microphone controls when
+fullscreen is unavailable.
 
 ## Implemented CLI functions
 
@@ -545,5 +550,9 @@ Browser control is HTTPS but intentionally has no pairing authentication in
 Phase 5. The first device on the local network can acquire the only controller
 lease. Do not expose port 8443 to the internet or configure router port
 forwarding. The generated server certificate is signed by the robot's local
-certificate authority. Export and trust its public CA certificate once on
-each controlling phone or computer; never copy either private key.
+certificate authority, and the served certificate file includes the complete
+leaf-and-CA chain. Chrome versions that offer **Advanced → Proceed** can be
+used without installing the CA after accepting the warning and reloading the
+controller. Installing the exported public CA remains recommended and is
+normally required by Safari and for reliable browser microphone access. Never
+copy either private key.
