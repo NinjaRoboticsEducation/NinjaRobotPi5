@@ -25,6 +25,7 @@ from ninjarobot_pi5_agent import (
     ProviderHealth,
     ProviderHealthStatus,
     RecoveryPolicy,
+    RobotPresentationController,
     StreamEventType,
     ToolCall,
     ToolRegistry,
@@ -55,6 +56,20 @@ class _IDs:
     def __call__(self) -> str:
         self.value += 1
         return f"id-{self.value}"
+
+
+class _FaceClient:
+    def __init__(self) -> None:
+        self.faces: list[str] = []
+        self.idle_count = 0
+
+    async def show_agent_face(self, expression: str) -> bool:
+        self.faces.append(expression)
+        return True
+
+    async def restore_idle_face(self) -> bool:
+        self.idle_count += 1
+        return True
 
 
 class _ActiveThinkingProvider:
@@ -242,6 +257,44 @@ def test_agent_loop_executes_tool_once_and_persists_complete_context(tmp_path) -
             "assistant",
         ]
         assert messages[1].message.tool_calls[0].name == "robot.distance.read"
+        await registry.close()
+        await store.close()
+
+    asyncio.run(exercise())
+
+
+def test_agent_loop_strips_emotion_directive_and_restores_idle(tmp_path) -> None:
+    async def exercise() -> None:
+        store = ConversationStore(tmp_path / "presentation.sqlite3")
+        await store.start()
+        registry = ToolRegistry((IDEToolProvider(FakeIDEClient((descriptor(),))),))
+        await registry.start()
+        face_client = _FaceClient()
+        loop = AgentLoop(
+            provider=FakeProvider(
+                (
+                    ModelTurn(
+                        request_id="id-2",
+                        text="[[face:happy]] Hello there.",
+                        finish_reason=FinishReason.STOP,
+                    ),
+                )
+            ),
+            tools=registry,
+            policy=PolicyEngine(MotionArmManager()),
+            recovery=RecoveryPolicy(),
+            store=store,
+            presentation=RobotPresentationController(face_client),
+            id_factory=_IDs(),
+        )
+
+        reply = await loop.chat(session_id="session-1", text="Hello")
+
+        assert reply.text == "Hello there."
+        assert face_client.faces == ["thinking", "happy"]
+        assert face_client.idle_count == 1
+        messages = await store.messages("session-1")
+        assert messages[-1].message.content == "Hello there."
         await registry.close()
         await store.close()
 

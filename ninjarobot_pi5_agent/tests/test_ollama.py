@@ -165,6 +165,52 @@ def test_ollama_health_and_malformed_output_are_safe() -> None:
     asyncio.run(exercise())
 
 
+def test_ollama_lists_local_models_without_loading_them() -> None:
+    async def exercise() -> None:
+        captured_methods: list[str] = []
+
+        def handler(http_request: httpx.Request) -> httpx.Response:
+            captured_methods.append(http_request.method)
+            return httpx.Response(
+                200,
+                json={
+                    "models": [
+                        {
+                            "name": "qwen3:4b",
+                            "size": 2_600_000_000,
+                            "modified_at": "2026-07-29T00:00:00Z",
+                            "details": {
+                                "family": "qwen3",
+                                "parameter_size": "4.0B",
+                                "quantization_level": "Q4_K_M",
+                            },
+                        },
+                        {
+                            "model": "gemma3:1b",
+                            "size": 815_000_000,
+                            "details": {},
+                        },
+                    ]
+                },
+            )
+
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            base_url="http://127.0.0.1:11434",
+        )
+        provider = OllamaProvider(client=client)
+
+        models = await provider.list_models()
+
+        assert [model.name for model in models] == ["gemma3:1b", "qwen3:4b"]
+        assert models[1].parameter_size == "4.0B"
+        assert models[1].quantization == "Q4_K_M"
+        assert captured_methods == ["GET"]
+        await client.aclose()
+
+    asyncio.run(exercise())
+
+
 def test_model_messages_preserve_assistant_tool_call_context() -> None:
     turn = asyncio.run(_tool_turn())
     message = ModelMessage(

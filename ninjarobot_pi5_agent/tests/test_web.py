@@ -250,10 +250,26 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert 'id="activityDrawer"' in html
     assert 'class="orientation-blocker"' in html
     assert 'rel="manifest"' in html
+    assert 'id="startControllerButton"' in html
+    assert "maximum-scale=1, user-scalable=no" in html
+    assert "Agent Controller" not in html
+    assert "AI motion disarmed" not in html
+    assert "DIRECT CONTROL" not in html
+    assert 'aria-pressed="false"' in html
     assert "-webkit-user-select: none" in css
     assert "-webkit-touch-callout: none" in css
     assert "overscroll-behavior: none" in css
+    assert "max(44px, calc(env(safe-area-inset-bottom) + 38px))" in css
     assert "event.preventDefault()" in javascript
     assert "elements.chatInput.focus()" in recognition_handler
     assert "submitChat(" not in recognition_handler
+    assert 'elements.webMic.querySelector("strong")' in javascript
+    assert 'elements.webMic.querySelector("span")' not in javascript
+    assert "state.recognitionActive" in javascript
+    assert "recognition.stop()" in javascript
+    assert "requestFullscreen" in javascript
+    assert "webkitRequestFullscreen" in javascript
+    assert 'window.matchMedia("(display-mode: standalone)")' in javascript
+    assert "startController()" in javascript
+    assert "motionBadge" not in javascript
     assert (static / "manifest.webmanifest").is_file()

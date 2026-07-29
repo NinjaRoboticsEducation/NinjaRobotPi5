@@ -64,6 +64,19 @@ class OllamaConfig(BaseModel):
         return value.rstrip("/")
 
 
+class OllamaModelInfo(BaseModel):
+    """Safe subset of one locally installed Ollama model record."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    name: Annotated[str, StringConstraints(min_length=1, max_length=100)]
+    size_bytes: Annotated[int, Field(ge=0)]
+    parameter_size: str | None = None
+    quantization: str | None = None
+    family: str | None = None
+    modified_at: str | None = None
+
+
 class OllamaProvider:
     """Normalize Ollama chat, native tools, streaming, usage, and health."""
 
@@ -205,6 +218,44 @@ class OllamaProvider:
             detail=detail,
         )
 
+    async def list_models(self) -> tuple[OllamaModelInfo, ...]:
+        """Return installed local models without loading any model into memory."""
+        self._ensure_open()
+        try:
+            response = await self._client.get("/api/tags", timeout=5.0)
+            response.raise_for_status()
+            payload = response.json()
+        except (httpx.HTTPError, json.JSONDecodeError) as exc:
+            raise OllamaUnavailableError(
+                f"Ollama model catalog failed: {type(exc).__name__}"
+            ) from exc
+        if not isinstance(payload, dict) or not isinstance(payload.get("models"), list):
+            raise OllamaProtocolError("Ollama model catalog must contain a models list")
+        models: list[OllamaModelInfo] = []
+        for item in payload["models"]:
+            if not isinstance(item, dict):
+                raise OllamaProtocolError("Ollama model catalog entries must be objects")
+            name = item.get("name") or item.get("model")
+            size = item.get("size")
+            if not isinstance(name, str) or not name.strip():
+                raise OllamaProtocolError("Ollama model catalog entry is missing its name")
+            if not isinstance(size, int) or isinstance(size, bool) or size < 0:
+                raise OllamaProtocolError("Ollama model catalog entry has an invalid size")
+            details = item.get("details", {})
+            if not isinstance(details, dict):
+                raise OllamaProtocolError("Ollama model details must be an object")
+            models.append(
+                OllamaModelInfo(
+                    name=name,
+                    size_bytes=size,
+                    parameter_size=_optional_text(details.get("parameter_size")),
+                    quantization=_optional_text(details.get("quantization_level")),
+                    family=_optional_text(details.get("family")),
+                    modified_at=_optional_text(item.get("modified_at")),
+                )
+            )
+        return tuple(sorted(models, key=lambda model: model.name.casefold()))
+
     async def close(self) -> None:
         """Release the owned HTTP client once."""
         if self._closed:
@@ -338,3 +389,7 @@ def _optional_nonnegative_int(value: Any) -> int | None:
     if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
         return value
     return None
+
+
+def _optional_text(value: Any) -> str | None:
+    return value if isinstance(value, str) and value else None

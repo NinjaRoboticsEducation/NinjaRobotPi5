@@ -26,6 +26,12 @@ from .models import (
 )
 from .persistence import ConversationStore
 from .policy import PolicyContext, PolicyEngine
+from .presentation import (
+    NullPresentationController,
+    PresentationController,
+    StreamingPresentationFilter,
+    extract_presentation_directive,
+)
 from .prompts import PromptComposer
 from .providers import LLMProvider
 from .recovery import RecoveryAction, RecoveryPolicy
@@ -80,6 +86,7 @@ class AgentLoop:
         config: AgentLoopConfig | None = None,
         runtime_state: RuntimeStateProvider | None = None,
         id_factory: IDFactory | None = None,
+        presentation: PresentationController | None = None,
     ) -> None:
         self._provider = provider
         self._tools = tools
@@ -93,6 +100,7 @@ class AgentLoop:
             lambda _session_id, _lease_id: {"status": "available"}
         )
         self._id_factory = id_factory or (lambda: uuid.uuid4().hex)
+        self._presentation = presentation or NullPresentationController()
 
     async def chat(
         self,
@@ -124,6 +132,14 @@ class AgentLoop:
             raise AgentLoopError(
                 f"agent request exceeded its {request_timeout:g}-second limit"
             ) from exc
+        finally:
+            await asyncio.shield(
+                self._present(
+                    "idle",
+                    self._presentation.idle,
+                    session_id=session_id,
+                )
+            )
 
     async def _chat(
         self,
@@ -146,6 +162,11 @@ class AgentLoop:
         await self._events.publish(
             AgentEventType.CHAT,
             "User message accepted.",
+            session_id=session_id,
+        )
+        await self._present(
+            "thinking",
+            self._presentation.thinking,
             session_id=session_id,
         )
 
@@ -194,6 +215,7 @@ class AgentLoop:
             turn = await self._model_turn(
                 request,
                 on_text_delta=on_text_delta,
+                session_id=session_id,
             )
             await self._events.publish(
                 AgentEventType.CHAT,
@@ -256,10 +278,27 @@ class AgentLoop:
         request: ModelRequest,
         *,
         on_text_delta: TextDeltaHandler | None,
+        session_id: str,
     ) -> ModelTurn:
         if on_text_delta is None or not self._provider.capabilities.streaming:
             async with asyncio.timeout(request.timeout_seconds):
-                return await self._provider.generate(request)
+                turn = await self._provider.generate(request)
+            face, visible = extract_presentation_directive(turn.text)
+            if turn.finish_reason is not FinishReason.TOOL_CALLS:
+                await self._present(
+                    "responding",
+                    lambda: self._presentation.responding(face),
+                    session_id=session_id,
+                )
+            return turn.model_copy(update={"text": visible})
+        stream_filter = StreamingPresentationFilter(
+            on_visible_text=on_text_delta,
+            on_response_started=lambda face: self._present(
+                "responding",
+                lambda: self._presentation.responding(face),
+                session_id=session_id,
+            ),
+        )
         final: ModelTurn | None = None
         stream = self._provider.stream(request).__aiter__()
         while True:
@@ -271,11 +310,20 @@ class AgentLoop:
             final = await self._consume_stream_event(
                 event,
                 final=final,
-                on_text_delta=on_text_delta,
+                on_text_delta=stream_filter.feed,
             )
         if final is None:
             raise AgentLoopError("provider stream ended without a final turn")
-        return final
+        face, visible = extract_presentation_directive(final.text)
+        if final.finish_reason is not FinishReason.TOOL_CALLS:
+            await stream_filter.finish()
+            if face is not None:
+                await self._present(
+                    "responding",
+                    lambda: self._presentation.responding(face),
+                    session_id=session_id,
+                )
+        return final.model_copy(update={"text": visible})
 
     @staticmethod
     async def _consume_stream_event(
@@ -339,14 +387,26 @@ class AgentLoop:
             session_id=session_id,
             lease_id=lease_id,
         )
-        result = await self._tools.call(invocation, cancellation)
-        recovery = self._recovery.decide(
-            definition,
-            result,
-            attempts_completed=1,
+        await self._present(
+            "action",
+            lambda: self._presentation.action_started(call.name),
+            session_id=session_id,
         )
-        if recovery.action is RecoveryAction.RETRY:
+        try:
             result = await self._tools.call(invocation, cancellation)
+            recovery = self._recovery.decide(
+                definition,
+                result,
+                attempts_completed=1,
+            )
+            if recovery.action is RecoveryAction.RETRY:
+                result = await self._tools.call(invocation, cancellation)
+        finally:
+            await self._present(
+                "thinking",
+                lambda: self._presentation.action_finished(call.name),
+                session_id=session_id,
+            )
         await self._events.publish(
             AgentEventType.TOOL,
             f"Tool {result.status.value}: {call.name}",
@@ -371,3 +431,20 @@ class AgentLoop:
             message,
             message_id=f"message-{self._id_factory()}",
         )
+
+    async def _present(
+        self,
+        state: str,
+        operation: Callable[[], Awaitable[None]],
+        *,
+        session_id: str,
+    ) -> None:
+        try:
+            await operation()
+        except Exception as exc:
+            await self._events.publish(
+                AgentEventType.ERROR,
+                f"Robot presentation state '{state}' was unavailable.",
+                session_id=session_id,
+                data={"error": f"{type(exc).__name__}: {exc}"},
+            )

@@ -825,7 +825,7 @@ transport = "streamable_http"
 url = "https://mcp.tavily.com/mcp"
 authentication = "bearer_environment"
 token_environment = "TAVILY_API_KEY"
-allowed_tools = ["tavily-search"]
+allowed_tools = ["tavily_search"]
 timeout_seconds = 20.0
 max_result_bytes = 131072
 preset = "tavily"
@@ -844,12 +844,13 @@ external price and quota are not guaranteed by NinjaRobotPi5. The key is sent
 in an `Authorization: Bearer` header and is never placed in the server URL,
 logs, prompts, transcripts, or configuration inspection output.
 
-Only `tavily-search` is enabled by default. Extract, map, and crawl tools require
-an explicit allowlist change. The agent searches when the answer depends on
-current information or the user requests a search, not for every conversation.
-Search-based answers include source links. Quota exhaustion, authentication
-failure, or network loss produces a clear unavailability result; the agent
-must not present an unverified current claim as verified.
+Only raw server tool `tavily_search` is enabled by default. It is normalized to
+stable agent-facing name `mcp.tavily.tavily-search`. Extract, map, and crawl
+tools require an explicit allowlist change. The agent searches when the answer
+depends on current information or the user requests a search, not for every
+conversation. Search-based answers include source links. Quota exhaustion,
+authentication failure, or network loss produces a clear unavailability
+result; the agent must not present an unverified current claim as verified.
 
 ### 12.4.2 Agent skills and system prompts
 
@@ -1733,8 +1734,8 @@ installation-guide workflow passed on Raspberry Pi 5.
 
 **Implementation record — 2026-07-28**
 
-Phase 5.0 through Phase 5.7 are implemented. The immutable-driver check, Python
-compilation, Ruff lint and formatting, strict mypy, 259 automated tests,
+Phase 5.0 through Phase 5.8 are implemented. The immutable-driver check, Python
+compilation, Ruff lint and formatting, strict mypy, 278 automated tests,
 JavaScript syntax check, wheel-package asset inspection, and simulated
 single-owner service/HTTPS lifecycle smoke test pass. No managed driver changed
 during Phase 5. Qwen3:4B remains a candidate until the Raspberry Pi benchmark
@@ -1861,8 +1862,9 @@ Document tool namespaces, profiles, session arming, and recovery rules.
   secret file, so keys do not enter shell history or ordinary configuration.
 - Ship Tavily as the default configured search provider after
   `TAVILY_API_KEY` setup.
-- Enable only `tavily-search` by default, with basic depth, at most five
-  results, no images, and no raw page content.
+- Enable only raw Tavily tool `tavily_search` by default, publish it as
+  `mcp.tavily.tavily-search`, and enforce basic depth, at most five results, no
+  images, and no raw page content.
 - Require source links in search-grounded answers.
 - Treat all MCP metadata and output as external untrusted content.
 - Refuse any attempt by MCP content to change safety policy or invoke hardware
@@ -2094,6 +2096,60 @@ microphone permissions, English/Japanese selection, privacy, and recovery.
   ledger, and safety state.
 - Only one browser controls the robot, and loss of its lease stops movement.
 - No provider code imports a driver.
+
+#### Phase 5.8 — Tested model, presentation, MCP, and controller refinement
+
+**Status**
+
+Implemented on 2026-07-29. The full software gate passes; the dated Raspberry
+Pi checklist remains operator work.
+
+**Objective**
+
+- Discover locally installed Ollama models and let the interactive or
+  scriptable CLI select one without hard-coding Qwen3:4B.
+- Keep model selection provider-neutral so later cloud adapters register
+  without rebuilding the agent loop.
+- Permit idle-time hot switching and persistent stopped-service selection,
+  while blocking switches during responses or robot actions.
+- Require an accepted exact-model benchmark before natural-language physical
+  motion can be armed.
+- Coordinate silent Idle, Thinking, Speaking, emotion, and action presentation
+  only through the IDE-owned robot assembly.
+- Keep model-selected emotion display-only, strictly allowlisted, stripped
+  from visible and persisted text, and unable to affect safety or permission.
+- Update the Tavily preset for current raw server tool name `tavily_search`
+  while preserving public `mcp.tavily.tavily-search`.
+- Repair browser speech controls and retain review-before-Send behavior.
+- Match the approved portrait controller mockup, consolidate AI motion state
+  into the Arm button, reserve space above Live Activity, and add a
+  user-gesture fullscreen flow with a Safari standalone fallback.
+
+**Validation**
+
+- Ollama `/api/tags` catalog parsing and strict metadata tests.
+- Offline persistence, running-service hot switch, busy rejection, previous
+  provider cleanup, motion-disarm, and benchmark-gating tests.
+- Split-stream presentation directive, invalid face, persisted-text, and IDE
+  lifecycle tests.
+- Tavily legacy migration, raw/public name mapping, live health, and tool
+  discovery checks.
+- Browser static contract, WebSocket lease, microphone, touch, fullscreen,
+  and packaged-asset tests.
+- Full compile, Ruff, formatting, MyPy, pytest, JavaScript syntax,
+  immutable-driver, and diff checks after each implementation phase.
+
+**Hardware risk**
+
+Model benchmarking produces CPU, memory, and thermal load. Face validation
+uses the display. Final mobile D-pad validation moves raised wheels only.
+No managed `pi5*` driver changes are authorized or required.
+
+**Documentation**
+
+Updated `README.md`, `InstallationGuide.md`, `DevelopmentGuide.md`,
+`DevelopmentLog.md`, this implementation plan, and the dated Phase 5 model and
+controller Raspberry Pi validation checklist.
 
 ### Phase 6: Cloud provider adapters
 

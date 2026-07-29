@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from typing import Any
 
 from .agent_loop import AgentLoop, AgentReply, TextDeltaHandler
 from .events import AgentEventType, EventBroker
+from .model_selection import ModelCatalogEntry, ModelManager
 from .models import ProviderHealth, ToolCall, ToolExecutionResult, ToolInvocation
 from .persistence import ConversationStore
 from .policy import MotionArmManager, PolicyContext, PolicyEngine
@@ -29,6 +31,7 @@ class AgentRuntime:
         motion_arms: MotionArmManager,
         skills: SkillRepository,
         events: EventBroker,
+        model_manager: ModelManager | None = None,
     ) -> None:
         self.provider = provider
         self.tools = tools
@@ -38,8 +41,12 @@ class AgentRuntime:
         self.motion_arms = motion_arms
         self.skills = skills
         self.events = events
+        self.models = model_manager
         self._started = False
         self._closed = False
+        self._active_operations = 0
+        self._switching_model = False
+        self._chat_lock = asyncio.Lock()
 
     async def start(self) -> None:
         """Start persistence and all tool providers transactionally."""
@@ -68,37 +75,47 @@ class AgentRuntime:
     ) -> AgentReply:
         """Run one chat through the bounded loop."""
         self._ensure_started()
-        skill = (
-            self.skills.get(
-                skill_id,
-                available_tools={tool.name for tool in self.tools.list_tools()},
-            )
-            if skill_id is not None
-            else None
-        )
-        return await self.loop.chat(
-            session_id=session_id,
-            text=text,
-            skill=skill,
-            lease_id=lease_id,
-            confirmed=confirmed,
-            cancellation=cancellation,
-            on_text_delta=on_text_delta,
-        )
+        self._begin_operation()
+        try:
+            async with self._chat_lock:
+                skill = (
+                    self.skills.get(
+                        skill_id,
+                        available_tools={tool.name for tool in self.tools.list_tools()},
+                    )
+                    if skill_id is not None
+                    else None
+                )
+                return await self.loop.chat(
+                    session_id=session_id,
+                    text=text,
+                    skill=skill,
+                    lease_id=lease_id,
+                    confirmed=confirmed,
+                    cancellation=cancellation,
+                    on_text_delta=on_text_delta,
+                )
+        finally:
+            self._end_operation()
 
     async def status(self) -> dict[str, Any]:
         """Return provider, tool-provider, session, and motion-arm status."""
         self._ensure_started()
-        provider = await self.provider.health()
-        tool_health = await self.tools.health()
-        sessions = await self.store.sessions()
-        return {
-            "started": True,
-            "provider": provider.model_dump(mode="json"),
-            "tool_providers": [report.model_dump(mode="json") for report in tool_health],
-            "tools": [tool.name for tool in self.tools.list_tools()],
-            "session_count": len(sessions),
-        }
+        self._begin_operation()
+        try:
+            provider = await self.provider.health()
+            tool_health = await self.tools.health()
+            sessions = await self.store.sessions()
+            return {
+                "started": True,
+                "provider": provider.model_dump(mode="json"),
+                "model_selection": self.models.selection() if self.models else None,
+                "tool_providers": [report.model_dump(mode="json") for report in tool_health],
+                "tools": [tool.name for tool in self.tools.list_tools()],
+                "session_count": len(sessions),
+            }
+        finally:
+            self._end_operation()
 
     async def history(self, session_id: str) -> list[dict[str, Any]]:
         """Return one ordered transcript."""
@@ -126,6 +143,11 @@ class AgentRuntime:
     ) -> None:
         """Arm physical motion for one bounded session."""
         self._ensure_started()
+        if self.models is not None and not self.models.accepted:
+            raise PermissionError(
+                "natural-language physical motion requires an accepted benchmark "
+                f"for model '{self.models.model}'"
+            )
         self.motion_arms.arm(
             session_id,
             confirmed=confirmed,
@@ -149,6 +171,31 @@ class AgentRuntime:
     ) -> ToolExecutionResult:
         """Execute one catalog tool through the same non-bypassable policy boundary."""
         self._ensure_started()
+        self._begin_operation()
+        try:
+            return await self._execute_tool(
+                tool_name=tool_name,
+                arguments=arguments,
+                session_id=session_id,
+                lease_id=lease_id,
+                confirmed=confirmed,
+                requested_by=requested_by,
+                cancellation=cancellation,
+            )
+        finally:
+            self._end_operation()
+
+    async def _execute_tool(
+        self,
+        *,
+        tool_name: str,
+        arguments: dict[str, Any],
+        session_id: str,
+        lease_id: str | None,
+        confirmed: bool,
+        requested_by: str,
+        cancellation: CancellationToken | None,
+    ) -> ToolExecutionResult:
         definition = self.tools.get(tool_name)
         decision = self.policy.evaluate(
             definition,
@@ -210,7 +257,61 @@ class AgentRuntime:
 
     async def provider_health(self) -> ProviderHealth:
         """Return model health for lightweight UI checks."""
-        return await self.provider.health()
+        self._begin_operation()
+        try:
+            return await self.provider.health()
+        finally:
+            self._end_operation()
+
+    async def list_models(self) -> tuple[ModelCatalogEntry, ...]:
+        """Return available models from every registered provider."""
+        self._ensure_started()
+        if self.models is None:
+            raise RuntimeError("runtime model selection is not configured")
+        return await self.models.catalog()
+
+    def current_model(self) -> dict[str, object]:
+        """Return the active provider/model and benchmark acceptance."""
+        self._ensure_started()
+        if self.models is None:
+            raise RuntimeError("runtime model selection is not configured")
+        return self.models.selection()
+
+    async def select_model(self, provider_id: str, model: str) -> ModelCatalogEntry:
+        """Switch only while the service has no active chat or robot action."""
+        self._ensure_started()
+        if self.models is None:
+            raise RuntimeError("runtime model selection is not configured")
+        if self._switching_model or self._active_operations:
+            raise RuntimeError(
+                "the agent is busy; wait for the current response or robot action to finish"
+            )
+        self._switching_model = True
+        try:
+            selected = await self.models.select(provider_id, model)
+            self.motion_arms.disarm_all()
+            await self.events.publish(
+                AgentEventType.SERVICE,
+                f"Agent model changed to {provider_id}/{model}.",
+                data={
+                    "provider": provider_id,
+                    "model": model,
+                    "accepted": selected.accepted,
+                },
+            )
+            return selected
+        finally:
+            self._switching_model = False
+
+    def _begin_operation(self) -> None:
+        if self._switching_model:
+            raise RuntimeError("the agent model is currently changing")
+        self._active_operations += 1
+
+    def _end_operation(self) -> None:
+        self._active_operations -= 1
+        if self._active_operations < 0:
+            raise RuntimeError("agent operation accounting underflow")
 
     def _ensure_started(self) -> None:
         if self._closed:

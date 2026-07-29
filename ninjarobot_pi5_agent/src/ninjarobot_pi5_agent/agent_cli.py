@@ -13,7 +13,7 @@ from typing import Any, cast
 
 from pydantic import ValidationError
 
-from ninjarobot_pi5_ide import RiskLevel
+from ninjarobot_pi5_ide import RiskLevel, load_robot_config
 
 from .benchmark import BenchmarkCase, ModelBenchmark
 from .ipc import AgentIPCClient, AgentIPCError
@@ -29,8 +29,14 @@ from .mcp_config import (
     save_mcp_configuration,
     tavily_server_config,
 )
+from .model_selection import (
+    BenchmarkRegistry,
+    ModelCatalogEntry,
+    ModelSelectionError,
+    persist_model_selection,
+)
 from .models import ToolCall, ToolDefinition, ToolInvocation
-from .ollama import OllamaConfig, OllamaProvider
+from .ollama import OllamaConfig, OllamaError, OllamaProvider
 from .secrets import SecretStore
 from .service_main import run_service
 from .skills import LoadedSkill, SkillRepository, SkillValidationError
@@ -46,6 +52,7 @@ DEFAULT_MCP_CONFIG = Path("~/.config/ninjarobot_pi5/mcp.toml")
 DEFAULT_SECRET_FILE = Path("~/.config/ninjarobot_pi5/secrets.env")
 DEFAULT_SKILL_DIRECTORY = Path("~/.config/ninjarobot_pi5/skills")
 DEFAULT_BENCHMARK_REPORT = Path("~/.local/share/ninjarobot_pi5/benchmarks/qwen3-4b-latest.json")
+DEFAULT_BENCHMARK_DIRECTORY = Path("~/.local/share/ninjarobot_pi5/benchmarks")
 DEFAULT_SERVICE_SOCKET = Path("~/.local/state/ninjarobot_pi5/agent.sock")
 DEFAULT_SERVICE_LOCK = Path("~/.local/state/ninjarobot_pi5/agent.lock")
 DEFAULT_CONVERSATION_DB = Path("~/.local/share/ninjarobot_pi5/conversations.sqlite3")
@@ -126,6 +133,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Local whisper.cpp model file.",
     )
     parser.add_argument("--whisper-threads", type=int, default=4)
+    parser.add_argument(
+        "--benchmark-dir",
+        type=Path,
+        default=DEFAULT_BENCHMARK_DIRECTORY,
+        help="Directory containing model acceptance benchmark reports.",
+    )
     parser.add_argument("--web-host", default="0.0.0.0")
     parser.add_argument("--web-port", type=int, default=8443)
     parser.add_argument(
@@ -149,8 +162,8 @@ def build_parser() -> argparse.ArgumentParser:
     for service_command in ("run", "start"):
         service_parser = service_commands.add_parser(service_command)
         service_parser.add_argument("--real", action="store_true")
-        service_parser.add_argument("--model", default="qwen3:4b")
-        service_parser.add_argument("--base-url", default="http://127.0.0.1:11434")
+        service_parser.add_argument("--model")
+        service_parser.add_argument("--base-url")
     service_commands.add_parser("status")
     service_commands.add_parser("stop")
 
@@ -178,6 +191,14 @@ def build_parser() -> argparse.ArgumentParser:
     arm.add_argument("--confirm", action="store_true")
     disarm = motion_commands.add_parser("disarm")
     disarm.add_argument("--session", default="local-cli")
+
+    model = commands.add_parser("model", help="List or select an agent model.")
+    model_commands = model.add_subparsers(dest="model_command", required=True)
+    model_commands.add_parser("list", help="List locally installed provider models.")
+    model_commands.add_parser("current", help="Show the active provider and model.")
+    select_model = model_commands.add_parser("select", help="Select an installed model.")
+    select_model.add_argument("model_name")
+    select_model.add_argument("--provider")
 
     secret = commands.add_parser("secret", help="Manage agent secrets safely.")
     secret_commands = secret.add_subparsers(dest="secret_command", required=True)
@@ -271,6 +292,8 @@ def main(argv: list[str] | None = None) -> None:
         PermissionError,
         FileExistsError,
         AgentIPCError,
+        ModelSelectionError,
+        OllamaError,
     ) as exc:
         parser.error(_safe_error(exc))
     raise SystemExit(exit_code)
@@ -289,6 +312,8 @@ async def _run(arguments: argparse.Namespace) -> int:
         return await _run_session_command(arguments)
     if arguments.command == "motion":
         return await _run_motion_command(arguments)
+    if arguments.command == "model":
+        return await _run_model_command(arguments)
     if arguments.command == "web":
         if arguments.web_command == "certificate-status":
             certificate, key = ensure_local_ca_certificate(
@@ -590,10 +615,8 @@ async def _spawn_service(arguments: argparse.Namespace) -> int:
         str(namespace.secret_file.expanduser()),
         "--skill-dir",
         str(namespace.skill_dir.expanduser()),
-        "--model",
-        namespace.model,
-        "--base-url",
-        namespace.base_url,
+        "--benchmark-dir",
+        str(namespace.benchmark_dir.expanduser()),
         "--whisper-command",
         str(namespace.whisper_command.expanduser()),
         "--whisper-model",
@@ -609,6 +632,10 @@ async def _spawn_service(arguments: argparse.Namespace) -> int:
         "--web-key",
         str(namespace.web_key.expanduser()),
     ]
+    if namespace.model is not None:
+        command.extend(("--model", namespace.model))
+    if namespace.base_url is not None:
+        command.extend(("--base-url", namespace.base_url))
     if namespace.real:
         command.append("--real")
     log_path = DEFAULT_SERVICE_LOG.expanduser()
@@ -653,8 +680,9 @@ def _service_namespace(arguments: argparse.Namespace) -> argparse.Namespace:
         mcp_config=arguments.mcp_config,
         secret_file=arguments.secret_file,
         skill_dir=arguments.skill_dir,
-        model=getattr(arguments, "model", "qwen3:4b"),
-        base_url=getattr(arguments, "base_url", "http://127.0.0.1:11434"),
+        benchmark_dir=arguments.benchmark_dir,
+        model=getattr(arguments, "model", None),
+        base_url=getattr(arguments, "base_url", None),
         whisper_command=arguments.whisper_command,
         whisper_model=arguments.whisper_model,
         whisper_threads=arguments.whisper_threads,
@@ -705,6 +733,138 @@ async def _run_motion_command(arguments: argparse.Namespace) -> int:
     raise AssertionError(f"unhandled motion command: {arguments.motion_command}")
 
 
+async def _run_model_command(arguments: argparse.Namespace) -> int:
+    if arguments.model_command == "list":
+        _print_json({"models": await _available_models(arguments)})
+        return 0
+    if arguments.model_command == "current":
+        _print_json(await _current_model(arguments))
+        return 0
+    if arguments.model_command == "select":
+        selected = await _select_model(
+            arguments,
+            model=arguments.model_name,
+            provider=arguments.provider,
+        )
+        _print_json(selected)
+        return 0
+    raise AssertionError(f"unhandled model command: {arguments.model_command}")
+
+
+async def _available_models(arguments: argparse.Namespace) -> list[dict[str, Any]]:
+    client = AgentIPCClient(arguments.service_socket)
+    try:
+        response = await client.request({"command": "models"})
+    except AgentIPCError:
+        return [entry.model_dump(mode="json") for entry in await _offline_ollama_catalog(arguments)]
+    data = response["data"]
+    if not isinstance(data, list):
+        raise AgentIPCError("agent service model catalog is malformed")
+    return [cast(dict[str, Any], item) for item in data if isinstance(item, dict)]
+
+
+async def _current_model(arguments: argparse.Namespace) -> dict[str, Any]:
+    client = AgentIPCClient(arguments.service_socket)
+    try:
+        response = await client.request({"command": "model_current"})
+    except AgentIPCError:
+        provider_id, provider_config = _configured_provider(arguments)
+        return {
+            "provider": provider_id,
+            "model": provider_config.model,
+            "accepted": BenchmarkRegistry(arguments.benchmark_dir).accepted(provider_config.model),
+            "service_running": False,
+        }
+    data = response["data"]
+    if not isinstance(data, dict):
+        raise AgentIPCError("agent service model selection is malformed")
+    return {**data, "service_running": True}
+
+
+async def _select_model(
+    arguments: argparse.Namespace,
+    *,
+    model: str,
+    provider: str | None,
+) -> dict[str, Any]:
+    provider_id, _provider_config = _configured_provider(arguments)
+    selected_provider = provider or provider_id
+    client = AgentIPCClient(arguments.service_socket)
+    try:
+        response = await client.request(
+            {
+                "command": "model_select",
+                "provider": selected_provider,
+                "model": model,
+            }
+        )
+    except AgentIPCError as exc:
+        if "agent service is not running" not in str(exc):
+            raise
+        catalog = await _offline_ollama_catalog(arguments)
+        selected = next(
+            (
+                entry
+                for entry in catalog
+                if entry.provider == selected_provider and entry.name == model
+            ),
+            None,
+        )
+        if selected is None:
+            raise ModelSelectionError(
+                f"model '{model}' is not installed for provider '{selected_provider}'"
+            )
+        persist_model_selection(arguments.config, selected_provider, model)
+        return {
+            **selected.model_copy(update={"current": True}).model_dump(mode="json"),
+            "service_running": False,
+        }
+    data = response["data"]
+    if not isinstance(data, dict):
+        raise AgentIPCError("agent service model selection response is malformed")
+    return {**data, "service_running": True}
+
+
+async def _offline_ollama_catalog(
+    arguments: argparse.Namespace,
+) -> tuple[ModelCatalogEntry, ...]:
+    provider_id, provider_config = _configured_provider(arguments)
+    if provider_config.kind != "ollama":
+        raise ModelSelectionError(
+            f"provider kind '{provider_config.kind}' is configured but not implemented"
+        )
+    provider = OllamaProvider(
+        OllamaConfig(
+            model=provider_config.model,
+            base_url=provider_config.base_url or "http://127.0.0.1:11434",
+        )
+    )
+    benchmarks = BenchmarkRegistry(arguments.benchmark_dir)
+    try:
+        return tuple(
+            ModelCatalogEntry(
+                provider=provider_id,
+                name=model.name,
+                size_bytes=model.size_bytes,
+                parameter_size=model.parameter_size,
+                quantization=model.quantization,
+                family=model.family,
+                modified_at=model.modified_at,
+                current=model.name == provider_config.model,
+                accepted=benchmarks.accepted(model.name),
+            )
+            for model in await provider.list_models()
+        )
+    finally:
+        await provider.close()
+
+
+def _configured_provider(arguments: argparse.Namespace) -> tuple[str, Any]:
+    config = load_robot_config(arguments.config)
+    provider_id = config.agent.default_provider
+    return provider_id, config.providers[provider_id]
+
+
 async def _service_request(
     arguments: argparse.Namespace,
     payload: dict[str, Any],
@@ -720,16 +880,17 @@ async def _interactive(arguments: argparse.Namespace) -> int:
             "\nNinjaRobotAgent Interactive Tool\n"
             "1. Chat with NinjaRobot\n"
             "2. Agent Status\n"
-            "3. Start Agent Service\n"
-            "4. Conversation Sessions\n"
-            "5. Start Web Interface\n"
-            "6. Web Interface Status\n"
-            "7. Stop Web Interface\n"
-            "8. Export Browser Trust Certificate\n"
-            "9. MCP Tools\n"
-            "10. Agent Skills\n"
-            "11. Stop Agent Service\n"
-            "12. Quit CLI\n"
+            "3. Change Agent Model\n"
+            "4. Start Agent Service\n"
+            "5. Conversation Sessions\n"
+            "6. Start Web Interface\n"
+            "7. Web Interface Status\n"
+            "8. Stop Web Interface\n"
+            "9. Export Browser Trust Certificate\n"
+            "10. MCP Tools\n"
+            "11. Agent Skills\n"
+            "12. Stop Agent Service\n"
+            "13. Quit CLI\n"
         )
         choice = (await asyncio.to_thread(input, "Select an option: ")).strip()
         try:
@@ -738,6 +899,8 @@ async def _interactive(arguments: argparse.Namespace) -> int:
             elif choice == "2":
                 await _service_request(arguments, {"command": "status"})
             elif choice == "3":
+                await _interactive_model_selection(arguments)
+            elif choice == "4":
                 mode = (
                     await asyncio.to_thread(
                         input,
@@ -745,18 +908,18 @@ async def _interactive(arguments: argparse.Namespace) -> int:
                     )
                 ).strip()
                 arguments.real = mode == "2"
-                arguments.model = "qwen3:4b"
-                arguments.base_url = "http://127.0.0.1:11434"
+                arguments.model = None
+                arguments.base_url = None
                 await _spawn_service(arguments)
-            elif choice == "4":
-                await _service_request(arguments, {"command": "sessions"})
             elif choice == "5":
-                await _service_request(arguments, {"command": "web_start"})
+                await _service_request(arguments, {"command": "sessions"})
             elif choice == "6":
-                await _service_request(arguments, {"command": "web_status"})
+                await _service_request(arguments, {"command": "web_start"})
             elif choice == "7":
-                await _service_request(arguments, {"command": "web_stop"})
+                await _service_request(arguments, {"command": "web_status"})
             elif choice == "8":
+                await _service_request(arguments, {"command": "web_stop"})
+            elif choice == "9":
                 output = export_local_ca_certificate(
                     arguments.web_certificate,
                     arguments.web_key,
@@ -772,12 +935,12 @@ async def _interactive(arguments: argparse.Namespace) -> int:
                         ),
                     }
                 )
-            elif choice == "9":
+            elif choice == "10":
                 configuration = load_mcp_configuration(arguments.mcp_config)
                 _print_json(
                     {"servers": [server.redacted_dict() for server in configuration.servers]}
                 )
-            elif choice == "10":
+            elif choice == "11":
                 _print_json(
                     {
                         "skills": [
@@ -790,15 +953,74 @@ async def _interactive(arguments: argparse.Namespace) -> int:
                         ]
                     }
                 )
-            elif choice == "11":
-                await _service_request(arguments, {"command": "stop"})
             elif choice == "12":
+                await _service_request(arguments, {"command": "stop"})
+            elif choice == "13":
                 print("CLI disconnected. Any running agent service continues.")
                 return 0
             else:
-                print("Please choose a number from 1 through 12.")
-        except (AgentIPCError, ValueError, KeyError) as exc:
+                print("Please choose a number from 1 through 13.")
+        except (
+            AgentIPCError,
+            KeyError,
+            ModelSelectionError,
+            OllamaError,
+            ValueError,
+        ) as exc:
             print(f"Error: {exc}")
+
+
+async def _interactive_model_selection(arguments: argparse.Namespace) -> None:
+    models = await _available_models(arguments)
+    if not models:
+        print("No local Ollama models are installed.")
+        return
+    print("\nAvailable Agent Models")
+    for index, model in enumerate(models, start=1):
+        current = " [current]" if model.get("current") is True else ""
+        accepted = "accepted" if model.get("accepted") is True else "not benchmarked"
+        details = " · ".join(
+            str(value)
+            for value in (
+                model.get("parameter_size"),
+                model.get("quantization"),
+                _human_size(model.get("size_bytes")),
+            )
+            if value
+        )
+        suffix = f" · {details}" if details else ""
+        print(f"{index}. {model['name']}{current} · {accepted}{suffix}")
+    print("0. Back")
+    choice = (await asyncio.to_thread(input, "Select a model: ")).strip()
+    if choice == "0":
+        return
+    try:
+        selected = models[int(choice) - 1]
+    except (ValueError, IndexError):
+        print("Please select one of the displayed model numbers.")
+        return
+    result = await _select_model(
+        arguments,
+        model=str(selected["name"]),
+        provider=str(selected["provider"]),
+    )
+    print(f"Agent model changed to {result['provider']}/{result['name']}.")
+    if result.get("accepted") is not True:
+        print(
+            "This model can chat and simulate, but AI physical motion remains "
+            "disabled until its benchmark is accepted."
+        )
+
+
+def _human_size(value: object) -> str | None:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        return None
+    size = float(value)
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if size < 1024 or unit == "TiB":
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return None
 
 
 async def _run_benchmark(arguments: argparse.Namespace) -> int:

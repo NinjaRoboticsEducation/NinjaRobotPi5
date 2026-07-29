@@ -280,7 +280,7 @@ class RobotConfig(ConfigModel):
 
 def load_robot_config(path: str | Path) -> RobotConfig:
     """Load and strictly validate a TOML configuration file."""
-    config_path = Path(path)
+    config_path = Path(path).expanduser()
     try:
         with config_path.open("rb") as source:
             payload = tomllib.load(source)

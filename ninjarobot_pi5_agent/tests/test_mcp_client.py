@@ -18,7 +18,7 @@ from ninjarobot_pi5_agent import (
 
 
 class _Tool:
-    def __init__(self, name: str = "tavily-search") -> None:
+    def __init__(self, name: str = "tavily_search") -> None:
         self.name = name
         self.description = "Search current public web pages."
         self.input_schema = {"type": "object"}
@@ -98,6 +98,7 @@ def test_mcp_provider_discovers_allowlist_and_enforces_tavily_limits(tmp_path) -
             "external_untrusted_content": {"content": [{"url": "https://example.test"}]}
         }
         _, arguments = connection.calls[0]
+        assert connection.calls[0][0] == "tavily_search"
         assert arguments["max_results"] == 5
         assert arguments["search_depth"] == "basic"
         assert arguments["include_images"] is False
@@ -150,8 +151,9 @@ def test_mcp_provider_rejects_oversized_results_and_supports_cancellation(
             id="tavily",
             transport=MCPTransport.STREAMABLE_HTTP,
             url="https://mcp.tavily.com/mcp",
-            allowed_tools=("tavily-search",),
+            allowed_tools=("tavily_search",),
             max_result_bytes=1024,
+            preset="tavily",
         )
         large = _FakeConnection((_Tool(),), result={"content": "x" * 2000})
         provider = MCPToolProvider(

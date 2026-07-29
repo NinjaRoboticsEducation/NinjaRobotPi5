@@ -325,10 +325,39 @@ def test_robot_liveliness_runs_greeting_then_supervises_silent_idle(tmp_path: Pa
         assert len(display.frames) > frame_count
         assert len(buzzer.play_calls) == greeting_sound_count
 
+        thinking = idle.model_copy(
+            update={
+                "name": "thinking",
+                "stages": (
+                    idle.stages[0].model_copy(
+                        update={
+                            "operations": (
+                                idle.stages[0]
+                                .operations[0]
+                                .model_copy(update={"expression": "thinking"}),
+                            )
+                        }
+                    ),
+                ),
+            }
+        )
+        robot.assets._definitions["thinking"] = thinking  # type: ignore[attr-defined]
+        assert await robot.show_agent_face("thinking") is True
+        await asyncio.sleep(0)
+        assert robot._idle_task is not None  # type: ignore[attr-defined]
+        assert robot._idle_task.get_name() == "ninjarobot-silent-thinking"  # type: ignore[attr-defined]
+
         await robot.run_definition(expression_definition(hold_seconds=0.05))
         frame_count = len(display.frames)
         await asyncio.sleep(0.12)
         assert len(display.frames) > frame_count
+        assert robot._idle_task is not None  # type: ignore[attr-defined]
+        assert robot._idle_task.get_name() == "ninjarobot-silent-thinking"  # type: ignore[attr-defined]
+
+        assert await robot.restore_idle_face() is True
+        await asyncio.sleep(0)
+        assert robot._idle_task is not None  # type: ignore[attr-defined]
+        assert robot._idle_task.get_name() == "ninjarobot-silent-idle"  # type: ignore[attr-defined]
 
         await robot.stop()
         frame_count = len(display.frames)

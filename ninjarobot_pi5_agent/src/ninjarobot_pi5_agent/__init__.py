@@ -28,6 +28,14 @@ from .mcp_config import (
     save_mcp_configuration,
     tavily_server_config,
 )
+from .model_selection import (
+    BenchmarkRegistry,
+    ModelCatalogEntry,
+    ModelManager,
+    ModelSelectionError,
+    ProviderRegistration,
+    persist_model_selection,
+)
 from .models import (
     FinishReason,
     MemoryCandidate,
@@ -52,12 +60,21 @@ from .models import (
 from .ollama import (
     OllamaConfig,
     OllamaError,
+    OllamaModelInfo,
     OllamaProtocolError,
     OllamaProvider,
     OllamaUnavailableError,
 )
 from .persistence import ConversationStore, StoredMessage
 from .policy import MotionArmManager, PolicyContext, PolicyDecision, PolicyEngine
+from .presentation import (
+    EMOTION_FACES,
+    NullPresentationController,
+    PresentationController,
+    RobotPresentationController,
+    StreamingPresentationFilter,
+    extract_presentation_directive,
+)
 from .prompts import IDENTITY_PROMPT, IMMUTABLE_SAFETY_PROMPT, PromptComposer
 from .providers import LLMProvider
 from .recovery import RecoveryAction, RecoveryDecision, RecoveryPolicy
@@ -91,6 +108,7 @@ __all__ = [
     "BenchmarkMetrics",
     "BenchmarkReport",
     "BenchmarkThresholds",
+    "BenchmarkRegistry",
     "ConversationStore",
     "EventBroker",
     "FinishReason",
@@ -111,25 +129,33 @@ __all__ = [
     "MessageRole",
     "ModelMessage",
     "ModelBenchmark",
+    "ModelCatalogEntry",
+    "ModelManager",
     "ModelRequest",
+    "ModelSelectionError",
     "ModelStreamEvent",
     "ModelTurn",
     "OllamaConfig",
     "OllamaError",
+    "OllamaModelInfo",
     "OllamaProtocolError",
     "OllamaProvider",
     "OllamaUnavailableError",
     "MotionArmManager",
+    "NullPresentationController",
     "PolicyContext",
     "PolicyDecision",
     "PolicyEngine",
+    "PresentationController",
     "PromptComposer",
     "ProviderCapabilities",
     "ProviderHealth",
     "ProviderHealthStatus",
+    "ProviderRegistration",
     "RecoveryAction",
     "RecoveryDecision",
     "RecoveryPolicy",
+    "RobotPresentationController",
     "SessionRecord",
     "ServiceAlreadyRunningError",
     "ServiceOwnership",
@@ -138,6 +164,7 @@ __all__ = [
     "StoredMessage",
     "SystemSnapshot",
     "StreamEventType",
+    "StreamingPresentationFilter",
     "LoadedSkill",
     "SkillExamples",
     "SkillLimits",
@@ -156,9 +183,12 @@ __all__ = [
     "ToolRegistry",
     "ToolRegistryError",
     "ToolTrust",
+    "EMOTION_FACES",
+    "extract_presentation_directive",
     "load_mcp_configuration",
     "save_mcp_configuration",
     "tavily_server_config",
+    "persist_model_selection",
 ]
 
 __version__ = "0.1.0"

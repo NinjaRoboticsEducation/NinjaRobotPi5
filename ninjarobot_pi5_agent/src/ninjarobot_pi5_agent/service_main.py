@@ -14,9 +14,17 @@ from .events import AgentEventType, EventBroker
 from .ipc import AgentIPCServer
 from .mcp_client import MCPToolProvider
 from .mcp_config import load_mcp_configuration
+from .model_selection import (
+    BenchmarkRegistry,
+    ModelCatalogEntry,
+    ModelManager,
+    ProviderRegistration,
+    persist_model_selection,
+)
 from .ollama import OllamaConfig, OllamaProvider
 from .persistence import ConversationStore
 from .policy import MotionArmManager, PolicyEngine
+from .presentation import RobotPresentationController
 from .prompts import PromptComposer
 from .recovery import RecoveryPolicy
 from .runtime import AgentRuntime
@@ -45,8 +53,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--web-port", type=int, default=8443)
     parser.add_argument("--web-certificate", type=Path, required=True)
     parser.add_argument("--web-key", type=Path, required=True)
-    parser.add_argument("--model", default="qwen3:4b")
-    parser.add_argument("--base-url", default="http://127.0.0.1:11434")
+    parser.add_argument("--benchmark-dir", type=Path, required=True)
+    parser.add_argument("--model")
+    parser.add_argument("--base-url")
     parser.add_argument("--real", action="store_true")
     return parser
 
@@ -80,11 +89,59 @@ async def run_service(arguments: argparse.Namespace) -> None:
         providers,
         optional_provider_ids=optional_ids,
     )
-    model = OllamaProvider(
-        OllamaConfig(
-            model=arguments.model,
-            base_url=arguments.base_url,
+    provider_id = config.agent.default_provider
+    provider_config = config.providers[provider_id]
+    if provider_config.kind != "ollama":
+        raise RuntimeError(
+            f"provider kind '{provider_config.kind}' is configured but not implemented"
         )
+    active_model = arguments.model or provider_config.model
+    base_url = arguments.base_url or provider_config.base_url or "http://127.0.0.1:11434"
+
+    def ollama_factory(model_name: str) -> OllamaProvider:
+        return OllamaProvider(OllamaConfig(model=model_name, base_url=base_url))
+
+    async def ollama_catalog() -> tuple[ModelCatalogEntry, ...]:
+        catalog_provider = ollama_factory(active_model)
+        try:
+            return tuple(
+                ModelCatalogEntry(
+                    provider=provider_id,
+                    name=model.name,
+                    size_bytes=model.size_bytes,
+                    parameter_size=model.parameter_size,
+                    quantization=model.quantization,
+                    family=model.family,
+                    modified_at=model.modified_at,
+                )
+                for model in await catalog_provider.list_models()
+            )
+        finally:
+            await catalog_provider.close()
+
+    model = ModelManager(
+        active_provider_id=provider_id,
+        active_model=active_model,
+        active_provider=ollama_factory(active_model),
+        registrations=(
+            ProviderRegistration(
+                provider_id=provider_id,
+                factory=ollama_factory,
+                catalog=ollama_catalog,
+            ),
+        ),
+        benchmarks=BenchmarkRegistry(
+            getattr(
+                arguments,
+                "benchmark_dir",
+                Path("~/.local/share/ninjarobot_pi5/benchmarks"),
+            )
+        ),
+        selection_writer=lambda selected_provider, selected_model: persist_model_selection(
+            arguments.config,
+            selected_provider,
+            selected_model,
+        ),
     )
     store = ConversationStore(arguments.database, retention_days=7)
     arms = MotionArmManager()
@@ -110,6 +167,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
             "motion_armed": arms.is_armed(session_id, lease_id=lease_id),
             "simulated": not arguments.real,
         },
+        presentation=RobotPresentationController(ide),
     )
     runtime = AgentRuntime(
         provider=model,
@@ -120,6 +178,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
         motion_arms=arms,
         skills=SkillRepository(arguments.skill_dir),
         events=events,
+        model_manager=model,
     )
     web_controller = WebRobotController(runtime)
     leases = ControllerLeaseManager(on_revoke=web_controller.lease_revoked)

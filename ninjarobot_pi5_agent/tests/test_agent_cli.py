@@ -5,7 +5,11 @@ import json
 import pytest
 from ninjarobot_pi5_agent.agent_cli import main
 from ninjarobot_pi5_agent.mcp_config import load_mcp_configuration
+from ninjarobot_pi5_agent.ollama import OllamaModelInfo, OllamaProvider
 from ninjarobot_pi5_agent.secrets import SecretStore
+from ninjarobot_pi5_ide.config_import import default_robot_config, save_robot_config
+
+from ninjarobot_pi5_ide import load_robot_config
 
 from .test_skills import write_skill
 
@@ -36,7 +40,7 @@ def test_agent_cli_manages_tavily_configuration(tmp_path, capsys) -> None:
 
     run_cli([*common, "mcp", "list"])
     listed = json.loads(capsys.readouterr().out)
-    assert listed["servers"][0]["allowed_tools"] == ["tavily-search"]
+    assert listed["servers"][0]["allowed_tools"] == ["tavily_search"]
 
     run_cli([*common, "mcp", "remove", "search", "--confirm"])
     capsys.readouterr()
@@ -123,3 +127,42 @@ def test_agent_cli_exports_only_public_browser_trust_certificate(
     assert result["contains_private_key"] is False
     assert "BEGIN CERTIFICATE" in exported.read_text(encoding="ascii")
     assert "PRIVATE KEY" not in exported.read_text(encoding="ascii")
+
+
+def test_agent_cli_lists_and_persists_an_offline_ollama_selection(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    config = tmp_path / "config.toml"
+    save_robot_config(default_robot_config(), config, overwrite=False)
+
+    async def list_models(_provider: OllamaProvider) -> tuple[OllamaModelInfo, ...]:
+        return (
+            OllamaModelInfo(
+                name="qwen3:4b",
+                size_bytes=2_600_000_000,
+                parameter_size="4.0B",
+                quantization="Q4_K_M",
+            ),
+            OllamaModelInfo(name="small:2b", size_bytes=1_200_000_000),
+        )
+
+    monkeypatch.setattr(OllamaProvider, "list_models", list_models)
+    common = [
+        "--config",
+        str(config),
+        "--service-socket",
+        str(tmp_path / "missing.sock"),
+        "--benchmark-dir",
+        str(tmp_path / "reports"),
+    ]
+
+    run_cli([*common, "model", "list"])
+    listed = json.loads(capsys.readouterr().out)
+    assert [model["name"] for model in listed["models"]] == ["qwen3:4b", "small:2b"]
+
+    run_cli([*common, "model", "select", "small:2b"])
+    selected = json.loads(capsys.readouterr().out)
+    assert selected["service_running"] is False
+    assert load_robot_config(config).providers["ollama"].model == "small:2b"

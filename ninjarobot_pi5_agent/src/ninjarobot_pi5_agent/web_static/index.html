@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#07111f">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,21 +13,14 @@
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <div>
-          <p class="eyebrow">NINJA ROBOT PI5</p>
-          <h1>Agent Controller</h1>
-        </div>
-        <div class="status-stack">
-          <span id="connectionBadge" class="badge badge-wait">Connecting</span>
-          <span id="motionBadge" class="badge">AI motion disarmed</span>
-        </div>
+        <p class="eyebrow">NINJA ROBOT PI5</p>
       </header>
 
       <main class="dashboard">
         <section class="panel controls-panel" aria-label="Direct robot controls">
           <div class="control-status">
-            <span class="control-label">DIRECT CONTROL</span>
-            <button id="armAiButton" class="small-button">Arm AI motion</button>
+            <span id="connectionBadge" class="badge badge-wait">Not connected</span>
+            <button id="armAiButton" class="small-button motion-arm" aria-pressed="false">Arm AI motion</button>
           </div>
 
           <div class="dpad" aria-label="Movement controls">
@@ -113,6 +106,15 @@
     <div class="orientation-blocker" role="alert">
       <strong>Portrait mode required</strong>
       <span>Rotate your phone back to portrait to control NinjaRobot safely.</span>
+    </div>
+    <div id="startOverlay" class="start-overlay">
+      <div class="start-card">
+        <p class="eyebrow">NINJA ROBOT PI5</p>
+        <h1>Robot Controller</h1>
+        <p>Connect to the robot and enter the largest available portrait view.</p>
+        <button id="startControllerButton" type="button">Tap to Start Controller</button>
+        <small>On iPhone, Add to Home Screen gives the best full-screen experience.</small>
+      </div>
     </div>
     <div id="toast" class="toast hidden" role="status"></div>
     <script src="/assets/app.js" defer></script>

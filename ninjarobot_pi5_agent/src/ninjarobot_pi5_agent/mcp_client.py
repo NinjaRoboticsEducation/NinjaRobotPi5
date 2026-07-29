@@ -239,7 +239,7 @@ class MCPToolProvider:
                 )
             for raw_name in self._config.allowed_tools:
                 tool = discovered[raw_name]
-                name = f"mcp.{self._config.id}.{raw_name}"
+                name = f"mcp.{self._config.id}.{self._public_tool_name(raw_name)}"
                 self._definitions[name] = ToolDefinition(
                     name=name,
                     version="1.0.0",
@@ -369,7 +369,7 @@ class MCPToolProvider:
 
     def _arguments(self, raw_name: str, supplied: dict[str, Any]) -> dict[str, Any]:
         arguments = {**self._config.default_parameters, **supplied}
-        if self._config.preset == "tavily" and raw_name == "tavily-search":
+        if self._config.preset == "tavily" and raw_name == "tavily_search":
             arguments["search_depth"] = "basic"
             requested_results = arguments.get("max_results", 5)
             if not isinstance(requested_results, int) or isinstance(requested_results, bool):
@@ -378,6 +378,12 @@ class MCPToolProvider:
             arguments["include_images"] = False
             arguments["include_raw_content"] = False
         return arguments
+
+    def _public_tool_name(self, raw_name: str) -> str:
+        """Keep the existing agent-facing Tavily name while its server name evolves."""
+        if self._config.preset == "tavily" and raw_name == "tavily_search":
+            return "tavily-search"
+        return raw_name
 
     def _ensure_started(self) -> None:
         if self._closed:

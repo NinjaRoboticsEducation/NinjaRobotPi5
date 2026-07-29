@@ -21,6 +21,7 @@ from .camera import (
     CameraStatusAdapter,
 )
 from .config import RobotConfig, load_robot_config
+from .config_import import save_robot_config
 from .display import (
     DisplayBrightnessAdapter,
     DisplayClearAdapter,
@@ -143,6 +144,7 @@ __all__ = [
     "build_robot_ide_client",
     "raspberry_pi_undervoltage_active",
     "load_robot_config",
+    "save_robot_config",
 ]
 
 __version__ = "0.1.0"

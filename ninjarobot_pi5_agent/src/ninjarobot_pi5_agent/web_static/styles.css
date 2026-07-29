@@ -33,6 +33,7 @@ body {
     radial-gradient(circle at 15% 5%, rgba(34, 124, 255, 0.23), transparent 31rem),
     linear-gradient(165deg, #07182a, #03070c 72%);
   -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
 }
 
 button,
@@ -70,7 +71,7 @@ p {
   padding:
     max(8px, env(safe-area-inset-top))
     max(8px, env(safe-area-inset-right))
-    max(10px, env(safe-area-inset-bottom))
+    max(44px, calc(env(safe-area-inset-bottom) + 38px))
     max(8px, env(safe-area-inset-left));
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -78,7 +79,7 @@ p {
 }
 
 .topbar {
-  min-height: 44px;
+  min-height: 30px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -107,6 +108,12 @@ h2 {
   display: grid;
   justify-items: end;
   gap: 3px;
+}
+
+.motion-arm[aria-pressed="true"] {
+  border-color: rgba(77, 226, 164, 0.64);
+  color: #031018;
+  background: var(--green);
 }
 
 .badge {
@@ -166,6 +173,10 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.control-status {
+  min-height: 30px;
 }
 
 .small-button {
@@ -411,6 +422,53 @@ h2 {
   transform: translate(-50%, calc(100% - 34px));
   transition: transform 180ms ease-out;
   touch-action: pan-y;
+}
+
+.start-overlay {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding:
+    max(20px, env(safe-area-inset-top))
+    max(20px, env(safe-area-inset-right))
+    max(20px, env(safe-area-inset-bottom))
+    max(20px, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 50% 22%, rgba(34, 124, 255, 0.3), transparent 24rem),
+    #040a12;
+}
+
+.start-overlay.started {
+  display: none;
+}
+
+.start-card {
+  width: min(100%, 420px);
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: clamp(22px, 7vw, 36px);
+  text-align: center;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.start-card p:not(.eyebrow),
+.start-card small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.start-card button {
+  min-height: 52px;
+  border: 0;
+  border-radius: 13px;
+  color: #031018;
+  background: var(--cyan);
+  font-weight: 850;
 }
 
 .activity-drawer.open {

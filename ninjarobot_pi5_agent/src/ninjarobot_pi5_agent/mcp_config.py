@@ -134,7 +134,7 @@ def tavily_server_config(server_id: str = "tavily") -> MCPServerConfig:
         url="https://mcp.tavily.com/mcp",
         authentication=MCPAuthentication.BEARER_ENVIRONMENT,
         token_environment="TAVILY_API_KEY",
-        allowed_tools=("tavily-search",),
+        allowed_tools=("tavily_search",),
         timeout_seconds=20.0,
         max_result_bytes=131_072,
         default_parameters={
@@ -154,7 +154,24 @@ def load_mcp_configuration(path: str | Path) -> MCPConfiguration:
         return MCPConfiguration()
     with config_path.open("rb") as handle:
         payload = tomllib.load(handle)
+    _migrate_legacy_tavily_tool_name(payload)
     return MCPConfiguration.model_validate_json(json.dumps(payload))
+
+
+def _migrate_legacy_tavily_tool_name(payload: dict[str, Any]) -> None:
+    """Accept the former Tavily raw tool name without rewriting a read operation."""
+    servers = payload.get("servers")
+    if not isinstance(servers, list):
+        return
+    for server in servers:
+        if not isinstance(server, dict) or server.get("preset") != "tavily":
+            continue
+        allowed_tools = server.get("allowed_tools")
+        if not isinstance(allowed_tools, list):
+            continue
+        server["allowed_tools"] = [
+            "tavily_search" if tool == "tavily-search" else tool for tool in allowed_tools
+        ]
 
 
 def save_mcp_configuration(configuration: MCPConfiguration, path: str | Path) -> Path:

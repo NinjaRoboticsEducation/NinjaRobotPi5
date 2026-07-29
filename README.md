@@ -18,12 +18,12 @@ which is the single source of truth.
 
 Phase 0, Phase 1, Phase 2, Phase 3.1 through Phase 3.5, and Phase 4 are
 implemented and the operator reports the complete Phase 4 and installation
-workflow passed. Phase 5.0 through Phase 5.7 and the 2026-07-29 agent/web
+workflow passed. Phase 5.0 through Phase 5.8 and the 2026-07-29 agent/web
 refinement are implemented and pass the local software gate. Raspberry Pi
 acceptance—including the Qwen3:4B
 performance benchmark, live Tavily search, LAN browser checks, camera,
 microphone, and raised-wheel motion—still requires the operator checklist in
-[`docs/validation/phase-5-agent-refinement-validation-2026-07-29.md`](docs/validation/phase-5-agent-refinement-validation-2026-07-29.md).
+[`docs/validation/phase-5-agent-model-ui-refinement-validation-2026-07-29.md`](docs/validation/phase-5-agent-model-ui-refinement-validation-2026-07-29.md).
 Phase 0 established project governance and preserved the
 original import hashes for the six existing Pi5 hardware libraries. Phase 1
 added strict IDE and agent contracts, deterministic fakes, V4-owned
@@ -155,8 +155,11 @@ Phase 5 keeps Ollama and the selected language model on the Raspberry Pi.
 Qwen3:4B is the installed candidate, not an accepted default until it passes
 the recorded Raspberry Pi benchmark. The `ninjarobot-agent` command provides
 streaming chat, session history, service lifecycle, MCP and skill management,
-and an interactive menu. A FastAPI HTTPS interface serves the local network,
-and one browser holds the exclusive controller lease at a time.
+local Ollama model discovery and selection, and an interactive menu. A model
+can be changed while the service is idle or saved before the service starts.
+An unaccepted model can chat and simulate, but cannot arm natural-language
+physical motion. A FastAPI HTTPS interface serves the local network, and one
+browser holds the exclusive controller lease at a time.
 
 The agent is also an MCP host. MCP means Model Context Protocol, a standard
 connection for separately installed tools. The official hosted Tavily MCP
@@ -174,10 +177,15 @@ whisper.cpp USB-microphone transcription, English/Japanese browser speech
 recognition, AI chat, and live events. A second browser receives `423 Locked`.
 Missed heartbeats revoke the lease and request a motor stop without waiting for
 the model. Agent startup runs Greeting once, then the IDE supervises a silent
-looping Idle face between normal interactions. The portrait-first controller
-supports mobile Chrome and Safari, prevents D-pad text selection, keeps Live
-Activity in a bottom drawer, and places browser speech in the message box for
-review before Send.
+looping Idle face between normal interactions. A conversation normally moves
+from Idle to Thinking, then Speaking or one strictly allowlisted emotion,
+through any robot action, and back to Idle. Face selection is display-only and
+cannot authorize a tool or movement. The portrait-first controller supports
+mobile Chrome and Safari, prevents D-pad text selection, keeps Live Activity
+in a bottom drawer, and places browser speech in the message box for review
+before Send. A start gesture requests fullscreen where the browser supports
+it; iPhone and iPad users can add the controller to the Home Screen for the
+most reliable standalone view.
 
 ## Implemented CLI functions
 
@@ -260,6 +268,8 @@ The `ninjarobot-agent` additionally provides:
   `/help`, `/exit`, `/clear`, `/status`, `/arm`, and `/disarm`
 - `web start|status|stop` for the HTTPS local-network interface
 - `motion arm --confirm` for one CLI chat session's physical-motion consent
+- `model list|current|select` for installed Ollama model discovery, persistent
+  selection, and idle-time hot switching
 - `mcp` commands for the Tavily preset and approved `stdio` or Streamable HTTP
   servers
 - `skill` validation, simulation, non-overwriting installation, enable,

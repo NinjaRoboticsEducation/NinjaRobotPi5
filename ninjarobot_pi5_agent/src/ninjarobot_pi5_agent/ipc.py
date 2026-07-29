@@ -158,6 +158,33 @@ class AgentIPCServer:
                 {"type": "result", "data": await self._runtime.status()},
             )
             return
+        if command == "models":
+            await _write_message(
+                writer,
+                {
+                    "type": "result",
+                    "data": [
+                        model.model_dump(mode="json") for model in await self._runtime.list_models()
+                    ],
+                },
+            )
+            return
+        if command == "model_current":
+            await _write_message(
+                writer,
+                {"type": "result", "data": self._runtime.current_model()},
+            )
+            return
+        if command == "model_select":
+            selected = await self._runtime.select_model(
+                _required_text(payload, "provider"),
+                _required_text(payload, "model"),
+            )
+            await _write_message(
+                writer,
+                {"type": "result", "data": selected.model_dump(mode="json")},
+            )
+            return
         if command == "sessions":
             await _write_message(
                 writer,

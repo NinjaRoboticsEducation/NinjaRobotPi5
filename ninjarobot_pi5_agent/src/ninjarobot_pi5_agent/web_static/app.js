@@ -11,15 +11,17 @@
     activeAssistant: new Map(),
     usbRecording: false,
     recognition: null,
+    recognitionActive: false,
     previewTimer: null,
     released: false,
     activeMoveButton: null,
     drawerDragged: false,
+    controllerStarted: false,
   };
 
   const elements = {
     badge: document.querySelector("#connectionBadge"),
-    motionBadge: document.querySelector("#motionBadge"),
+    armAi: document.querySelector("#armAiButton"),
     chatMessages: document.querySelector("#chatMessages"),
     chatForm: document.querySelector("#chatForm"),
     chatInput: document.querySelector("#chatInput"),
@@ -32,6 +34,8 @@
     cameraImage: document.querySelector("#cameraImage"),
     activityDrawer: document.querySelector("#activityDrawer"),
     activityToggle: document.querySelector("#activityToggle"),
+    startOverlay: document.querySelector("#startOverlay"),
+    startController: document.querySelector("#startControllerButton"),
   };
 
   function log(message, kind = "info") {
@@ -264,8 +268,6 @@
     send("emergency_stop")
       .then(() => {
         updateAiMotion(false);
-        elements.motionBadge.textContent = "System stopped";
-        elements.motionBadge.className = "badge badge-wait";
         toast("Emergency stop completed.");
       })
       .catch(() => {});
@@ -307,11 +309,10 @@
   });
 
   function updateAiMotion(armed) {
-    const button = document.querySelector("#armAiButton");
+    const button = elements.armAi;
     button.dataset.armed = String(armed);
     button.textContent = armed ? "Disarm AI motion" : "Arm AI motion";
-    elements.motionBadge.textContent = armed ? "AI motion armed" : "AI motion disarmed";
-    elements.motionBadge.className = armed ? "badge badge-ok" : "badge";
+    button.setAttribute("aria-pressed", String(armed));
   }
 
   document.querySelector("#cameraButton").addEventListener("click", () => {
@@ -340,7 +341,7 @@
     }
     state.usbRecording = true;
     elements.usbMic.classList.add("recording");
-    elements.usbMic.querySelector("span").textContent = "STOP USB MICROPHONE";
+    elements.usbMic.querySelector("strong").textContent = "STOP USB MICROPHONE";
     const language = elements.language.value.startsWith("ja") ? "ja" : "en";
     send("usb_microphone", { duration_seconds: 5, language })
       .then((data) => {
@@ -353,7 +354,7 @@
       .finally(() => {
         state.usbRecording = false;
         elements.usbMic.classList.remove("recording");
-        elements.usbMic.querySelector("span").textContent = "USB MICROPHONE";
+        elements.usbMic.querySelector("strong").textContent = "USB MICROPHONE";
       });
   });
 
@@ -368,12 +369,13 @@
     recognition.interimResults = true;
     recognition.continuous = false;
     recognition.onstart = () => {
+      state.recognitionActive = true;
       elements.webMic.classList.add("recording");
-      elements.webMic.querySelector("span").textContent = "LISTENING…";
+      elements.webMic.querySelector("strong").textContent = "STOP LISTENING";
     };
     recognition.onresult = (event) => {
       let transcript = "";
-      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      for (let index = 0; index < event.results.length; index += 1) {
         transcript += event.results[index][0].transcript;
       }
       elements.chatInput.value = transcript.trim();
@@ -382,15 +384,37 @@
         toast("Speech added to the message box. Review it, then tap Send.");
       }
     };
-    recognition.onerror = (event) => log(`Browser microphone: ${event.error}`, "error");
+    recognition.onerror = (event) => {
+      const messages = {
+        "not-allowed": "Microphone permission was denied.",
+        "service-not-allowed": "Browser speech recognition is unavailable on this device.",
+        "audio-capture": "No working browser microphone was found.",
+        "no-speech": "No speech was detected. Tap Web Microphone and try again.",
+        network: "The browser speech service could not be reached.",
+      };
+      const message = messages[event.error] || `Browser microphone error: ${event.error}`;
+      log(message, "error");
+      toast(message);
+    };
     recognition.onend = () => {
+      state.recognitionActive = false;
       elements.webMic.classList.remove("recording");
-      elements.webMic.querySelector("span").textContent = "WEB MICROPHONE";
+      elements.webMic.querySelector("strong").textContent = "WEB MICROPHONE";
     };
     state.recognition = recognition;
     elements.webMic.addEventListener("click", () => {
+      if (state.recognitionActive) {
+        recognition.stop();
+        return;
+      }
       recognition.lang = elements.language.value;
-      recognition.start();
+      try {
+        recognition.start();
+      } catch (error) {
+        const message = `Browser microphone could not start: ${error.message}`;
+        log(message, "error");
+        toast(message);
+      }
     });
   }
 
@@ -469,7 +493,54 @@
     window.clearInterval(state.heartbeatTimer);
   });
 
+  function standaloneDisplay() {
+    return (
+      window.matchMedia("(display-mode: standalone)").matches ||
+      window.navigator.standalone === true
+    );
+  }
+
+  async function requestControllerFullscreen() {
+    if (standaloneDisplay() || document.fullscreenElement) return;
+    const root = document.documentElement;
+    const requestFullscreen = root.requestFullscreen || root.webkitRequestFullscreen;
+    if (!requestFullscreen) {
+      log(
+        "This browser does not offer page fullscreen. Use Add to Home Screen for a full-screen controller.",
+      );
+      return;
+    }
+    try {
+      await requestFullscreen.call(root);
+      if (window.screen.orientation?.lock) {
+        await window.screen.orientation.lock("portrait").catch(() => {});
+      }
+    } catch (error) {
+      log(`Full-screen mode was unavailable: ${error.message}`);
+    }
+  }
+
+  async function startController() {
+    if (state.controllerStarted) return;
+    state.controllerStarted = true;
+    await requestControllerFullscreen();
+    elements.startOverlay.classList.add("started");
+    connect();
+  }
+
+  elements.startController.addEventListener("click", () => {
+    startController().catch((error) => {
+      state.controllerStarted = false;
+      log(`Controller could not start: ${error.message}`, "error");
+      toast("Controller could not start.");
+    });
+  });
+
   syncViewportHeight();
   configureSpeechRecognition();
-  connect();
+  if (standaloneDisplay()) {
+    elements.startOverlay.classList.add("started");
+    state.controllerStarted = true;
+    connect();
+  }
 })();

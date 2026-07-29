@@ -780,7 +780,7 @@ Bundled assets refuse deletion.
 
 ## Implemented Phase 5 agent and extension contracts
 
-Phase 5.0 through Phase 5.7 implement these contracts. The software gate
+Phase 5.0 through Phase 5.8 implement these contracts. The software gate
 passes; the Raspberry Pi acceptance checklist remains operator work.
 
 ### Agent and service boundaries
@@ -868,10 +868,14 @@ substitution, relative executable paths, and unapproved inherited
 environment variables.
 
 The official Tavily remote MCP server is the bundled search preset. Its key is
-resolved from `TAVILY_API_KEY` and sent in an authorization header. Only
-`tavily-search` is initially allowed. Search uses basic depth, at most five
-results, no images, and no raw page content. Live tests require an explicitly
-supplied key and are excluded from the default test suite.
+resolved from `TAVILY_API_KEY` and sent in an authorization header. The
+current server advertises raw tool name `tavily_search`; that exact name is
+stored in the allowlist. `MCPToolProvider` maps it to the stable public agent
+name `mcp.tavily.tavily-search`, so existing skills and CLI examples do not
+change. Legacy Tavily configuration containing raw `tavily-search` migrates
+in memory without rewriting the owner's file. Search uses basic depth, at most
+five results, no images, and no raw page content. Live tests require an
+explicitly supplied key and are excluded from the default test suite.
 
 MCP tool descriptions, annotations, resources, prompts, and results are
 untrusted. Tests must cover prompt injection, malicious schemas, name
@@ -937,6 +941,22 @@ The benchmark command never executes a tool. Qwen3:4B becomes accepted only
 when the Raspberry Pi report meets every recorded latency, memory, temperature,
 throttling, correctness, and safety threshold.
 
+`ModelManager` is the provider-neutral selection boundary. An Ollama catalog
+comes from loopback `GET /api/tags` and records installed name, byte size,
+parameter size, quantization, family, and modification time. Provider
+registrations keep future cloud adapters outside the core selection logic.
+Selection is permitted only when the runtime has no active response or robot
+action. The candidate is health-checked first, then the TOML configuration is
+atomically saved, the provider reference is replaced, and the previous
+provider is closed. A stopped service uses the same persistent workflow
+offline. Switching disarms every previous AI motion session.
+
+`BenchmarkRegistry` reads bounded, non-symbolic-link reports and accepts only a
+report whose exact model name matches and whose `accepted` field is true.
+Unaccepted models retain chat and simulation but cannot arm
+natural-language physical motion. Direct deterministic controller commands do
+not inherit model permissions.
+
 The web server is started and stopped through IPC, so it cannot create a
 second IDE or hardware owner. It uses a generated local certificate authority,
 a `.local` server certificate, static package assets, and one WebSocket
@@ -957,6 +977,16 @@ enables its silent Idle supervisor. Normal behaviors preempt Idle and restore
 it when they finish. Level 1, Level 2, driver-failure, and shutdown screens are
 never overwritten by Idle; a successful Resume re-enables it.
 
+Conversation presentation also stays behind `RobotIDEClient`. The agent may
+request only silent ambient faces; it never receives a display driver.
+Concurrent chat turns are serialized. The normal state order is Idle,
+Thinking, optional tool action, Thinking again, Speaking or an allowlisted
+emotion, then Idle. A bounded leading directive such as `[[face:happy]]` may
+select display-only emotion. The streaming filter buffers only the possible
+directive prefix, strips it before user output and persistence, rejects names
+outside the fixed allowlist, and cannot affect tool policy. Foreground IDE
+behaviors and safety displays have higher priority than ambient faces.
+
 The browser protocol exposes only fixed operations. It never accepts an
 arbitrary tool name or arbitrary robot capability. Camera preview calls
 `robot.camera.preview`; the JPEG is base64-encoded only long enough to return
@@ -969,7 +999,12 @@ Browser speech recognition stays in the browser and places recognized English
 or Japanese text in the input for review; only Send transmits it. The
 portrait-first Chrome/Safari interface has no document scrolling, blocks
 landscape controls, suppresses D-pad selection and touch callouts, and keeps
-Live Activity in a bottom drawer.
+Live Activity in a bottom drawer. A visible start overlay supplies the user
+gesture required by fullscreen APIs. Chrome requests fullscreen directly;
+standalone Progressive Web App mode bypasses the overlay. Mobile Safari may
+decline page fullscreen, so the controller remains usable and recommends
+Add to Home Screen. Safe-area padding reserves the collapsed drawer-tab height
+so it cannot cover the chat form.
 
 ### Phase 5 developer validation
 
@@ -982,6 +1017,8 @@ Implemented suites include:
 - tool policy and unknown-outcome recovery tests
 - FastAPI and exclusive WebSocket lease tests
 - fake-provider and Ollama contract tests
+- model discovery, persistence, hot-switch, and benchmark-gating tests
+- presentation-directive filtering and IDE face-lifecycle tests
 - opt-in Tavily and Raspberry Pi acceptance tests
 
 Run the configured project scope with:

@@ -50,6 +50,18 @@ def test_example_configuration_matches_confirmed_wiring() -> None:
     assert config.providers["ollama"].api_key_env is None
 
 
+def test_configuration_path_expands_home_directory(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    config_directory = tmp_path / ".config" / "ninjarobot_pi5"
+    config_directory.mkdir(parents=True)
+    config_path = config_directory / "config.toml"
+    config_path.write_bytes(EXAMPLE.read_bytes())
+
+    config = load_robot_config("~/.config/ninjarobot_pi5/config.toml")
+
+    assert config.schema_version == 1
+
+
 def test_configuration_migrates_legacy_agent_timeout() -> None:
     payload = load_robot_config(EXAMPLE).model_dump()
     payload["agent"].pop("request_timeout_seconds")

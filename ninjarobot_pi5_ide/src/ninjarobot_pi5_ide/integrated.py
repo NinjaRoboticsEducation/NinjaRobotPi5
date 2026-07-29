@@ -259,6 +259,18 @@ class RobotIDEClient:
             raise RuntimeError("robot IDE client is not started")
         return await self.robot.start_liveliness()
 
+    async def show_agent_face(self, expression: str) -> bool:
+        """Request an ambient face without exposing display hardware to the agent."""
+        if not self._started:
+            raise RuntimeError("robot IDE client is not started")
+        return await self.robot.show_agent_face(expression)
+
+    async def restore_idle_face(self) -> bool:
+        """Restore the IDE-owned silent idle presentation."""
+        if not self._started:
+            raise RuntimeError("robot IDE client is not started")
+        return await self.robot.restore_idle_face()
+
     async def action(self, action_id: str) -> ActionRecord | None:
         return await self._engine.action(action_id)
 

@@ -6,7 +6,12 @@ import asyncio
 from typing import Any, cast
 
 from .behavior_assets import BehaviorAssetRepository
-from .behavior_models import BehaviorDefinition, BehaviorStage, FaceOperation
+from .behavior_models import (
+    BehaviorDefinition,
+    BehaviorStage,
+    FaceOperation,
+    normalize_face_name,
+)
 from .behavior_runtime import BehaviorRunner, MelodyProvider, load_pi5buzzer_melody
 from .buzzer import BuzzerDevice, BuzzerFactory
 from .camera import CameraDevice, CameraFactory
@@ -169,6 +174,8 @@ class RobotAssembly:
         self.behaviors.set_failure_handler(self._driver_failure)
         self._liveliness_enabled = False
         self._idle_suppressed = False
+        self._ambient_face = "idle"
+        self._foreground_behaviors = 0
         self._idle_task: asyncio.Task[None] | None = None
         self._idle_lock = asyncio.Lock()
         self._closing = False
@@ -195,12 +202,24 @@ class RobotAssembly:
                 f"system is stopped ({snapshot.reason or 'local_stop'}); "
                 "resume or launch a fresh tool process"
             )
-        await self._stop_idle()
+        await self._begin_foreground_behavior()
         try:
             result = await self.behaviors.run(definition)
         finally:
-            await self._start_idle_if_safe()
+            await self._end_foreground_behavior()
         return result
+
+    async def show_agent_face(self, expression: str) -> bool:
+        """Loop one silent agent face unless safety or a foreground action has priority."""
+        face = normalize_face_name(expression)
+        self._ambient_face = face
+        await self._stop_idle()
+        await self._start_idle_if_safe()
+        return not self.system_safety.stopped
+
+    async def restore_idle_face(self) -> bool:
+        """Restore the normal silent idle loop after an agent interaction."""
+        return await self.show_agent_face("idle")
 
     async def health(self) -> dict[str, str]:
         """Return integrated expression component health."""
@@ -263,20 +282,33 @@ class RobotAssembly:
             or self._idle_suppressed
             or self._closing
             or self.system_safety.stopped
+            or self._foreground_behaviors
         ):
             return
         snapshot = self.safety_state.read()
         if snapshot.motion_latched or snapshot.system_latched:
             return
         async with self._idle_lock:
+            if self._foreground_behaviors:
+                return
             if self._idle_task is not None and not self._idle_task.done():
                 return
-            definition = self._silent_idle_definition()
+            definition = self._silent_face_definition(self._ambient_face)
             self._idle_task = asyncio.create_task(
                 self._run_idle(definition),
-                name="ninjarobot-silent-idle",
+                name=f"ninjarobot-silent-{self._ambient_face}",
             )
         await asyncio.sleep(0)
+
+    async def _begin_foreground_behavior(self) -> None:
+        async with self._idle_lock:
+            self._foreground_behaviors += 1
+        await self._stop_idle()
+
+    async def _end_foreground_behavior(self) -> None:
+        async with self._idle_lock:
+            self._foreground_behaviors = max(0, self._foreground_behaviors - 1)
+        await self._start_idle_if_safe()
 
     async def _run_idle(self, definition: BehaviorDefinition) -> None:
         current = asyncio.current_task()
@@ -301,8 +333,8 @@ class RobotAssembly:
             task.cancel()
         await asyncio.gather(task, return_exceptions=True)
 
-    def _silent_idle_definition(self) -> BehaviorDefinition:
-        configured = self.assets.load("idle")
+    def _silent_face_definition(self, expression: str) -> BehaviorDefinition:
+        configured = self.assets.load(expression)
         source = next(
             operation
             for stage in configured.stages
@@ -311,12 +343,12 @@ class RobotAssembly:
         )
         return BehaviorDefinition(
             schema_version=1,
-            name="idle",
-            description="Loop the embedded idle face silently between interactions.",
+            name=f"agent_{expression}",
+            description=f"Loop the embedded {expression} face silently.",
             category="expression",
             stages=(
                 BehaviorStage(
-                    name="silent_idle_face",
+                    name=f"silent_{expression}_face",
                     operations=(source.model_copy(update={"hold_seconds": None}),),
                 ),
             ),

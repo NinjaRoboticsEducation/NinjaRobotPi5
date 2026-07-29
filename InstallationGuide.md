@@ -650,6 +650,32 @@ there is no undervoltage or throttling, and no unsafe loop, duplicate physical
 action, or malformed execution occurs. If it reports `"accepted": false`, keep
 using simulation and review the report before selecting another model.
 
+List the models that are actually installed in Ollama, then select one:
+
+```bash
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" model list
+
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" model select qwen3:4b
+
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" model current
+```
+
+When the service is stopped, `model select` saves the choice in
+`~/.config/ninjarobot_pi5/config.toml`. When the service is running and idle,
+the same command health-checks the new model, switches without restarting the
+service, and saves the choice. It refuses to switch during an active response
+or robot action. The interactive tool provides the same workflow under
+**Change Agent Model** and shows models by number.
+
+The selected model does not need an accepted benchmark to chat or run
+simulation. Until a benchmark report for that exact model name says
+`"accepted": true`, natural-language physical motion cannot be armed. Direct
+operator controls such as the browser D-pad remain independent of model
+acceptance.
+
 Start the agent in simulation:
 
 ```bash
@@ -670,8 +696,18 @@ without model activity. Existing configurations containing the old
 
 In real mode, service startup runs Greeting once, including the face, melody,
 and “Nice to meet you” text. The robot then loops a silent Idle face until a
-behavior takes over. Normal completion returns to Idle; safety-stop displays
-remain visible until Resume.
+behavior takes over. During conversation, the silent face follows this normal
+flow:
+
+```text
+Idle → Thinking → Speaking or a matching emotion → robot action → Idle
+```
+
+If a tool is needed, the robot returns to Thinking after that tool and before
+the final response. The model may select only an embedded display-only emotion
+from the fixed allowlist. The selection is removed from chat text and cannot
+grant motion or tool permission. Normal completion returns to Idle;
+safety-stop displays remain visible until Resume.
 
 Start the HTTPS web interface:
 
@@ -701,6 +737,13 @@ changing trust.
 The first browser receives the only controller lease. A second browser is
 rejected with HTTP `423 Locked`; some browsers show only a generic connection
 failure for a rejected WebSocket.
+
+In a normal browser tab, tap **Tap to Start Controller**. This is the user
+gesture that browsers require before entering fullscreen. Chrome uses
+fullscreen when available. iPhone and iPad Safari may keep browser controls
+visible; choose **Share → Add to Home Screen**, then launch the saved
+NinjaRobot icon for the most reliable standalone portrait view. The controller
+still works when fullscreen is unavailable.
 
 In simulation, check:
 
@@ -927,6 +970,11 @@ For the complete model, Tavily, HTTPS lease, camera, USB microphone, browser
 microphone, network-loss, Emergency Stop, and raised-wheel test sequence, use:
 
 [Phase 5 agent refinement validation](docs/validation/phase-5-agent-refinement-validation-2026-07-29.md).
+
+For the local-model selector, face lifecycle, Tavily compatibility, and latest
+mobile layout checks, use:
+
+[Phase 5 model and controller validation](docs/validation/phase-5-agent-model-ui-refinement-validation-2026-07-29.md).
 
 ### Common installation problems
 
@@ -1191,6 +1239,33 @@ processes, and repeat once. Do not repeatedly benchmark an overheating or
 undervoltage Pi. Keep the model marked as a candidate until every threshold
 passes.
 
+#### Agent reports that the configured model is not installed
+
+List Ollama's local models and choose one of the exact displayed names:
+
+```bash
+ollama list
+uv run --frozen ninjarobot-agent model list
+uv run --frozen ninjarobot-agent model select qwen3:4b
+uv run --frozen ninjarobot-agent model current
+```
+
+Model names include their tag, such as `qwen3:4b`. Selecting a model does not
+download it. Run `ollama pull MODEL_NAME` first if the desired model is absent.
+If the service says it is busy, wait for the current response or action to
+finish and select again.
+
+#### Web Microphone does not start
+
+Confirm that the page shows a normal trusted lock and uses
+`https://ninjarobotpi5.local:8443/`. Tap **Web Microphone** directly, allow
+microphone access, and speak in the language selected beside the button.
+Recognized text should fill the message box; it is intentionally not sent
+until **Send** is tapped. On iPhone or iPad, check
+**Settings → Safari → Microphone** and the site-specific permission. Browser
+speech recognition may also depend on the browser or operating-system speech
+service and is unavailable when that service is disabled.
+
 #### Raspberry Pi reports undervoltage
 
 Check:
@@ -1354,7 +1429,7 @@ transport = "streamable_http"
 url = "https://mcp.tavily.com/mcp"
 authentication = "bearer_environment"
 token_environment = "TAVILY_API_KEY"
-allowed_tools = ["tavily-search"]
+allowed_tools = ["tavily_search"]
 timeout_seconds = 20.0
 max_result_bytes = 131072
 preset = "tavily"
@@ -1378,8 +1453,11 @@ uv run --frozen ninjarobot-agent mcp tools tavily
 uv run --frozen ninjarobot-agent mcp inspect tavily
 ```
 
-Expected result: the server is healthy and the active allowlist contains
-`tavily-search`. Secret values must appear as redacted, not as the real key.
+Expected result: the server is healthy and exposes the stable agent-facing
+tool `mcp.tavily.tavily-search`. The current Tavily server reports its raw tool
+name as `tavily_search`; NinjaRobotAgent deliberately keeps the documented
+hyphenated public name. Secret values must appear as redacted, not as the real
+key.
 
 5. Run one harmless search:
 

@@ -1,5 +1,63 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-29 — Local model, expressive-agent, Tavily, and controller refinement
+
+### Summary
+
+Completed the approved post-test refinement in five independently validated
+implementation phases:
+
+- corrected the Tavily preset to allow current raw server tool
+  `tavily_search`, preserved public name `mcp.tavily.tavily-search`, and added
+  in-memory migration for an older owner configuration
+- repaired browser-microphone state and label handling while preserving the
+  rule that recognized text waits in the input until the user presses Send
+- added provider-neutral installed-model discovery, numbered interactive
+  selection, scriptable `model list|current|select`, atomic persistence, and
+  idle-only hot switching
+- closed the old provider after a successful switch, disarmed previous AI
+  motion sessions, and blocked natural-language physical motion until the
+  selected exact model has an accepted benchmark report
+- serialized conversations and added the IDE-owned Idle, Thinking,
+  Speaking/emotion, tool-action, and return-to-Idle presentation lifecycle
+- added a strict display-only emotion directive that is removed before
+  streaming or transcript persistence and cannot grant tool or motion access
+- refined the portrait controller to match `templates/webinterface_02.jpg`,
+  removed redundant labels, consolidated AI motion state into its button,
+  protected the chat form from the Live Activity tab, and added the
+  fullscreen/start gesture with a mobile Safari standalone fallback
+- made `load_robot_config` consistently expand a leading home-directory
+  shortcut so default CLI paths work for new commands
+
+### Architecture and safety
+
+The agent still reaches robot presentation and actions only through
+`RobotIDEClient`. Ambient faces yield to foreground IDE behaviors and do not
+overwrite Level 1, Level 2, driver-failure, or shutdown presentation. Model
+emotion is a bounded display choice, not an action or permission.
+
+No managed `pi5*` driver file changed. The immutable-driver report continues
+to match 222 tracked files and 25 previously authorized repairs.
+
+### Validation
+
+Each implementation phase passed compile checks, Ruff lint and format checks,
+strict MyPy, pytest, JavaScript syntax, diff checks, and immutable-driver
+verification. The last pre-documentation gate reported 278 passing tests with
+one known Starlette test-client deprecation warning. The complete
+post-documentation gate repeated the same 278-test result, built both agent and
+IDE source/wheel distributions, and confirmed the packaged web assets. Live
+read-only checks confirmed local Ollama model discovery and current Tavily
+health/tool discovery.
+
+### Raspberry Pi status
+
+Software implementation is complete. Physical and browser acceptance remains
+an operator task. Follow
+`docs/validation/phase-5-agent-model-ui-refinement-validation-2026-07-29.md`
+in order, beginning with simulation and read-only checks before display,
+privacy, network-loss, or raised-wheel motion tests.
+
 ## 2026-07-29 — Phase 5 agent and mobile web refinement
 
 ### Summary
