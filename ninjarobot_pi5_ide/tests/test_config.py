@@ -42,10 +42,24 @@ def test_example_configuration_matches_confirmed_wiring() -> None:
         "left_motor": "gpio12",
         "right_motor": "gpio13",
     }
-    assert config.behaviors.obstacle_threshold_mm == 100
+    assert config.behaviors.obstacle_threshold_mm == 50
     assert config.behaviors.obstacle_consecutive_readings == 3
     assert config.behaviors.stop_on_invalid_distance is False
+    assert config.agent.request_timeout_seconds == 600.0
+    assert config.agent.model_inactivity_timeout_seconds == 120.0
     assert config.providers["ollama"].api_key_env is None
+
+
+def test_configuration_migrates_legacy_agent_timeout() -> None:
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["agent"].pop("request_timeout_seconds")
+    payload["agent"].pop("model_inactivity_timeout_seconds")
+    payload["agent"]["turn_timeout_seconds"] = 90.0
+
+    config = RobotConfig.model_validate(payload)
+
+    assert config.agent.request_timeout_seconds == 600.0
+    assert config.agent.model_inactivity_timeout_seconds == 120.0
 
 
 def test_configuration_rejects_unknown_fields_and_gpio_conflicts() -> None:

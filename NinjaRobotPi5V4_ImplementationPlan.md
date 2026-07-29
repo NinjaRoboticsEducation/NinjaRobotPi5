@@ -1,7 +1,7 @@
 # NinjaRobotPi5V4 Implementation Plan
 
 Status: Approved architecture and active delivery record
-Last updated: 2026-07-28 (Phase 5.0–5.7 software implementation completed)
+Last updated: 2026-07-29 (Phase 5 agent/web refinement implemented)
 Primary development computer: Raspberry Pi 5, 8 GB RAM
 Target computer: Raspberry Pi 5, 8 GB RAM
 Implementation status: Phases 0–4 implemented and operator-validated; Phase
@@ -984,7 +984,8 @@ default_provider = "ollama"
 fallback_providers = []
 max_model_turns = 6
 max_tool_calls = 8
-turn_timeout_seconds = 90
+request_timeout_seconds = 600
+model_inactivity_timeout_seconds = 120
 
 [providers.ollama]
 model = "configured-by-user"
@@ -1680,13 +1681,11 @@ historical runtime or OpenClaw code is imported.
   wheel motor.
 - Exact motor targets: forward `+45/-45`, backward `-30/+30`, right
   `+45/+45`, and left `-45/-45`.
-- Front motion starts after three clear samples. A measured distance above
-  100 mm or the exact VL53L0X `8191` clear-space/out-of-range sentinel counts
-  as clear. Communication errors, timeouts, stale values, and generic null
-  results do not count as clear. Three consecutive measured readings at or
-  below 100 mm cause a Level 1 motion stop.
-- Invalid, missing, and stale readings warn without stopping an already-running
-  movement, following the project owner's explicit decision.
+- Motion starts without a distance-clear preflight. The exact VL53L0X `8191`
+  clear-space/out-of-range sentinel is clear. Null, invalid, missing, and stale
+  readings do not stop motion. Three consecutive valid readings at or below
+  50 mm cause a Level 1 stop for forward and turning movement. Backward
+  movement is warning-only.
 - Level 1 stops for obstacle, current undervoltage, and watchdog timeout.
 - Level 2 cleanup for Ctrl+C, shutdown, explicit stop, and driver failure.
   Driver failure remains latched until explicit confirmation and healthy
@@ -2007,7 +2006,8 @@ troubleshooting instructions.
 
 **Objective**
 
-- Serve a mobile-landscape-first interface that also works on desktop.
+- Serve a portrait-first, no-page-scroll interface for mobile Chrome, mobile
+  Safari, and desktop browsers. Landscape shows a rotate-back safety overlay.
 - Display AI chat, system status, tool execution logs, robot actions, warnings,
   errors, and recovery events.
 - Provide D-pad Move Forward, Move Backward, Turn Left, and Turn Right controls.
@@ -2017,15 +2017,20 @@ troubleshooting instructions.
   default.
 - Start/stop USB microphone capture and send completed audio into the approved
   Phase 5 text workflow without adding spoken robot responses.
-- Use browser speech recognition for English and Japanese and send recognized
-  text to the agent.
+- Use browser speech recognition for English and Japanese, place recognized
+  text in the message input, and require Send before transmission.
+- Keep Live Activity in a hidden bottom drawer with tap and slide controls.
+- Suppress D-pad text selection and touch callouts with Pointer Events and a
+  touch-event fallback.
 - Enforce one exclusive browser WebSocket controller lease. A second connection
   receives `423 Locked`.
 - Require the active lease identifier on control requests.
 - Revoke the lease and stop movement after missed heartbeats.
 - Permit short-lived reconnect-token recovery after browser refresh.
 - Refuse control endpoints when no active WebSocket lease exists.
-- Use HTTPS on the LAN and clearly document the accepted first-device risk.
+- Use a local-CA-signed HTTPS certificate for
+  `ninjarobotpi5.local`, provide public-CA export, and document one-time
+  Chrome/Safari trust plus the accepted first-device risk.
 
 **Likely files**
 
@@ -2037,7 +2042,9 @@ troubleshooting instructions.
 - FastAPI contract, WebSocket lease, second-client rejection, heartbeat,
   reconnect, refresh, malformed request, camera lifetime, microphone
   cancellation, language selection, and service-shutdown tests.
-- Browser checks in mobile landscape and desktop layouts.
+- Browser checks in portrait mobile Chrome, portrait mobile Safari, and desktop
+  layouts. Landscape must show the rotate-back safety overlay instead of live
+  robot controls.
 - Network interruption must stop active movement without waiting for a model.
 - Standard workspace quality gate and immutable-driver verification.
 

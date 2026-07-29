@@ -257,8 +257,6 @@ def robot_config_to_toml(config: RobotConfig) -> str:
         f"right_motor_role = {_toml(behavior.right_motor_role)}",
         f"obstacle_threshold_mm = {behavior.obstacle_threshold_mm}",
         f"obstacle_consecutive_readings = {behavior.obstacle_consecutive_readings}",
-        f"clear_readings_before_motion = {behavior.clear_readings_before_motion}",
-        f"clear_reading_timeout_seconds = {behavior.clear_reading_timeout_seconds}",
         f"distance_poll_interval_seconds = {behavior.distance_poll_interval_seconds}",
         f"watchdog_timeout_seconds = {behavior.watchdog_timeout_seconds}",
         f"system_stopped_display_seconds = {behavior.system_stopped_display_seconds}",
@@ -274,7 +272,8 @@ def robot_config_to_toml(config: RobotConfig) -> str:
             f"default_provider = {_toml(config.agent.default_provider)}",
             f"max_model_turns = {config.agent.max_model_turns}",
             f"max_tool_calls = {config.agent.max_tool_calls}",
-            f"turn_timeout_seconds = {config.agent.turn_timeout_seconds}",
+            f"request_timeout_seconds = {config.agent.request_timeout_seconds}",
+            f"model_inactivity_timeout_seconds = {config.agent.model_inactivity_timeout_seconds}",
         ]
     )
     for name, provider in config.providers.items():

@@ -599,22 +599,18 @@ Zero or the calibrated center represents neutral for these MG90D
 continuous-rotation motors. An emergency stop uses zero PWM pulse through the
 driver's `off` path rather than leaving a motion target active.
 
-Front-guarded motion requires three clear samples before the motors start. A
-measured value above 100 mm is clear. The exact VL53L0X raw sentinel `8191` is
-also clear because it means no target is measurable in the sensor's range; the
-public distance capability still refuses to publish it as a real millimetre
-measurement. A generic null result, I2C communication error, timeout,
-disconnect, or stale result is not clear and resets the startup sequence.
+Movement starts immediately after ordinary driver and latch checks; there is
+no distance-clear preflight. The exact VL53L0X raw sentinel `8191` is clear
+space because no target is measurable in range. Null, invalid, missing, and
+stale results do not stop motion.
 
-Three consecutive measured readings at or below 100 mm cause a Level 1 stop.
-The threshold is configurable but the schema refuses values below 50 mm.
-Backward movement uses warning-only monitoring because the sensor faces
-forward. Turns report that side and rear space is not protected.
+Three consecutive valid readings at or below 50 mm cause a Level 1 stop for
+forward, left-turn, and right-turn movement. The schema refuses thresholds
+below 50 mm. Backward movement uses warning-only monitoring because the sensor
+faces forward.
 
-The owner explicitly selected warning-only behavior for missing, invalid, and
-stale readings during an already-running movement. Those samples break the
-three-reading sequence but do not stop the motors. A front-guarded action still
-cannot start until it receives the configured number of clear samples.
+Missing, invalid, and stale samples break the three-low-reading sequence but
+do not stop the motors.
 
 ### Stop levels
 
@@ -933,19 +929,33 @@ sessions, SQLite transcripts, motion arms, events, and the optional FastAPI
 server.
 
 Ollama accepts only loopback base URLs. The Qwen3:4B candidate uses a 4,096
-token context, 512 output-token limit, temperature 0.1, disabled model
-thinking, bounded model turns, bounded tool calls, and a per-turn deadline.
+token context, 512 output-token limit, temperature 0.1, bounded model turns,
+bounded tool calls, a 600-second complete-request limit, and a 120-second
+inactivity limit. Private thinking chunks reset inactivity without being
+displayed or logged.
 The benchmark command never executes a tool. Qwen3:4B becomes accepted only
 when the Raspberry Pi report meets every recorded latency, memory, temperature,
 throttling, correctness, and safety threshold.
 
 The web server is started and stopped through IPC, so it cannot create a
-second IDE or hardware owner. It uses a generated owner-only self-signed TLS
-key, static package assets, and one WebSocket controller lease. TLS means the
+second IDE or hardware owner. It uses a generated local certificate authority,
+a `.local` server certificate, static package assets, and one WebSocket
+controller lease. TLS means the
 HTTPS encryption layer. Every control message carries the active lease ID.
 The first browser wins; another receives HTTP `423 Locked`. A refresh can
 reclaim the lease during a short grace period using a reconnect token. A
 missed heartbeat revokes it and requests `robot.servo.stop`.
+
+The default certificate chain is created under
+`~/.config/ninjarobot_pi5/tls/`. `local-ca-key.pem` and `agent-key.pem` remain
+owner-only. `ninjarobot-agent web export-ca` copies only the public CA
+certificate for one-time Chrome or Safari trust onboarding. The default URL is
+`https://ninjarobotpi5.local:8443/`.
+
+The agent service invokes the IDE-owned startup Greeting exactly once and then
+enables its silent Idle supervisor. Normal behaviors preempt Idle and restore
+it when they finish. Level 1, Level 2, driver-failure, and shutdown screens are
+never overwritten by Idle; a successful Resume re-enables it.
 
 The browser protocol exposes only fixed operations. It never accepts an
 arbitrary tool name or arbitrary robot capability. Camera preview calls
@@ -955,8 +965,11 @@ transient so the durable action ledger stores the outcome but not the JPEG.
 USB speech calls
 `robot.microphone.transcribe`; the IDE captures a temporary WAV, invokes local
 `whisper-cli` without a shell, and removes both audio and transcript staging.
-Browser speech recognition stays in the browser and sends only recognized
-English or Japanese text.
+Browser speech recognition stays in the browser and places recognized English
+or Japanese text in the input for review; only Send transmits it. The
+portrait-first Chrome/Safari interface has no document scrolling, blocks
+landscape controls, suppresses D-pad selection and touch callouts, and keeps
+Live Activity in a bottom drawer.
 
 ### Phase 5 developer validation
 
@@ -1133,11 +1146,10 @@ test; the separate pre-Phase-1 live-Pi report is stored under `docs/validation/`
   power disconnect if one is installed, shut down before touching wiring, and
   inspect power, common ground, signal routing, and calibration. The current
   robot has no accessible cutoff, which is a known residual risk.
-- **Integrated movement says it did not receive clear readings:** keep the
-  front sensor aimed at open space. Three measured values above 100 mm or
-  three exact `DEVICE_OUT_OF_RANGE` results backed by raw `8191` permit
-  startup. A generic null, I2C error, timeout, disconnect, or stale sample does
-  not; repair that communication problem first. The motors have not started.
+- **Integrated movement reports a sensor warning:** movement no longer waits
+  for clear readings. Check I2C communication, but remember that null,
+  invalid, missing, and stale results do not stop movement. Three consecutive
+  valid readings at or below 50 mm stop guarded motion.
 - **Integrated movement says motion is latched:** remove the obstacle or solve
   the power/watchdog problem, then run
   `ninjarobot-ide-tool motion resume --confirm`.

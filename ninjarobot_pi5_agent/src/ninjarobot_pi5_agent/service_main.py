@@ -10,7 +10,7 @@ from pathlib import Path
 from ninjarobot_pi5_ide import build_robot_ide_client, load_robot_config
 
 from .agent_loop import AgentLoop, AgentLoopConfig
-from .events import EventBroker
+from .events import AgentEventType, EventBroker
 from .ipc import AgentIPCServer
 from .mcp_client import MCPToolProvider
 from .mcp_config import load_mcp_configuration
@@ -101,7 +101,8 @@ async def run_service(arguments: argparse.Namespace) -> None:
         config=AgentLoopConfig(
             max_model_turns=config.agent.max_model_turns,
             max_tool_calls=config.agent.max_tool_calls,
-            turn_timeout_seconds=config.agent.turn_timeout_seconds,
+            request_timeout_seconds=config.agent.request_timeout_seconds,
+            model_inactivity_timeout_seconds=(config.agent.model_inactivity_timeout_seconds),
         ),
         runtime_state=lambda session_id, lease_id: {
             "session_id": session_id,
@@ -146,6 +147,18 @@ async def run_service(arguments: argparse.Namespace) -> None:
     for signal_number in (signal.SIGINT, signal.SIGTERM):
         loop_object.add_signal_handler(signal_number, server.request_stop)
     await server.start()
+    try:
+        await ide.start_liveliness()
+        await events.publish(
+            AgentEventType.SERVICE,
+            "Startup greeting completed; silent idle animation is active.",
+        )
+    except Exception as exc:
+        await events.publish(
+            AgentEventType.ERROR,
+            "Startup greeting failed; the agent service remains available.",
+            data={"error": f"{type(exc).__name__}: {exc}"},
+        )
     try:
         await server.serve()
     finally:

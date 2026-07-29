@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import os
+import socket
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from cryptography import x509
 from ninjarobot_pi5_agent.events import EventBroker
 from ninjarobot_pi5_agent.models import (
     ProviderHealth,
@@ -18,6 +20,7 @@ from ninjarobot_pi5_agent.runtime import AgentRuntime
 from ninjarobot_pi5_agent.web_app import (
     create_web_app,
     ensure_self_signed_certificate,
+    local_ca_paths,
 )
 from ninjarobot_pi5_agent.web_control import (
     ControllerLeaseManager,
@@ -206,7 +209,7 @@ def test_second_websocket_receives_http_423_locked() -> None:
             }
 
 
-def test_self_signed_certificate_is_reused_and_private(tmp_path: Path) -> None:
+def test_local_ca_certificate_is_reused_named_and_private(tmp_path: Path) -> None:
     certificate = tmp_path / "tls" / "cert.pem"
     key = tmp_path / "tls" / "key.pem"
 
@@ -219,3 +222,38 @@ def test_self_signed_certificate_is_reused_and_private(tmp_path: Path) -> None:
     assert certificate.read_text(encoding="ascii").startswith("-----BEGIN CERTIFICATE-----")
     assert key.read_text(encoding="ascii").startswith("-----BEGIN PRIVATE KEY-----")
     assert os.stat(key).st_mode & 0o777 == 0o600
+    ca_certificate, ca_key = local_ca_paths(certificate)
+    server = x509.load_pem_x509_certificate(certificate.read_bytes())
+    authority = x509.load_pem_x509_certificate(ca_certificate.read_bytes())
+    names = set(
+        server.extensions.get_extension_for_class(
+            x509.SubjectAlternativeName
+        ).value.get_values_for_type(x509.DNSName)
+    )
+    hostname = socket.gethostname().rstrip(".")
+    assert server.issuer == authority.subject
+    assert {hostname, f"{hostname}.local", "localhost"} <= names
+    assert authority.extensions.get_extension_for_class(x509.BasicConstraints).value.ca is True
+    assert os.stat(ca_key).st_mode & 0o777 == 0o600
+
+
+def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> None:
+    static = Path(__file__).resolve().parents[1] / "src" / "ninjarobot_pi5_agent" / "web_static"
+    html = (static / "index.html").read_text(encoding="utf-8")
+    css = (static / "styles.css").read_text(encoding="utf-8")
+    javascript = (static / "app.js").read_text(encoding="utf-8")
+    recognition_handler = javascript.split("recognition.onresult =", maxsplit=1)[1].split(
+        "recognition.onerror =",
+        maxsplit=1,
+    )[0]
+
+    assert 'id="activityDrawer"' in html
+    assert 'class="orientation-blocker"' in html
+    assert 'rel="manifest"' in html
+    assert "-webkit-user-select: none" in css
+    assert "-webkit-touch-callout: none" in css
+    assert "overscroll-behavior: none" in css
+    assert "event.preventDefault()" in javascript
+    assert "elements.chatInput.focus()" in recognition_handler
+    assert "submitChat(" not in recognition_handler
+    assert (static / "manifest.webmanifest").is_file()

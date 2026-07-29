@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -14,10 +16,16 @@ from ninjarobot_pi5_agent import (
     ConversationStore,
     FinishReason,
     IDEToolProvider,
+    ModelRequest,
+    ModelStreamEvent,
     ModelTurn,
     MotionArmManager,
     PolicyEngine,
+    ProviderCapabilities,
+    ProviderHealth,
+    ProviderHealthStatus,
     RecoveryPolicy,
+    StreamEventType,
     ToolCall,
     ToolRegistry,
 )
@@ -49,6 +57,56 @@ class _IDs:
         return f"id-{self.value}"
 
 
+class _ActiveThinkingProvider:
+    """Emit private activity often enough to reset the inactivity timeout."""
+
+    def __init__(self, *, activity_count: int = 4, interval: float = 0.02) -> None:
+        self.activity_count = activity_count
+        self.interval = interval
+
+    @property
+    def capabilities(self) -> ProviderCapabilities:
+        return ProviderCapabilities(
+            native_tools=True,
+            streaming=True,
+            images=False,
+            audio=False,
+            structured_output=True,
+            usage_reporting=False,
+            provider_conversation_state=False,
+        )
+
+    async def generate(self, request: ModelRequest) -> ModelTurn:
+        raise AssertionError("streaming provider should not use generate")
+
+    async def stream(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
+        for _ in range(self.activity_count):
+            await asyncio.sleep(self.interval)
+            yield ModelStreamEvent(
+                request_id=request.request_id,
+                event=StreamEventType.ACTIVITY,
+            )
+        yield ModelStreamEvent(
+            request_id=request.request_id,
+            event=StreamEventType.DONE,
+            turn=ModelTurn(
+                request_id=request.request_id,
+                text="Thinking completed.",
+                finish_reason=FinishReason.STOP,
+            ),
+        )
+
+    async def health(self) -> ProviderHealth:
+        return ProviderHealth(
+            provider="active-thinking",
+            status=ProviderHealthStatus.READY,
+            checked_at=datetime(2026, 7, 29, tzinfo=UTC),
+        )
+
+    async def close(self) -> None:
+        return None
+
+
 async def build_loop(
     tmp_path: Path,
     turns: list[ModelTurn],
@@ -71,6 +129,81 @@ async def build_loop(
         id_factory=_IDs(),
     )
     return loop, store, registry, ide
+
+
+async def build_streaming_loop(
+    tmp_path: Path,
+    provider: _ActiveThinkingProvider,
+    *,
+    config: AgentLoopConfig,
+) -> tuple[AgentLoop, ConversationStore, ToolRegistry]:
+    store = ConversationStore(tmp_path / "streaming-conversation.sqlite3")
+    await store.start()
+    registry = ToolRegistry((IDEToolProvider(FakeIDEClient((descriptor(),))),))
+    await registry.start()
+    loop = AgentLoop(
+        provider=provider,
+        tools=registry,
+        policy=PolicyEngine(MotionArmManager()),
+        recovery=RecoveryPolicy(),
+        store=store,
+        config=config,
+        id_factory=_IDs(),
+    )
+    return loop, store, registry
+
+
+def test_agent_loop_private_activity_resets_model_inactivity_timeout(tmp_path) -> None:
+    async def exercise() -> None:
+        loop, store, registry = await build_streaming_loop(
+            tmp_path,
+            _ActiveThinkingProvider(),
+            config=AgentLoopConfig(
+                request_timeout_seconds=0.5,
+                model_inactivity_timeout_seconds=0.03,
+            ),
+        )
+
+        deltas: list[str] = []
+        reply = await loop.chat(
+            session_id="session-1",
+            text="Think carefully",
+            on_text_delta=lambda text: _record_delta(deltas, text),
+        )
+
+        assert reply.text == "Thinking completed."
+        assert deltas == []
+        await registry.close()
+        await store.close()
+
+    asyncio.run(exercise())
+
+
+def test_agent_loop_complete_request_timeout_still_bounds_activity(tmp_path) -> None:
+    async def exercise() -> None:
+        loop, store, registry = await build_streaming_loop(
+            tmp_path,
+            _ActiveThinkingProvider(activity_count=100),
+            config=AgentLoopConfig(
+                request_timeout_seconds=0.05,
+                model_inactivity_timeout_seconds=0.03,
+            ),
+        )
+
+        with pytest.raises(AgentLoopError, match="complete request|agent request exceeded"):
+            await loop.chat(
+                session_id="session-1",
+                text="Never finish",
+                on_text_delta=lambda text: _record_delta([], text),
+            )
+        await registry.close()
+        await store.close()
+
+    asyncio.run(exercise())
+
+
+async def _record_delta(values: list[str], text: str) -> None:
+    values.append(text)
 
 
 def test_agent_loop_executes_tool_once_and_persists_complete_context(tmp_path) -> None:

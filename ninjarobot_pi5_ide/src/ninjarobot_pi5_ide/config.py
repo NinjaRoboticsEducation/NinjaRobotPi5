@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import (
     BaseModel,
@@ -154,8 +154,10 @@ class BehaviorConfig(ConfigModel):
             "right_motor": "gpio13",
         }
     )
-    obstacle_threshold_mm: Annotated[int, Field(ge=50, le=2_000)] = 100
+    obstacle_threshold_mm: Annotated[int, Field(ge=50, le=2_000)] = 50
     obstacle_consecutive_readings: Annotated[int, Field(ge=1, le=10)] = 3
+    # Accepted only so Phase 4 configuration files continue to load. Movement no
+    # longer waits for clear readings before energizing the servos.
     clear_readings_before_motion: Annotated[int, Field(ge=1, le=10)] = 3
     clear_reading_timeout_seconds: Annotated[float, Field(ge=1.0, le=30.0)] = 5.0
     distance_poll_interval_seconds: Annotated[float, Field(ge=0.02, le=2.0)] = 0.05
@@ -212,7 +214,20 @@ class AgentConfig(ConfigModel):
     default_provider: NonEmptyText = "ollama"
     max_model_turns: Annotated[int, Field(ge=1, le=20)] = 6
     max_tool_calls: Annotated[int, Field(ge=0, le=50)] = 8
-    turn_timeout_seconds: Annotated[float, Field(gt=0, le=600)] = 90.0
+    request_timeout_seconds: Annotated[float, Field(gt=0, le=600)] = 600.0
+    model_inactivity_timeout_seconds: Annotated[float, Field(gt=0, le=600)] = 120.0
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_legacy_turn_timeout(cls, value: Any) -> Any:
+        """Give existing Phase 5 configurations the new activity-aware defaults."""
+        if not isinstance(value, dict) or "turn_timeout_seconds" not in value:
+            return value
+        migrated = dict(value)
+        migrated.pop("turn_timeout_seconds")
+        migrated.setdefault("request_timeout_seconds", 600.0)
+        migrated.setdefault("model_inactivity_timeout_seconds", 120.0)
+        return migrated
 
 
 class ProviderConfig(ConfigModel):

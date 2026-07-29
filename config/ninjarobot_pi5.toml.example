@@ -53,10 +53,8 @@ user_directory = "~/.config/ninjarobot_pi5/behaviors"
 safety_state_file = "~/.local/state/ninjarobot_pi5/safety.json"
 left_motor_role = "left_motor"
 right_motor_role = "right_motor"
-obstacle_threshold_mm = 100
+obstacle_threshold_mm = 50
 obstacle_consecutive_readings = 3
-clear_readings_before_motion = 3
-clear_reading_timeout_seconds = 5.0
 distance_poll_interval_seconds = 0.05
 watchdog_timeout_seconds = 1.0
 system_stopped_display_seconds = 2.0
@@ -70,7 +68,8 @@ right_motor = "gpio13"
 default_provider = "ollama"
 max_model_turns = 6
 max_tool_calls = 8
-turn_timeout_seconds = 90.0
+request_timeout_seconds = 600.0
+model_inactivity_timeout_seconds = 120.0
 
 [providers.ollama]
 kind = "ollama"

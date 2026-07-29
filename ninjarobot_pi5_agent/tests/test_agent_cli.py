@@ -95,3 +95,31 @@ def test_agent_cli_validates_installs_simulates_and_removes_skill(
     run_cli([*common, "skill", "remove", "test-skill", "--confirm"])
     capsys.readouterr()
     assert not (skill_directory / "test-skill").exists()
+
+
+def test_agent_cli_exports_only_public_browser_trust_certificate(
+    tmp_path,
+    capsys,
+) -> None:
+    certificate = tmp_path / "tls" / "agent-cert.pem"
+    key = tmp_path / "tls" / "agent-key.pem"
+    exported = tmp_path / "phone" / "ninjarobot-ca.pem"
+
+    run_cli(
+        [
+            "--web-certificate",
+            str(certificate),
+            "--web-key",
+            str(key),
+            "web",
+            "export-ca",
+            "--output",
+            str(exported),
+        ]
+    )
+
+    result = json.loads(capsys.readouterr().out)
+    assert result["exported"] == str(exported)
+    assert result["contains_private_key"] is False
+    assert "BEGIN CERTIFICATE" in exported.read_text(encoding="ascii")
+    assert "PRIVATE KEY" not in exported.read_text(encoding="ascii")

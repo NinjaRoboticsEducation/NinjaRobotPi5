@@ -214,7 +214,7 @@ class _ResumeAdapter:
         snapshot = (
             await self._robot.resume_system(confirmed=True)
             if self._system
-            else self._robot.resume_motion(confirmed=True)
+            else await self._robot.resume_motion(confirmed=True)
         )
         return asdict(snapshot)
 
@@ -252,6 +252,12 @@ class RobotIDEClient:
 
     async def execute(self, request: ActionRequest) -> ActionResult:
         return await self._engine.execute(request)
+
+    async def start_liveliness(self) -> dict[str, Any]:
+        """Run the service-start greeting through the IDE-owned assembly."""
+        if not self._started:
+            raise RuntimeError("robot IDE client is not started")
+        return await self.robot.start_liveliness()
 
     async def action(self, action_id: str) -> ActionRecord | None:
         return await self._engine.action(action_id)

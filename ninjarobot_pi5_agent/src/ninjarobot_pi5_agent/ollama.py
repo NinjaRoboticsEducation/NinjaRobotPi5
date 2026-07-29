@@ -109,7 +109,7 @@ class OllamaProvider:
         return self._normalize_turn(request.request_id, payload)
 
     async def stream(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
-        """Yield text deltas followed by one complete normalized turn."""
+        """Yield private activity, text deltas, then one normalized turn."""
         self._ensure_open()
         accumulated_text: list[str] = []
         accumulated_calls: list[dict[str, Any]] = []
@@ -134,6 +134,14 @@ class OllamaProvider:
                     content = message.get("content", "")
                     if not isinstance(content, str):
                         raise OllamaProtocolError("Ollama stream content must be text")
+                    thinking = message.get("thinking", "")
+                    if not isinstance(thinking, str):
+                        raise OllamaProtocolError("Ollama stream thinking must be text")
+                    if thinking:
+                        yield ModelStreamEvent(
+                            request_id=request.request_id,
+                            event=StreamEventType.ACTIVITY,
+                        )
                     if content:
                         accumulated_text.append(content)
                         yield ModelStreamEvent(
@@ -146,6 +154,11 @@ class OllamaProvider:
                         if not isinstance(raw_calls, list):
                             raise OllamaProtocolError("Ollama tool_calls must be a list")
                         accumulated_calls.extend(raw_calls)
+                        if not content:
+                            yield ModelStreamEvent(
+                                request_id=request.request_id,
+                                event=StreamEventType.ACTIVITY,
+                            )
                     if decoded.get("done") is True:
                         final_payload = decoded
                         break

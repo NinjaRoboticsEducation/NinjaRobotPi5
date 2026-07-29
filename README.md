@@ -18,11 +18,12 @@ which is the single source of truth.
 
 Phase 0, Phase 1, Phase 2, Phase 3.1 through Phase 3.5, and Phase 4 are
 implemented and the operator reports the complete Phase 4 and installation
-workflow passed. Phase 5.0 through Phase 5.7 are now implemented and pass the
-local software gate. Raspberry Pi acceptance—including the Qwen3:4B
+workflow passed. Phase 5.0 through Phase 5.7 and the 2026-07-29 agent/web
+refinement are implemented and pass the local software gate. Raspberry Pi
+acceptance—including the Qwen3:4B
 performance benchmark, live Tavily search, LAN browser checks, camera,
 microphone, and raised-wheel motion—still requires the operator checklist in
-[`docs/validation/phase-5-agent-validation-2026-07-28.md`](docs/validation/phase-5-agent-validation-2026-07-28.md).
+[`docs/validation/phase-5-agent-refinement-validation-2026-07-29.md`](docs/validation/phase-5-agent-refinement-validation-2026-07-29.md).
 Phase 0 established project governance and preserved the
 original import hashes for the six existing Pi5 hardware libraries. Phase 1
 added strict IDE and agent contracts, deterministic fakes, V4-owned
@@ -90,13 +91,13 @@ and `error_warning` provide special combinations. `stop` is deliberately a
 safety command, not a reusable behavior asset.
 
 The default logical mapping is `left_motor` to GPIO12 and `right_motor` to
-GPIO13. Front-guarded movement requires three clear VL53L0X samples before it
-starts. A real measurement above 100 mm or the exact raw `8191` sentinel
-counts as clear; `8191` means no target is measurable in range. A null result
-caused by a communication error, timeout, disconnect, or stale sample does not
-count as clear. Three consecutive measured readings at or below 100 mm produce
-a Level 1 motion stop. Undervoltage and a frozen control-loop watchdog also
-stop both motors.
+GPIO13. Movement no longer waits for clear-distance samples before starting.
+`move_forward`, `turn_left`, and `turn_right` stop and latch at Level 1 after
+three consecutive valid readings at or below 50 mm. The exact raw `8191`
+sentinel means clear space. Null, invalid, missing, and stale readings do not
+stop movement. `move_backward` is warning-only because the forward-facing
+sensor cannot protect the rear. Undervoltage and a frozen control-loop
+watchdog also stop both motors.
 Ctrl+C, normal tool shutdown, an explicit behavior stop, or a hardware-driver
 failure performs Level 2 cleanup: stop servos and ranging, close camera and
 microphone devices, silence the buzzer, and show a red Emergency Stop sign.
@@ -172,7 +173,11 @@ confirmed Resume, Greeting, Celebrate, temporary camera preview, local
 whisper.cpp USB-microphone transcription, English/Japanese browser speech
 recognition, AI chat, and live events. A second browser receives `423 Locked`.
 Missed heartbeats revoke the lease and request a motor stop without waiting for
-the model.
+the model. Agent startup runs Greeting once, then the IDE supervises a silent
+looping Idle face between normal interactions. The portrait-first controller
+supports mobile Chrome and Safari, prevents D-pad text selection, keeps Live
+Activity in a bottom drawer, and places browser speech in the message box for
+review before Send.
 
 ## Implemented CLI functions
 
@@ -289,8 +294,9 @@ unknown outcomes are recorded as structured failures. The public
 `distance.read` capability never reports `8191 mm` as a real distance: it
 returns the structured `DEVICE_OUT_OF_RANGE` result. The integrated movement
 safety layer interprets that exact structured result as silent clear space.
-Other null or failed readings remain communication faults and cannot satisfy
-the three-clear-sample startup gate.
+Other null or failed readings remain communication faults, but the integrated
+movement layer no longer waits for clear-distance samples before starting and
+does not treat those faults as obstacle stops.
 
 The nested `NinjaClawBot/` checkout is an excluded, read-only historical
 reference. It is not part of the V4 product or Git history.
@@ -519,15 +525,15 @@ requires the private configuration to enable both motion gates, valid
 calibration for GPIO12 and GPIO13, `--real`, and `--confirm-motion`. A Level 1
 stop keeps display, buzzer, and sensors available but blocks another movement
 until `motion resume --confirm`. A driver-failure Level 2 stop blocks all
-behaviors until `system resume --confirm` completes healthy probes. Invalid or
-stale distance readings warn without stopping a movement already in progress,
-as explicitly selected by the owner. The exact `8191` out-of-range sentinel is
-silent clear space; a communication failure or generic null result still
-blocks guarded startup because it is not proof of clear space.
+behaviors until `system resume --confirm` completes healthy probes. Invalid,
+missing, or stale distance readings may warn but do not stop movement. The
+exact `8191` out-of-range sentinel is silent clear space, and there is no
+guarded-startup distance gate.
 Model output is treated as an untrusted proposal; the
 deterministic IDE control plane retains final authority over robot actions.
 Browser control is HTTPS but intentionally has no pairing authentication in
 Phase 5. The first device on the local network can acquire the only controller
 lease. Do not expose port 8443 to the internet or configure router port
-forwarding. The browser's self-signed-certificate warning is expected during
-initial local setup.
+forwarding. The generated server certificate is signed by the robot's local
+certificate authority. Export and trust its public CA certificate once on
+each controlling phone or computer; never copy either private key.

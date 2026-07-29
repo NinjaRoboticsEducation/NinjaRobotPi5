@@ -6,7 +6,7 @@ import asyncio
 from typing import Any, cast
 
 from .behavior_assets import BehaviorAssetRepository
-from .behavior_models import BehaviorDefinition
+from .behavior_models import BehaviorDefinition, BehaviorStage, FaceOperation
 from .behavior_runtime import BehaviorRunner, MelodyProvider, load_pi5buzzer_melody
 from .buzzer import BuzzerDevice, BuzzerFactory
 from .camera import CameraDevice, CameraFactory
@@ -167,10 +167,21 @@ class RobotAssembly:
         )
         self.behaviors.set_drive_handler(self.motion.drive)
         self.behaviors.set_failure_handler(self._driver_failure)
+        self._liveliness_enabled = False
+        self._idle_suppressed = False
+        self._idle_task: asyncio.Task[None] | None = None
+        self._idle_lock = asyncio.Lock()
+        self._closing = False
 
     async def start(self) -> None:
         """Initialize shared expression hardware without running a behavior."""
         await self.behaviors.start()
+
+    async def start_liveliness(self) -> dict[str, Any]:
+        """Run the one-time greeting and then supervise a silent idle face."""
+        self._liveliness_enabled = True
+        self._idle_suppressed = False
+        return await self.run_behavior("greeting")
 
     async def run_behavior(self, name: str) -> dict[str, Any]:
         """Load and run one validated expression behavior by safe name."""
@@ -184,7 +195,12 @@ class RobotAssembly:
                 f"system is stopped ({snapshot.reason or 'local_stop'}); "
                 "resume or launch a fresh tool process"
             )
-        return await self.behaviors.run(definition)
+        await self._stop_idle()
+        try:
+            result = await self.behaviors.run(definition)
+        finally:
+            await self._start_idle_if_safe()
+        return result
 
     async def health(self) -> dict[str, str]:
         """Return integrated expression component health."""
@@ -192,16 +208,21 @@ class RobotAssembly:
 
     async def stop(self) -> dict[str, Any]:
         """Perform a non-latching full stop requested by the operator."""
+        self._idle_suppressed = True
+        await self._stop_idle()
         await self.behaviors.stop()
         return await self.system_safety.full_stop("operator_stop", latch=False)
 
-    def resume_motion(self, *, confirmed: bool) -> SafetySnapshot:
+    async def resume_motion(self, *, confirmed: bool) -> SafetySnapshot:
         """Clear an explicitly confirmed Level 1 latch."""
-        return self.motion.resume(confirmed=confirmed)
+        snapshot = self.motion.resume(confirmed=confirmed)
+        self._idle_suppressed = False
+        await self._start_idle_if_safe()
+        return snapshot
 
     async def resume_system(self, *, confirmed: bool) -> SafetySnapshot:
         """Clear Level 2 only after every configured device reports ready."""
-        return await self.system_safety.resume_system(
+        snapshot = await self.system_safety.resume_system(
             confirmed=confirmed,
             health_checks=(
                 self._expression_health,
@@ -211,9 +232,15 @@ class RobotAssembly:
                 self._microphone_health,
             ),
         )
+        self._idle_suppressed = False
+        await self._start_idle_if_safe()
+        return snapshot
 
     async def close(self) -> None:
         """Release all assembly-owned devices."""
+        self._closing = True
+        self._idle_suppressed = True
+        await self._stop_idle()
         await self.behaviors.stop()
         await asyncio.gather(
             self.servo.close(),
@@ -227,7 +254,73 @@ class RobotAssembly:
     async def _driver_failure(self, error: Exception) -> None:
         if isinstance(error, MotionSafetyError):
             return
+        self._idle_suppressed = True
         await self.system_safety.full_stop("driver_failure", latch=True)
+
+    async def _start_idle_if_safe(self) -> None:
+        if (
+            not self._liveliness_enabled
+            or self._idle_suppressed
+            or self._closing
+            or self.system_safety.stopped
+        ):
+            return
+        snapshot = self.safety_state.read()
+        if snapshot.motion_latched or snapshot.system_latched:
+            return
+        async with self._idle_lock:
+            if self._idle_task is not None and not self._idle_task.done():
+                return
+            definition = self._silent_idle_definition()
+            self._idle_task = asyncio.create_task(
+                self._run_idle(definition),
+                name="ninjarobot-silent-idle",
+            )
+        await asyncio.sleep(0)
+
+    async def _run_idle(self, definition: BehaviorDefinition) -> None:
+        current = asyncio.current_task()
+        try:
+            await self.behaviors.run(definition)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            return
+        finally:
+            async with self._idle_lock:
+                if self._idle_task is current:
+                    self._idle_task = None
+
+    async def _stop_idle(self) -> None:
+        async with self._idle_lock:
+            task = self._idle_task
+            self._idle_task = None
+        if task is None or task is asyncio.current_task():
+            return
+        if not task.done():
+            task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+    def _silent_idle_definition(self) -> BehaviorDefinition:
+        configured = self.assets.load("idle")
+        source = next(
+            operation
+            for stage in configured.stages
+            for operation in stage.operations
+            if isinstance(operation, FaceOperation)
+        )
+        return BehaviorDefinition(
+            schema_version=1,
+            name="idle",
+            description="Loop the embedded idle face silently between interactions.",
+            category="expression",
+            stages=(
+                BehaviorStage(
+                    name="silent_idle_face",
+                    operations=(source.model_copy(update={"hold_seconds": None}),),
+                ),
+            ),
+        )
 
     async def _show_system_stopped(self) -> dict[str, Any]:
         width, height = await self.display.dimensions()

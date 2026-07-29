@@ -101,6 +101,10 @@ def test_ollama_stream_yields_deltas_then_one_complete_turn() -> None:
     async def exercise() -> None:
         lines = [
             {
+                "message": {"role": "assistant", "content": "", "thinking": "private"},
+                "done": False,
+            },
+            {
                 "message": {"role": "assistant", "content": "Hello "},
                 "done": False,
             },
@@ -126,10 +130,12 @@ def test_ollama_stream_yields_deltas_then_one_complete_turn() -> None:
         events = [event async for event in provider.stream(request())]
 
         assert [event.event for event in events] == [
+            StreamEventType.ACTIVITY,
             StreamEventType.TEXT_DELTA,
             StreamEventType.TEXT_DELTA,
             StreamEventType.DONE,
         ]
+        assert all(event.text != "private" for event in events)
         assert events[-1].turn is not None
         assert events[-1].turn.text == "Hello robot"
         await client.aclose()

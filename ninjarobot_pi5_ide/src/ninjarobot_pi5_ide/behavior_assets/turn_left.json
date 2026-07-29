@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "name": "turn_left",
-  "description": "Turn left continuously while reporting limited side and rear sensor coverage.",
+  "description": "Turn left continuously with the confirmed 50 mm front obstacle guard.",
   "category": "movement",
   "stages": [
     {

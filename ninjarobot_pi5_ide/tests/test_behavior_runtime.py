@@ -268,3 +268,85 @@ def test_robot_assembly_shares_expression_devices_and_blocks_unsafe_motion_start
         await robot.close()
 
     asyncio.run(exercise())
+
+
+def test_robot_liveliness_runs_greeting_then_supervises_silent_idle(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        display = FakeDisplayDriver()
+        buzzer = FakeBuzzerDriver()
+        config = load_robot_config(EXAMPLE)
+        config = config.model_copy(
+            update={
+                "behaviors": BehaviorConfig(
+                    user_directory=str(tmp_path / "behaviors"),
+                    safety_state_file=str(tmp_path / "safety.json"),
+                    system_stopped_display_seconds=0.0,
+                )
+            }
+        )
+        robot = RobotAssembly(
+            config=config,
+            display_factory=lambda **_settings: display,
+            buzzer_factory=lambda _pin, _volume: buzzer,
+            melody_provider=lambda _name: ((440, 0.01),),
+            simulated=True,
+        )
+        idle = BehaviorDefinition.model_validate(
+            {
+                "schema_version": 1,
+                "name": "idle",
+                "description": "Test idle face.",
+                "category": "expression",
+                "stages": [
+                    {
+                        "name": "idle_face",
+                        "operations": [
+                            {
+                                "kind": "face",
+                                "expression": "idle",
+                                "hold_seconds": 0.05,
+                            },
+                            {"kind": "melody", "melody": "idle", "volume": 20},
+                        ],
+                    }
+                ],
+            }
+        )
+        greeting = expression_definition(hold_seconds=0.05).model_copy(update={"name": "greeting"})
+        robot.assets = _LifecycleAssets(greeting=greeting, idle=idle)  # type: ignore[assignment]
+        await robot.start()
+
+        result = await robot.start_liveliness()
+        assert result["name"] == "greeting"
+        greeting_sound_count = len(buzzer.play_calls)
+        frame_count = len(display.frames)
+        await asyncio.sleep(0.22)
+
+        assert len(display.frames) > frame_count
+        assert len(buzzer.play_calls) == greeting_sound_count
+
+        await robot.run_definition(expression_definition(hold_seconds=0.05))
+        frame_count = len(display.frames)
+        await asyncio.sleep(0.12)
+        assert len(display.frames) > frame_count
+
+        await robot.stop()
+        frame_count = len(display.frames)
+        await asyncio.sleep(0.12)
+        assert len(display.frames) == frame_count
+        await robot.close()
+
+    asyncio.run(exercise())
+
+
+class _LifecycleAssets:
+    def __init__(
+        self,
+        *,
+        greeting: BehaviorDefinition,
+        idle: BehaviorDefinition,
+    ) -> None:
+        self._definitions = {"greeting": greeting, "idle": idle}
+
+    def load(self, name: str) -> BehaviorDefinition:
+        return self._definitions[name]

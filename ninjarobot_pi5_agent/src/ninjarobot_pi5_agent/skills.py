@@ -46,7 +46,7 @@ class SkillLimits(BaseModel):
 
     max_model_turns: Annotated[int, Field(ge=1, le=12)] = 4
     max_tool_calls: Annotated[int, Field(ge=0, le=20)] = 5
-    timeout_seconds: Annotated[float, Field(ge=1, le=300)] = 60.0
+    timeout_seconds: Annotated[float, Field(ge=1, le=600)] = 300.0
 
 
 class SkillSafety(BaseModel):

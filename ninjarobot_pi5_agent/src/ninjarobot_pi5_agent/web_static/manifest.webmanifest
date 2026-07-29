@@ -1,0 +1,9 @@
+{
+  "name": "NinjaRobotPi5 Agent Controller",
+  "short_name": "NinjaRobot",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#040a12",
+  "theme_color": "#07111f"
+}

@@ -6,17 +6,18 @@ import asyncio
 import ipaddress
 import json
 import os
+import shutil
 import socket
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import uvicorn
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.x509.oid import NameOID
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -33,16 +34,36 @@ from .web_control import (
 MAX_WEB_MESSAGE_BYTES = 64 * 1024
 
 
-def ensure_self_signed_certificate(
+def local_ca_paths(certificate_path: str | Path) -> tuple[Path, Path]:
+    """Return the public CA certificate and owner-only CA key paths."""
+    parent = Path(certificate_path).expanduser().parent
+    return parent / "local-ca.pem", parent / "local-ca-key.pem"
+
+
+def ensure_local_ca_certificate(
     certificate_path: str | Path,
     key_path: str | Path,
 ) -> tuple[Path, Path]:
-    """Create a private, reusable localhost/LAN certificate when absent."""
+    """Create or reuse a local-CA-signed certificate for the mDNS hostname."""
     certificate = Path(certificate_path).expanduser()
     key = Path(key_path).expanduser()
+    ca_certificate, ca_key = local_ca_paths(certificate)
     if certificate.is_file() and key.is_file():
         os.chmod(key, 0o600)
-        return certificate, key
+        existing = x509.load_pem_x509_certificate(certificate.read_bytes())
+        if not ca_certificate.is_file() and not ca_key.is_file():
+            if not _is_legacy_managed_certificate(existing):
+                return certificate, key
+            certificate.unlink()
+            key.unlink()
+        elif ca_certificate.is_file() and ca_key.is_file():
+            ca = x509.load_pem_x509_certificate(ca_certificate.read_bytes())
+            if existing.issuer != ca.subject:
+                return certificate, key
+            if _certificate_dns_names(existing) >= _required_dns_names():
+                return certificate, key
+            certificate.unlink()
+            key.unlink()
     if certificate.exists() != key.exists():
         raise RuntimeError("HTTPS certificate and key must either both exist or both be absent")
     certificate.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -50,51 +71,162 @@ def ensure_self_signed_certificate(
     certificate.parent.chmod(0o700)
     key.parent.chmod(0o700)
 
+    if ca_certificate.exists() != ca_key.exists():
+        raise RuntimeError("local CA certificate and key must either both exist or both be absent")
+    if ca_certificate.is_file():
+        authority = x509.load_pem_x509_certificate(ca_certificate.read_bytes())
+        authority_key = cast(
+            rsa.RSAPrivateKey,
+            serialization.load_pem_private_key(ca_key.read_bytes(), password=None),
+        )
+        os.chmod(ca_key, 0o600)
+    else:
+        authority_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        authority_subject = x509.Name(
+            [
+                x509.NameAttribute(NameOID.ORGANIZATION_NAME, "NinjaRobotPi5"),
+                x509.NameAttribute(NameOID.COMMON_NAME, "NinjaRobotPi5 Local CA"),
+            ]
+        )
+        now = datetime.now(UTC)
+        authority = (
+            x509.CertificateBuilder()
+            .subject_name(authority_subject)
+            .issuer_name(authority_subject)
+            .public_key(authority_key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(minutes=5))
+            .not_valid_after(now + timedelta(days=3650))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+            .add_extension(
+                x509.KeyUsage(
+                    digital_signature=True,
+                    content_commitment=False,
+                    key_encipherment=False,
+                    data_encipherment=False,
+                    key_agreement=False,
+                    key_cert_sign=True,
+                    crl_sign=True,
+                    encipher_only=False,
+                    decipher_only=False,
+                ),
+                critical=True,
+            )
+            .sign(authority_key, hashes.SHA256())
+        )
+        _atomic_private_key(ca_key, authority_key)
+        _atomic_certificate(ca_certificate, authority, mode=0o644)
+
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    hostname = socket.gethostname()
-    subject = issuer = x509.Name(
+    display_name = mdns_hostname()
+    subject = x509.Name(
         [
             x509.NameAttribute(NameOID.ORGANIZATION_NAME, "NinjaRobotPi5"),
-            x509.NameAttribute(NameOID.COMMON_NAME, hostname),
+            x509.NameAttribute(NameOID.COMMON_NAME, display_name),
         ]
     )
     now = datetime.now(UTC)
     san_names: list[x509.GeneralName] = [
-        x509.DNSName("localhost"),
-        x509.DNSName(hostname),
+        *(x509.DNSName(name) for name in sorted(_required_dns_names())),
         x509.IPAddress(ipaddress.ip_address("127.0.0.1")),
         x509.IPAddress(ipaddress.ip_address("::1")),
     ]
     built = (
         x509.CertificateBuilder()
         .subject_name(subject)
-        .issuer_name(issuer)
+        .issuer_name(authority.subject)
         .public_key(private_key.public_key())
         .serial_number(x509.random_serial_number())
         .not_valid_before(now - timedelta(minutes=5))
         .not_valid_after(now + timedelta(days=365))
         .add_extension(x509.SubjectAlternativeName(san_names), critical=False)
-        .sign(private_key, hashes.SHA256())
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .add_extension(
+            x509.ExtendedKeyUsage((ExtendedKeyUsageOID.SERVER_AUTH,)),
+            critical=False,
+        )
+        .sign(authority_key, hashes.SHA256())
     )
-    key_tmp = key.with_name(f".{key.name}.tmp")
-    certificate_tmp = certificate.with_name(f".{certificate.name}.tmp")
+    _atomic_private_key(key, private_key)
+    _atomic_certificate(certificate, built, mode=0o644)
+    return certificate, key
+
+
+def ensure_self_signed_certificate(
+    certificate_path: str | Path,
+    key_path: str | Path,
+) -> tuple[Path, Path]:
+    """Backward-compatible name for the safer local-CA certificate setup."""
+    return ensure_local_ca_certificate(certificate_path, key_path)
+
+
+def export_local_ca_certificate(
+    certificate_path: str | Path,
+    key_path: str | Path,
+    output_path: str | Path,
+) -> Path:
+    """Export only the public CA certificate for browser trust onboarding."""
+    certificate, _key = ensure_local_ca_certificate(certificate_path, key_path)
+    ca_certificate, ca_key = local_ca_paths(certificate)
+    if not ca_certificate.is_file() or not ca_key.is_file():
+        raise RuntimeError("the configured server certificate is custom; no local CA is available")
+    output = Path(output_path).expanduser()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(ca_certificate, output)
+    os.chmod(output, 0o644)
+    return output
+
+
+def _atomic_private_key(path: Path, private_key: Any) -> None:
+    temporary = path.with_name(f".{path.name}.tmp")
     try:
-        key_tmp.write_bytes(
+        temporary.write_bytes(
             private_key.private_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PrivateFormat.PKCS8,
                 encryption_algorithm=serialization.NoEncryption(),
             )
         )
-        os.chmod(key_tmp, 0o600)
-        certificate_tmp.write_bytes(built.public_bytes(serialization.Encoding.PEM))
-        os.chmod(certificate_tmp, 0o600)
-        os.replace(key_tmp, key)
-        os.replace(certificate_tmp, certificate)
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, path)
     finally:
-        key_tmp.unlink(missing_ok=True)
-        certificate_tmp.unlink(missing_ok=True)
-    return certificate, key
+        temporary.unlink(missing_ok=True)
+
+
+def _atomic_certificate(path: Path, certificate: x509.Certificate, *, mode: int) -> None:
+    temporary = path.with_name(f".{path.name}.tmp")
+    try:
+        temporary.write_bytes(certificate.public_bytes(serialization.Encoding.PEM))
+        os.chmod(temporary, mode)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def mdns_hostname() -> str:
+    """Return the Bonjour/mDNS hostname browsers should open."""
+    hostname = socket.gethostname().rstrip(".")
+    return hostname if hostname.endswith(".local") else f"{hostname}.local"
+
+
+def _required_dns_names() -> set[str]:
+    hostname = socket.gethostname().rstrip(".")
+    return {"localhost", hostname, mdns_hostname()}
+
+
+def _certificate_dns_names(certificate: x509.Certificate) -> set[str]:
+    try:
+        extension = certificate.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+    except x509.ExtensionNotFound:
+        return set()
+    return set(extension.value.get_values_for_type(x509.DNSName))
+
+
+def _is_legacy_managed_certificate(certificate: x509.Certificate) -> bool:
+    organizations = certificate.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)
+    return certificate.subject == certificate.issuer and any(
+        item.value == "NinjaRobotPi5" for item in organizations
+    )
 
 
 def create_web_app(
@@ -365,7 +497,7 @@ class WebServerManager:
         if self._task is not None and not self._task.done():
             return self.status()
         certificate, key = await asyncio.to_thread(
-            ensure_self_signed_certificate,
+            ensure_local_ca_certificate,
             self._certificate_path,
             self._key_path,
         )
@@ -411,13 +543,16 @@ class WebServerManager:
 
     def status(self) -> dict[str, Any]:
         running = self._task is not None and not self._task.done()
-        display_host = socket.gethostname() if self._host in {"0.0.0.0", "::"} else self._host
+        display_host = mdns_hostname() if self._host in {"0.0.0.0", "::"} else self._host
+        ca_certificate, _ca_key = local_ca_paths(self._certificate_path)
         return {
             "running": running,
             "host": self._host,
             "port": self._port,
             "url": f"https://{display_host}:{self._port}/" if running else None,
             "certificate": str(self._certificate_path),
+            "local_ca_certificate": (str(ca_certificate) if ca_certificate.is_file() else None),
+            "browser_trust_required": ca_certificate.is_file(),
         }
 
     async def close(self) -> None:

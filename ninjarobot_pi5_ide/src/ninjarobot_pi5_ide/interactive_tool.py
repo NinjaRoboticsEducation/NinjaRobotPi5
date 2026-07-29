@@ -210,7 +210,7 @@ class InteractiveRobotSession:
         if not self.system_stopped and not snapshot.system_latched:
             robot = await self._ensure_robot()
             if snapshot.motion_latched:
-                resumed = robot.resume_motion(confirmed=True)
+                resumed = await robot.resume_motion(confirmed=True)
                 result = {"level": 1, "state": asdict(resumed)}
             else:
                 result = {"level": 0, "state": asdict(snapshot)}

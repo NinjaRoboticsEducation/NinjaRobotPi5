@@ -169,25 +169,48 @@ def test_safety_state_is_private_atomic_and_corruption_fails_closed(tmp_path: Pa
     assert corrupted.reason == "invalid_safety_state"
 
 
-def test_forward_requires_clear_start_and_stops_after_three_low_readings(
+@pytest.mark.parametrize("behavior_name", ["move_forward", "turn_left", "turn_right"])
+def test_guarded_motion_starts_immediately_and_stops_after_three_low_readings(
     tmp_path: Path,
+    behavior_name: str,
 ) -> None:
     async def exercise() -> None:
         motion, servo, _distance, state = controller(
-            tmp_path,
-            readings=[200, 210, 220, 90, 80, 70],
+            tmp_path / behavior_name,
+            readings=[50, 40, 30],
         )
 
-        result = await motion.drive(drive_operation(), "move_forward")
+        result = await motion.drive(drive_operation(), behavior_name)
 
         assert servo.move_calls == [({"gpio12": 45.0, "gpio13": -45.0}, "M")]
         assert result["stop_reason"] == "front_obstacle"
+        assert result["warnings"] == []
         assert state.read().motion_latched is True
         assert state.read().system_latched is False
         with pytest.raises(MotionSafetyError, match="motion is latched"):
             await motion.drive(drive_operation(), "move_forward")
         motion.resume(confirmed=True)
         assert state.read().motion_latched is False
+
+    asyncio.run(exercise())
+
+
+def test_guarded_motion_requires_consecutive_low_readings(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        motion, _servo, _distance, state = controller(
+            tmp_path,
+            readings=[50, 40, 51, 50, 40, RuntimeError("missing")],
+        )
+        task = asyncio.create_task(motion.drive(drive_operation(), "turn_right"))
+        while not motion.active:
+            await asyncio.sleep(0.001)
+        await asyncio.sleep(0.16)
+
+        assert not task.done()
+        assert state.read().motion_latched is False
+        await motion.stop_motion("operator_stop", latch=False)
+        result = await task
+        assert result["stop_reason"] == "operator_stop"
 
     asyncio.run(exercise())
 
@@ -308,18 +331,23 @@ def test_watchdog_receives_heartbeats_during_a_slow_async_servo_ramp(
     asyncio.run(exercise())
 
 
-def test_clear_reading_preflight_blocks_without_latching(tmp_path: Path) -> None:
+def test_missing_readings_do_not_block_motion_start_or_latch(tmp_path: Path) -> None:
     async def exercise() -> None:
         motion, servo, _distance, state = controller(
             tmp_path,
             readings=[RuntimeError("missing")],
-            config_updates={"clear_reading_timeout_seconds": 1.0},
         )
+        task = asyncio.create_task(motion.drive(drive_operation(), "move_forward"))
+        while not motion.active:
+            await asyncio.sleep(0.001)
+        await asyncio.sleep(0.06)
 
-        with pytest.raises(MotionSafetyError, match="did not start"):
-            await motion.drive(drive_operation(), "move_forward")
+        assert servo.move_calls == [({"gpio12": 45.0, "gpio13": -45.0}, "M")]
+        assert state.read().motion_latched is False
 
-        assert servo.move_calls == []
+        await motion.stop_motion("operator_stop", latch=False)
+        result = await task
+        assert result["stop_reason"] == "operator_stop"
         assert state.read().motion_latched is False
 
     asyncio.run(exercise())

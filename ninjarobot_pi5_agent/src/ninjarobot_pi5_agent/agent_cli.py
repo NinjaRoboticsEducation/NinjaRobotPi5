@@ -35,6 +35,12 @@ from .secrets import SecretStore
 from .service_main import run_service
 from .skills import LoadedSkill, SkillRepository, SkillValidationError
 from .tools import ToolRegistry, ToolRegistryError
+from .web_app import (
+    ensure_local_ca_certificate,
+    export_local_ca_certificate,
+    local_ca_paths,
+    mdns_hostname,
+)
 
 DEFAULT_MCP_CONFIG = Path("~/.config/ninjarobot_pi5/mcp.toml")
 DEFAULT_SECRET_FILE = Path("~/.config/ninjarobot_pi5/secrets.env")
@@ -50,6 +56,7 @@ DEFAULT_WHISPER_COMMAND = Path("~/whisper.cpp/build/bin/whisper-cli")
 DEFAULT_WHISPER_MODEL = Path("~/whisper.cpp/models/ggml-base.bin")
 DEFAULT_WEB_CERTIFICATE = Path("~/.config/ninjarobot_pi5/tls/agent-cert.pem")
 DEFAULT_WEB_KEY = Path("~/.config/ninjarobot_pi5/tls/agent-key.pem")
+DEFAULT_WEB_CA_EXPORT = Path("~/ninjarobotpi5-local-ca.pem")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -152,6 +159,9 @@ def build_parser() -> argparse.ArgumentParser:
     web_commands.add_parser("start")
     web_commands.add_parser("status")
     web_commands.add_parser("stop")
+    web_commands.add_parser("certificate-status")
+    export_ca = web_commands.add_parser("export-ca")
+    export_ca.add_argument("--output", type=Path, default=DEFAULT_WEB_CA_EXPORT)
 
     session = commands.add_parser("session", help="Inspect or clear local conversations.")
     session_commands = session.add_subparsers(dest="session_command", required=True)
@@ -280,6 +290,37 @@ async def _run(arguments: argparse.Namespace) -> int:
     if arguments.command == "motion":
         return await _run_motion_command(arguments)
     if arguments.command == "web":
+        if arguments.web_command == "certificate-status":
+            certificate, key = ensure_local_ca_certificate(
+                arguments.web_certificate,
+                arguments.web_key,
+            )
+            ca_certificate, _ca_key = local_ca_paths(certificate)
+            _print_json(
+                {
+                    "certificate": str(certificate),
+                    "key": str(key),
+                    "local_ca_certificate": (
+                        str(ca_certificate) if ca_certificate.is_file() else None
+                    ),
+                    "url": f"https://{mdns_hostname()}:{arguments.web_port}/",
+                }
+            )
+            return 0
+        if arguments.web_command == "export-ca":
+            output = export_local_ca_certificate(
+                arguments.web_certificate,
+                arguments.web_key,
+                arguments.output,
+            )
+            _print_json(
+                {
+                    "exported": str(output),
+                    "contains_private_key": False,
+                    "next_step": "Install this certificate on the controlling device.",
+                }
+            )
+            return 0
         return await _service_request(
             arguments,
             {"command": f"web_{arguments.web_command}"},
@@ -684,10 +725,11 @@ async def _interactive(arguments: argparse.Namespace) -> int:
             "5. Start Web Interface\n"
             "6. Web Interface Status\n"
             "7. Stop Web Interface\n"
-            "8. MCP Tools\n"
-            "9. Agent Skills\n"
-            "10. Stop Agent Service\n"
-            "11. Quit CLI\n"
+            "8. Export Browser Trust Certificate\n"
+            "9. MCP Tools\n"
+            "10. Agent Skills\n"
+            "11. Stop Agent Service\n"
+            "12. Quit CLI\n"
         )
         choice = (await asyncio.to_thread(input, "Select an option: ")).strip()
         try:
@@ -715,11 +757,27 @@ async def _interactive(arguments: argparse.Namespace) -> int:
             elif choice == "7":
                 await _service_request(arguments, {"command": "web_stop"})
             elif choice == "8":
+                output = export_local_ca_certificate(
+                    arguments.web_certificate,
+                    arguments.web_key,
+                    DEFAULT_WEB_CA_EXPORT,
+                )
+                _print_json(
+                    {
+                        "exported": str(output),
+                        "contains_private_key": False,
+                        "next_step": (
+                            "Copy this file to your phone or computer, install it, "
+                            "and enable certificate trust."
+                        ),
+                    }
+                )
+            elif choice == "9":
                 configuration = load_mcp_configuration(arguments.mcp_config)
                 _print_json(
                     {"servers": [server.redacted_dict() for server in configuration.servers]}
                 )
-            elif choice == "9":
+            elif choice == "10":
                 _print_json(
                     {
                         "skills": [
@@ -732,13 +790,13 @@ async def _interactive(arguments: argparse.Namespace) -> int:
                         ]
                     }
                 )
-            elif choice == "10":
-                await _service_request(arguments, {"command": "stop"})
             elif choice == "11":
+                await _service_request(arguments, {"command": "stop"})
+            elif choice == "12":
                 print("CLI disconnected. Any running agent service continues.")
                 return 0
             else:
-                print("Please choose a number from 1 through 11.")
+                print("Please choose a number from 1 through 12.")
         except (AgentIPCError, ValueError, KeyError) as exc:
             print(f"Error: {exc}")
 

@@ -98,6 +98,7 @@ class ToolExecutionStatus(StrEnum):
 class StreamEventType(StrEnum):
     """Provider-neutral streaming event kinds."""
 
+    ACTIVITY = "activity"
     TEXT_DELTA = "text_delta"
     DONE = "done"
 
@@ -247,7 +248,7 @@ class ModelTurn(AgentContractModel):
 
 
 class ModelStreamEvent(AgentContractModel):
-    """One text delta or final normalized provider turn."""
+    """One private activity signal, text delta, or final provider turn."""
 
     request_id: Identifier
     event: StreamEventType
@@ -257,7 +258,10 @@ class ModelStreamEvent(AgentContractModel):
     @model_validator(mode="after")
     def event_payload_is_consistent(self) -> ModelStreamEvent:
         """Keep partial text separate from the terminal turn."""
-        if self.event is StreamEventType.TEXT_DELTA:
+        if self.event is StreamEventType.ACTIVITY:
+            if self.text or self.turn is not None:
+                raise ValueError("activity events do not expose provider content")
+        elif self.event is StreamEventType.TEXT_DELTA:
             if not self.text or self.turn is not None:
                 raise ValueError("text delta events require text and no turn")
         elif self.turn is None or self.text:

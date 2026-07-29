@@ -27,7 +27,7 @@
   "limits": {
     "max_model_turns": 4,
     "max_tool_calls": 3,
-    "timeout_seconds": 60.0
+    "timeout_seconds": 300.0
   },
   "safety": {
     "external_content": "untrusted",

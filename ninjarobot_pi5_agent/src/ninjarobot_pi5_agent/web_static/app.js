@@ -13,6 +13,8 @@
     recognition: null,
     previewTimer: null,
     released: false,
+    activeMoveButton: null,
+    drawerDragged: false,
   };
 
   const elements = {
@@ -28,6 +30,8 @@
     language: document.querySelector("#languageSelect"),
     preview: document.querySelector("#cameraPreview"),
     cameraImage: document.querySelector("#cameraImage"),
+    activityDrawer: document.querySelector("#activityDrawer"),
+    activityToggle: document.querySelector("#activityToggle"),
   };
 
   function log(message, kind = "info") {
@@ -75,13 +79,16 @@
     state.socket.send(JSON.stringify(message));
     return new Promise((resolve, reject) => {
       state.pending.set(requestId, { resolve, reject, type });
+      const responseTimeout = type === "chat" ? 620000 : 120000;
       window.setTimeout(() => {
         const pending = state.pending.get(requestId);
         if (pending) {
           state.pending.delete(requestId);
-          reject(new Error(`${type} did not answer within 120 seconds`));
+          reject(
+            new Error(`${type} did not answer within ${responseTimeout / 1000} seconds`),
+          );
         }
-      }, 120000);
+      }, responseTimeout);
     });
   }
 
@@ -206,30 +213,52 @@
     else pending.reject(value);
   }
 
-  document.querySelectorAll(".dpad-button").forEach((button) => {
-    const start = (event) => {
-      event.preventDefault();
-      button.setPointerCapture?.(event.pointerId);
-      button.classList.add("active");
-      send("move_start", { direction: button.dataset.direction }).catch((error) =>
-        log(error.message, "error"),
-      );
-    };
-    const stop = (event) => {
-      event.preventDefault();
+  function startMovement(button, event) {
+    if (state.activeMoveButton) return;
+    event.preventDefault();
+    state.activeMoveButton = button;
+    button.classList.add("active");
+    send("move_start", { direction: button.dataset.direction }).catch((error) => {
       button.classList.remove("active");
-      send("move_stop").catch(() => {});
-    };
-    button.addEventListener("pointerdown", start);
-    button.addEventListener("pointerup", stop);
-    button.addEventListener("pointercancel", stop);
-    button.addEventListener("lostpointercapture", () => {
-      if (button.classList.contains("active")) {
-        button.classList.remove("active");
-        send("move_stop").catch(() => {});
-      }
+      state.activeMoveButton = null;
+      log(error.message, "error");
     });
+  }
+
+  function stopMovement(event) {
+    if (event) event.preventDefault();
+    const button = state.activeMoveButton;
+    if (!button) return;
+    state.activeMoveButton = null;
+    button.classList.remove("active");
+    send("move_stop").catch(() => {});
+  }
+
+  document.querySelectorAll(".dpad-button").forEach((button) => {
+    button.addEventListener("selectstart", (event) => event.preventDefault());
+    button.addEventListener("contextmenu", (event) => event.preventDefault());
+    button.addEventListener("dragstart", (event) => event.preventDefault());
+    if (window.PointerEvent) {
+      button.addEventListener("pointerdown", (event) => {
+        if (!event.isPrimary || event.button !== 0) return;
+        event.preventDefault();
+        button.setPointerCapture?.(event.pointerId);
+        startMovement(button, event);
+      });
+      button.addEventListener("pointerup", stopMovement);
+      button.addEventListener("pointercancel", stopMovement);
+      button.addEventListener("lostpointercapture", stopMovement);
+    } else {
+      button.addEventListener(
+        "touchstart",
+        (event) => startMovement(button, event),
+        { passive: false },
+      );
+      button.addEventListener("touchend", stopMovement, { passive: false });
+      button.addEventListener("touchcancel", stopMovement, { passive: false });
+    }
   });
+  window.addEventListener("blur", stopMovement);
 
   document.querySelector("#emergencyButton").addEventListener("click", () => {
     send("emergency_stop")
@@ -349,7 +378,8 @@
       }
       elements.chatInput.value = transcript.trim();
       if (event.results[event.results.length - 1].isFinal && transcript.trim()) {
-        submitChat(transcript.trim());
+        elements.chatInput.focus();
+        toast("Speech added to the message box. Review it, then tap Send.");
       }
     };
     recognition.onerror = (event) => log(`Browser microphone: ${event.error}`, "error");
@@ -391,10 +421,55 @@
     elements.log.replaceChildren();
   });
 
+  function setActivityDrawer(open) {
+    elements.activityDrawer.classList.toggle("open", open);
+    elements.activityToggle.setAttribute("aria-expanded", String(open));
+  }
+
+  let drawerStartY = null;
+  elements.activityToggle.addEventListener("pointerdown", (event) => {
+    drawerStartY = event.clientY;
+    state.drawerDragged = false;
+    elements.activityToggle.setPointerCapture?.(event.pointerId);
+  });
+  elements.activityToggle.addEventListener("pointermove", (event) => {
+    if (drawerStartY === null) return;
+    const distance = event.clientY - drawerStartY;
+    if (Math.abs(distance) < 10) return;
+    state.drawerDragged = true;
+    if (distance < -35) setActivityDrawer(true);
+    if (distance > 35) setActivityDrawer(false);
+  });
+  elements.activityToggle.addEventListener("pointerup", () => {
+    drawerStartY = null;
+    window.setTimeout(() => {
+      state.drawerDragged = false;
+    }, 0);
+  });
+  elements.activityToggle.addEventListener("pointercancel", () => {
+    drawerStartY = null;
+  });
+  elements.activityToggle.addEventListener("click", (event) => {
+    if (state.drawerDragged) {
+      event.preventDefault();
+      return;
+    }
+    setActivityDrawer(!elements.activityDrawer.classList.contains("open"));
+  });
+
+  function syncViewportHeight() {
+    const height = window.visualViewport?.height || window.innerHeight;
+    document.documentElement.style.setProperty("--app-height", `${height}px`);
+  }
+  window.addEventListener("resize", syncViewportHeight);
+  window.visualViewport?.addEventListener("resize", syncViewportHeight);
+
   window.addEventListener("pagehide", () => {
+    stopMovement();
     window.clearInterval(state.heartbeatTimer);
   });
 
+  syncViewportHeight();
   configureSpeechRecognition();
   connect();
 })();

@@ -1,5 +1,87 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-29 — Phase 5 agent and mobile web refinement
+
+### Summary
+
+Refined the completed Phase 5 agent and controller after Raspberry Pi testing:
+
+- replaced the single short model timeout with a 600-second complete-request
+  limit and a 120-second inactivity limit that resets on visible or private
+  model activity
+- kept private model thinking out of chat, transcripts, and user-facing logs
+- added one real startup Greeting followed by a service-owned, silent,
+  continuously looping Idle face
+- restored Idle after normal behavior completion or Resume without overwriting
+  Level 1, Level 2, driver-failure, or shutdown safety displays
+- removed the distance-clear startup gate, changed the obstacle threshold to
+  50 mm, and applied three-reading Level 1 stops to Forward and both turns
+- retained backward movement as warning-only and treated exact raw `8191` as
+  clear space; null, invalid, missing, and stale readings do not stop motion
+- replaced the generated self-signed leaf certificate with a persistent local
+  certificate authority and `.local` server certificate
+- added public-CA status/export commands while keeping both private keys
+  owner-only
+- changed the printed controller URL to
+  `https://ninjarobotpi5.local:8443/`
+- rebuilt the controller as a fixed portrait layout for mobile Chrome and
+  Safari, with a rotate-back landscape overlay and hidden Live Activity drawer
+- hardened D-pad pointer/touch behavior against text selection, touch callouts,
+  lost releases, page hiding, and focus loss
+- changed browser speech recognition to fill the chat input for review; only
+  Send transmits it
+
+### Main files changed
+
+- `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/agent_loop.py`
+- `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/ollama.py`
+- `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/service_main.py`
+- `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_app.py`
+- `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/`
+- `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/robot.py`
+- `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/config.py`
+- the related agent and IDE tests
+- `README.md`, `InstallationGuide.md`, `DevelopmentGuide.md`,
+  `NinjaRobotPi5V4_ImplementationPlan.md`, and the new Raspberry Pi validation
+  checklist
+
+No managed `pi5*` hardware-driver file was changed. Cross-device behavior
+remains inside `ninjarobot_pi5_ide`, and the agent still accesses hardware
+only through the IDE boundary.
+
+### Why
+
+Physical testing showed that local model thinking could outlast the previous
+timeout, the old distance preflight could prevent valid movement, and an
+untrusted leaf certificate was difficult to use with mobile Safari. The
+controller also needed a reliable portrait touch layout and a review step
+between speech recognition and sending a prompt.
+
+### Validation
+
+Each implementation phase passed immutable-driver verification and its full
+Python gate. Before the documentation pass, the final software suite reported
+268 passing tests. JavaScript syntax validation also passed. The complete
+post-documentation gate and packaged-static-asset check are recorded in the
+final task handoff.
+
+### Raspberry Pi status
+
+Operator validation is still required for the refreshed Qwen3:4B timeout
+behavior, startup Greeting/Idle lifecycle, 50 mm obstacle stops, certificate
+trust in both mobile Safari and Chrome, portrait touch controls, heartbeat
+loss, camera preview, USB microphone cleanup, and raised-wheel movement.
+
+Follow
+`docs/validation/phase-5-agent-refinement-validation-2026-07-29.md` from top
+to bottom.
+
+### Follow-up
+
+Record the completed device checklist and benchmark report. Keep the web
+controller local to the trusted LAN; authentication and internet exposure
+remain outside this phase.
+
 ## 2026-07-28 — Phase 5.0–5.7 agent implementation
 
 ### Summary

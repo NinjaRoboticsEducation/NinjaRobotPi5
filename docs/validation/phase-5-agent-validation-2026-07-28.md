@@ -1,5 +1,11 @@
 # Phase 5 NinjaRobotAgent Raspberry Pi Validation
 
+> **Superseded on 2026-07-29:** This checklist describes the original Phase 5
+> delivery. Use
+> [Phase 5 Agent and Mobile Web Refinement Validation](phase-5-agent-refinement-validation-2026-07-29.md)
+> for current certificate, portrait browser, timeout, Idle, and 50 mm movement
+> behavior.
+
 Date prepared: 2026-07-28  
 Software status: implemented; local software gate passed  
 Raspberry Pi status: operator validation required  

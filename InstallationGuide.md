@@ -534,9 +534,8 @@ group_motion_enabled = true
 [behaviors]
 left_motor_role = "left_motor"
 right_motor_role = "right_motor"
-obstacle_threshold_mm = 100
+obstacle_threshold_mm = 50
 obstacle_consecutive_readings = 3
-clear_readings_before_motion = 3
 
 [behaviors.servo_roles]
 left_motor = "gpio12"
@@ -664,11 +663,22 @@ uv run --frozen ninjarobot-agent chat \
 ```
 
 `service start` launches the one background owner. A second CLI connects to
-that same service; it does not initialize another robot.
+that same service; it does not initialize another robot. The service allows a
+complete request to run for up to 600 seconds and stops only after 120 seconds
+without model activity. Existing configurations containing the old
+`turn_timeout_seconds = 90` setting migrate automatically.
+
+In real mode, service startup runs Greeting once, including the face, melody,
+and “Nice to meet you” text. The robot then loops a silent Idle face until a
+behavior takes over. Normal completion returns to Idle; safety-stop displays
+remain visible until Resume.
 
 Start the HTTPS web interface:
 
 ```bash
+uv run --frozen ninjarobot-agent web certificate-status
+uv run --frozen ninjarobot-agent web export-ca \
+  --output "$HOME/ninjarobotpi5-local-ca.pem"
 uv run --frozen ninjarobot-agent web start
 ```
 
@@ -679,25 +689,31 @@ hostname does not resolve, use:
 https://ninjarobotpi5.local:8443/
 ```
 
-The certificate is self-signed, meaning your Raspberry Pi created it rather
-than a public certificate company. The browser warning is expected; inspect
-that the address is your own Raspberry Pi before continuing. The first
-browser receives the only controller lease. A second browser is rejected with
-HTTP `423 Locked`; some browsers show only a generic connection failure for a
-rejected WebSocket.
+Before opening the controller, copy `ninjarobotpi5-local-ca.pem` to the phone
+or computer and install it as a trusted root certificate. This exported file
+contains no private key. On iPhone or iPad, install the downloaded profile,
+then open **Settings → General → About → Certificate Trust Settings** and
+enable full trust for **NinjaRobotPi5 Local CA**. On macOS, import it into the
+System keychain and set it to Always Trust. Android and desktop Chrome use the
+device or operating-system certificate settings. Restart the browser after
+changing trust.
+
+The first browser receives the only controller lease. A second browser is
+rejected with HTTP `423 Locked`; some browsers show only a generic connection
+failure for a rejected WebSocket.
 
 In simulation, check:
 
 1. Chat sends and streams a response.
-2. The system log displays service and tool events.
+2. Tap or slide the **Live Activity** bottom tab to see service and tool events.
 3. D-pad buttons report simulated movement and stop when released.
 4. X performs simulated Emergency Stop.
 5. Y asks for confirmation before Resume.
 6. A runs Greeting and B runs Celebrate.
 7. Camera displays a temporary simulated preview.
 8. USB Microphone returns simulated recognized text.
-9. Web Microphone offers English and Japanese when the browser supports its
-   Speech Recognition API.
+9. Web Microphone offers English and Japanese when supported. Recognized text
+   fills the message box and is not sent until **Send** is pressed.
 
 Stop only the web interface:
 
@@ -731,7 +747,7 @@ Choose **Quit CLI** to disconnect only that terminal. Choose **Stop Web
 Interface** to release the browser server. Choose **Stop Agent Service** to
 release the model, IDE, hardware, MCP connections, database, socket, and web
 resources. Complete the privacy and raised-wheel checks in the
-[Phase 5 validation guide](docs/validation/phase-5-agent-validation-2026-07-28.md)
+[Phase 5 agent refinement validation guide](docs/validation/phase-5-agent-refinement-validation-2026-07-29.md)
 before using real movement from chat or the browser.
 
 ## 3. Simulation, testing, and troubleshooting
@@ -871,12 +887,12 @@ uv run --frozen --extra hardware ninjarobot-ide-tool \
 
 Use **Simulation** first. During real wheel movement:
 
-- three clear front-distance results are required before movement starts
-- readings above 100 mm permit movement
-- the exact out-of-range value `8191` also permits movement
-- three consecutive valid readings below 100 mm cause a Level 1 motion stop
-- `null` is treated as a communication problem, not clear space
-- backward and turning movement cannot protect unseen rear or side areas
+- movement starts without waiting for clear-distance samples
+- the exact out-of-range value `8191` is clear space
+- three consecutive valid readings at or below 50 mm stop and latch forward
+  and turning movement at Level 1
+- null, invalid, missing, and stale readings do not stop movement
+- backward movement continues with a warning because the sensor faces forward
 
 Detailed checklists:
 
@@ -910,7 +926,7 @@ uv run --frozen ninjarobot-agent service stop
 For the complete model, Tavily, HTTPS lease, camera, USB microphone, browser
 microphone, network-loss, Emergency Stop, and raised-wheel test sequence, use:
 
-[Phase 5 agent validation](docs/validation/phase-5-agent-validation-2026-07-28.md).
+[Phase 5 agent refinement validation](docs/validation/phase-5-agent-refinement-validation-2026-07-29.md).
 
 ### Common installation problems
 
@@ -1069,8 +1085,8 @@ uv run --frozen --extra hardware ninjarobot-ide-tool \
   --config "$HOME/.config/ninjarobot_pi5/config.toml" hardware status --real
 ```
 
-Both calibrations must exist, both motion flags must be `true`, the safety
-state must not be latched, and the front sensor must provide three clear
+Both calibrations must exist, both motion flags must be `true`, and the safety
+state must not be latched. Movement does not wait for three clear sensor
 results. If a previous Level 1 stop is latched:
 
 ```bash
@@ -1124,17 +1140,23 @@ port 8443 through router port forwarding.
 
 #### Browser rejects the HTTPS certificate
 
-The default certificate is self-signed and stored under:
+The generated private CA and server certificate are stored under:
 
 ```text
 ~/.config/ninjarobot_pi5/tls/
 ```
 
-Confirm the browser address is your own Raspberry Pi and accept the local
-warning. Browser microphone access normally requires HTTPS. If the certificate
-and key become mismatched, stop the web interface and move both files to a
-private backup location; the next `web start` creates a new matching pair.
-Never share `agent-key.pem`.
+Do not rely on bypassing a browser warning. Export the public CA certificate:
+
+```bash
+uv run --frozen ninjarobot-agent web export-ca \
+  --output "$HOME/ninjarobotpi5-local-ca.pem"
+```
+
+Install and trust that public certificate on the controlling device, then use
+`https://ninjarobotpi5.local:8443/`. Safari requires the additional iPhone or
+iPad full-trust switch described in Step 7. Browser microphone access requires
+a trusted HTTPS page. Never share `agent-key.pem` or `local-ca-key.pem`.
 
 #### USB microphone transcription is unavailable
 

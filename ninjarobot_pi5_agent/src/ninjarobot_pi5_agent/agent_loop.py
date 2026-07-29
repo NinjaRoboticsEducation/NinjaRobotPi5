@@ -44,7 +44,8 @@ class AgentLoopConfig(BaseModel):
 
     max_model_turns: Annotated[int, Field(ge=1, le=20)] = 6
     max_tool_calls: Annotated[int, Field(ge=0, le=50)] = 8
-    turn_timeout_seconds: Annotated[float, Field(gt=0, le=600)] = 90.0
+    request_timeout_seconds: Annotated[float, Field(gt=0, le=600)] = 600.0
+    model_inactivity_timeout_seconds: Annotated[float, Field(gt=0, le=600)] = 120.0
     max_output_tokens: Annotated[int, Field(ge=32, le=4096)] = 512
 
 
@@ -105,6 +106,37 @@ class AgentLoop:
         on_text_delta: TextDeltaHandler | None = None,
     ) -> AgentReply:
         """Run one bounded conversational turn and persist its messages."""
+        request_timeout = self._config.request_timeout_seconds
+        if skill is not None:
+            request_timeout = min(request_timeout, skill.manifest.limits.timeout_seconds)
+        try:
+            async with asyncio.timeout(request_timeout):
+                return await self._chat(
+                    session_id=session_id,
+                    text=text,
+                    skill=skill,
+                    lease_id=lease_id,
+                    confirmed=confirmed,
+                    cancellation=cancellation,
+                    on_text_delta=on_text_delta,
+                )
+        except TimeoutError as exc:
+            raise AgentLoopError(
+                f"agent request exceeded its {request_timeout:g}-second limit"
+            ) from exc
+
+    async def _chat(
+        self,
+        *,
+        session_id: str,
+        text: str,
+        skill: LoadedSkill | None = None,
+        lease_id: str | None = None,
+        confirmed: bool = False,
+        cancellation: CancellationToken | None = None,
+        on_text_delta: TextDeltaHandler | None = None,
+    ) -> AgentReply:
+        """Execute one request inside the complete-request deadline."""
         if not text.strip():
             raise ValueError("chat text must not be empty")
         token = cancellation or CancellationToken()
@@ -136,14 +168,9 @@ class AgentLoop:
                 self._config.max_tool_calls,
                 skill.manifest.limits.max_tool_calls,
             )
-            turn_timeout = min(
-                self._config.turn_timeout_seconds,
-                skill.manifest.limits.timeout_seconds,
-            )
         else:
             max_model_turns = self._config.max_model_turns
             max_tool_calls = self._config.max_tool_calls
-            turn_timeout = self._config.turn_timeout_seconds
 
         completed_tool_calls = 0
         seen_call_ids: set[str] = set()
@@ -162,7 +189,7 @@ class AgentLoop:
                 ),
                 tools=definitions,
                 max_output_tokens=self._config.max_output_tokens,
-                timeout_seconds=turn_timeout,
+                timeout_seconds=self._config.model_inactivity_timeout_seconds,
             )
             turn = await self._model_turn(
                 request,
@@ -234,13 +261,18 @@ class AgentLoop:
             async with asyncio.timeout(request.timeout_seconds):
                 return await self._provider.generate(request)
         final: ModelTurn | None = None
-        async with asyncio.timeout(request.timeout_seconds):
-            async for event in self._provider.stream(request):
-                final = await self._consume_stream_event(
-                    event,
-                    final=final,
-                    on_text_delta=on_text_delta,
-                )
+        stream = self._provider.stream(request).__aiter__()
+        while True:
+            try:
+                async with asyncio.timeout(request.timeout_seconds):
+                    event = await anext(stream)
+            except StopAsyncIteration:
+                break
+            final = await self._consume_stream_event(
+                event,
+                final=final,
+                on_text_delta=on_text_delta,
+            )
         if final is None:
             raise AgentLoopError("provider stream ended without a final turn")
         return final
@@ -252,6 +284,8 @@ class AgentLoop:
         final: ModelTurn | None,
         on_text_delta: TextDeltaHandler,
     ) -> ModelTurn | None:
+        if event.event is StreamEventType.ACTIVITY:
+            return final
         if event.event is StreamEventType.TEXT_DELTA:
             await on_text_delta(event.text)
             return final

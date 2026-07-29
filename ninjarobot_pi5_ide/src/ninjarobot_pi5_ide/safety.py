@@ -277,9 +277,6 @@ class MotionController:
             targets = self._resolve_targets(operation)
             await asyncio.gather(self._servo.start(), self._distance.start())
             self._warnings = list(_direction_warnings(behavior_name))
-            if operation.obstacle_policy == "front_guarded":
-                await self._require_clear_start()
-
             self._stop_event.clear()
             self._stop_reason = None
             self._fatal_error = None
@@ -360,34 +357,6 @@ class MotionController:
         if self._active:
             raise RuntimeError("motion cannot resume while a movement is active")
         return self._state.clear_motion()
-
-    async def _require_clear_start(self) -> None:
-        clear_count = 0
-        try:
-            async with asyncio.timeout(self._config.clear_reading_timeout_seconds):
-                while clear_count < self._config.clear_readings_before_motion:
-                    try:
-                        reading = await self._distance.execute({})
-                    except IDEError as exc:
-                        if exc.details.code == "DEVICE_OUT_OF_RANGE":
-                            clear_count += 1
-                        else:
-                            clear_count = 0
-                    except Exception:
-                        clear_count = 0
-                    else:
-                        if _fresh(reading) and (
-                            reading["distance_mm"] > self._config.obstacle_threshold_mm
-                        ):
-                            clear_count += 1
-                        else:
-                            clear_count = 0
-                    await asyncio.sleep(self._config.distance_poll_interval_seconds)
-        except TimeoutError as exc:
-            raise MotionSafetyError(
-                "movement did not start because the front sensor did not provide "
-                f"{self._config.clear_readings_before_motion} clear readings"
-            ) from exc
 
     async def _distance_monitor(self, operation: DriveOperation) -> None:
         below_count = 0
@@ -560,8 +529,6 @@ def _fresh(reading: dict[str, Any]) -> bool:
 def _direction_warnings(name: str) -> tuple[str, ...]:
     if name == "move_backward":
         return ("front sensor does not protect the rear",)
-    if name in {"turn_left", "turn_right"}:
-        return ("front sensor does not protect the side or rear",)
     return ()
 
 
