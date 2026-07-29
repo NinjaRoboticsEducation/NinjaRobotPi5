@@ -219,7 +219,12 @@ class AgentIPCServer:
             )
             return
         if command == "disarm_motion":
-            self._runtime.disarm_motion(_required_text(payload, "session_id"))
+            session_id = _required_text(payload, "session_id")
+            await self._runtime.stop_and_disarm_motion(
+                session_id,
+                lease_id=_optional_text(payload, "lease_id"),
+                requested_by="ipc-disarm",
+            )
             await _write_message(
                 writer,
                 {"type": "result", "data": {"motion_armed": False}},

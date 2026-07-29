@@ -498,6 +498,7 @@ async def _dispatch_web_message(
         controller.arm_chat_motion(lease_id, confirmed=True)
         return {"motion_armed": True}
     if kind == "disarm_chat_motion":
+        await controller.stop_motion(lease_id)
         controller.disarm_chat_motion(lease_id)
         return {"motion_armed": False}
     raise ValueError(f"unsupported web request type: {kind}")

@@ -164,6 +164,16 @@ async def run_service(arguments: argparse.Namespace) -> None:
         runtime_state=lambda session_id, lease_id: {
             "session_id": session_id,
             "controller_lease": lease_id,
+            "execution_mode": "real" if arguments.real else "simulation",
+            "physical_hardware_enabled": arguments.real,
+            "motion_authorization": {
+                "armed": arms.is_armed(session_id, lease_id=lease_id),
+                "meaning": (
+                    "trusted motion tools may execute for this session"
+                    if arms.is_armed(session_id, lease_id=lease_id)
+                    else "trusted motion tools must not execute for this session"
+                ),
+            },
             "motion_armed": arms.is_armed(session_id, lease_id=lease_id),
             "simulated": not arguments.real,
         },

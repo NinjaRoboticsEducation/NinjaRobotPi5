@@ -20,13 +20,24 @@ def test_integrated_agent_ide_exposes_shared_simulated_robot_capabilities(
     tmp_path,
 ) -> None:
     async def exercise() -> None:
-        config = load_robot_config(EXAMPLE).model_copy(
+        base_config = load_robot_config(EXAMPLE)
+        config = base_config.model_copy(
             update={
                 "behaviors": BehaviorConfig(
                     user_directory=str(tmp_path / "behaviors"),
                     safety_state_file=str(tmp_path / "safety.json"),
                     system_stopped_display_seconds=0.0,
-                )
+                ),
+                "hardware": base_config.hardware.model_copy(
+                    update={
+                        "servos": base_config.hardware.servos.model_copy(
+                            update={
+                                "motion_enabled": True,
+                                "group_motion_enabled": True,
+                            }
+                        )
+                    }
+                ),
             }
         )
         client = build_robot_ide_client(
@@ -36,10 +47,14 @@ def test_integrated_agent_ide_exposes_shared_simulated_robot_capabilities(
         )
         await client.start()
 
-        names = {descriptor.name for descriptor in await client.capabilities()}
+        descriptors = {descriptor.name: descriptor for descriptor in await client.capabilities()}
+        names = set(descriptors)
         assert {
             "behavior.list",
             "behavior.run",
+            "behavior.execute_expression",
+            "behavior.execute_movement",
+            "behavior.save_user",
             "behavior.stop",
             "motion.resume",
             "system.resume",
@@ -50,6 +65,15 @@ def test_integrated_agent_ide_exposes_shared_simulated_robot_capabilities(
             "microphone.capture",
             "microphone.transcribe",
         } <= names
+        expression_schema = descriptors["behavior.execute_expression"].input_schema
+        expression_mapping = expression_schema["$defs"]["_ExpressionStage"]["properties"][
+            "operations"
+        ]["items"]["discriminator"]["mapping"]
+        assert "drive" not in expression_mapping
+        movement_schema = descriptors["behavior.execute_movement"].input_schema
+        target_schema = movement_schema["$defs"]["DriveOperation"]["properties"]["targets"]
+        assert set(target_schema["properties"]) == {"left_motor", "right_motor"}
+        assert target_schema["additionalProperties"] is False
 
         result = await client.execute(
             ActionRequest(
@@ -65,6 +89,125 @@ def test_integrated_agent_ide_exposes_shared_simulated_robot_capabilities(
         assert result.data is not None
         behavior_names = {behavior["name"] for behavior in result.data["behaviors"]}
         assert {"move_forward", "move_backward", "turn_left", "turn_right"} <= (behavior_names)
+
+        expression = await client.execute(
+            ActionRequest(
+                action_id="expression-1",
+                capability="behavior.execute_expression",
+                arguments={
+                    "schema_version": 1,
+                    "name": "agent_smile",
+                    "description": "A transient agent-created smile and tone.",
+                    "category": "expression",
+                    "stages": [
+                        {
+                            "name": "smile",
+                            "operations": [
+                                {
+                                    "kind": "face",
+                                    "expression": "happy",
+                                    "hold_seconds": 0.05,
+                                },
+                                {
+                                    "kind": "tone",
+                                    "frequency_hz": 880,
+                                    "duration_seconds": 0.05,
+                                    "volume": 32,
+                                },
+                            ],
+                        }
+                    ],
+                },
+                requested_by="test",
+                session_id="test-session",
+                idempotency_key="expression-key-1",
+            )
+        )
+        assert expression.status is ActionStatus.SUCCEEDED
+
+        saved_definition = {
+            "schema_version": 1,
+            "name": "saved_agent_smile",
+            "description": "A saved agent-created expression.",
+            "category": "expression",
+            "stages": [
+                {
+                    "name": "smile",
+                    "operations": [
+                        {
+                            "kind": "face",
+                            "expression": "happy",
+                            "hold_seconds": 0.05,
+                        }
+                    ],
+                }
+            ],
+        }
+        saved = await client.execute(
+            ActionRequest(
+                action_id="save-1",
+                capability="behavior.save_user",
+                arguments=saved_definition,
+                requested_by="confirmed-test",
+                session_id="test-session",
+                idempotency_key="save-key-1",
+            )
+        )
+        assert saved.status is ActionStatus.SUCCEEDED
+        assert saved.data is not None
+        assert saved.data["name"] == "saved_agent_smile"
+        assert Path(saved.data["path"]).is_file()
+
+        duplicate_save = await client.execute(
+            ActionRequest(
+                action_id="save-2",
+                capability="behavior.save_user",
+                arguments=saved_definition,
+                requested_by="confirmed-test",
+                session_id="test-session",
+                idempotency_key="save-key-2",
+            )
+        )
+        assert duplicate_save.status is ActionStatus.FAILED
+        assert duplicate_save.error is not None
+        assert "already exists" in duplicate_save.error.technical_detail
+
+        movement = await client.execute(
+            ActionRequest(
+                action_id="movement-1",
+                capability="behavior.execute_movement",
+                arguments={
+                    "schema_version": 1,
+                    "name": "agent_roll",
+                    "description": "A transient agent-created raised-wheel movement.",
+                    "category": "movement",
+                    "stages": [
+                        {
+                            "name": "roll",
+                            "operations": [
+                                {
+                                    "kind": "face",
+                                    "expression": "exciting",
+                                    "hold_seconds": 0.05,
+                                },
+                                {
+                                    "kind": "drive",
+                                    "targets": {
+                                        "left_motor": 20,
+                                        "right_motor": -20,
+                                    },
+                                    "hold_seconds": 0.05,
+                                },
+                            ],
+                        }
+                    ],
+                },
+                requested_by="test",
+                session_id="test-session",
+                idempotency_key="movement-key-1",
+            )
+        )
+        assert movement.status is ActionStatus.SUCCEEDED, movement.model_dump(mode="json")
 
         preview = await client.execute(
             ActionRequest(

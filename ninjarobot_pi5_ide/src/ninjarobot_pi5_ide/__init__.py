@@ -10,6 +10,7 @@ from .behavior_models import (
     FaceOperation,
     MelodyOperation,
     TextOperation,
+    ToneOperation,
     WaitOperation,
 )
 from .behavior_runtime import BehaviorRunner, Melody, StageResult, load_pi5buzzer_melody
@@ -136,6 +137,7 @@ __all__ = [
     "SpeechTranscriber",
     "SystemSafetyController",
     "TextOperation",
+    "ToneOperation",
     "WhisperCppTranscriber",
     "VL53L0XDistanceAdapter",
     "WaitOperation",

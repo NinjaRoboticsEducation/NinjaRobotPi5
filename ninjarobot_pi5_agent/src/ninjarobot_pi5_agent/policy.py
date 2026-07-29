@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import time
-from collections.abc import Callable
 from dataclasses import dataclass
 
 from ninjarobot_pi5_ide import RiskLevel
@@ -32,22 +30,12 @@ class PolicyDecision:
 @dataclass(frozen=True, slots=True)
 class _MotionArm:
     lease_id: str | None
-    expires_at: float
 
 
 class MotionArmManager:
-    """Hold short-lived one-time motion consent per user session."""
+    """Hold explicit motion consent until a deterministic revocation event."""
 
-    def __init__(
-        self,
-        *,
-        ttl_seconds: float = 300.0,
-        clock: Callable[[], float] = time.monotonic,
-    ) -> None:
-        if not 1.0 <= ttl_seconds <= 3600.0:
-            raise ValueError("motion arm TTL must be between 1 and 3600 seconds")
-        self._ttl_seconds = ttl_seconds
-        self._clock = clock
+    def __init__(self) -> None:
         self._arms: dict[str, _MotionArm] = {}
 
     def arm(
@@ -60,29 +48,23 @@ class MotionArmManager:
         """Arm motion only after explicit user confirmation."""
         if not confirmed:
             raise PermissionError("explicit confirmation is required to arm motion")
-        self._arms[session_id] = _MotionArm(
-            lease_id=lease_id,
-            expires_at=self._clock() + self._ttl_seconds,
-        )
+        self._arms[session_id] = _MotionArm(lease_id=lease_id)
 
     def is_armed(self, session_id: str, *, lease_id: str | None = None) -> bool:
         """Return whether the matching session and optional lease remain armed."""
         arm = self._arms.get(session_id)
         if arm is None:
             return False
-        if self._clock() >= arm.expires_at:
-            self._arms.pop(session_id, None)
-            return False
         if arm.lease_id is not None and arm.lease_id != lease_id:
             return False
         return True
 
     def disarm(self, session_id: str) -> None:
-        """Revoke a session arm after stop, disconnect, or expiry."""
+        """Revoke a session arm after stop or disconnect."""
         self._arms.pop(session_id, None)
 
     def disarm_all(self) -> None:
-        """Revoke all motion consent during service shutdown."""
+        """Revoke all motion consent during shutdown or model replacement."""
         self._arms.clear()
 
 

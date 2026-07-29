@@ -810,12 +810,69 @@ You can then run the interactive agent tool from another terminal:
 uv run --frozen ninjarobot-agent
 ```
 
+To let the agent create physical movements, enter `/arm` and type `ARM` when
+asked. This permission now remains active for that chat session even when a
+small local model needs more than five minutes to reason. It ends only when
+you use `/disarm`, trigger Emergency Stop, disconnect the controlling browser,
+change models, or stop the service.
+
+Try a non-moving creative expression first:
+
+```text
+Create and perform a two-stage happy expression. Show a happy face with a
+short 880 Hz tone, then show “Hello!” while playing the happy melody.
+```
+
+The agent may combine approved face animations, text, bounded tones, and named
+melodies without motion authorization. For the physical test, raise both
+wheels, arm the session, and enter:
+
+```text
+Create a brief exciting movement. Show the exciting face, play an exciting
+melody, and move forward for one second, then stop and return to Idle.
+```
+
+The generated behavior is temporary unless you explicitly approve saving it.
+In the interactive chat, use:
+
+```text
+/confirm Save the successful behavior as my_exciting_move.
+```
+
+For a scriptable chat session, use:
+
+```bash
+uv run --frozen ninjarobot-agent motion arm \
+  --session dynamic-test \
+  --confirm
+
+uv run --frozen ninjarobot-agent chat \
+  --session dynamic-test \
+  "Create a brief happy raised-wheel movement and then stop."
+
+uv run --frozen ninjarobot-agent chat \
+  --session dynamic-test \
+  --confirmed \
+  "Save that successful behavior as my_happy_move."
+
+uv run --frozen ninjarobot-agent motion disarm \
+  --session dynamic-test
+```
+
+`--confirmed` approves sensitive work only for that one chat request. Camera
+and microphone actions still need their separate privacy confirmation.
+Generated definitions cannot contain GPIO numbers or file paths; movement uses
+configured logical roles such as `left_motor` and `right_motor`.
+
 Choose **Quit CLI** to disconnect only that terminal. Choose **Stop Web
 Interface** to release the browser server. Choose **Stop Agent Service** to
 release the model, IDE, hardware, MCP connections, database, socket, and web
 resources. Complete the privacy and raised-wheel checks in the
 [Phase 5 agent refinement validation guide](docs/validation/phase-5-agent-refinement-validation-2026-07-29.md)
 before using real movement from chat or the browser.
+
+For the complete dynamic behavior checklist, follow
+[Phase 5 dynamic behavior validation](docs/validation/phase-5-dynamic-behavior-validation-2026-07-29.md).
 
 ## 3. Simulation, testing, and troubleshooting
 
@@ -1209,6 +1266,41 @@ uv run --frozen ninjarobot-agent web start
 
 This releases active movement before the web server closes. Do not expose
 port 8443 through router port forwarding.
+
+#### Agent says it cannot move even though motion is armed
+
+First confirm the service is running in real mode:
+
+```bash
+uv run --frozen ninjarobot-agent status
+```
+
+Then arm the exact session used for chat:
+
+```bash
+uv run --frozen ninjarobot-agent motion arm \
+  --session local-cli \
+  --confirm
+```
+
+The agent runtime now reports `execution_mode: "real"` for physical hardware
+and a structured armed authorization. The older field `simulated: false` also
+means real hardware; it does not mean simulation.
+
+If a tool result says `Motion is not armed for this session`, check that the
+session names match exactly. An interactive CLI uses `local-cli` by default,
+while each browser controller has its own lease-bound chat session. Arm the
+browser with its **Arm AI Motion** button rather than arming `local-cli`.
+
+If the model still only explains the action, start a new conversation after
+updating the software so old assistant refusals are not reused as examples:
+
+```bash
+uv run --frozen ninjarobot-agent session clear local-cli
+```
+
+Restarting the service also clears all motion authorization. Re-arm after a
+restart or model change.
 
 #### Browser rejects the HTTPS certificate
 

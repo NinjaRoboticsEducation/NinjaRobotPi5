@@ -16,6 +16,7 @@ from .behavior_models import (
     MelodyName,
     MelodyOperation,
     TextOperation,
+    ToneOperation,
     WaitOperation,
 )
 from .buzzer import BuzzerDevice
@@ -202,6 +203,19 @@ class BehaviorRunner:
             return {"kind": "text", **result}
         if isinstance(operation, MelodyOperation):
             return await self._play_melody(operation)
+        if isinstance(operation, ToneOperation):
+            result = await self._buzzer.play(
+                frequency_hz=operation.frequency_hz,
+                duration_seconds=operation.duration_seconds,
+                volume=operation.volume,
+            )
+            return {
+                "kind": "tone",
+                "frequency_hz": operation.frequency_hz,
+                "duration_seconds": operation.duration_seconds,
+                "volume": operation.volume,
+                "interrupted": bool(result["interrupted"]),
+            }
         if isinstance(operation, WaitOperation):
             await asyncio.sleep(operation.seconds)
             return {"kind": "wait", "seconds": operation.seconds}

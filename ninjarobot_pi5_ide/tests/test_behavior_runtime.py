@@ -179,6 +179,42 @@ def test_expression_stages_run_in_order_and_stage_operations_overlap() -> None:
     asyncio.run(exercise())
 
 
+def test_bounded_tone_operation_uses_shared_buzzer_device() -> None:
+    async def exercise() -> None:
+        runner, _display, buzzer = build_runner()
+        definition = BehaviorDefinition.model_validate(
+            {
+                "schema_version": 1,
+                "name": "tone_runtime",
+                "description": "Play one transient tone.",
+                "category": "expression",
+                "stages": [
+                    {
+                        "name": "tone",
+                        "operations": [
+                            {
+                                "kind": "tone",
+                                "frequency_hz": 880,
+                                "duration_seconds": 0.05,
+                                "volume": 48,
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+
+        result = await runner.run(definition)
+
+        assert buzzer.play_calls == [(880, 0.05, 48)]
+        operation = result["stages"][0]["operations"][0]
+        assert operation["kind"] == "tone"
+        assert operation["interrupted"] is False
+        await runner.close()
+
+    asyncio.run(exercise())
+
+
 def test_face_animation_updates_until_cancelled() -> None:
     async def exercise() -> None:
         runner, display, _buzzer = build_runner()

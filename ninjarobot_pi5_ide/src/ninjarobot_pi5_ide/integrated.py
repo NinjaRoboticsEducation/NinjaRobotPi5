@@ -4,8 +4,19 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any, Literal
 
+from pydantic import Field
+
+from .behavior_models import (
+    BehaviorDefinition,
+    BehaviorStage,
+    FaceOperation,
+    MelodyOperation,
+    TextOperation,
+    ToneOperation,
+    WaitOperation,
+)
 from .buzzer import BuzzerStopAdapter, BuzzerToneAdapter
 from .camera import CameraCaptureAdapter, CameraPreviewAdapter, CameraStatusAdapter
 from .config import RobotConfig
@@ -35,6 +46,165 @@ from .models import (
 from .registry import CapabilityRegistry
 from .robot import RobotAssembly
 from .servo import ServoMoveAdapter, ServoStatusAdapter, ServoStopAdapter
+
+_ExpressionOperation = Annotated[
+    FaceOperation | TextOperation | MelodyOperation | ToneOperation | WaitOperation,
+    Field(discriminator="kind"),
+]
+
+
+class _ExpressionStage(BehaviorStage):
+    """Inline expression stage whose schema omits drive operations."""
+
+    operations: tuple[_ExpressionOperation, ...]
+
+
+class _ExpressionDefinition(BehaviorDefinition):
+    """Inline expression contract that cannot contain drive operations."""
+
+    category: Literal["expression"]
+    stages: tuple[_ExpressionStage, ...]
+
+
+class _MovementDefinition(BehaviorDefinition):
+    """Inline movement contract that must contain a drive operation."""
+
+    category: Literal["movement"]
+
+
+class _InlineBehaviorAdapter:
+    """Execute one transient, schema-validated behavior definition."""
+
+    def __init__(
+        self,
+        robot: RobotAssembly,
+        *,
+        motion: bool,
+        servo_roles: tuple[str, ...],
+    ) -> None:
+        self._robot = robot
+        self._servo_roles = frozenset(servo_roles)
+        self._definition_type = _MovementDefinition if motion else _ExpressionDefinition
+        capability = "behavior.execute_movement" if motion else "behavior.execute_expression"
+        description = (
+            "Execute one transient validated movement that may combine approved "
+            "faces, text, tones, melodies, and logical servo roles. Operations in "
+            "one stage start together; stages run in order."
+            if motion
+            else "Execute one transient validated expression combining approved "
+            "faces, text, tones, and melodies. Operations in one stage start "
+            "together; stages run in order. Drive operations are forbidden."
+        )
+        input_schema = self._definition_type.model_json_schema()
+        if motion:
+            input_schema["$defs"]["DriveOperation"]["properties"]["targets"] = {
+                "type": "object",
+                "properties": {
+                    role: {
+                        "type": "number",
+                        "minimum": -90.0,
+                        "maximum": 90.0,
+                    }
+                    for role in sorted(self._servo_roles)
+                },
+                "additionalProperties": False,
+                "minProperties": 1,
+            }
+        self.descriptor = CapabilityDescriptor(
+            name=capability,
+            version="1.0.0",
+            description=description,
+            input_schema=input_schema,
+            output_schema={"type": "object"},
+            risk=RiskLevel.MOTION if motion else RiskLevel.LOW,
+            resources=(
+                ("display", "buzzer", "servo_bus", "distance_sensor")
+                if motion
+                else ("display", "buzzer")
+            ),
+            default_timeout_seconds=300.0,
+            idempotent=False,
+            cancellable=True,
+            confirmation_required=motion,
+        )
+
+    async def start(self) -> None:
+        await self._robot.start()
+
+    async def execute(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        definition = self._definition_type.model_validate(arguments)
+        unknown_roles = sorted(
+            {
+                role
+                for stage in definition.stages
+                for operation in stage.operations
+                if operation.kind == "drive"
+                for role in operation.targets
+                if role not in self._servo_roles
+            }
+        )
+        if unknown_roles:
+            raise ValueError(
+                "drive targets contain unconfigured logical servo roles: "
+                + ", ".join(unknown_roles)
+            )
+        return await self._robot.run_definition(definition)
+
+    async def health(self) -> ResourceHealth:
+        health = await self._robot.health()
+        return (
+            ResourceHealth.READY
+            if health and all(value == "ready" for value in health.values())
+            else ResourceHealth.DEGRADED
+        )
+
+    async def close(self) -> None:
+        return
+
+
+class _BehaviorSaveAdapter:
+    """Persist one validated user behavior without overwriting existing assets."""
+
+    descriptor = CapabilityDescriptor(
+        name="behavior.save_user",
+        version="1.0.0",
+        description=(
+            "Save one validated AI-created behavior in the confined user behavior "
+            "directory. Call only after the user explicitly asks to save and the "
+            "current request carries confirmation. Existing or bundled behaviors "
+            "are never overwritten."
+        ),
+        input_schema=BehaviorDefinition.model_json_schema(),
+        output_schema={"type": "object"},
+        risk=RiskLevel.MAINTENANCE,
+        resources=(),
+        default_timeout_seconds=5.0,
+        idempotent=False,
+        cancellable=False,
+        confirmation_required=True,
+    )
+
+    def __init__(self, robot: RobotAssembly) -> None:
+        self._robot = robot
+
+    async def start(self) -> None:
+        await self._robot.start()
+
+    async def execute(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        definition = BehaviorDefinition.model_validate(arguments)
+        path = self._robot.assets.save_user(definition, overwrite=False)
+        return {
+            "saved": True,
+            "name": definition.name,
+            "category": definition.category,
+            "path": str(path),
+        }
+
+    async def health(self) -> ResourceHealth:
+        return ResourceHealth.READY
+
+    async def close(self) -> None:
+        return
 
 
 class _BehaviorListAdapter:
@@ -312,6 +482,17 @@ def build_robot_ide_client(
     for adapter in (
         _BehaviorListAdapter(robot),
         _BehaviorRunAdapter(robot),
+        _InlineBehaviorAdapter(
+            robot,
+            motion=False,
+            servo_roles=tuple(config.behaviors.servo_roles),
+        ),
+        _InlineBehaviorAdapter(
+            robot,
+            motion=True,
+            servo_roles=tuple(config.behaviors.servo_roles),
+        ),
+        _BehaviorSaveAdapter(robot),
         _BehaviorStopAdapter(robot),
         _ResumeAdapter(robot, system=False),
         _ResumeAdapter(robot, system=True),

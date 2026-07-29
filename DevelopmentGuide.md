@@ -546,9 +546,11 @@ The main modules are:
 
 A behavior contains one or more stages. Stages execute in order. Operations
 inside a stage begin concurrently. A stage may contain one display operation,
-one existing buzzer melody, one drive operation, and one wait. This structure
-makes greeting text and sound start together without forcing every robot
-behavior into one long serial sequence.
+one buzzer operation—either an existing melody or one bounded tone—one drive
+operation, and one wait. Tone frequency is limited to 20–20,000 Hz, duration
+to 0.05–2 seconds, and volume to 1–128. This structure makes greeting text and
+sound start together without forcing every robot behavior into one long serial
+sequence.
 
 Bundled assets are package data and read-only. Private assets live in
 `~/.config/ninjarobot_pi5/behaviors`. Names cannot contain paths, symbolic
@@ -698,8 +700,18 @@ uv run --frozen ninjarobot-ide-tool behavior create \
 
 The tool validates and simulates the action before saving it. A complete
 multi-stage action can instead be supplied with `--from-file`. Any future
-AI-proposed action uses the same preview and confirmation path; it cannot save
-or physically run itself without user approval.
+AI-proposed action uses the same strict behavior model. The agent may execute
+an inline expression through `behavior.execute_expression`, whose JSON Schema
+does not contain drive operations. An armed session may execute an inline
+movement through `behavior.execute_movement`; its schema advertises only the
+configured logical servo roles. Inline definitions are transient and never
+write a file.
+
+`behavior.save_user` is a separate maintenance-risk capability. Agent policy
+requires a confirmed request before it reaches the repository. The repository
+then repeats complete schema, path-confinement, symbolic-link, bundled-name,
+and no-overwrite checks. In the interactive agent, `/confirm <request>` marks
+only that request as approved.
 
 ### Standalone configuration import and synchronization
 
@@ -780,7 +792,7 @@ Bundled assets refuse deletion.
 
 ## Implemented Phase 5 agent and extension contracts
 
-Phase 5.0 through Phase 5.8 implement these contracts. The software gate
+Phase 5.0 through Phase 5.10 implement these contracts. The software gate
 passes; the Raspberry Pi acceptance checklist remains operator work.
 
 ### Agent and service boundaries
@@ -959,6 +971,38 @@ natural-language physical motion after explicit session confirmation.
 `MotionArmManager`, tool policy, the exclusive browser lease, and all IDE
 motion and obstacle checks remain mandatory. Direct deterministic controller
 commands do not inherit model permissions.
+
+`MotionArmManager` now holds session-lived consent rather than a wall-clock
+timeout. This prevents a valid arm from expiring while a small local model is
+still reasoning. Consent is revoked by explicit Disarm, Emergency Stop,
+controller lease loss, model replacement, or service shutdown. Runtime
+disarm also cancels registered in-flight motion tokens and requests
+`robot.servo.stop`; it does not merely block the next tool call.
+
+The model receives unambiguous trusted service facts:
+
+```json
+{
+  "execution_mode": "real",
+  "physical_hardware_enabled": true,
+  "motion_authorization": {
+    "armed": true,
+    "meaning": "trusted motion tools may execute for this session"
+  }
+}
+```
+
+The legacy `simulated` and `motion_armed` booleans remain for compatibility,
+but prompt guidance defines `simulated: false` as real hardware. Runtime facts
+are authoritative data, while strings arriving from the user, MCP servers,
+web pages, and skills remain incapable of changing policy.
+
+The agent is not limited to bundled behavior names. Its tool catalog includes
+the full validated inline schemas, exact face and melody enums, tone bounds,
+stage rules, and configured logical servo roles. The prompt tells the model to
+call a trusted tool for an actionable request instead of explaining an action
+that it can execute. The deterministic policy still decides whether that call
+may reach the IDE.
 
 The web server is started and stopped through IPC, so it cannot create a
 second IDE or hardware owner. It uses a generated local certificate authority,

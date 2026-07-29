@@ -523,7 +523,8 @@ async def _chat_repl(arguments: argparse.Namespace, *, session_id: str) -> int:
             return 0
         if text == "/help":
             print(
-                "/help  /exit  /clear  /status  /arm  /disarm\nOrdinary text is sent to NinjaRobot."
+                "/help  /exit  /clear  /status  /arm  /disarm  "
+                "/confirm <request>\nOrdinary text is sent to NinjaRobot."
             )
             continue
         if text == "/clear":
@@ -559,6 +560,28 @@ async def _chat_repl(arguments: argparse.Namespace, *, session_id: str) -> int:
                 arguments,
                 {"command": "disarm_motion", "session_id": session_id},
             )
+            continue
+        if text == "/confirm" or text.startswith("/confirm "):
+            confirmed_text = text.removeprefix("/confirm").strip()
+            if not confirmed_text:
+                confirmed_text = (
+                    await asyncio.to_thread(
+                        input,
+                        "Enter the request you explicitly approve: ",
+                    )
+                ).strip()
+            if not confirmed_text:
+                print("No confirmed request was sent.")
+                continue
+            try:
+                await _stream_chat(
+                    arguments,
+                    session_id=session_id,
+                    text=confirmed_text,
+                    confirmed=True,
+                )
+            except AgentIPCError as exc:
+                print(f"Error: {exc}")
             continue
         try:
             await _stream_chat(

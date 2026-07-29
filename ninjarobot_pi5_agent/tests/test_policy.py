@@ -34,8 +34,7 @@ def tool(
 
 
 def test_motion_requires_explicit_session_and_lease_arm() -> None:
-    now = [100.0]
-    arms = MotionArmManager(ttl_seconds=10.0, clock=lambda: now[0])
+    arms = MotionArmManager()
     policy = PolicyEngine(arms)
     context = PolicyContext(session_id="session-1", lease_id="lease-1")
 
@@ -53,8 +52,19 @@ def test_motion_requires_explicit_session_and_lease_arm() -> None:
         PolicyContext(session_id="session-1", lease_id="other-lease"),
     ).allowed
 
-    now[0] = 111.0
+    arms.disarm("session-1")
     assert not policy.evaluate(tool(RiskLevel.MOTION), context).allowed
+
+
+def test_confirmed_motion_arm_survives_slow_local_model_reasoning() -> None:
+    arms = MotionArmManager()
+    policy = PolicyEngine(arms)
+    context = PolicyContext(session_id="slow-model", lease_id=None)
+
+    arms.arm("slow-model", confirmed=True)
+    decision = policy.evaluate(tool(RiskLevel.MOTION), context)
+    assert decision.allowed
+    assert decision.reason == "Motion is armed for this active session."
 
 
 def test_emergency_is_allowed_and_sensitive_work_requires_confirmation() -> None:

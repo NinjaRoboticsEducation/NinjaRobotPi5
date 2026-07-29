@@ -18,12 +18,15 @@ which is the single source of truth.
 
 Phase 0, Phase 1, Phase 2, Phase 3.1 through Phase 3.5, and Phase 4 are
 implemented and the operator reports the complete Phase 4 and installation
-workflow passed. Phase 5.0 through Phase 5.8 and the 2026-07-29 agent/web
-refinement are implemented and pass the local software gate. Raspberry Pi
+workflow passed. Phase 5.0 through Phase 5.10 and the 2026-07-29 agent/web and
+dynamic-behavior refinements are implemented and pass the local software gate.
+Raspberry Pi
 acceptance—including the Qwen3:4B
 performance benchmark, live Tavily search, LAN browser checks, camera,
 microphone, and raised-wheel motion—still requires the operator checklist in
-[`docs/validation/phase-5-agent-model-ui-refinement-validation-2026-07-29.md`](docs/validation/phase-5-agent-model-ui-refinement-validation-2026-07-29.md).
+[`docs/validation/phase-5-agent-model-ui-refinement-validation-2026-07-29.md`](docs/validation/phase-5-agent-model-ui-refinement-validation-2026-07-29.md)
+and the creative-action checklist in
+[`docs/validation/phase-5-dynamic-behavior-validation-2026-07-29.md`](docs/validation/phase-5-dynamic-behavior-validation-2026-07-29.md).
 Phase 0 established project governance and preserved the
 original import hashes for the six existing Pi5 hardware libraries. Phase 1
 added strict IDE and agent contracts, deterministic fakes, V4-owned
@@ -164,6 +167,21 @@ quality evidence, but they are not a motion permission gate. A FastAPI HTTPS
 interface serves the local network, and one browser holds the exclusive
 controller lease at a time.
 
+Confirmed motion authorization is session-lived: it does not expire while a
+small local model is still reasoning. It ends on explicit Disarm, Emergency
+Stop, controller disconnection, model replacement, or service shutdown. An
+armed agent may create transient behaviors instead of being limited to the
+bundled catalog. Each behavior may combine approved animated faces, text,
+bounded buzzer tones, named melodies, and configured logical servo roles in
+simultaneous stages and ordered sequences. The IDE validates every generated
+definition and retains obstacle, calibration, resource, cancellation, and
+safety-latch authority.
+
+Generated behaviors are transient by default. Saving one requires an explicit
+confirmed request and uses the confined user behavior directory without
+overwriting an existing or bundled behavior. Camera and microphone operations
+keep separate privacy confirmation.
+
 The agent is also an MCP host. MCP means Model Context Protocol, a standard
 connection for separately installed tools. The official hosted Tavily MCP
 server is the bundled real-time web-search preset after the owner adds a
@@ -270,7 +288,8 @@ The `ninjarobot-agent` additionally provides:
 
 - `service run|start|status|stop` for the single owner process
 - streaming `chat`, reconnectable sessions, seven-day transcripts, and
-  `/help`, `/exit`, `/clear`, `/status`, `/arm`, and `/disarm`
+  `/help`, `/exit`, `/clear`, `/status`, `/arm`, `/disarm`, and
+  `/confirm <request>`
 - `web start|status|stop` for the HTTPS local-network interface
 - `motion arm --confirm` for one CLI chat session's physical-motion consent
 - `model list|current|select` for installed Ollama model discovery, persistent
@@ -279,7 +298,8 @@ The `ninjarobot-agent` additionally provides:
   servers
 - `skill` validation, simulation, non-overwriting installation, enable,
   disable, inspection, and confirmed removal
-- `benchmark ollama` for the required Qwen3:4B Raspberry Pi acceptance report
+- `benchmark ollama` for a recommended Raspberry Pi performance and quality
+  report
 
 Simulation remains the service default. Start the physical service only after
 all Phase 4 hardware checks pass:
@@ -291,6 +311,24 @@ uv run --frozen --extra hardware ninjarobot-agent \
 
 uv run --frozen ninjarobot-agent web start
 ```
+
+Inside the interactive chat, use `/arm`, type `ARM`, and then ask naturally
+for a new combination:
+
+```text
+Create a cheerful two-stage behavior. First show an exciting face and play a
+short tone. Then show a speaking face while moving forward briefly.
+```
+
+The agent uses `robot.behavior.execute_expression` when no servo operation is
+needed and `robot.behavior.execute_movement` for an armed movement. To approve
+saving the successful definition, use:
+
+```text
+/confirm Save that behavior as cheerful_roll.
+```
+
+Use `/disarm` to revoke authorization and request an immediate servo stop.
 
 Quitting a CLI disconnects only that terminal. Use `web stop` to stop the web
 interface and `service stop` to release the model, IDE, hardware, MCP, database,
@@ -493,6 +531,9 @@ For Phase 4 integrated behaviors and movements, follow
 For the refined 20-face catalog, direct interactive menus, `8191` startup
 handling, Emergency Stop sign, and Resume workflow, follow
 [`docs/validation/phase-4-refinement-validation-2026-07-27.md`](docs/validation/phase-4-refinement-validation-2026-07-27.md).
+For session-lived motion authorization, agent-created multimodule behaviors,
+Disarm cancellation, privacy separation, and confirmed saving, follow
+[`docs/validation/phase-5-dynamic-behavior-validation-2026-07-29.md`](docs/validation/phase-5-dynamic-behavior-validation-2026-07-29.md).
 
 Run the complete root gate:
 

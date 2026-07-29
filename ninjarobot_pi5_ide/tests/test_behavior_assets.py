@@ -189,6 +189,42 @@ def test_definition_rejects_expression_motion_and_early_indefinite_stage() -> No
         BehaviorDefinition.model_validate(payload)
 
 
+def test_tone_operation_is_bounded_and_cannot_conflict_with_melody() -> None:
+    payload = {
+        "schema_version": 1,
+        "name": "tone_test",
+        "description": "A bounded transient tone.",
+        "category": "expression",
+        "stages": [
+            {
+                "name": "tone",
+                "operations": [
+                    {
+                        "kind": "tone",
+                        "frequency_hz": 880,
+                        "duration_seconds": 0.25,
+                        "volume": 48,
+                    }
+                ],
+            }
+        ],
+    }
+
+    definition = BehaviorDefinition.model_validate(payload)
+    assert definition.required_resources == ("buzzer",)
+
+    payload["stages"][0]["operations"][0]["frequency_hz"] = 20_001
+    with pytest.raises(ValidationError, match="less than or equal to 20000"):
+        BehaviorDefinition.model_validate(payload)
+
+    payload["stages"][0]["operations"] = [
+        {"kind": "tone", "frequency_hz": 880},
+        {"kind": "melody", "melody": "happy"},
+    ]
+    with pytest.raises(ValidationError, match="only one buzzer operation"):
+        BehaviorDefinition.model_validate(payload)
+
+
 def test_repository_rejects_filename_payload_mismatch(tmp_path: Path) -> None:
     directory = tmp_path / "behaviors"
     directory.mkdir()

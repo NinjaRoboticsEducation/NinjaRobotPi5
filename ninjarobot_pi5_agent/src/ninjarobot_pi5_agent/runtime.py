@@ -6,6 +6,8 @@ import asyncio
 import uuid
 from typing import Any
 
+from ninjarobot_pi5_ide import RiskLevel
+
 from .agent_loop import AgentLoop, AgentReply, TextDeltaHandler
 from .events import AgentEventType, EventBroker
 from .model_selection import ModelCatalogEntry, ModelManager
@@ -47,6 +49,7 @@ class AgentRuntime:
         self._active_operations = 0
         self._switching_model = False
         self._chat_lock = asyncio.Lock()
+        self._motion_cancellations: dict[str, set[CancellationToken]] = {}
 
     async def start(self) -> None:
         """Start persistence and all tool providers transactionally."""
@@ -150,8 +153,28 @@ class AgentRuntime:
         )
 
     def disarm_motion(self, session_id: str) -> None:
-        """Revoke one session's physical-motion consent."""
+        """Revoke one session's consent and cancel its active motion tools."""
         self.motion_arms.disarm(session_id)
+        self.loop.cancel_session(session_id)
+        for token in self._motion_cancellations.pop(session_id, set()):
+            token.cancel()
+
+    async def stop_and_disarm_motion(
+        self,
+        session_id: str,
+        *,
+        lease_id: str | None = None,
+        requested_by: str = "local-controller",
+    ) -> ToolExecutionResult:
+        """Revoke consent, cancel motion work, and request an immediate servo stop."""
+        self.disarm_motion(session_id)
+        return await self.execute_tool(
+            tool_name="robot.servo.stop",
+            arguments={},
+            session_id=session_id,
+            lease_id=lease_id,
+            requested_by=requested_by,
+        )
 
     async def execute_tool(
         self,
@@ -210,19 +233,31 @@ class AgentRuntime:
             correlation_id=call_id,
             data={"tool": tool_name},
         )
-        result = await self.tools.call(
-            ToolInvocation(
-                call=ToolCall(
-                    call_id=call_id,
-                    name=tool_name,
-                    arguments=arguments,
+        effective_cancellation = cancellation
+        if definition.risk is RiskLevel.MOTION:
+            effective_cancellation = cancellation or CancellationToken()
+            self._motion_cancellations.setdefault(session_id, set()).add(effective_cancellation)
+        try:
+            result = await self.tools.call(
+                ToolInvocation(
+                    call=ToolCall(
+                        call_id=call_id,
+                        name=tool_name,
+                        arguments=arguments,
+                    ),
+                    session_id=session_id,
+                    requested_by=requested_by,
+                    lease_id=lease_id,
                 ),
-                session_id=session_id,
-                requested_by=requested_by,
-                lease_id=lease_id,
-            ),
-            cancellation,
-        )
+                effective_cancellation,
+            )
+        finally:
+            if definition.risk is RiskLevel.MOTION and effective_cancellation is not None:
+                active = self._motion_cancellations.get(session_id)
+                if active is not None:
+                    active.discard(effective_cancellation)
+                    if not active:
+                        self._motion_cancellations.pop(session_id, None)
         event_type = (
             AgentEventType.TOOL if result.status.value == "succeeded" else AgentEventType.ERROR
         )
@@ -244,7 +279,7 @@ class AgentRuntime:
         if self._closed:
             return
         self._closed = True
-        self.motion_arms.disarm_all()
+        self._disarm_all_motion()
         await self.tools.close()
         await self.provider.close()
         await self.store.close()
@@ -284,7 +319,7 @@ class AgentRuntime:
         self._switching_model = True
         try:
             selected = await self.models.select(provider_id, model)
-            self.motion_arms.disarm_all()
+            self._disarm_all_motion()
             await self.events.publish(
                 AgentEventType.SERVICE,
                 f"Agent model changed to {provider_id}/{model}.",
@@ -297,6 +332,19 @@ class AgentRuntime:
             return selected
         finally:
             self._switching_model = False
+
+    def _disarm_all_motion(self) -> None:
+        """Revoke all arms and cancel every active motion tool."""
+        self.motion_arms.disarm_all()
+        self.loop.cancel_all()
+        tokens = tuple(
+            token
+            for session_tokens in self._motion_cancellations.values()
+            for token in session_tokens
+        )
+        self._motion_cancellations.clear()
+        for token in tokens:
+            token.cancel()
 
     def _begin_operation(self) -> None:
         if self._switching_model:

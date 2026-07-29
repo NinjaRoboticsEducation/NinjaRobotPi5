@@ -2207,6 +2207,83 @@ Update `README.md`, `InstallationGuide.md`, `DevelopmentGuide.md`,
 `DevelopmentLog.md`, this plan, and the dated Phase 5 Raspberry Pi validation
 checklist.
 
+#### Phase 5.10 — Session-lived authorization and creative behavior composition
+
+**Status**
+
+Implemented on 2026-07-29. Automated validation passes; the dated Raspberry Pi
+expression, raised-wheel motion, cancellation, and saving checklist remains
+operator work.
+
+**Objective**
+
+- Prevent confirmed motion authorization from expiring while a slow local
+  model is still reasoning.
+- Make runtime facts unambiguous: `execution_mode = real` means physical
+  hardware, and an armed authorization permits trusted motion tools.
+- Revoke authorization on Disarm, Emergency Stop, lease loss, model change,
+  and service shutdown.
+- Cancel active motion work and request a servo stop when a session disarms.
+- Let the agent create transient multi-stage behaviors from approved animated
+  faces, text, bounded tones, named melodies, and configured logical servo
+  roles.
+- Keep expression-only and motion-capable tools separate so catalog risk
+  remains deterministic.
+- Preserve camera and microphone privacy confirmation independently from
+  motion arming.
+- Require explicit request confirmation before saving an AI-created behavior.
+
+**IDE deliverables**
+
+- `ToneOperation` with the existing buzzer limits: 20–20,000 Hz, 0.05–2
+  seconds, and volume 1–128.
+- `behavior.execute_expression`, whose published schema excludes drive
+  operations.
+- `behavior.execute_movement`, whose published schema lists only configured
+  logical servo roles and retains all motion guards.
+- `behavior.save_user`, classified as maintenance work and backed by the
+  confined, atomic, non-overwriting behavior repository.
+- Sequential stages, concurrent non-conflicting operations, cancellation,
+  shared resources, and return-to-Idle cleanup.
+
+**Agent deliverables**
+
+- Session-lived `MotionArmManager` state.
+- Structured real/simulation and motion-authorization runtime facts.
+- Model guidance to execute trusted tools rather than incorrectly refusing or
+  merely describing an available action.
+- Creative composition guidance and exact tool schemas.
+- `/confirm <request>` for one explicitly approved interactive request.
+- Compatibility fields retained for existing clients.
+
+**Validation**
+
+- Reproduced the physical test timing: a tool call more than five minutes
+  after arming remains authorized.
+- Unarmed and mismatched-lease motion remains denied.
+- Disarm cancels registered motion work and invokes the servo-stop boundary.
+- Expression schema omits drive; movement schema rejects unconfigured roles.
+- Tone bounds and same-stage buzzer conflicts are rejected.
+- Transient expression and movement definitions execute in simulation.
+- Model tool-call tests cover armed creative movement.
+- Saving is denied without confirmation, succeeds with confirmation, rejects
+  duplicates, and remains path-confined.
+- Full compile, Ruff, formatting, MyPy, pytest, package-build,
+  immutable-driver, JavaScript, manifest, and diff checks.
+
+**Hardware risk**
+
+Automated tests are simulation-only. Physical expression tests energize the
+display and buzzer. Dynamic movement tests must start with both wheels raised,
+Emergency Stop ready, and short finite drive stages. Floor testing follows
+only after cancellation, Disarm, Level 1, and Level 2 checks pass.
+
+**Documentation**
+
+Update `README.md`, `InstallationGuide.md`, `DevelopmentGuide.md`,
+`DevelopmentLog.md`, this implementation plan, and
+`docs/validation/phase-5-dynamic-behavior-validation-2026-07-29.md`.
+
 ### Phase 6: Cloud provider adapters
 
 **Objective**

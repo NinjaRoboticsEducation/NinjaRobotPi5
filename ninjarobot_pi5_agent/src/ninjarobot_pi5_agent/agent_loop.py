@@ -101,6 +101,7 @@ class AgentLoop:
         )
         self._id_factory = id_factory or (lambda: uuid.uuid4().hex)
         self._presentation = presentation or NullPresentationController()
+        self._active_cancellations: dict[str, CancellationToken] = {}
 
     async def chat(
         self,
@@ -117,6 +118,8 @@ class AgentLoop:
         request_timeout = self._config.request_timeout_seconds
         if skill is not None:
             request_timeout = min(request_timeout, skill.manifest.limits.timeout_seconds)
+        token = cancellation or CancellationToken()
+        self._active_cancellations[session_id] = token
         try:
             async with asyncio.timeout(request_timeout):
                 return await self._chat(
@@ -125,7 +128,7 @@ class AgentLoop:
                     skill=skill,
                     lease_id=lease_id,
                     confirmed=confirmed,
-                    cancellation=cancellation,
+                    cancellation=token,
                     on_text_delta=on_text_delta,
                 )
         except TimeoutError as exc:
@@ -133,6 +136,8 @@ class AgentLoop:
                 f"agent request exceeded its {request_timeout:g}-second limit"
             ) from exc
         finally:
+            if self._active_cancellations.get(session_id) is token:
+                self._active_cancellations.pop(session_id, None)
             await asyncio.shield(
                 self._present(
                     "idle",
@@ -140,6 +145,19 @@ class AgentLoop:
                     session_id=session_id,
                 )
             )
+
+    def cancel_session(self, session_id: str) -> None:
+        """Cancel active reasoning or tool work for one session."""
+        token = self._active_cancellations.get(session_id)
+        if token is not None:
+            token.cancel()
+
+    def cancel_all(self) -> None:
+        """Cancel every active conversation during global revocation."""
+        tokens = tuple(self._active_cancellations.values())
+        self._active_cancellations.clear()
+        for token in tokens:
+            token.cancel()
 
     async def _chat(
         self,
@@ -246,6 +264,8 @@ class AgentLoop:
             )
             await self._append(session_id, assistant)
             for call in turn.tool_calls:
+                if token.cancelled:
+                    raise asyncio.CancelledError
                 completed_tool_calls += 1
                 if completed_tool_calls > max_tool_calls:
                     raise AgentLoopError("agent exceeded the configured tool-call limit")

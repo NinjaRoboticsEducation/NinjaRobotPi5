@@ -164,6 +164,15 @@ class MelodyOperation(BehaviorModel):
     volume: Annotated[int, Field(ge=0, le=128)] = 64
 
 
+class ToneOperation(BehaviorModel):
+    """Play one bounded passive-buzzer tone."""
+
+    kind: Literal["tone"]
+    frequency_hz: Annotated[int, Field(ge=20, le=20_000)]
+    duration_seconds: Annotated[float, Field(ge=0.05, le=2.0)] = 0.25
+    volume: Annotated[int, Field(ge=1, le=128)] = 64
+
+
 class DriveOperation(BehaviorModel):
     """Drive one or more logical continuous-rotation servo roles."""
 
@@ -189,7 +198,12 @@ class WaitOperation(BehaviorModel):
 
 
 BehaviorOperation = Annotated[
-    FaceOperation | TextOperation | MelodyOperation | DriveOperation | WaitOperation,
+    FaceOperation
+    | TextOperation
+    | MelodyOperation
+    | ToneOperation
+    | DriveOperation
+    | WaitOperation,
     Field(discriminator="kind"),
 ]
 
@@ -219,6 +233,9 @@ class BehaviorStage(BehaviorModel):
         display_operations = sum(kind in {"face", "text"} for kind in kinds)
         if display_operations > 1:
             raise ValueError("a behavior stage may contain only one display operation")
+        buzzer_operations = sum(kind in {"melody", "tone"} for kind in kinds)
+        if buzzer_operations > 1:
+            raise ValueError("a behavior stage may contain only one buzzer operation")
         return self
 
 
@@ -279,7 +296,7 @@ class BehaviorDefinition(BehaviorModel):
             for operation in stage.operations:
                 if operation.kind in {"face", "text"}:
                     resources.add("display")
-                elif operation.kind == "melody":
+                elif operation.kind in {"melody", "tone"}:
                     resources.add("buzzer")
                 elif operation.kind == "drive":
                     resources.update({"distance_sensor", "servo_bus"})

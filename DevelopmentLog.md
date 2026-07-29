@@ -1,5 +1,73 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-29 — Session-lived AI motion and creative behavior composition
+
+### Summary
+
+Repaired the local-agent movement failure and expanded the IDE boundary so the
+robot can express model-selected combinations rather than only running bundled
+behavior names:
+
+- reproduced the real failure where a Qwen tool call arrived more than seven
+  minutes after the prompt and was denied because its 300-second arm expired
+- replaced time-limited consent with session-lived consent revoked by Disarm,
+  Emergency Stop, controller loss, model change, or service shutdown
+- made Disarm cancel active motion tokens and request an immediate servo stop
+- replaced ambiguous model-visible state with explicit real/simulation and
+  motion-authorization facts while retaining compatibility fields
+- instructed local models that an armed real session may execute trusted
+  robot tools instead of incorrectly refusing or merely explaining the action
+- added transient expression and movement capabilities that combine validated
+  faces, text, tones, melodies, and logical servo targets
+- added a bounded tone behavior operation using the existing buzzer limits
+- made expression schemas omit drive operations and movement schemas publish
+  only configured logical servo roles
+- added confirmation-gated `behavior.save_user` plus interactive
+  `/confirm <request>`; assets remain confined, private, non-overwriting, and
+  schema-validated
+- kept camera and microphone privacy approval separate from motion arming
+
+### Main files changed
+
+- Agent policy, runtime, prompt, service state, IPC, web disarm handling, and
+  interactive CLI.
+- IDE behavior models, runtime, integrated capability adapters, and public
+  exports.
+- Agent and IDE policy, prompt, behavior, integration, and persistence tests.
+- Project, installation, developer, implementation-plan, log, and Raspberry
+  Pi validation documentation.
+
+No managed `pi5*` driver or nested NinjaClawBot file changed. The agent still
+uses hardware only through `ninjarobot_pi5_ide`.
+
+### Why
+
+The stored physical-test transcript proved two distinct causes. Runtime state
+was captured as armed, but a slow model exceeded the five-minute arm lifetime
+before its tool call reached policy. Other responses interpreted
+`simulated: false` backwards because the prompt called runtime state
+“untrusted data.” The prior agent also lacked a validated inline multimodule
+behavior capability, so creativity was limited to selecting bundled assets or
+calling devices independently.
+
+### Validation
+
+Every implementation phase passed immutable-driver verification and the full
+compile, Ruff, format, strict MyPy, and pytest gate. The pre-documentation gate
+reported 284 passing tests and one known Starlette test-client deprecation
+warning. The final documentation gate reported 285 passing tests, 57 strictly
+typed source files, 291 formatted files, clean JavaScript and web-manifest
+checks, successful agent and IDE source/wheel builds, required packaged
+assets, 222 immutable tracked driver files plus 25 authorized repairs, and a
+clean `git diff --check`.
+
+### Raspberry Pi status
+
+Automated validation is simulation-only. Follow
+`docs/validation/phase-5-dynamic-behavior-validation-2026-07-29.md` in order.
+Keep both wheels raised until expression, authorization, cancellation,
+Disarm, obstacle, and Emergency Stop checks pass.
+
 ## 2026-07-29 — Model-arm, HTTPS chain, and mobile viewport repair
 
 ### Summary
