@@ -9,6 +9,8 @@ This checklist verifies:
 - distance, camera, and microphone restart in the same agent service
 - Greeting and Celebrate returning to looping Idle
 - repeatable one-photo AI camera permission from `/camera` and **AI camera**
+- deterministic English and Japanese photo requests that do not rely on the
+  selected language model
 - the `3`, `2`, `1` countdown and animated camera icon
 - temporary preview cleanup and transcript redaction
 
@@ -146,14 +148,15 @@ First verify that camera permission is required:
 2. Ask: `Use the robot camera to take one temporary photo now.`
 
 Expected result: the model cannot execute `robot.camera.preview` without the
-one-shot grant.
+one-shot grant. The response should be the stable service message explaining
+that `/camera` or **AI camera** is required; model wording should not appear.
 
 Now grant and use one photo:
 
 1. Press **AI camera**.
 2. Approve the confirmation.
 3. Confirm the button says **AI camera ready**.
-4. Ask: `Use robot.camera.preview now and take one temporary photo.`
+4. Ask: `Please take a photo.`
 
 Expected result:
 
@@ -163,6 +166,8 @@ Expected result:
 - **AI camera ready** turns off after successful preview delivery
 - the response completes and the display returns to looping Idle
 - the preview closes automatically after about 15 seconds
+- the response reports zero model turns in terminal or diagnostic output,
+  because the trusted service handled the request directly
 
 Ask for another photo without pressing **AI camera** again.
 
@@ -186,6 +191,28 @@ Expected result:
 - every successful photo turns **AI camera ready** off
 - requesting another photo without a fourth grant is refused
 - each completed request returns the display to looping Idle
+- the result does not depend on which Ollama or cloud model is selected
+
+Test Japanese once with a fresh grant:
+
+```text
+写真を撮ってください。
+```
+
+Expected result: it follows the same countdown, temporary preview, grant
+consumption, and Idle lifecycle.
+
+Finally verify that the intent check is conservative. Grant one photo, then
+send each message separately:
+
+```text
+How does the camera work?
+Do not take a photo.
+```
+
+Expected result: neither message captures a photo or consumes the grant. The
+first remains an ordinary AI question. The negative request does not capture.
+Afterward, `Please take a photo` should still use the unconsumed grant.
 
 You can also grant from terminal chat:
 
@@ -276,7 +303,10 @@ the robot and confirming all modules are healthy.
 - One successful temporary preview consumes exactly one camera grant.
 - A later explicit grant works in the same conversation and authorizes one
   additional preview.
+- A recognized granted photo request executes without depending on an LLM tool
+  decision.
 - A failed preview does not consume the grant.
+- Camera questions and negated requests do not consume the grant.
 - Preview JPEG bytes remain live-only and are not stored in transcripts or
   durable events.
 
@@ -299,6 +329,10 @@ the robot and confirming all modules are healthy.
 | Second grant succeeds in the same chat |  |  |
 | Third grant succeeds in the same chat |  |  |
 | Grant number increases for each permission |  |  |
+| Authorized capture works even if the model would refuse |  |  |
+| Japanese photo request succeeds |  |  |
+| Camera question does not capture |  |  |
+| Negative photo request does not capture |  |  |
 | Preview data is absent from retained state |  |  |
 | Raised-wheel Celebrate returns to Idle |  |  |
 | Chrome mobile flow passes |  |  |

@@ -1,5 +1,56 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-30 — Deterministic granted camera requests
+
+### Summary
+
+Closed the remaining repeat-photo failure found during physical testing:
+
+- Explicit English and Japanese requests to take a photo are now recognized
+  before the first model turn.
+- With a valid current grant, the service directly constructs
+  `robot.camera.preview` and executes it through the existing policy and IDE.
+- Without a matching grant, the service returns stable `/camera` guidance.
+- Camera questions and negated requests do not enter the deterministic capture
+  path.
+- Deterministic replies report zero model turns and stream normally to the web
+  and terminal interfaces.
+
+### Main files changed
+
+- Agent loop deterministic intent, camera execution, response, and model-turn
+  accounting.
+- Regression tests for model refusal, three same-chat grants, English and
+  Japanese matching, negation, questions, lease mismatch, failure retry,
+  streaming, and JPEG redaction.
+- README, installation guide, developer guide, implementation plan, this log,
+  and the Raspberry Pi validation checklist.
+
+No managed `pi5*` driver or nested `NinjaClawBot/` file changed.
+
+### Why
+
+The physical transcript showed a successful first `robot.camera.preview`, then
+assistant-only authorization refusals after later grants. The action ledger
+contained no second camera attempt and no policy or IDE denial. The previous
+test proved that a scripted cooperative model could call the tool, but did not
+cover a model that ignored trusted runtime authorization. Privacy permission
+must be enforced by deterministic service code, not model interpretation.
+
+### Validation
+
+- Pre-change and implementation-phase immutable-driver verification passed.
+- Compilation, Ruff, formatting, strict MyPy, and all 329 tests passed.
+- The refusal-model regression confirms the provider receives zero requests
+  while the authorized photo succeeds and remains redacted from the transcript.
+- Final documentation-phase validation is recorded at task handoff.
+- Physical Raspberry Pi camera acceptance remains pending.
+
+### Recommended next step
+
+Run the updated Phase 5 camera checklist with three grants in one unchanged
+chat, including the Japanese, camera-question, and negative-request checks.
+
 ## 2026-07-30 — Repeatable one-photo AI camera grants
 
 ### Summary

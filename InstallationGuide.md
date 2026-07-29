@@ -842,6 +842,12 @@ In the web interface, you can press **AI camera** instead. Then ask:
 Take one photo now.
 ```
 
+Japanese is also supported:
+
+```text
+写真を撮ってください。
+```
+
 The robot display counts down `3`, `2`, `1`, then shows an animated camera
 icon while capturing. The temporary photograph appears in the web preview and
 is not retained on disk. A successful preview uses the permission. If capture
@@ -849,7 +855,9 @@ fails, the permission remains ready so you can correct the camera problem and
 try again. After a successful photo, enter `/camera` again or press **AI
 camera** again before asking for another photo. You can repeat this as many
 times as needed in the same chat; every grant still permits only one successful
-photo.
+photo. Clear photo requests are handled directly by the trusted service rather
+than being left to the selected AI model, so changing models does not change
+this permission behavior.
 
 Try a non-moving creative expression first:
 

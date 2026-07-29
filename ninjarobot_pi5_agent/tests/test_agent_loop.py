@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from ninjarobot_pi5_agent.agent_loop import _is_camera_preview_request
 from ninjarobot_pi5_agent.testing import FakeProvider
 from ninjarobot_pi5_ide.testing import FakeIDEClient
 
@@ -33,7 +34,13 @@ from ninjarobot_pi5_agent import (
     ToolCall,
     ToolRegistry,
 )
-from ninjarobot_pi5_ide import CapabilityDescriptor, RiskLevel
+from ninjarobot_pi5_ide import (
+    ActionStatus,
+    CapabilityDescriptor,
+    ErrorDetails,
+    RetrySafety,
+    RiskLevel,
+)
 
 
 def descriptor(
@@ -276,27 +283,18 @@ def test_one_shot_ai_camera_preview_is_ephemeral_and_redacted(tmp_path: Path) ->
         policy = PolicyEngine(MotionArmManager(), grants)
         events = EventBroker()
         queue = await events.subscribe()
+        provider = FakeProvider(
+            [
+                ModelTurn(
+                    request_id="id-2",
+                    text="I do not have camera authorization.",
+                    finish_reason=FinishReason.STOP,
+                ),
+            ]
+        )
+        streamed: list[str] = []
         loop = AgentLoop(
-            provider=FakeProvider(
-                [
-                    ModelTurn(
-                        request_id="id-2",
-                        finish_reason=FinishReason.TOOL_CALLS,
-                        tool_calls=(
-                            ToolCall(
-                                call_id="camera-call",
-                                name="robot.camera.preview",
-                                arguments={},
-                            ),
-                        ),
-                    ),
-                    ModelTurn(
-                        request_id="id-5",
-                        text="The temporary photo is ready.",
-                        finish_reason=FinishReason.STOP,
-                    ),
-                ]
-            ),
+            provider=provider,
             tools=registry,
             policy=policy,
             recovery=RecoveryPolicy(),
@@ -305,9 +303,17 @@ def test_one_shot_ai_camera_preview_is_ephemeral_and_redacted(tmp_path: Path) ->
             id_factory=_IDs(),
         )
 
-        reply = await loop.chat(session_id="camera-session", text="Take a photo")
+        reply = await loop.chat(
+            session_id="camera-session",
+            text="Take a photo",
+            on_text_delta=lambda text: _record_delta(streamed, text),
+        )
 
         assert reply.tool_calls == 1
+        assert reply.model_turns == 0
+        assert reply.text == "The temporary photo is ready."
+        assert streamed == ["The temporary photo is ready."]
+        assert provider.requests == []
         assert not grants.is_granted("camera-session")
         transcript = await store.messages("camera-session")
         tool_message = next(
@@ -363,43 +369,17 @@ def test_ai_camera_can_be_regranted_in_the_same_conversation(tmp_path: Path) -> 
         await registry.start()
         grants = CameraGrantManager()
         assert grants.grant("camera-session", confirmed=True) == 1
+        provider = FakeProvider(
+            [
+                ModelTurn(
+                    request_id="id-2",
+                    text="I still do not have authorization.",
+                    finish_reason=FinishReason.STOP,
+                ),
+            ]
+        )
         loop = AgentLoop(
-            provider=FakeProvider(
-                [
-                    ModelTurn(
-                        request_id="id-2",
-                        finish_reason=FinishReason.TOOL_CALLS,
-                        tool_calls=(
-                            ToolCall(
-                                call_id="camera-call-1",
-                                name="robot.camera.preview",
-                                arguments={},
-                            ),
-                        ),
-                    ),
-                    ModelTurn(
-                        request_id="id-5",
-                        text="The first temporary photo is ready.",
-                        finish_reason=FinishReason.STOP,
-                    ),
-                    ModelTurn(
-                        request_id="id-8",
-                        finish_reason=FinishReason.TOOL_CALLS,
-                        tool_calls=(
-                            ToolCall(
-                                call_id="camera-call-2",
-                                name="robot.camera.preview",
-                                arguments={},
-                            ),
-                        ),
-                    ),
-                    ModelTurn(
-                        request_id="id-11",
-                        text="The second temporary photo is ready.",
-                        finish_reason=FinishReason.STOP,
-                    ),
-                ]
-            ),
+            provider=provider,
             tools=registry,
             policy=PolicyEngine(MotionArmManager(), grants),
             recovery=RecoveryPolicy(),
@@ -418,12 +398,286 @@ def test_ai_camera_can_be_regranted_in_the_same_conversation(tmp_path: Path) -> 
         )
 
         assert second.tool_calls == 1
-        assert capture_count == 2
+        assert not grants.is_granted("camera-session")
+
+        assert grants.grant("camera-session", confirmed=True) == 3
+        third = await loop.chat(
+            session_id="camera-session",
+            text="写真を撮ってください。",
+        )
+
+        assert third.tool_calls == 1
+        assert capture_count == 3
+        assert provider.requests == []
         assert not grants.is_granted("camera-session")
         transcript = await store.messages("camera-session")
         tool_messages = [item.message for item in transcript if item.message.role.value == "tool"]
-        assert len(tool_messages) == 2
+        assert len(tool_messages) == 3
         assert all("jpeg_base64" not in item.content for item in tool_messages)
+
+        await registry.close()
+        await store.close()
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Please take one more photo.",
+        "Could you capture a picture now?",
+        "Snap a photograph for me.",
+        "写真を撮ってください。",
+        "写真を撮影してください。",
+    ],
+)
+def test_camera_preview_intent_recognizes_explicit_capture_requests(text: str) -> None:
+    assert _is_camera_preview_request(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "How does the camera work?",
+        "Tell me about photography.",
+        "Do not take a photo.",
+        "Never capture a picture.",
+        "写真を撮らないでください。",
+        "カメラについて説明してください。",
+    ],
+)
+def test_camera_preview_intent_rejects_questions_and_negative_requests(text: str) -> None:
+    assert not _is_camera_preview_request(text)
+
+
+def test_camera_request_without_a_matching_grant_is_deterministically_refused(
+    tmp_path: Path,
+) -> None:
+    async def exercise() -> None:
+        store = ConversationStore(tmp_path / "camera-refusal.sqlite3")
+        await store.start()
+        ide = FakeIDEClient(
+            (
+                descriptor(
+                    risk=RiskLevel.PRIVACY,
+                    name="camera.preview",
+                ),
+            )
+        )
+        registry = ToolRegistry((IDEToolProvider(ide),))
+        await registry.start()
+        grants = CameraGrantManager()
+        grants.grant(
+            "camera-session",
+            confirmed=True,
+            lease_id="expected-lease",
+        )
+        provider = FakeProvider(
+            [
+                ModelTurn(
+                    request_id="id-2",
+                    text="The model should not be called.",
+                    finish_reason=FinishReason.STOP,
+                ),
+            ]
+        )
+        loop = AgentLoop(
+            provider=provider,
+            tools=registry,
+            policy=PolicyEngine(MotionArmManager(), grants),
+            recovery=RecoveryPolicy(),
+            store=store,
+            id_factory=_IDs(),
+        )
+
+        reply = await loop.chat(
+            session_id="camera-session",
+            lease_id="wrong-lease",
+            text="Please take a photo.",
+        )
+
+        assert reply.model_turns == 0
+        assert reply.tool_calls == 0
+        assert "not currently granted" in reply.text
+        assert provider.requests == []
+        assert grants.is_granted(
+            "camera-session",
+            lease_id="expected-lease",
+        )
+
+        await registry.close()
+        await store.close()
+
+    asyncio.run(exercise())
+
+
+def test_failed_deterministic_camera_request_keeps_the_grant(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        store = ConversationStore(tmp_path / "camera-failure.sqlite3")
+        await store.start()
+        ide = FakeIDEClient(
+            (
+                descriptor(
+                    risk=RiskLevel.PRIVACY,
+                    name="camera.preview",
+                ),
+            )
+        )
+        original_execute = ide.execute
+
+        async def fail_camera(request):
+            result = await original_execute(request)
+            return result.model_copy(
+                update={
+                    "status": ActionStatus.FAILED,
+                    "data": None,
+                    "error": ErrorDetails(
+                        code="CAMERA_UNAVAILABLE",
+                        message="The camera is temporarily unavailable.",
+                        definitely_not_executed=True,
+                        retry_safety=RetrySafety.SAFE,
+                        capability="camera.preview",
+                        action_id=result.action_id,
+                    ),
+                    "retry_safety": RetrySafety.SAFE,
+                }
+            )
+
+        ide.execute = fail_camera  # type: ignore[method-assign]
+        registry = ToolRegistry((IDEToolProvider(ide),))
+        await registry.start()
+        grants = CameraGrantManager()
+        grants.grant("camera-session", confirmed=True)
+        provider = FakeProvider(())
+        loop = AgentLoop(
+            provider=provider,
+            tools=registry,
+            policy=PolicyEngine(MotionArmManager(), grants),
+            recovery=RecoveryPolicy(),
+            store=store,
+            id_factory=_IDs(),
+        )
+
+        reply = await loop.chat(
+            session_id="camera-session",
+            text="Please capture a photo.",
+        )
+
+        assert reply.model_turns == 0
+        assert reply.tool_calls == 1
+        assert "grant remains ready" in reply.text
+        assert grants.is_granted("camera-session")
+        assert provider.requests == []
+
+        await registry.close()
+        await store.close()
+
+    asyncio.run(exercise())
+
+
+def test_negative_camera_request_does_not_consume_a_grant(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        store = ConversationStore(tmp_path / "negative-camera.sqlite3")
+        await store.start()
+        ide = FakeIDEClient(
+            (
+                descriptor(
+                    risk=RiskLevel.PRIVACY,
+                    name="camera.preview",
+                ),
+            )
+        )
+        registry = ToolRegistry((IDEToolProvider(ide),))
+        await registry.start()
+        grants = CameraGrantManager()
+        grants.grant("camera-session", confirmed=True)
+        provider = FakeProvider(())
+        loop = AgentLoop(
+            provider=provider,
+            tools=registry,
+            policy=PolicyEngine(MotionArmManager(), grants),
+            recovery=RecoveryPolicy(),
+            store=store,
+            id_factory=_IDs(),
+        )
+
+        reply = await loop.chat(
+            session_id="camera-session",
+            text="Do not take a photo.",
+        )
+
+        assert reply.model_turns == 0
+        assert reply.tool_calls == 0
+        assert reply.text.startswith("No photo was taken.")
+        assert grants.is_granted("camera-session")
+        assert ide.requests == []
+        assert provider.requests == []
+
+        await registry.close()
+        await store.close()
+
+    asyncio.run(exercise())
+
+
+def test_model_cannot_spend_camera_grant_on_a_non_capture_turn(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        store = ConversationStore(tmp_path / "camera-question.sqlite3")
+        await store.start()
+        ide = FakeIDEClient(
+            (
+                descriptor(
+                    risk=RiskLevel.PRIVACY,
+                    name="camera.preview",
+                ),
+            )
+        )
+        registry = ToolRegistry((IDEToolProvider(ide),))
+        await registry.start()
+        grants = CameraGrantManager()
+        grants.grant("camera-session", confirmed=True)
+        provider = FakeProvider(
+            [
+                ModelTurn(
+                    request_id="id-2",
+                    finish_reason=FinishReason.TOOL_CALLS,
+                    tool_calls=(
+                        ToolCall(
+                            call_id="untrusted-camera-choice",
+                            name="robot.camera.preview",
+                            arguments={},
+                        ),
+                    ),
+                ),
+                ModelTurn(
+                    request_id="id-5",
+                    text="The camera is used for temporary previews.",
+                    finish_reason=FinishReason.STOP,
+                ),
+            ]
+        )
+        loop = AgentLoop(
+            provider=provider,
+            tools=registry,
+            policy=PolicyEngine(MotionArmManager(), grants),
+            recovery=RecoveryPolicy(),
+            store=store,
+            id_factory=_IDs(),
+        )
+
+        reply = await loop.chat(
+            session_id="camera-session",
+            text="How does the camera work?",
+        )
+
+        assert reply.model_turns == 2
+        assert reply.tool_calls == 1
+        assert grants.is_granted("camera-session")
+        assert ide.requests == []
+        transcript = await store.messages("camera-session")
+        tool_message = next(
+            item.message for item in transcript if item.message.role.value == "tool"
+        )
+        assert "clear user capture request" in tool_message.content
 
         await registry.close()
         await store.close()

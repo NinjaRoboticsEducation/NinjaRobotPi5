@@ -52,8 +52,10 @@ def test_prompt_order_keeps_safety_before_skill_and_conversation(tmp_path) -> No
     assert "unlimited successive grants" in messages[1].content
     assert "Never use" in messages[1].content
     assert "robot.camera.capture" in messages[1].content
-    assert "overrides stale conversation messages" in messages[0].content
-    assert "regardless of earlier camera messages" in messages[2].content
+    assert "routed by the trusted service" in messages[0].content
+    assert "Do not propose" in messages[0].content
+    assert "Do not spend that grant" in messages[1].content
+    assert "only the trusted deterministic camera" in messages[2].content
     assert '"current_grant_sequence": 2' in messages[2].content
     assert "Retained camera captures" in messages[1].content
     assert "subordinate workflow" in messages[3].content

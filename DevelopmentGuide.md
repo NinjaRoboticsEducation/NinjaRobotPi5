@@ -992,6 +992,18 @@ grant overrides stale transcript messages about an older consumed grant. The
 Base64 JPEG is sent through a non-retained live event and removed from the tool
 result before it enters the conversation transcript or returns to the model.
 
+`AgentLoop` also owns a deterministic camera-intent boundary. Conservative
+English and Japanese matching recognizes explicit requests to take a photo
+while rejecting camera questions and negated requests. A recognized request is
+resolved before the first model turn. Without a matching session-and-lease
+grant, the service returns `/camera` guidance. With a grant, it constructs a
+fixed `robot.camera.preview` call and sends it through the same policy,
+cancellation, tool registry, IDE, presentation, event, and redaction paths used
+by model-proposed tools. The response reports `model_turns = 0`, which means no
+LLM was consulted. This prevents small or cloud models from verbally refusing a
+valid current grant and prevents old transcript wording from controlling
+privacy authorization.
+
 The model receives unambiguous trusted service facts:
 
 ```json
@@ -1131,6 +1143,11 @@ followed by an animated camera icon. After the tool finishes, the normal agent
 lifecycle continues through Thinking or Speaking and ends in Idle. A successful
 preview consumes only that numbered grant; the user can invoke `/camera` again
 immediately in the same conversation.
+
+Do not broaden the deterministic matcher into a general camera keyword test.
+Questions such as `How does the camera work?` must remain conversational, and
+negated requests such as `Do not take a photo` must never capture. Any new
+language form needs positive, negative, no-grant, failure, and redaction tests.
 
 Conversation presentation also stays behind `RobotIDEClient`. The agent may
 request only silent ambient faces; it never receives a display driver.

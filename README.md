@@ -189,7 +189,10 @@ camera files keep separate privacy confirmation. Entering `/camera` or pressing
 The grant remains available after a failed attempt and is consumed only after a
 successful preview is delivered. Each later `/camera` command or button press
 issues a fresh numbered grant, so the same chat can take as many photos as the
-user explicitly authorizes—one grant and one photo at a time.
+user explicitly authorizes—one grant and one photo at a time. Clear English or
+Japanese capture requests such as `Take a photo` or `写真を撮ってください` are
+routed deterministically through policy and the IDE. They do not depend on the
+selected language model correctly choosing the camera tool.
 
 The agent is also an MCP host. MCP means Model Context Protocol, a standard
 connection for separately installed tools. The official hosted Tavily MCP
@@ -379,7 +382,9 @@ agent to take a photograph. A successful capture appears in the temporary web
 preview and consumes the grant. A failed capture keeps the same grant so the
 operator can correct the camera and try again. Retained files are never created
 by this one-photo path. After a successful photo, enter `/camera` or press
-**AI camera** again to issue a new grant in the same chat session.
+**AI camera** again to issue a new grant in the same chat session. Explicit
+English and Japanese photo requests use a deterministic service path, so an LLM
+(large language model) refusal cannot override a valid current grant.
 
 Quitting a CLI disconnects only that terminal. Use `web stop` to stop the web
 interface and `service stop` to release the model, IDE, hardware, MCP, database,

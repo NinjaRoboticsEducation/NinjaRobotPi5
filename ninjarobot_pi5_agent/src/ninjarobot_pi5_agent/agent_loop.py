@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
+import unicodedata
 import uuid
 from collections.abc import Awaitable, Callable
 from typing import Annotated, Any
@@ -62,7 +64,7 @@ class AgentReply(BaseModel):
 
     session_id: Annotated[str, StringConstraints(min_length=1, max_length=128)]
     text: Annotated[str, StringConstraints(min_length=1, max_length=20_000)]
-    model_turns: Annotated[int, Field(ge=1)]
+    model_turns: Annotated[int, Field(ge=0)]
     tool_calls: Annotated[int, Field(ge=0)]
 
 
@@ -211,6 +213,18 @@ class AgentLoop:
             max_model_turns = self._config.max_model_turns
             max_tool_calls = self._config.max_tool_calls
 
+        available_tool_names = {definition.name for definition in definitions}
+        camera_reply = await self._handle_deterministic_camera_request(
+            text=text,
+            session_id=session_id,
+            lease_id=lease_id,
+            available_tool_names=available_tool_names,
+            cancellation=token,
+            on_text_delta=on_text_delta,
+        )
+        if camera_reply is not None:
+            return camera_reply
+
         completed_tool_calls = 0
         seen_call_ids: set[str] = set()
         for model_turn_number in range(1, max_model_turns + 1):
@@ -257,7 +271,6 @@ class AgentLoop:
                     tool_calls=completed_tool_calls,
                 )
 
-            available_tool_names = {definition.name for definition in definitions}
             turn = turn.model_copy(
                 update={
                     "tool_calls": tuple(
@@ -304,6 +317,145 @@ class AgentLoop:
                     ),
                 )
         raise AgentLoopError("agent exceeded the configured model-turn limit")
+
+    async def _handle_deterministic_camera_request(
+        self,
+        *,
+        text: str,
+        session_id: str,
+        lease_id: str | None,
+        available_tool_names: set[str],
+        cancellation: CancellationToken,
+        on_text_delta: TextDeltaHandler | None,
+    ) -> AgentReply | None:
+        """Execute a clearly requested, explicitly granted preview without an LLM."""
+        if _is_camera_preview_rejection(text):
+            return await self._direct_reply(
+                session_id=session_id,
+                text=(
+                    "No photo was taken. Any current one-photo grant remains ready "
+                    "until you make a clear capture request."
+                ),
+                tool_calls=0,
+                on_text_delta=on_text_delta,
+            )
+        if not _is_camera_preview_request(text):
+            return None
+
+        camera_tool = "robot.camera.preview"
+        if camera_tool not in available_tool_names:
+            return await self._direct_reply(
+                session_id=session_id,
+                text=(
+                    "The temporary camera preview is unavailable in the current "
+                    "agent configuration."
+                ),
+                tool_calls=0,
+                on_text_delta=on_text_delta,
+            )
+
+        grants = self._policy.camera_grants
+        if not grants.is_granted(session_id, lease_id=lease_id):
+            return await self._direct_reply(
+                session_id=session_id,
+                text=(
+                    "AI camera access is not currently granted. Enter /camera or "
+                    "press AI camera, then ask me to take the photo again."
+                ),
+                tool_calls=0,
+                on_text_delta=on_text_delta,
+            )
+
+        if cancellation.cancelled:
+            raise asyncio.CancelledError
+        call = ToolCall(
+            call_id=f"{self._id_factory()}-camera-preview",
+            name=camera_tool,
+            arguments={},
+        )
+        await self._append(
+            session_id,
+            ModelMessage(
+                role=MessageRole.ASSISTANT,
+                content="",
+                tool_calls=(call,),
+            ),
+        )
+        result = await self._execute_call(
+            call,
+            session_id=session_id,
+            lease_id=lease_id,
+            confirmed=False,
+            duplicate=False,
+            cancellation=cancellation,
+            deterministic_camera_request=True,
+        )
+        await self._append(
+            session_id,
+            ModelMessage(
+                role=MessageRole.TOOL,
+                content=json.dumps(
+                    result.model_dump(mode="json"),
+                    sort_keys=True,
+                    ensure_ascii=False,
+                ),
+                name=call.name,
+                tool_call_id=call.call_id,
+            ),
+        )
+
+        if result.status is ToolExecutionStatus.SUCCEEDED:
+            reply_text = "The temporary photo is ready."
+        elif grants.is_granted(session_id, lease_id=lease_id):
+            reply_text = (
+                f"The camera preview failed: {result.error} "
+                "Your current one-photo grant remains ready, so you can try again."
+            )
+        else:
+            reply_text = (
+                f"The camera preview did not complete: {result.error} "
+                "Enter /camera or press AI camera before trying again."
+            )
+        await self._events.publish(
+            AgentEventType.CHAT,
+            "Deterministic camera request completed.",
+            session_id=session_id,
+            correlation_id=call.call_id,
+            data={"status": result.status.value},
+        )
+        return await self._direct_reply(
+            session_id=session_id,
+            text=reply_text,
+            tool_calls=1,
+            on_text_delta=on_text_delta,
+        )
+
+    async def _direct_reply(
+        self,
+        *,
+        session_id: str,
+        text: str,
+        tool_calls: int,
+        on_text_delta: TextDeltaHandler | None,
+    ) -> AgentReply:
+        """Persist and stream a deterministic response without a model turn."""
+        await self._present(
+            "responding",
+            self._presentation.responding,
+            session_id=session_id,
+        )
+        if on_text_delta is not None:
+            await on_text_delta(text)
+        await self._append(
+            session_id,
+            ModelMessage(role=MessageRole.ASSISTANT, content=text),
+        )
+        return AgentReply(
+            session_id=session_id,
+            text=text,
+            model_turns=0,
+            tool_calls=tool_calls,
+        )
 
     async def _model_turn(
         self,
@@ -382,6 +534,7 @@ class AgentLoop:
         confirmed: bool,
         duplicate: bool,
         cancellation: CancellationToken,
+        deterministic_camera_request: bool = False,
     ) -> ToolExecutionResult:
         if duplicate:
             return ToolExecutionResult(
@@ -398,6 +551,20 @@ class AgentLoop:
                 tool_name=call.name,
                 status=ToolExecutionStatus.DENIED,
                 error="The requested tool is unavailable.",
+            )
+        if (
+            call.name == "robot.camera.preview"
+            and not confirmed
+            and not deterministic_camera_request
+        ):
+            return ToolExecutionResult(
+                call_id=call.call_id,
+                tool_name=call.name,
+                status=ToolExecutionStatus.DENIED,
+                error=(
+                    "Temporary AI camera preview requires a clear user capture "
+                    "request handled by the trusted service."
+                ),
             )
         decision = self._policy.evaluate(
             definition,
@@ -586,3 +753,58 @@ def _contains_explicit_motion(value: Any) -> bool:
         return True
 
     return any(_contains_explicit_motion(item) for item in value.values())
+
+
+_ENGLISH_CAMERA_OBJECT = re.compile(
+    r"\b(?:photo(?:graph)?s?|pictures?|snapshots?)\b",
+)
+_ENGLISH_CAPTURE_ACTION = re.compile(
+    r"\b(?:take|capture|shoot|snap|photograph)\b",
+)
+_ENGLISH_NEGATED_CAPTURE = re.compile(
+    r"\b(?:do\s+not|don't|dont|never|not)\s+"
+    r"(?:please\s+)?(?:take|capture|shoot|snap|photograph)\b",
+)
+_JAPANESE_CAMERA_OBJECTS = ("写真", "撮影", "画像")
+_JAPANESE_CAPTURE_ACTIONS = ("撮って", "撮る", "撮影して", "写して")
+_JAPANESE_CAPTURE_NEGATIONS = (
+    "撮らない",
+    "撮らないで",
+    "撮影しない",
+    "撮影しないで",
+    "写さない",
+    "写さないで",
+)
+
+
+def _is_camera_preview_request(text: str) -> bool:
+    """Recognize conservative English and Japanese requests to capture a photo."""
+    normalized = unicodedata.normalize("NFKC", text).casefold().strip()
+    if not normalized:
+        return False
+    if _is_normalized_camera_preview_rejection(normalized):
+        return False
+    if _ENGLISH_CAMERA_OBJECT.search(normalized) and _ENGLISH_CAPTURE_ACTION.search(normalized):
+        return True
+    if any(negation in normalized for negation in _JAPANESE_CAPTURE_NEGATIONS):
+        return False
+    return any(item in normalized for item in _JAPANESE_CAMERA_OBJECTS) and any(
+        action in normalized for action in _JAPANESE_CAPTURE_ACTIONS
+    )
+
+
+def _is_camera_preview_rejection(text: str) -> bool:
+    """Recognize explicit English and Japanese instructions not to capture."""
+    normalized = unicodedata.normalize("NFKC", text).casefold().strip()
+    return bool(normalized) and _is_normalized_camera_preview_rejection(normalized)
+
+
+def _is_normalized_camera_preview_rejection(normalized: str) -> bool:
+    english_rejection = (
+        _ENGLISH_CAMERA_OBJECT.search(normalized) is not None
+        and _ENGLISH_NEGATED_CAPTURE.search(normalized) is not None
+    )
+    japanese_rejection = any(item in normalized for item in _JAPANESE_CAMERA_OBJECTS) and any(
+        negation in normalized for negation in _JAPANESE_CAPTURE_NEGATIONS
+    )
+    return english_rejection or japanese_rejection

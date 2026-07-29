@@ -2506,6 +2506,51 @@ retain a file, but everyone in view must consent before each capture.
 Update the core project documents and the Phase 5 recovery, Idle, and AI camera
 validation checklist with a three-grant same-session acceptance test.
 
+#### Phase 5.15 — Deterministic granted camera requests
+
+**Status**
+
+Implemented on 2026-07-30. Automated validation passes; Raspberry Pi camera
+acceptance remains operator work.
+
+**Objective**
+
+Prevent any selected language model from verbally refusing a valid one-photo
+grant before calling `robot.camera.preview`.
+
+**Deliverables**
+
+- Conservative English and Japanese capture-intent recognition.
+- Deterministic no-grant guidance without an LLM turn.
+- Direct construction of the fixed temporary-preview tool call when the
+  session-and-lease grant is active.
+- Existing policy, IDE, countdown, camera animation, cancellation, retry,
+  ephemeral delivery, redaction, and Idle behavior remain authoritative.
+- Camera questions and negated capture requests continue to normal
+  conversation and never trigger the deterministic capture path.
+- Accurate `model_turns = 0` reporting for deterministic replies.
+
+**Validation**
+
+- A fake model scripted to refuse is never called during an authorized photo.
+- Three successive numbered grants capture three previews in one unchanged
+  conversation.
+- English, Japanese, negative intent, camera questions, lease mismatch,
+  failure retry, live-only JPEG delivery, transcript redaction, and streaming
+  response behavior are covered.
+- Immutable drivers, compilation, Ruff, formatting, strict MyPy, and full
+  pytest pass.
+
+**Hardware risk**
+
+This path captures a real temporary photograph. It does not move servos or
+retain the image, but the operator must obtain consent from everyone in view.
+
+**Documentation**
+
+Update the core project documents and the Phase 5 recovery, Idle, and AI camera
+validation checklist with explicit model-independence checks.
+
 ### Phase 6: Cloud provider adapters
 
 **Objective**
