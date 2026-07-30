@@ -917,6 +917,7 @@ async def _run_provider_command(arguments: argparse.Namespace) -> int:
         await web_login(
             arguments.config,
             arguments.provider_id,
+            secret_file=arguments.secret_file,
             client_id_file=arguments.client_id_file,
         )
         _print_json(
@@ -947,8 +948,11 @@ async def _run_provider_command(arguments: argparse.Namespace) -> int:
         return 0
     if arguments.provider_command == "logout":
         if provider.auth_method == "oauth":
-            await web_logout(arguments.config, arguments.provider_id)
-            removed = True
+            removed = await web_logout(
+                arguments.config,
+                arguments.provider_id,
+                secret_file=arguments.secret_file,
+            )
         elif provider.api_key_env is not None:
             removed = secrets.delete(provider.api_key_env)
         else:
@@ -1253,51 +1257,50 @@ async def _interactive_model_selection(arguments: argparse.Namespace) -> None:
             f"\n{provider_id} authentication is set to {provider.auth_method}. "
             f"Credential source ready: {'yes' if configured else 'not confirmed'}."
         )
-        web_label = (
-            "Web Login (not supported for OpenAI API inference)"
-            if provider.kind == "openai"
-            else "Web Login"
-        )
-        print(f"1. {web_label}")
-        print("2. Enter API Key")
-        print("3. Continue with Current Authentication")
-        print("0. Back")
-        auth_choice = (await asyncio.to_thread(input, "Select authentication: ")).strip()
-        if auth_choice == "0":
-            return
-        if auth_choice == "1":
-            client_id_file: Path | None = None
-            if provider.kind == "gemini":
-                raw_path = (
-                    await asyncio.to_thread(
-                        input,
-                        "Google OAuth client JSON path (blank for gcloud default): ",
-                    )
-                ).strip()
-                client_id_file = Path(raw_path) if raw_path else None
-            await web_login(
-                arguments.config,
-                provider_id,
-                client_id_file=client_id_file,
-            )
-        elif auth_choice == "2":
-            if provider.api_key_env is None:
-                raise ValueError(f"{provider_id} has no API-key secret reference")
-            secret = await asyncio.to_thread(
-                getpass.getpass,
-                f"Enter {provider.api_key_env}: ",
-            )
-            confirmation = await asyncio.to_thread(
-                getpass.getpass,
-                f"Enter {provider.api_key_env} again: ",
-            )
-            if secret != confirmation:
-                raise ValueError("API key values did not match")
-            SecretStore(arguments.secret_file).set(provider.api_key_env, secret)
-            persist_auth_method(arguments.config, provider_id, "api_key")
-        elif auth_choice != "3":
-            print("Please choose 0, 1, 2, or 3.")
-            return
+        if provider.kind == "openai":
+            print("1. Enter API Key")
+            print("2. Continue with Current API Key")
+            print("0. Back")
+            auth_choice = (await asyncio.to_thread(input, "Select authentication: ")).strip()
+            if auth_choice == "0":
+                return
+            if auth_choice == "1":
+                await _interactive_set_api_key(arguments, provider_id, provider.api_key_env)
+            elif auth_choice != "2":
+                print("Please choose 0, 1, or 2.")
+                return
+        else:
+            print("1. Web Login")
+            print("2. Enter API Key")
+            print("3. Continue with Current Authentication")
+            print("0. Back")
+            auth_choice = (await asyncio.to_thread(input, "Select authentication: ")).strip()
+            if auth_choice == "0":
+                return
+            if auth_choice == "1":
+                client_id_file: Path | None = None
+                if provider.kind == "gemini":
+                    raw_path = (
+                        await asyncio.to_thread(
+                            input,
+                            "Google Desktop OAuth client JSON path: ",
+                        )
+                    ).strip()
+                    if not raw_path:
+                        print("Gemini Web Login requires a Desktop OAuth client JSON file.")
+                        return
+                    client_id_file = Path(raw_path)
+                await web_login(
+                    arguments.config,
+                    provider_id,
+                    secret_file=arguments.secret_file,
+                    client_id_file=client_id_file,
+                )
+            elif auth_choice == "2":
+                await _interactive_set_api_key(arguments, provider_id, provider.api_key_env)
+            elif auth_choice != "3":
+                print("Please choose 0, 1, 2, or 3.")
+                return
     models = await _available_models(arguments, provider=provider_id)
     if not models:
         print(f"No compatible {provider_id} models are available.")
@@ -1338,6 +1341,28 @@ async def _interactive_model_selection(arguments: argparse.Namespace) -> None:
             "informational; explicitly armed AI motion remains available through "
             "the normal IDE safety boundary."
         )
+
+
+async def _interactive_set_api_key(
+    arguments: argparse.Namespace,
+    provider_id: str,
+    api_key_env: str | None,
+) -> None:
+    """Collect and persist one cloud API key without echoing it."""
+    if api_key_env is None:
+        raise ValueError(f"{provider_id} has no API-key secret reference")
+    secret = await asyncio.to_thread(
+        getpass.getpass,
+        f"Enter {api_key_env}: ",
+    )
+    confirmation = await asyncio.to_thread(
+        getpass.getpass,
+        f"Enter {api_key_env} again: ",
+    )
+    if secret != confirmation:
+        raise ValueError("API key values did not match")
+    SecretStore(arguments.secret_file).set(api_key_env, secret)
+    persist_auth_method(arguments.config, provider_id, "api_key")
 
 
 def _human_size(value: object) -> str | None:

@@ -320,7 +320,9 @@ The `ninjarobot-agent` additionally provides:
 - `web start|status|stop` for the HTTPS local-network interface
 - `motion arm --confirm` for one CLI chat session's physical-motion consent
 - `provider list|status|health|login|set-api-key|logout` for terminal-only
-  OpenAI, Google Gemini, and Anthropic authentication
+  cloud authentication; OpenAI uses API keys, Gemini supports native browser
+  OAuth or an API key, and Anthropic supports the official `ant` login or an
+  API key
 - provider-scoped `model list|current|select` for dynamic model discovery,
   persistent selection, and idle-time hot switching across Ollama and cloud
   providers
@@ -337,8 +339,11 @@ and the same selected Agent Skill instructions. Cloud adapters only translate
 and normalize model traffic; they never execute a tool or access a Pi5 driver.
 API keys are entered only in the terminal and stored in the owner-private
 secret file. OpenAI API inference supports API keys, not ChatGPT account
-login. Gemini supports API keys or Google Application Default Credentials.
-Anthropic supports API keys or the official `ant` CLI web login.
+login. Gemini supports API keys or a native Google Desktop OAuth login that
+does not require `gcloud`. Gemini OAuth refresh credentials are stored under
+the owner's `~/.config/ninjarobot_pi5/oauth/` directory with mode `0600`.
+Anthropic supports API keys or the separately installed official `ant` CLI
+web login.
 
 For example:
 

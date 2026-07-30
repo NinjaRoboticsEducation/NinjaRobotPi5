@@ -125,16 +125,16 @@ uv run --frozen ninjarobot-agent \
 
 Optional OAuth test:
 
-1. Install the current Google Cloud CLI by following Google's official Debian
-   instructions.
-2. Create a Desktop OAuth client and download its JSON file.
-3. Put the Google Cloud project ID in the private Gemini provider block:
+1. Create a Google Desktop OAuth client and download its JSON file by
+   following the Gemini Web Login section of `InstallationGuide.md`. The
+   Google Cloud CLI is not needed.
+2. Put the Google Cloud project ID in the private Gemini provider block:
 
    ```toml
    project_id = "your-google-cloud-project"
    ```
 
-4. Run:
+3. Run:
 
    ```bash
    uv run --frozen ninjarobot-agent \
@@ -143,8 +143,24 @@ Optional OAuth test:
      --client-id-file "$HOME/path/to/client_secret.json"
    ```
 
-Follow the displayed URL and code. The access and refresh credentials are
-owned by `gcloud`, not NinjaRobotPi5.
+4. Open the displayed authorization URL on a phone or computer.
+5. After approval, the localhost page may fail to open. Copy the complete
+   `http://localhost:8080/...` URL from the browser address bar and paste it
+   into the hidden terminal prompt.
+6. Check:
+
+   ```bash
+   uv run --frozen ninjarobot-agent \
+     --config "$NINJAROBOT_CONFIG" provider status gemini
+
+   uv run --frozen ninjarobot-agent \
+     --config "$NINJAROBOT_CONFIG" provider health gemini
+   ```
+
+Expected result: status reports OAuth configured through the
+`ninjarobot_pi5` credential store, health says `ready`, and `gcloud` is never
+requested. The credential file under `~/.config/ninjarobot_pi5/oauth/` must
+have mode `0600`, meaning only its owner can read and write it.
 
 ## 4. Anthropic communication test
 
@@ -174,15 +190,22 @@ uv run --frozen ninjarobot-agent \
 
 Optional OAuth test:
 
-1. Install Anthropic's current official `ant` CLI.
-2. Run:
+1. Follow the separate **Optional Anthropic Web Login with the official ant
+   CLI** instructions in `InstallationGuide.md`.
+2. Confirm the independently installed command:
+
+   ```bash
+   ant --version
+   ```
+
+3. Run:
 
    ```bash
    uv run --frozen ninjarobot-agent \
      --config "$NINJAROBOT_CONFIG" provider login anthropic
    ```
 
-3. Follow the displayed no-browser URL and code.
+4. Follow the displayed no-browser URL and code.
 
 The adapter asks `ant` for a refreshed bearer token when needed. It does not
 copy the profile token into NinjaRobotPi5 configuration.

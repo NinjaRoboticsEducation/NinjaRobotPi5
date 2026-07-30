@@ -63,6 +63,10 @@ physical 45-degree position.
 - PortAudio and ALSA audio tools for the USB microphone
 - Ollama for the local language model
 - Optional OpenAI, Google Gemini, or Anthropic cloud model accounts
+- `google-auth-oauthlib`, installed automatically by `uv`, for optional native
+  Gemini Web Login
+- Optional official Anthropic `ant` CLI, installed separately only when using
+  Anthropic Web Login
 - whisper.cpp for local English and Japanese speech-to-text
 - FastAPI and HTTPS for the local browser controller
 - NinjaRobotPi5 and its six managed `pi5*` hardware libraries
@@ -774,35 +778,150 @@ uv run --frozen ninjarobot-agent \
 ```
 
 Choose **3. Change Agent Model**, select Ollama, OpenAI, Google, or Anthropic,
-choose the terminal authentication method, then select a numbered model.
+choose the available terminal authentication method, then select a numbered
+model. OpenAI displays API-key choices only because ChatGPT account login
+cannot authenticate OpenAI API requests.
 
-Google and Anthropic also support their official web-login tools:
+##### Optional Gemini Web Login without gcloud
 
-- Gemini needs the Google Cloud CLI, Application Default Credentials, a
-  Desktop OAuth client JSON file, and `project_id` in the Gemini provider
-  block. See Google's
-  [Gemini OAuth guide](https://ai.google.dev/gemini-api/docs/oauth), then run:
+Gemini Web Login uses Google's Desktop OAuth flow directly from Python.
+OAuth means browser-based permission: Google gives NinjaRobotAgent a
+short-lived access token and a renewable refresh token without revealing your
+Google password. The Google Cloud CLI (`gcloud`) is not required.
 
-  ```bash
-  uv run --frozen ninjarobot-agent \
-    --config "$NINJAROBOT_CONFIG" \
-    provider login gemini \
-    --client-id-file "$HOME/path/to/client_secret.json"
-  ```
+1. Open Google's
+   [Gemini OAuth guide](https://ai.google.dev/gemini-api/docs/oauth) on your
+   computer.
+2. Create or select a Google Cloud project.
+3. Enable the **Generative Language API**.
+4. Configure the Google OAuth consent screen. If the app is in testing mode,
+   add your Google account as a test user.
+5. Create an OAuth client with application type **Desktop app** and download
+   its JSON file.
+6. Copy that file to the Pi outside the NinjaRobotPi5 repository. For example,
+   run this on the computer that contains the downloaded file. Replace the
+   username and downloaded-file path where necessary:
 
-- Anthropic needs the official `ant` CLI. Install it by following Anthropic's
-  [current CLI quickstart](https://platform.claude.com/docs/en/cli-sdks-libraries/cli/quickstart),
-  then run:
+   ```bash
+   PI_USER="replace-with-your-pi-username"
+   scp "$HOME/Downloads/client_secret_"*.json \
+     "$PI_USER@ninjarobotpi5.local:/home/$PI_USER/google-client.json"
+   ```
 
-  ```bash
-  uv run --frozen ninjarobot-agent \
-    --config "$NINJAROBOT_CONFIG" provider login anthropic
-  ```
+7. On the Pi, protect the file:
 
-Both commands print a URL/code workflow suitable for a Raspberry Pi without a
-desktop. The resulting OAuth credentials stay in the official provider CLI
-store, not the NinjaRobot secret file. Use `provider logout PROVIDER_ID` to
-remove the selected credential source.
+   ```bash
+   chmod 600 "$HOME/google-client.json"
+   ```
+
+8. Edit the private robot configuration:
+
+   ```bash
+   nano "$NINJAROBOT_CONFIG"
+   ```
+
+   Find the existing `[providers.gemini]` block and add this one line inside
+   it. Do not add a second `[providers.gemini]` heading:
+
+   ```toml
+   project_id = "your-google-cloud-project-id"
+   ```
+
+   Save with **Ctrl+O**, press **Enter**, then exit with **Ctrl+X**. The login
+   command changes `auth_method` to `oauth` only after authorization succeeds.
+
+9. Start Gemini Web Login:
+
+   ```bash
+   uv run --frozen ninjarobot-agent \
+     --config "$NINJAROBOT_CONFIG" \
+     provider login gemini \
+     --client-id-file "$HOME/google-client.json"
+   ```
+
+10. Copy the displayed Google authorization URL into a browser on your phone
+    or computer. Sign in and approve access.
+11. Google redirects the browser to `http://localhost:8080/`. Because the
+    browser is not running on the Pi, the page may say it cannot connect. This
+    is expected. Copy the complete URL from the browser address bar.
+12. Paste the complete localhost URL into the hidden terminal prompt and press
+    **Enter**.
+13. Confirm the credential and model catalog:
+
+    ```bash
+    uv run --frozen ninjarobot-agent \
+      --config "$NINJAROBOT_CONFIG" provider status gemini
+
+    uv run --frozen ninjarobot-agent \
+      --config "$NINJAROBOT_CONFIG" provider health gemini
+
+    uv run --frozen ninjarobot-agent \
+      --config "$NINJAROBOT_CONFIG" model list --provider gemini
+    ```
+
+Expected result: status reports `"method": "oauth"` and
+`"configured": true`, health reports `ready`, and no command asks for
+`gcloud`. NinjaRobotAgent saves the renewable credential in
+`~/.config/ninjarobot_pi5/oauth/` with permissions that allow only your Linux
+user to read it.
+
+To remove that saved Gemini credential:
+
+```bash
+uv run --frozen ninjarobot-agent \
+  --config "$NINJAROBOT_CONFIG" provider logout gemini
+```
+
+##### Optional Anthropic Web Login with the official ant CLI
+
+`uv sync` installs Python packages, but Anthropic's official `ant` command is
+a separate Go application. Install it only if you want Anthropic Web Login.
+An Anthropic API key does not need `ant`.
+
+1. Install Go and check its version:
+
+   ```bash
+   sudo apt update
+   sudo apt install -y golang-go
+   go version
+   ```
+
+   `ant` requires Go 1.22 or newer. If the displayed version is older, stop
+   here and install a current Go release using the
+   [official Go installation guide](https://go.dev/doc/install).
+
+2. Install Anthropic's official CLI and place it on the system command path:
+
+   ```bash
+   go install 'github.com/anthropics/anthropic-cli/cmd/ant@latest'
+   sudo install -m 0755 "$(go env GOPATH)/bin/ant" /usr/local/bin/ant
+   ant --version
+   ```
+
+   These commands follow Anthropic's
+   [official ant CLI quickstart](https://platform.claude.com/docs/en/cli-sdks-libraries/cli/quickstart).
+
+3. Start the account login:
+
+   ```bash
+   uv run --frozen ninjarobot-agent \
+     --config "$NINJAROBOT_CONFIG" provider login anthropic
+   ```
+
+4. Open the displayed URL on a phone or computer and enter the displayed code.
+5. Verify the login:
+
+   ```bash
+   ant auth status
+
+   uv run --frozen ninjarobot-agent \
+     --config "$NINJAROBOT_CONFIG" provider health anthropic
+   ```
+
+Anthropic owns and refreshes this OAuth profile through `ant`.
+NinjaRobotAgent does not copy the profile token into its TOML configuration
+or general secret file. Use `provider logout anthropic` to remove the selected
+Anthropic profile.
 
 Optional automatic provider fallback is off by default. To enable it, add
 configured provider IDs to the private TOML file:

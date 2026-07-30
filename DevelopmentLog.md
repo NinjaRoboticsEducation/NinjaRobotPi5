@@ -1,5 +1,54 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-30 — Native Gemini OAuth and provider-login refinement
+
+### Summary
+
+Removed Gemini's Google Cloud CLI dependency and made the interactive cloud
+authentication choices match the providers' supported workflows:
+
+- added `google-auth-oauthlib` to the locked agent dependencies
+- added a headless Google Desktop OAuth flow that prints the authorization
+  URL and accepts the final loopback URL through a hidden terminal prompt
+- added state, host, port, Desktop-client JSON, size, symbolic-link, and file
+  permission checks before storing or using credentials
+- added owner-private, atomic Gemini refresh-token storage under
+  `~/.config/ninjarobot_pi5/oauth/`
+- refreshed expired Gemini access tokens outside the asynchronous agent loop
+  and saved the renewed credential safely
+- changed Gemini logout to remove only NinjaRobotAgent's matching credential
+- removed Web Login from OpenAI's interactive submenu while preserving the
+  explicit scriptable error for unsupported OpenAI account login
+- retained Anthropic Web Login through the separately installed official
+  `ant` CLI
+- preserved the provider-neutral MCP, Agent Skill, policy, and IDE boundaries
+
+### Validation
+
+- managed-driver verification passed: 222 baseline files plus 25 authorized
+  repairs
+- 369 repository tests passed
+- `python -m compileall`, `ruff check`, `ruff format --check`, and `mypy .`
+  passed
+- OAuth tests cover confined filenames, owner-only permissions, symbolic
+  links, token refresh, redirect state, loopback destination, Desktop client
+  validation, hidden headless login, and secret-free status output
+- interactive-menu tests confirm OpenAI no longer offers Web Login and Gemini
+  requires a Desktop OAuth client JSON file
+
+No managed `pi5*` driver, hardware configuration, GPIO, I2C, SPI, PWM, camera,
+microphone, or nested `NinjaClawBot/` file changed. Live Google and Anthropic
+login remains an owner-run Raspberry Pi validation because it requires private
+accounts, internet access, and may incur provider charges.
+
+### Main files changed
+
+- `google_oauth.py`, `provider_auth.py`, `cloud_registry.py`, and
+  `agent_cli.py`
+- agent dependency lock and OAuth/provider-menu tests
+- README, installation guide, developer guide, implementation plan, this log,
+  and the Phase 6 Raspberry Pi validation guide
+
 ## 2026-07-30 — Phase 6 cloud-provider adapters
 
 ### Summary

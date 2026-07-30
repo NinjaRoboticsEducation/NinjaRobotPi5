@@ -1020,19 +1020,27 @@ still refused while a chat or robot action is active.
 
 - `auth_method = "api_key"` resolves `api_key_env` from the process
   environment first, then `~/.config/ninjarobot_pi5/secrets.env`.
-- Gemini `auth_method = "oauth"` resolves an access token with the official
-  `gcloud auth application-default print-access-token` command and requires a
-  configured Google Cloud `project_id`.
+- Gemini `auth_method = "oauth"` loads a Google authorized-user credential
+  managed by NinjaRobotAgent and requires a configured Google Cloud
+  `project_id`. `google-auth-oauthlib` performs the Desktop installed-app
+  authorization flow. The user opens the printed URL on another device and
+  pastes the final loopback redirect URL into a hidden terminal prompt.
+  `GoogleOAuthCredential` refreshes an expired access token in a worker thread
+  and atomically rewrites the credential with owner-only permissions.
 - Anthropic `auth_method = "oauth"` resolves a refreshed bearer token with
   `ant auth print-credentials --access-token` under `oauth_profile`.
 - OpenAI account/ChatGPT web login is not a supported authentication method
-  for third-party OpenAI API inference, so the schema rejects it.
+  for third-party OpenAI API inference, so the schema rejects it and the
+  interactive menu offers API-key choices only.
 
 The web interface never accepts provider secrets. The terminal uses hidden,
 double-entry prompts. Errors report provider/type/status categories and do not
 include response bodies or authorization headers. `SecretStore` writes with
 mode `0600`, reports presence without values, supports deletion, and redacts
-known values from nested diagnostics. Cloud adapter validators accept only
+known values from nested diagnostics. Gemini refresh credentials use a
+provider-ID hash for the filename, are confined to
+`~/.config/ninjarobot_pi5/oauth/`, reject symbolic-link targets, and are
+deleted by `provider logout gemini`. Cloud adapter validators accept only
 HTTPS and the official `api.openai.com`,
 `generativelanguage.googleapis.com`, or `api.anthropic.com` host, preventing a
 configuration change from forwarding provider credentials to another server.
