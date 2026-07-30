@@ -631,7 +631,11 @@ uv run --frozen ninjarobot-ide-tool motion resume --confirm
 Level 2 stops servo movement and ranging, closes camera and microphone devices,
 silences the buzzer, and leaves a red octagonal Emergency Stop sign on the
 display. Ctrl+C, explicit behavior stop, shutdown cleanup, and driver failure
-use this path. Driver failure persists a system latch.
+use this path. Driver failure persists a system latch with a bounded
+`fault_detail` description. The behavior runner escalates only stable
+hardware-driver error codes. Invalid generated arguments, text that does not
+fit the display, policy rejections, and configuration mistakes remain normal
+action failures and cannot create a false Level 2 latch.
 
 The interactive Resume Robot Movement choice closes the stopped assembly,
 constructs fresh device boundaries, probes every configured module, clears
@@ -643,6 +647,10 @@ equivalent starts a fresh process:
 uv run --frozen --extra hardware ninjarobot-ide-tool \
   system resume --confirm
 ```
+
+The resume probe reports failed components by name, such as `camera` or
+`servo`, and includes the bounded exception description. It never clears the
+latch when any configured component is unavailable.
 
 The watchdog uses a daemon thread, meaning a small background operating-system
 thread, and calls the servo zero-pulse path directly if the main asyncio event
@@ -1195,6 +1203,15 @@ The first browser wins; another receives HTTP `423 Locked`. A refresh can
 reclaim the lease during a short grace period using a reconnect token. A
 missed heartbeat revokes it and requests `robot.servo.stop`.
 
+Real `RobotAssembly` instances also claim
+`~/.local/state/ninjarobot_pi5/hardware-owner.lock` with a non-blocking
+operating-system file lock. A second agent or real IDE process receives a
+clear ownership error before opening a device. The lock records only the
+process identifier, program name, and acquisition time; it never stores
+credentials or command arguments. Process exit releases the operating-system
+lock even after a crash. Standalone `pi5*` tools do not use this integrated
+lock, so developers must stop the agent and IDE before running one.
+
 The default certificate chain is created under
 `~/.config/ninjarobot_pi5/tls/`. `local-ca-key.pem` and `agent-key.pem` remain
 owner-only. `ninjarobot-agent web export-ca` copies only the public CA
@@ -1475,7 +1492,14 @@ test; the separate pre-Phase-1 live-Pi report is stored under `docs/validation/`
   --confirm`. The command refuses to clear the latch when a required health
   probe fails. In the interactive tool, choose Run Robot Behaviors, Special
   Behaviors, then Resume Robot Movement. A failed probe leaves the Emergency
-  Stop sign active and never restarts the old movement.
+  Stop sign active, names the unhealthy component, and never restarts the old
+  movement. Review `fault_detail` in `hardware status` to see the original
+  device error.
+- **Hardware is already owned by another process:** do not start another real
+  IDE beside the agent service. Use the existing agent interface, or stop it
+  with `uv run --frozen ninjarobot-agent service stop`, then retry the IDE
+  command. Also stop both integrated tools before opening a standalone `pi5*`
+  hardware tool.
 - **A second terminal cannot stop a behavior:** first run
   `ninjarobot-ide-tool behavior stop`. It validates the recorded process start
   token before sending Ctrl+C, which avoids signaling an unrelated process

@@ -384,21 +384,37 @@ def test_full_stop_suspends_sensors_and_driver_failure_latches_system(
             display_hold_seconds=0,
         )
 
-        result = await system.full_stop("driver_failure", latch=True)
+        result = await system.full_stop(
+            "driver_failure",
+            latch=True,
+            fault_detail="DISPLAY_WRITE_FAILED: simulated SPI fault",
+        )
 
         assert result["level"] == 2
         assert result["cleanup_errors"] == []
         assert state.read().system_latched is True
+        assert state.read().fault_detail == "DISPLAY_WRITE_FAILED: simulated SPI fault"
         assert servo.stop_calls == 1
         assert distance.suspend_calls == 1
         assert camera.suspend_calls == 1
         assert microphone.suspend_calls == 1
         assert calls == ["silence", "display"]
         with pytest.raises(ValueError, match="explicit confirmation"):
-            await system.resume_system(confirmed=False, health_checks=())
+            await system.resume_system(confirmed=False, health_checks={})
+        with pytest.raises(
+            RuntimeError,
+            match=r"camera \(ImportError: missing camera backend\)",
+        ):
+            await system.resume_system(
+                confirmed=True,
+                health_checks={
+                    "display": lambda: _health(True),
+                    "camera": _failed_health,
+                },
+            )
         resumed = await system.resume_system(
             confirmed=True,
-            health_checks=(lambda: _health(True),),
+            health_checks={"test": lambda: _health(True)},
         )
         assert resumed.system_latched is False
         assert resumed.motion_latched is False
@@ -408,3 +424,7 @@ def test_full_stop_suspends_sensors_and_driver_failure_latches_system(
 
 async def _health(value: bool) -> bool:
     return value
+
+
+async def _failed_health() -> bool:
+    raise ImportError("missing camera backend")

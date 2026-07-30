@@ -1538,6 +1538,11 @@ uv run --frozen --extra hardware ninjarobot-ide-tool \
 ```
 
 Resume only after correcting the cause and making sure the robot is safe.
+If recovery fails, the message now names the unhealthy component. Run
+`hardware status --real` again and correct that component before retrying.
+The `safety` section also includes `fault_detail`, which explains the original
+driver failure. Invalid behavior text or another rejected AI-generated
+argument does not require a system resume.
 
 When the NinjaRobotAgent service owns the hardware, use its chat command
 instead of starting a second IDE process:
@@ -1552,6 +1557,20 @@ Then enter:
 /resume
 RESUME
 ```
+
+If a direct IDE command reports that the hardware is already owned, either
+continue through the running agent or stop the agent first:
+
+```bash
+uv run --frozen ninjarobot-agent service stop
+
+uv run --frozen --extra hardware ninjarobot-ide-tool \
+  --config "$HOME/.config/ninjarobot_pi5/config.toml" \
+  hardware status --real
+```
+
+Do not run standalone `pi5servo`, `pi5disp`, `pi5buzzer`, or other real
+hardware tools while the agent or integrated IDE is using the robot.
 
 Expected result: the command reports a successful `robot.system.resume`,
 restores Idle, and states that AI motion remains disarmed. If display,

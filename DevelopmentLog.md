@@ -1,5 +1,55 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-07-30 — Integrated hardware recovery and false-latch repair
+
+### Summary
+
+- confirmed on the Raspberry Pi test workspace that every safe real hardware
+  probe was ready while the persistent safety state remained Level 2 latched
+- separated genuine device-driver errors from invalid generated behavior,
+  policy, and configuration failures
+- retained Level 2 shutdown for stable display, buzzer, servo, distance,
+  camera, and microphone driver-failure codes
+- stored a bounded original `fault_detail` in the persistent safety state
+- changed system recovery to report each unhealthy component and its error
+- added a cross-process hardware-owner lock for real integrated IDE and agent
+  assemblies
+- repaired the interactive resume failure path so a rejected recovery closes
+  the candidate assembly and releases ownership
+
+### Root cause
+
+`BehaviorRunner` forwarded every non-cancellation exception to the assembly's
+driver-failure handler. A non-hardware problem, such as generated text that
+did not fit the configured display, could therefore persist a Level 2
+`driver_failure` latch. Both the IDE and agent then correctly refused hardware
+actions, which looked like every driver had disconnected. The old safety file
+stored no original exception, and concurrent real agent/IDE processes had no
+shared device-ownership guard.
+
+### Validation
+
+- managed-driver verification passed before and after both implementation
+  phases: 222 baseline files plus 25 authorized repairs
+- Phase 1 full gate passed with 371 tests
+- Phase 2 full gate passed with 373 tests
+- `python -m compileall`, Ruff lint, Ruff formatting, and `mypy .` passed
+- regression coverage verifies false-latch prevention, genuine driver
+  escalation, persisted fault detail, named recovery failures, exclusive
+  hardware ownership, lock release, and repeated release safety
+
+### Raspberry Pi status
+
+The post-update safe real probe successfully reported buzzer, camera, display,
+distance, microphone, and servo boundaries as `ready`; no servo movement,
+recording, photograph, or retained media was requested. A live contention
+check rejected a second real IDE process with the recorded owner information,
+and ownership was reacquired normally after that process exited. The existing
+Level 2 latch was intentionally left unchanged. Physical recovery and the
+staged manual tests in
+`docs/validation/hardware-recovery-repair-validation-2026-07-30.md` remain for
+the owner to run after pulling this change.
+
 ## 2026-07-30 — Native Gemini OAuth and provider-login refinement
 
 ### Summary

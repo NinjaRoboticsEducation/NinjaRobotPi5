@@ -306,6 +306,13 @@ The integrated `ninjarobot-ide-tool` additionally provides:
 - `motion resume --confirm` for a Level 1 latch
 - `system resume --confirm` for a driver-failure Level 2 latch
 
+Real integrated hardware has one cross-process owner. If the agent service is
+running, a separate real `ninjarobot-ide-tool` process exits with an
+“already owned” explanation before opening GPIO, I2C, SPI, or PWM resources.
+Stop the agent service first, or use the agent interface. Standalone `pi5*`
+tools do not participate in this ownership lock, so stop the agent and IDE
+before opening a standalone hardware tool.
+
 Simulation is always the default. A real movement also requires
 `--confirm-motion`. Private behaviors are stored under
 `~/.config/ninjarobot_pi5/behaviors`, validated before use, previewed in
@@ -675,10 +682,14 @@ requires the private configuration to enable both motion gates, valid
 calibration for GPIO12 and GPIO13, `--real`, and `--confirm-motion`. A Level 1
 stop keeps display, buzzer, and sensors available but blocks another movement
 until `motion resume --confirm`. A driver-failure Level 2 stop blocks all
-behaviors until `system resume --confirm` completes healthy probes. Invalid,
-missing, or stale distance readings may warn but do not stop movement. The
-exact `8191` out-of-range sentinel is silent clear space, and there is no
-guarded-startup distance gate.
+behaviors until `system resume --confirm` completes named health probes.
+The safety state records the original device error, and a failed resume names
+the component that remains unavailable. Invalid generated behavior arguments,
+oversized display text, and policy/configuration rejections return ordinary
+errors and do not masquerade as driver failures or latch the whole robot.
+Invalid, missing, or stale distance readings may warn but do not stop
+movement. The exact `8191` out-of-range sentinel is silent clear space, and
+there is no guarded-startup distance gate.
 Model output is treated as an untrusted proposal; the
 deterministic IDE control plane retains final authority over robot actions.
 Browser control is HTTPS but intentionally has no pairing authentication in

@@ -18,7 +18,9 @@ from .camera import CameraDevice, CameraFactory
 from .config import RobotConfig
 from .display import DisplayDevice, DisplayFactory
 from .distance import SensorFactory, VL53L0XDistanceAdapter
+from .errors import describe_hardware_driver_error, is_hardware_driver_error
 from .face_renderer import render_emergency_stop
+from .hardware_ownership import HardwareOwnership
 from .microphone import MicrophoneBackendFactory, MicrophoneDevice
 from .models import ResourceHealth
 from .safety import (
@@ -182,6 +184,9 @@ class RobotAssembly:
         self._idle_lock = asyncio.Lock()
         self._idle_error: str | None = None
         self._closing = False
+        self._hardware_ownership = HardwareOwnership()
+        if not simulated:
+            self._hardware_ownership.acquire()
 
     async def start(self) -> None:
         """Initialize shared expression hardware without running a behavior."""
@@ -276,13 +281,14 @@ class RobotAssembly:
         """Clear Level 2 only after every configured device reports ready."""
         snapshot = await self.system_safety.resume_system(
             confirmed=confirmed,
-            health_checks=(
-                self._expression_health,
-                self._servo_health,
-                self._distance_health,
-                self._camera_health,
-                self._microphone_health,
-            ),
+            health_checks={
+                "display": self._display_health,
+                "buzzer": self._buzzer_health,
+                "servo": self._servo_health,
+                "distance": self._distance_health,
+                "camera": self._camera_health,
+                "microphone": self._microphone_health,
+            },
         )
         self._idle_suppressed = False
         await self._start_idle_if_safe()
@@ -292,22 +298,29 @@ class RobotAssembly:
         """Release all assembly-owned devices."""
         self._closing = True
         self._idle_suppressed = True
-        await self._stop_idle()
-        await self.behaviors.stop()
-        await asyncio.gather(
-            self.servo.close(),
-            self.distance.close(),
-            self.camera.close(),
-            self.microphone.close(),
-            return_exceptions=True,
-        )
-        await self.behaviors.close()
+        try:
+            await self._stop_idle()
+            await self.behaviors.stop()
+            await asyncio.gather(
+                self.servo.close(),
+                self.distance.close(),
+                self.camera.close(),
+                self.microphone.close(),
+                return_exceptions=True,
+            )
+            await self.behaviors.close()
+        finally:
+            self._hardware_ownership.release()
 
     async def _driver_failure(self, error: Exception) -> None:
-        if isinstance(error, MotionSafetyError):
+        if isinstance(error, MotionSafetyError) or not is_hardware_driver_error(error):
             return
         self._idle_suppressed = True
-        await self.system_safety.full_stop("driver_failure", latch=True)
+        await self.system_safety.full_stop(
+            "driver_failure",
+            latch=True,
+            fault_detail=describe_hardware_driver_error(error),
+        )
 
     async def _start_idle_if_safe(self) -> None:
         if (
@@ -423,13 +436,15 @@ class RobotAssembly:
             background="#604000",
         )
 
-    async def _expression_health(self) -> bool:
+    async def _display_health(self) -> bool:
         await self.behaviors.start()
         health = await self.behaviors.health()
-        return all(
-            health.get(component) == ResourceHealth.READY.value
-            for component in ("display", "buzzer")
-        )
+        return health.get("display") == ResourceHealth.READY.value
+
+    async def _buzzer_health(self) -> bool:
+        await self.behaviors.start()
+        health = await self.behaviors.health()
+        return health.get("buzzer") == ResourceHealth.READY.value
 
     async def _servo_health(self) -> bool:
         await self.servo.start()

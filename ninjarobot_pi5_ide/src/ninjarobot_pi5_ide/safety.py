@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 import threading
 import time
-from collections.abc import Callable, Coroutine, Sequence
+from collections.abc import Callable, Coroutine, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -53,6 +53,7 @@ class SafetySnapshot:
     motion_latched: bool = False
     system_latched: bool = False
     reason: str | None = None
+    fault_detail: str | None = None
     updated_at: str | None = None
 
 
@@ -85,6 +86,10 @@ class SafetyStateStore:
                         and not isinstance(payload.get("reason"), str)
                     )
                     or (
+                        payload.get("fault_detail") is not None
+                        and not isinstance(payload.get("fault_detail"), str)
+                    )
+                    or (
                         payload.get("updated_at") is not None
                         and not isinstance(payload.get("updated_at"), str)
                     )
@@ -95,6 +100,7 @@ class SafetyStateStore:
                     motion_latched=payload["motion_latched"],
                     system_latched=payload["system_latched"],
                     reason=payload["reason"],
+                    fault_detail=payload.get("fault_detail"),
                     updated_at=payload["updated_at"],
                 )
             except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
@@ -117,12 +123,13 @@ class SafetyStateStore:
         self._write(snapshot)
         return snapshot
 
-    def latch_system(self, reason: str) -> SafetySnapshot:
+    def latch_system(self, reason: str, *, fault_detail: str | None = None) -> SafetySnapshot:
         """Persist a Level 2 system latch, which also blocks motion."""
         snapshot = SafetySnapshot(
             motion_latched=True,
             system_latched=True,
             reason=reason,
+            fault_detail=fault_detail[:1000] if fault_detail is not None else None,
             updated_at=_utc_now(),
         )
         self._write(snapshot)
@@ -472,11 +479,17 @@ class SystemSafetyController:
         """Return whether this assembly has completed a Level 2 stop."""
         return self._locally_stopped or self._state.read().system_latched
 
-    async def full_stop(self, reason: str, *, latch: bool) -> dict[str, Any]:
+    async def full_stop(
+        self,
+        reason: str,
+        *,
+        latch: bool,
+        fault_detail: str | None = None,
+    ) -> dict[str, Any]:
         """Stop motion, ranging/capture devices, and sound; preserve the display."""
         async with self._stop_lock:
             if latch:
-                snapshot = self._state.latch_system(reason)
+                snapshot = self._state.latch_system(reason, fault_detail=fault_detail)
             else:
                 snapshot = self._state.read()
             results = await asyncio.gather(
@@ -507,14 +520,32 @@ class SystemSafetyController:
         self,
         *,
         confirmed: bool,
-        health_checks: Sequence[Callable[[], Coroutine[Any, Any, bool]]],
+        health_checks: Mapping[str, Callable[[], Coroutine[Any, Any, bool]]],
     ) -> SafetySnapshot:
         """Clear a driver-failure latch only after explicit healthy probes."""
         if not confirmed:
             raise ValueError("system resume requires explicit confirmation")
-        results = await asyncio.gather(*(check() for check in health_checks))
-        if not all(results):
-            raise RuntimeError("system resume refused because a required health check failed")
+
+        async def probe(
+            name: str,
+            check: Callable[[], Coroutine[Any, Any, bool]],
+        ) -> tuple[str, bool, str | None]:
+            try:
+                ready = await check()
+                return name, ready, None if ready else "reported unavailable"
+            except Exception as exc:
+                return name, False, f"{type(exc).__name__}: {exc}"[:1000]
+
+        results = await asyncio.gather(
+            *(probe(name, check) for name, check in health_checks.items())
+        )
+        failures = [
+            f"{name} ({detail})" if detail else name for name, ready, detail in results if not ready
+        ]
+        if failures:
+            raise RuntimeError(
+                "system resume refused because these health checks failed: " + ", ".join(failures)
+            )
         self._locally_stopped = False
         return self._state.clear_system()
 

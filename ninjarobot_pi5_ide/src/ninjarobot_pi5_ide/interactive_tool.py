@@ -231,6 +231,8 @@ class InteractiveRobotSession:
             try:
                 await candidate.stop()
             finally:
+                await candidate.close()
+                self.robot = None
                 self.system_stopped = True
             raise
         self.system_stopped = False
