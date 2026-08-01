@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 from collections.abc import Callable
-from typing import Any, Protocol, cast
+from typing import Any, Protocol, TypeVar, cast
 
 from PIL import Image, ImageDraw
 
@@ -57,6 +57,7 @@ class DisplayDriver(Protocol):
 
 
 DisplayFactory = Callable[..., DisplayDriver]
+ThreadResult = TypeVar("ThreadResult")
 
 
 def _load_display(**settings: Any) -> DisplayDriver:
@@ -138,6 +139,56 @@ class DisplayDevice:
             self._start_attempted = True
             await self._initialize_locked()
 
+    async def recover(self) -> None:
+        """Reconstruct the backend and prove that one real frame write succeeds."""
+        async with self._lock:
+            if self._closed:
+                raise RuntimeError("display device is closed")
+            self._start_attempted = True
+            previous = self._driver
+            self._driver = None
+            close_error: str | None = None
+            if previous is not None:
+                try:
+                    await _run_thread_to_completion(previous.close)
+                except Exception as exc:
+                    close_error = f"previous close failed: {type(exc).__name__}: {exc}"
+
+            self._startup_error = None
+            await self._initialize_locked()
+            driver = self._driver
+            if driver is None:
+                detail = self._startup_error or "display reconstruction did not return a driver"
+                if close_error is not None:
+                    detail = f"{close_error}; {detail}"
+                raise _display_error(
+                    code="DISPLAY_RECOVERY_FAILED",
+                    message="The ST7789V display backend could not be reconstructed.",
+                    technical_detail=detail,
+                    definitely_not_executed=True,
+                    capability="system.resume",
+                )
+
+            try:
+                ready = await _run_thread_to_completion(driver.health_check)
+                if not ready:
+                    raise RuntimeError("reconstructed driver reported unhealthy")
+                await _run_thread_to_completion(driver.clear, (0, 0, 0))
+            except Exception as exc:
+                self._driver = None
+                self._startup_error = f"{type(exc).__name__}: {exc}"
+                try:
+                    await _run_thread_to_completion(driver.close)
+                except Exception:
+                    pass
+                raise _display_error(
+                    code="DISPLAY_RECOVERY_FAILED",
+                    message="The reconstructed ST7789V display failed its write probe.",
+                    technical_detail=self._startup_error,
+                    definitely_not_executed=False,
+                    capability="system.resume",
+                ) from exc
+
     async def show_text(
         self,
         *,
@@ -180,7 +231,7 @@ class DisplayDevice:
                 font_size=font_size,
             )
             try:
-                await asyncio.to_thread(driver.display, image)
+                await _run_thread_to_completion(driver.display, image)
             except Exception as exc:
                 raise _display_error(
                     code="DISPLAY_WRITE_FAILED",
@@ -214,7 +265,7 @@ class DisplayDevice:
                 )
             frame = image.convert("RGB")
             try:
-                await asyncio.to_thread(driver.display, frame)
+                await _run_thread_to_completion(driver.display, frame)
             except Exception as exc:
                 raise _display_error(
                     code="DISPLAY_WRITE_FAILED",
@@ -243,7 +294,7 @@ class DisplayDevice:
         async with self._lock:
             driver = await self._require_driver_locked("display.clear")
             try:
-                await asyncio.to_thread(driver.clear, _rgb(color))
+                await _run_thread_to_completion(driver.clear, _rgb(color))
             except Exception as exc:
                 raise _display_error(
                     code="DISPLAY_CLEAR_FAILED",
@@ -263,7 +314,7 @@ class DisplayDevice:
         async with self._lock:
             driver = await self._require_driver_locked("display.set_brightness")
             try:
-                await asyncio.to_thread(driver.set_brightness, percent)
+                await _run_thread_to_completion(driver.set_brightness, percent)
             except Exception as exc:
                 raise _display_error(
                     code="DISPLAY_BRIGHTNESS_FAILED",
@@ -284,7 +335,7 @@ class DisplayDevice:
             if self._driver is None:
                 return ResourceHealth.UNAVAILABLE
             try:
-                ready = await asyncio.to_thread(self._driver.health_check)
+                ready = await _run_thread_to_completion(self._driver.health_check)
             except Exception:
                 return ResourceHealth.DEGRADED
             return ResourceHealth.READY if ready else ResourceHealth.DEGRADED
@@ -298,22 +349,22 @@ class DisplayDevice:
             self._driver = None
             self._closed = True
             if driver is not None:
-                await asyncio.to_thread(driver.close)
+                await _run_thread_to_completion(driver.close)
 
     async def _initialize_locked(self) -> None:
         if self._driver is not None:
             return
         driver: DisplayDriver | None = None
         try:
-            driver = await asyncio.to_thread(self._driver_factory, **self._settings)
-            await asyncio.to_thread(driver.set_brightness, self._initial_brightness)
+            driver = await _run_thread_to_completion(self._driver_factory, **self._settings)
+            await _run_thread_to_completion(driver.set_brightness, self._initial_brightness)
             self._brightness = self._initial_brightness
             self._driver = driver
             self._startup_error = None
         except Exception as exc:
             if driver is not None:
                 try:
-                    await asyncio.to_thread(driver.close)
+                    await _run_thread_to_completion(driver.close)
                 except Exception:
                     pass
             self._driver = None
@@ -332,6 +383,29 @@ class DisplayDevice:
                 capability=capability,
             )
         return self._driver
+
+
+async def _run_thread_to_completion(
+    call: Callable[..., ThreadResult],
+    /,
+    *args: Any,
+    **kwargs: Any,
+) -> ThreadResult:
+    """Keep serialization locks held until a cancelled hardware call really exits."""
+    worker = asyncio.create_task(asyncio.to_thread(call, *args, **kwargs))
+    try:
+        return await asyncio.shield(worker)
+    except asyncio.CancelledError as cancellation:
+        while not worker.done():
+            try:
+                await asyncio.shield(worker)
+            except asyncio.CancelledError:
+                continue
+        try:
+            worker.result()
+        except Exception:
+            pass
+        raise cancellation
 
 
 class DisplayShowTextAdapter:

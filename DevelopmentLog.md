@@ -1,5 +1,68 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-01 — Long-run agent hardware ownership and recovery repair
+
+### Summary
+
+- replaced startup's 100 ms full-status polling with a lightweight readiness
+  command, followed by one detailed status request after Greeting settles
+- made threaded display and buzzer calls cancellation-safe so their async lock
+  remains owned until the underlying hardware call really exits
+- added explicit display and buzzer backend reconstruction for confirmed Level
+  2 recovery from their persisted driver-failure codes
+- required a reconstructed display to pass backend health and an actual
+  black-frame SPI write before the safety latch can clear
+- exposed Idle supervisor state and its bounded error through agent status;
+  unexpected loss now reports `liveliness_degraded`
+- added complete hardware-driver and Idle tracebacks plus Level 2 cleanup-error
+  logging to the agent service log
+
+### Root causes addressed
+
+Cancelling the looping Idle task cancelled its `asyncio.to_thread()` await but
+did not stop the worker thread. The async display lock was consequently
+released while an SPI transfer could still be running, allowing the next web
+or terminal presentation to overlap the same display. Separately,
+`DisplayDevice.start()` intentionally attempted initialization only once; a
+failed initial factory call or a stale post-failure driver could therefore not
+be replaced inside the long-running service. The prior display health check
+tested only backend/SPI-handle state and could accept a driver that still could
+not write. Frequent startup full-status polling added unnecessary provider and
+shared hardware health traffic during Greeting, and later Idle failures lacked
+enough service-log/status evidence for diagnosis.
+
+### Safety and compatibility
+
+The managed `pi5*` drivers remain unchanged. All reconstruction stays in the
+IDE integration boundary, and the agent still reaches hardware only through
+the IDE. Recovery remains explicit and fail-closed, never re-arms motion, and
+never retries an interrupted behavior. The display probe writes black but does
+not move an actuator; buzzer recovery initializes silently. Normal tools,
+behaviors, web controls, terminal chat, provider selection, and MCP names are
+unchanged.
+
+### Validation
+
+- immutable verification passed after every phase: 222 tracked files and 25
+  authorized repairs
+- compileall, Ruff lint/format, and strict mypy passed after each implemented
+  phase
+- 54 focused regression tests passed in the final stress phase
+- the complete repository suite passed with 379 tests; the only warning is the
+  pre-existing Starlette `httpx` test-client deprecation
+- coverage includes side-effect-free startup polling, cancelled-call lock
+  ownership, failed-first-start reconstruction, write-probed latch handling,
+  20 successive display and buzzer replacements, and 100 rapid Idle restarts
+  without overlapping writes or supervisor loss
+
+### Raspberry Pi status
+
+No physical device was operated during implementation. Follow
+`docs/validation/agent-long-run-hardware-stability-validation-2026-08-01.md`.
+Complete smoke and communication checks before Greeting/buzzer tests; keep all
+servo motion disarmed during the display/buzzer soak unless separately testing
+raised-wheel movement.
+
 ## 2026-08-01 — Authoritative agent startup and safety readiness
 
 ### Summary

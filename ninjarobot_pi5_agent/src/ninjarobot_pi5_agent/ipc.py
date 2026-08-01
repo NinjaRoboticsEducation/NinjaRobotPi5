@@ -152,6 +152,12 @@ class AgentIPCServer:
                 {"type": "result", "data": await self._runtime.status()},
             )
             return
+        if command == "startup_status":
+            await _write_message(
+                writer,
+                {"type": "result", "data": self._runtime.startup_status()},
+            )
+            return
         if command == "models":
             provider_id = payload.get("provider")
             if provider_id is not None and not isinstance(provider_id, str):

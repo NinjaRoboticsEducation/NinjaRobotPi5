@@ -253,7 +253,10 @@ the model. Agent startup runs Greeting once, then the IDE supervises a silent
 looping Idle face between normal interactions. A conversation normally moves
 from Idle to Thinking, then Speaking or one strictly allowlisted emotion,
 through any robot action, and back to Idle. Face selection is display-only and
-cannot authorize a tool or movement. The portrait-first controller supports
+cannot authorize a tool or movement. Cancelling Idle for a foreground face
+keeps the display lock until the current SPI write has physically completed,
+so rapid web or terminal interactions cannot overlap frame transfers. The
+portrait-first controller supports
 mobile Chrome and Safari, prevents D-pad text selection, keeps Live Activity
 in a bottom drawer, and places browser speech in the message box for review
 before Send. AI camera capture shows `3`, `2`, `1` on the robot display and then
@@ -409,17 +412,23 @@ readiness:
 - `ready` means startup completed and no Level 2 system latch blocks robot
   behavior.
 - `operational_state` is `starting`, `ready`, `motion_latched`,
-  `recovery_required`, `degraded`, or `status_degraded`.
+  `recovery_required`, `degraded`, `liveliness_degraded`, or
+  `status_degraded`.
 - `startup` reports whether Greeting/Idle is pending, ready, failed, or
   recovered.
 - `robot.safety` includes the persistent latch reason, original bounded
   `fault_detail`, and timestamp.
+- `robot.liveliness` reports whether the Idle task is running, foreground,
+  suppressed, or degraded, including its bounded last error.
 - `recovery` explains how to run the explicit, health-checked `/resume` path.
 
 Provider and MCP health can still be ready while `ready` is false; these are
 different subsystems. Inspect `operational_state`, `startup`, and
-`robot.safety` before assuming hardware is available. A Greeting/Idle exception
-is written with its traceback to
+`robot.safety` before assuming hardware is available. Startup polling uses a
+lightweight, side-effect-free status command; it does not repeatedly list cloud
+models, query MCP providers, read the conversation database, or run IDE health
+checks during Greeting. A Greeting, Idle, or hardware-driver exception is
+written with its traceback to
 `~/.local/state/ninjarobot_pi5/agent-service.log`.
 
 Inside the interactive chat, use `/arm`, type `ARM`, and then ask naturally
@@ -464,6 +473,11 @@ module is health-checked before the safety latch clears. A successful resume
 restores the looping Idle face but deliberately leaves AI motion disarmed.
 Enter `/arm` separately before requesting another servo movement. If any
 health check fails, the latch and Emergency Stop display remain active.
+For a persisted display or buzzer driver fault, confirmed recovery discards
+the stale backend and creates a fresh one. Display recovery must pass both its
+normal backend health check and an actual black-frame SPI write before the
+latch can clear; a failed probe leaves the latch unchanged for another safe
+attempt.
 Do not delete `safety.json` to bypass recovery. Robot configuration, safety
 state, action history, and conversation data live under `~/.config` and
 `~/.local`; they intentionally survive deleting, recloning, or moving the
@@ -677,6 +691,9 @@ For microphone integration, follow
 For Level 2 recovery, deterministic Idle, and one-shot AI camera acceptance,
 follow
 [`docs/validation/phase-5-recovery-idle-camera-validation-2026-07-30.md`](docs/validation/phase-5-recovery-idle-camera-validation-2026-07-30.md).
+For cancellation-safe display ownership, reconstructive Resume, service-log
+diagnostics, and a long-run web/terminal soak test, follow
+[`docs/validation/agent-long-run-hardware-stability-validation-2026-08-01.md`](docs/validation/agent-long-run-hardware-stability-validation-2026-08-01.md).
 Real recording also requires consent from everyone nearby.
 For Phase 4 integrated behaviors and movements, follow
 [`docs/validation/phase-4-integrated-behavior-validation-2026-07-26.md`](docs/validation/phase-4-integrated-behavior-validation-2026-07-26.md).

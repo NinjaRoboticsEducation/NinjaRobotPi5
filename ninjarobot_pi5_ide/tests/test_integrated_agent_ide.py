@@ -89,6 +89,14 @@ def test_integrated_agent_ide_exposes_shared_simulated_robot_capabilities(
         assert robot_status["safety"]["motion_latched"] is False
         assert robot_status["recovery_required"] is False
         assert robot_status["motion_recovery_required"] is False
+        assert robot_status["liveliness"] == {
+            "enabled": False,
+            "state": "disabled",
+            "idle_error": None,
+            "idle_task_running": False,
+            "ambient_face": "idle",
+            "foreground_behaviors": 0,
+        }
 
         descriptors = {descriptor.name: descriptor for descriptor in await client.capabilities()}
         names = set(descriptors)

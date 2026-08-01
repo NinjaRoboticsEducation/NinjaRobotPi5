@@ -166,39 +166,8 @@ class AgentRuntime:
             provider = await self.provider.health()
             tool_health = await self.tools.health()
             sessions = await self.store.sessions()
-            robot, robot_status_error = self._read_robot_status()
-            safety = robot.get("safety") if robot is not None else None
-            system_latched = bool(
-                isinstance(safety, Mapping) and safety.get("system_latched") is True
-            )
-            motion_latched = bool(
-                isinstance(safety, Mapping) and safety.get("motion_latched") is True
-            )
-            startup_complete = self._startup["complete"] is True
-            startup_failed = self._startup["liveliness"] == "failed"
-            ready = startup_complete and not startup_failed and not system_latched
-            if not startup_complete:
-                operational_state = "starting"
-            elif system_latched:
-                operational_state = "recovery_required"
-            elif robot_status_error is not None:
-                operational_state = "status_degraded"
-                ready = False
-            elif startup_failed:
-                operational_state = "degraded"
-            elif motion_latched:
-                operational_state = "motion_latched"
-            else:
-                operational_state = "ready"
-            recovery = self._recovery_status(safety, system_latched=system_latched)
             return {
-                "started": True,
-                "ready": ready,
-                "operational_state": operational_state,
-                "startup": dict(self._startup),
-                "robot": robot,
-                "robot_status_error": robot_status_error,
-                "recovery": recovery,
+                **self.startup_status(),
                 "provider": provider.model_dump(mode="json"),
                 "model_selection": self.models.selection() if self.models else None,
                 "tool_providers": [report.model_dump(mode="json") for report in tool_health],
@@ -207,6 +176,50 @@ class AgentRuntime:
             }
         finally:
             self._end_operation()
+
+    def startup_status(self) -> dict[str, Any]:
+        """Return readiness without model, database, MCP, or hardware health probes."""
+        self._ensure_started()
+        robot, robot_status_error = self._read_robot_status()
+        safety = robot.get("safety") if robot is not None else None
+        system_latched = bool(isinstance(safety, Mapping) and safety.get("system_latched") is True)
+        motion_latched = bool(isinstance(safety, Mapping) and safety.get("motion_latched") is True)
+        liveliness = robot.get("liveliness") if robot is not None else None
+        liveliness_degraded = bool(
+            isinstance(liveliness, Mapping) and liveliness.get("state") == "degraded"
+        )
+        startup_complete = self._startup["complete"] is True
+        startup_failed = self._startup["liveliness"] == "failed"
+        ready = (
+            startup_complete
+            and not startup_failed
+            and not system_latched
+            and not liveliness_degraded
+        )
+        if not startup_complete:
+            operational_state = "starting"
+        elif system_latched:
+            operational_state = "recovery_required"
+        elif robot_status_error is not None:
+            operational_state = "status_degraded"
+            ready = False
+        elif startup_failed:
+            operational_state = "degraded"
+        elif liveliness_degraded:
+            operational_state = "liveliness_degraded"
+        elif motion_latched:
+            operational_state = "motion_latched"
+        else:
+            operational_state = "ready"
+        return {
+            "started": True,
+            "ready": ready,
+            "operational_state": operational_state,
+            "startup": dict(self._startup),
+            "robot": robot,
+            "robot_status_error": robot_status_error,
+            "recovery": self._recovery_status(safety, system_latched=system_latched),
+        }
 
     def _read_robot_status(self) -> tuple[dict[str, Any] | None, str | None]:
         if self._robot_status is None:

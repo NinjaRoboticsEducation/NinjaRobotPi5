@@ -503,12 +503,7 @@ class RobotIDEClient:
 
     def status(self) -> dict[str, Any]:
         """Return non-invasive robot state for agent readiness reporting."""
-        snapshot = self.robot.safety_state.read()
-        return {
-            "safety": asdict(snapshot),
-            "recovery_required": snapshot.system_latched,
-            "motion_recovery_required": (snapshot.motion_latched and not snapshot.system_latched),
-        }
+        return self.robot.status()
 
     async def close(self) -> None:
         if self._closed:

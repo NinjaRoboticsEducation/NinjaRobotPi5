@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from ninjarobot_pi5_ide import (
     ActionLedger,
     ActionRequest,
@@ -84,6 +86,35 @@ class ConcurrencyDisplayDriver(FakeDisplayDriver):
         time.sleep(0.01)
         with self._call_lock:
             self.active_calls -= 1
+
+
+class BlockingDisplayDriver(FakeDisplayDriver):
+    def __init__(self) -> None:
+        super().__init__()
+        self.call_started = threading.Event()
+        self.release_call = threading.Event()
+        self.active_calls = 0
+        self.max_active_calls = 0
+        self._call_lock = threading.Lock()
+
+    def clear(self, color: tuple[int, int, int]) -> None:
+        with self._call_lock:
+            self.active_calls += 1
+            self.max_active_calls = max(self.max_active_calls, self.active_calls)
+        self.call_started.set()
+        assert self.release_call.wait(timeout=1.0)
+        super().clear(color)
+        with self._call_lock:
+            self.active_calls -= 1
+
+    def set_brightness(self, percent: int) -> None:
+        if self.brightness_calls:
+            with self._call_lock:
+                self.active_calls += 1
+                self.max_active_calls = max(self.max_active_calls, self.active_calls)
+            with self._call_lock:
+                self.active_calls -= 1
+        super().set_brightness(percent)
 
 
 def request(
@@ -287,6 +318,59 @@ def test_partial_startup_failure_closes_constructed_driver(tmp_path: Path) -> No
     asyncio.run(exercise())
 
 
+def test_explicit_recovery_retries_one_shot_startup_and_probes_a_write() -> None:
+    async def exercise() -> None:
+        driver = FakeDisplayDriver()
+        factory_calls = 0
+
+        def factory(**_settings: Any) -> FakeDisplayDriver:
+            nonlocal factory_calls
+            factory_calls += 1
+            if factory_calls == 1:
+                raise ConnectionError("SPI0 unavailable")
+            return driver
+
+        device = DisplayDevice(driver_factory=factory)
+        await device.start()
+        await device.start()
+        assert factory_calls == 1
+        assert await device.health() is ResourceHealth.UNAVAILABLE
+
+        await device.recover()
+
+        assert factory_calls == 2
+        assert driver.brightness_calls == [75]
+        assert driver.clear_calls == [(0, 0, 0)]
+        assert await device.health() is ResourceHealth.READY
+        await device.close()
+
+    asyncio.run(exercise())
+
+
+def test_repeated_recovery_closes_every_replaced_display_driver() -> None:
+    async def exercise() -> None:
+        drivers: list[FakeDisplayDriver] = []
+
+        def factory(**_settings: Any) -> FakeDisplayDriver:
+            driver = FakeDisplayDriver()
+            drivers.append(driver)
+            return driver
+
+        device = DisplayDevice(driver_factory=factory)
+        await device.start()
+        for _ in range(20):
+            await device.recover()
+
+        assert len(drivers) == 21
+        assert all(driver.close_calls == 1 for driver in drivers[:-1])
+        assert all(driver.clear_calls == [(0, 0, 0)] for driver in drivers[1:])
+        assert await device.health() is ResourceHealth.READY
+        await device.close()
+        assert drivers[-1].close_calls == 1
+
+    asyncio.run(exercise())
+
+
 def test_failed_spi_write_is_retry_safe_and_structured(tmp_path: Path) -> None:
     async def exercise() -> None:
         driver = FakeDisplayDriver(fail_write=True)
@@ -339,5 +423,31 @@ def test_concurrent_display_actions_are_serialized(tmp_path: Path) -> None:
         assert brightness_result.status is ActionStatus.SUCCEEDED
         assert driver.max_active_calls == 1
         await engine.close()
+
+    asyncio.run(exercise())
+
+
+def test_cancelled_display_call_keeps_lock_until_spi_thread_finishes() -> None:
+    async def exercise() -> None:
+        driver = BlockingDisplayDriver()
+        device = DisplayDevice(driver_factory=lambda **_settings: driver)
+        await device.start()
+
+        first = asyncio.create_task(device.clear(color="#000000"))
+        assert await asyncio.to_thread(driver.call_started.wait, 0.5)
+        first.cancel()
+        second = asyncio.create_task(device.set_brightness(percent=50))
+        await asyncio.sleep(0.02)
+
+        assert not first.done()
+        assert not second.done()
+        assert driver.max_active_calls == 1
+
+        driver.release_call.set()
+        with pytest.raises(asyncio.CancelledError):
+            await first
+        assert (await second)["brightness"] == 50
+        assert driver.max_active_calls == 1
+        await device.close()
 
     asyncio.run(exercise())

@@ -324,18 +324,26 @@ def test_service_start_waits_for_liveliness_result_before_reporting(
         "operational_state": "recovery_required",
         "startup": {"complete": True, "liveliness": "failed"},
     }
+    detailed = {
+        **degraded,
+        "provider": {"provider": "gemini", "status": "ready"},
+        "tool_providers": [],
+    }
 
     class FakeClient:
         def __init__(self) -> None:
+            self.requests = []
             self.responses = iter(
                 (
                     agent_cli.AgentIPCError("not running"),
                     {"data": pending},
                     {"data": degraded},
+                    {"data": detailed},
                 )
             )
 
-        async def request(self, _payload):
+        async def request(self, payload):
+            self.requests.append(payload)
             response = next(self.responses)
             if isinstance(response, Exception):
                 raise response
@@ -376,9 +384,15 @@ def test_service_start_waits_for_liveliness_result_before_reporting(
     )
 
     assert result == 0
+    assert fake_client.requests == [
+        {"command": "status"},
+        {"command": "startup_status"},
+        {"command": "startup_status"},
+        {"command": "status"},
+    ]
     sleep.assert_awaited_once_with(0.1)
     process.terminate.assert_not_called()
     output = json.loads(capsys.readouterr().out)
     assert output["started"] is True
     assert output["ready"] is False
-    assert output["status"] == degraded
+    assert output["status"] == detailed

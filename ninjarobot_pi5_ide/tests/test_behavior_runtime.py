@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -22,11 +24,13 @@ EXAMPLE = ROOT / "config" / "ninjarobot_pi5.toml.example"
 
 
 class FakeDisplayDriver:
-    def __init__(self, *, fail_write: bool = False) -> None:
+    def __init__(self, *, fail_write: bool = False, fail_clear: bool = False) -> None:
         self.width = 320
         self.height = 240
         self.fail_write = fail_write
+        self.fail_clear = fail_clear
         self.frames: list[Any] = []
+        self.clear_calls = 0
         self.brightness: list[int] = []
         self.closed = 0
 
@@ -36,7 +40,9 @@ class FakeDisplayDriver:
         self.frames.append(image.copy())
 
     def clear(self, _color: tuple[int, int, int]) -> None:
-        return
+        if self.fail_clear:
+            raise OSError("simulated SPI clear failure")
+        self.clear_calls += 1
 
     def set_brightness(self, percent: int) -> None:
         self.brightness.append(percent)
@@ -46,6 +52,25 @@ class FakeDisplayDriver:
 
     def close(self) -> None:
         self.closed += 1
+
+
+class SlowDisplayDriver(FakeDisplayDriver):
+    def __init__(self) -> None:
+        super().__init__()
+        self.active_writes = 0
+        self.max_active_writes = 0
+        self._write_lock = threading.Lock()
+
+    def display(self, image: Any) -> None:
+        with self._write_lock:
+            self.active_writes += 1
+            self.max_active_writes = max(self.max_active_writes, self.active_writes)
+        try:
+            time.sleep(0.003)
+            super().display(image)
+        finally:
+            with self._write_lock:
+                self.active_writes -= 1
 
 
 class FakeBuzzerDriver:
@@ -363,6 +388,14 @@ def test_robot_liveliness_runs_greeting_then_supervises_silent_idle(
 
         assert len(display.frames) > frame_count
         assert len(buzzer.play_calls) == greeting_sound_count
+        assert robot.status()["liveliness"] == {
+            "enabled": True,
+            "state": "running",
+            "idle_error": None,
+            "idle_task_running": True,
+            "ambient_face": "idle",
+            "foreground_behaviors": 0,
+        }
 
         thinking = idle.model_copy(
             update={
@@ -411,12 +444,153 @@ def test_robot_liveliness_runs_greeting_then_supervises_silent_idle(
         assert len(display.frames) == frame_count
 
         robot._idle_error = "OSError: previous idle frame failed"  # type: ignore[attr-defined]
+        assert robot.status()["liveliness"]["state"] == "degraded"
         resumed = await robot.resume_system(confirmed=True)
         assert resumed.system_latched is False
         await asyncio.sleep(0)
         assert robot._idle_task is not None  # type: ignore[attr-defined]
         assert robot._idle_task.get_name() == "ninjarobot-silent-idle"  # type: ignore[attr-defined]
         assert (await robot.health())["idle"] == "ready"
+        await robot.close()
+
+    asyncio.run(exercise())
+
+
+def test_level_two_resume_reconstructs_faulted_display_before_clearing_latch(
+    tmp_path: Path,
+) -> None:
+    async def exercise() -> None:
+        stale = FakeDisplayDriver(fail_write=True)
+        recovered = FakeDisplayDriver()
+        displays = iter((stale, recovered))
+        config = load_robot_config(EXAMPLE).model_copy(
+            update={
+                "behaviors": BehaviorConfig(
+                    user_directory=str(tmp_path / "behaviors"),
+                    safety_state_file=str(tmp_path / "safety.json"),
+                    system_stopped_display_seconds=0.0,
+                )
+            }
+        )
+        robot = RobotAssembly(
+            config=config,
+            display_factory=lambda **_settings: next(displays),
+            buzzer_factory=lambda _pin, _volume: FakeBuzzerDriver(),
+            simulated=True,
+        )
+        await robot.start()
+        robot.safety_state.latch_system(
+            "driver_failure",
+            fault_detail="DISPLAY_WRITE_FAILED: simulated SPI failure",
+        )
+
+        resumed = await robot.resume_system(confirmed=True)
+
+        assert resumed.system_latched is False
+        assert stale.closed == 1
+        assert recovered.clear_calls == 1
+        assert recovered.brightness == [75]
+        await robot.close()
+
+    asyncio.run(exercise())
+
+
+def test_level_two_resume_keeps_latch_when_display_write_probe_fails(
+    tmp_path: Path,
+) -> None:
+    async def exercise() -> None:
+        stale = FakeDisplayDriver(fail_write=True)
+        broken_replacement = FakeDisplayDriver(fail_clear=True)
+        displays = iter((stale, broken_replacement))
+        config = load_robot_config(EXAMPLE).model_copy(
+            update={
+                "behaviors": BehaviorConfig(
+                    user_directory=str(tmp_path / "behaviors"),
+                    safety_state_file=str(tmp_path / "safety.json"),
+                    system_stopped_display_seconds=0.0,
+                )
+            }
+        )
+        robot = RobotAssembly(
+            config=config,
+            display_factory=lambda **_settings: next(displays),
+            buzzer_factory=lambda _pin, _volume: FakeBuzzerDriver(),
+            simulated=True,
+        )
+        await robot.start()
+        robot.safety_state.latch_system(
+            "driver_failure",
+            fault_detail="DISPLAY_WRITE_FAILED: simulated SPI failure",
+        )
+
+        with pytest.raises(RuntimeError, match="display"):
+            await robot.resume_system(confirmed=True)
+
+        snapshot = robot.safety_state.read()
+        assert snapshot.system_latched is True
+        assert snapshot.fault_detail == "DISPLAY_WRITE_FAILED: simulated SPI failure"
+        assert broken_replacement.closed == 1
+        await robot.close()
+
+    asyncio.run(exercise())
+
+
+def test_rapid_idle_restarts_never_overlap_spi_writes_or_lose_supervision(
+    tmp_path: Path,
+) -> None:
+    async def exercise() -> None:
+        display = SlowDisplayDriver()
+        buzzer = FakeBuzzerDriver()
+        config = load_robot_config(EXAMPLE).model_copy(
+            update={
+                "behaviors": BehaviorConfig(
+                    user_directory=str(tmp_path / "behaviors"),
+                    safety_state_file=str(tmp_path / "safety.json"),
+                    system_stopped_display_seconds=0.0,
+                )
+            }
+        )
+        robot = RobotAssembly(
+            config=config,
+            display_factory=lambda **_settings: display,
+            buzzer_factory=lambda _pin, _volume: buzzer,
+            melody_provider=lambda _name: ((440, 0.01),),
+            simulated=True,
+        )
+        idle = BehaviorDefinition.model_validate(
+            {
+                "schema_version": 1,
+                "name": "idle",
+                "description": "Long-run cancellation regression face.",
+                "category": "expression",
+                "stages": [
+                    {
+                        "name": "idle_face",
+                        "operations": [
+                            {
+                                "kind": "face",
+                                "expression": "idle",
+                                "hold_seconds": 0.05,
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        greeting = idle.model_copy(update={"name": "greeting"})
+        robot.assets = _LifecycleAssets(greeting=greeting, idle=idle)  # type: ignore[assignment]
+        await robot.start()
+        await robot.start_liveliness()
+
+        for _ in range(100):
+            assert await robot.show_agent_face("idle") is True
+        await asyncio.sleep(0.03)
+
+        liveliness = robot.status()["liveliness"]
+        assert display.max_active_writes == 1
+        assert liveliness["state"] == "running"
+        assert liveliness["idle_error"] is None
+        assert robot.safety_state.read().system_latched is False
         await robot.close()
 
     asyncio.run(exercise())

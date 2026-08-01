@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+from dataclasses import asdict
 from typing import Any, cast
 
 from .behavior_assets import BehaviorAssetRepository
@@ -42,6 +44,7 @@ from .simulation import (
 )
 
 CAMERA_COUNTDOWN_INTERVAL_SECONDS = 1.0
+LOGGER = logging.getLogger(__name__)
 
 
 class RobotAssembly:
@@ -263,6 +266,38 @@ class RobotAssembly:
             health["idle"] = "degraded" if self._idle_error is not None else "ready"
         return health
 
+    def status(self) -> dict[str, Any]:
+        """Return non-invasive safety and liveliness supervision state."""
+        snapshot = self.safety_state.read()
+        idle_running = self._idle_task is not None and not self._idle_task.done()
+        if not self._liveliness_enabled:
+            liveliness_state = "disabled"
+        elif self._idle_error is not None:
+            liveliness_state = "degraded"
+        elif self._closing:
+            liveliness_state = "closing"
+        elif self._idle_suppressed or self.system_safety.stopped:
+            liveliness_state = "suppressed"
+        elif self._foreground_behaviors:
+            liveliness_state = "foreground"
+        elif idle_running:
+            liveliness_state = "running"
+        else:
+            liveliness_state = "degraded"
+        return {
+            "safety": asdict(snapshot),
+            "recovery_required": snapshot.system_latched,
+            "motion_recovery_required": (snapshot.motion_latched and not snapshot.system_latched),
+            "liveliness": {
+                "enabled": self._liveliness_enabled,
+                "state": liveliness_state,
+                "idle_error": self._idle_error,
+                "idle_task_running": idle_running,
+                "ambient_face": self._ambient_face,
+                "foreground_behaviors": self._foreground_behaviors,
+            },
+        }
+
     async def stop(self) -> dict[str, Any]:
         """Perform a non-latching full stop requested by the operator."""
         self._idle_suppressed = True
@@ -315,12 +350,21 @@ class RobotAssembly:
     async def _driver_failure(self, error: Exception) -> None:
         if isinstance(error, MotionSafetyError) or not is_hardware_driver_error(error):
             return
+        detail = describe_hardware_driver_error(error)
+        LOGGER.error(
+            "Hardware driver failure escalated to a persistent Level 2 stop: %s",
+            detail,
+            exc_info=(type(error), error, error.__traceback__),
+        )
         self._idle_suppressed = True
-        await self.system_safety.full_stop(
+        stopped = await self.system_safety.full_stop(
             "driver_failure",
             latch=True,
-            fault_detail=describe_hardware_driver_error(error),
+            fault_detail=detail,
         )
+        cleanup_errors = stopped.get("cleanup_errors")
+        if cleanup_errors:
+            LOGGER.error("Level 2 cleanup reported errors: %s", cleanup_errors)
 
     async def _start_idle_if_safe(self) -> None:
         if (
@@ -367,6 +411,11 @@ class RobotAssembly:
             raise
         except Exception as exc:
             self._idle_error = f"{type(exc).__name__}: {exc}"
+            LOGGER.error(
+                "Idle face supervisor stopped unexpectedly: %s",
+                self._idle_error,
+                exc_info=(type(exc), exc, exc.__traceback__),
+            )
             return
         finally:
             async with self._idle_lock:
@@ -437,14 +486,20 @@ class RobotAssembly:
         )
 
     async def _display_health(self) -> bool:
-        await self.behaviors.start()
-        health = await self.behaviors.health()
-        return health.get("display") == ResourceHealth.READY.value
+        snapshot = self.safety_state.read()
+        if snapshot.system_latched and (snapshot.fault_detail or "").startswith("DISPLAY_"):
+            await self.display.recover()
+        else:
+            await self.display.start()
+        return await self.display.health() is ResourceHealth.READY
 
     async def _buzzer_health(self) -> bool:
-        await self.behaviors.start()
-        health = await self.behaviors.health()
-        return health.get("buzzer") == ResourceHealth.READY.value
+        snapshot = self.safety_state.read()
+        if snapshot.system_latched and (snapshot.fault_detail or "").startswith("BUZZER_"):
+            await self.buzzer.recover()
+        else:
+            await self.buzzer.start()
+        return await self.buzzer.health() is ResourceHealth.READY
 
     async def _servo_health(self) -> bool:
         await self.servo.start()

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 from collections.abc import Callable
-from typing import Any, Protocol, cast
+from typing import Any, Protocol, TypeVar, cast
 
 from .errors import IDEError
 from .models import (
@@ -54,6 +54,7 @@ class BuzzerDriver(Protocol):
 
 
 BuzzerFactory = Callable[[int, int], BuzzerDriver]
+ThreadResult = TypeVar("ThreadResult")
 
 
 def _load_buzzer(pin: int, volume: int) -> BuzzerDriver:
@@ -102,6 +103,36 @@ class BuzzerDevice:
                 raise RuntimeError("buzzer device is closed")
             await self._initialize_locked()
 
+    async def recover(self) -> None:
+        """Silence and reconstruct the backend for an explicit Level 2 resume."""
+        self._stop_event.set()
+        async with self._lock:
+            if self._closed:
+                raise RuntimeError("buzzer device is closed")
+            previous = self._driver
+            self._driver = None
+            close_error: str | None = None
+            if previous is not None:
+                try:
+                    await _run_thread_to_completion(previous.off)
+                except Exception as exc:
+                    close_error = f"previous stop failed: {type(exc).__name__}: {exc}"
+
+            self._startup_error = None
+            await self._initialize_locked()
+            if self._driver is None or not self._driver.is_initialized:
+                detail = self._startup_error or "buzzer reconstruction did not initialize"
+                if close_error is not None:
+                    detail = f"{close_error}; {detail}"
+                raise _buzzer_error(
+                    code="BUZZER_RECOVERY_FAILED",
+                    message="The GPIO27 buzzer backend could not be reconstructed.",
+                    technical_detail=detail,
+                    definitely_not_executed=True,
+                    retry_safety=RetrySafety.SAFE,
+                    capability="system.resume",
+                )
+
     async def play(
         self,
         *,
@@ -115,7 +146,7 @@ class BuzzerDevice:
             driver.volume = volume
             self._stop_event.clear()
             try:
-                await asyncio.to_thread(
+                await _run_thread_to_completion(
                     driver.play_sound,
                     frequency_hz,
                     duration_seconds,
@@ -159,7 +190,7 @@ class BuzzerDevice:
             driver = self._driver
             if driver is not None:
                 try:
-                    await asyncio.to_thread(driver.off)
+                    await _run_thread_to_completion(driver.off)
                 except Exception as exc:
                     raise _buzzer_error(
                         code="BUZZER_STOP_FAILED",
@@ -192,16 +223,23 @@ class BuzzerDevice:
     async def _initialize_locked(self) -> None:
         if self._driver is not None and self._driver.is_initialized:
             return
+        driver = self._driver
         try:
-            if self._driver is None:
-                self._driver = await asyncio.to_thread(
+            if driver is None:
+                driver = await _run_thread_to_completion(
                     self._driver_factory,
                     self._pin,
                     self._default_volume,
                 )
-            await asyncio.to_thread(self._driver.initialize)
+            await _run_thread_to_completion(driver.initialize)
+            self._driver = driver
             self._startup_error = None
         except Exception as exc:
+            if driver is not None:
+                try:
+                    await _run_thread_to_completion(driver.off)
+                except Exception:
+                    pass
             self._driver = None
             self._startup_error = f"{type(exc).__name__}: {exc}"
 
@@ -217,6 +255,28 @@ class BuzzerDevice:
                 capability="buzzer.play_tone",
             )
         return self._driver
+
+
+async def _run_thread_to_completion(
+    call: Callable[..., ThreadResult],
+    /,
+    *args: Any,
+) -> ThreadResult:
+    """Keep the device lock held until a cancelled GPIO call really exits."""
+    worker = asyncio.create_task(asyncio.to_thread(call, *args))
+    try:
+        return await asyncio.shield(worker)
+    except asyncio.CancelledError as cancellation:
+        while not worker.done():
+            try:
+                await asyncio.shield(worker)
+            except asyncio.CancelledError:
+                continue
+        try:
+            worker.result()
+        except Exception:
+            pass
+        raise cancellation
 
 
 class BuzzerToneAdapter:

@@ -139,6 +139,20 @@ def test_runtime_status_exposes_startup_safety_and_recovery(tmp_path) -> None:
         assert starting["operational_state"] == "starting"
         assert starting["startup"]["complete"] is False
 
+        lightweight = runtime.startup_status()
+        assert lightweight == {
+            key: starting[key]
+            for key in (
+                "started",
+                "ready",
+                "operational_state",
+                "startup",
+                "robot",
+                "robot_status_error",
+                "recovery",
+            )
+        }
+
         failure = RuntimeError("system is stopped (driver_failure)")
         runtime.fail_startup_liveliness(failure)
         degraded = await runtime.status()
@@ -181,6 +195,60 @@ def test_runtime_status_failure_is_degraded_instead_of_hiding_status(tmp_path) -
         assert status["operational_state"] == "status_degraded"
         assert status["robot"] is None
         assert status["robot_status_error"] == "OSError: safety state cannot be read"
+        await runtime.close()
+
+    asyncio.run(exercise())
+
+
+def test_runtime_status_reports_unexpected_idle_supervisor_loss(tmp_path) -> None:
+    async def exercise() -> None:
+        runtime = build_runtime(
+            tmp_path,
+            robot_status=lambda: {
+                "safety": {
+                    "motion_latched": False,
+                    "system_latched": False,
+                    "reason": None,
+                    "fault_detail": None,
+                },
+                "liveliness": {
+                    "enabled": True,
+                    "state": "degraded",
+                    "idle_error": "OSError: simulated SPI failure",
+                    "idle_task_running": False,
+                },
+            },
+        )
+        await runtime.start()
+
+        status = runtime.startup_status()
+
+        assert status["ready"] is False
+        assert status["operational_state"] == "liveliness_degraded"
+        assert status["robot"]["liveliness"]["idle_error"] == ("OSError: simulated SPI failure")
+        await runtime.close()
+
+    asyncio.run(exercise())
+
+
+def test_startup_status_does_not_probe_model_tools_or_database(tmp_path) -> None:
+    async def exercise() -> None:
+        runtime = build_runtime(tmp_path)
+        runtime.begin_startup_liveliness()
+        await runtime.start()
+        provider_health = AsyncMock(side_effect=AssertionError("provider health was called"))
+        tool_health = AsyncMock(side_effect=AssertionError("tool health was called"))
+        sessions = AsyncMock(side_effect=AssertionError("database sessions were read"))
+        runtime.provider.health = provider_health  # type: ignore[method-assign]
+        runtime.tools.health = tool_health  # type: ignore[method-assign]
+        runtime.store.sessions = sessions  # type: ignore[method-assign]
+
+        status = runtime.startup_status()
+
+        assert status["operational_state"] == "starting"
+        provider_health.assert_not_called()
+        tool_health.assert_not_called()
+        sessions.assert_not_called()
         await runtime.close()
 
     asyncio.run(exercise())
@@ -278,6 +346,9 @@ def test_ipc_allows_reconnect_stream_history_clear_arm_and_stop(tmp_path) -> Non
         assert streamed[-1]["data"]["text"] == "Hello from NinjaRobot."
 
         second_client = AgentIPCClient(socket_path)
+        startup_status = await second_client.request({"command": "startup_status"})
+        assert startup_status["data"]["started"] is True
+        assert "provider" not in startup_status["data"]
         status = await second_client.request({"command": "status"})
         assert status["data"]["started"] is True
         history = await second_client.request({"command": "history", "session_id": "session-1"})

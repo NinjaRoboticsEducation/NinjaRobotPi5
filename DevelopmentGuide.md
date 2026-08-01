@@ -1257,13 +1257,17 @@ successful Resume re-enables it.
 Startup readiness is explicit. `AgentRuntime.begin_startup_liveliness()` is
 called before the IPC socket is bound, so a concurrent status request sees
 `startup.complete: false` instead of a false-ready service. The detached CLI
-launcher polls until the Greeting/Idle attempt completes, for up to 60 seconds.
-Success reports `ready: true`. Failure leaves the service available for local
-recovery but reports `ready: false` and either `degraded` or
-`recovery_required`. `RobotIDEClient.status()` reads only the durable safety
-snapshot; it does not move a servo, sound the buzzer, capture media, or clear a
-latch. Startup exceptions and tracebacks go to the service log, while status
-returns a bounded diagnostic string.
+launcher polls the dedicated synchronous `startup_status` IPC command until
+the Greeting/Idle attempt completes, for up to 60 seconds. That path reads only
+the already-owned robot's durable safety and in-memory liveliness state. It
+does not call model health, MCP or IDE-provider health, the conversation
+database, or a capability action. The launcher requests the complete detailed
+status only once after startup settles. Success reports `ready: true`. Failure
+leaves the service available for local recovery but reports `ready: false` and
+either `degraded`, `liveliness_degraded`, or `recovery_required`.
+`RobotIDEClient.status()` does not move a servo, sound the buzzer, write the
+display, capture media, or clear a latch. Startup, Idle, and driver exceptions
+and tracebacks go to the service log, while status returns bounded diagnostics.
 
 Readiness is deliberately separate from model and tool-provider health. A
 Gemini connection and the MCP catalogs can be ready while a persisted Level 2
@@ -1276,6 +1280,22 @@ microphone services. Suspension releases active hardware resources but does
 not permanently end their lifecycle. Resume calls `start()` and health-checks
 the same IDE-owned services before clearing the stop. Final process shutdown
 still uses terminal `close()` operations, so closed objects are never reused.
+
+Display and buzzer faults use a stronger recovery path. A persisted
+`DISPLAY_*` or `BUZZER_*` fault selects only that device for explicit backend
+reconstruction during confirmed Resume. The old backend is stopped or closed
+and discarded before the configured factory creates a replacement. The
+display replacement must report healthy and complete a real black-frame write;
+merely retaining a live SPI handle is insufficient. A failed factory, health
+probe, or write probe is returned as a failed Resume and the original safety
+latch is preserved. Ordinary health and startup calls remain
+non-reconstructive, so monitoring cannot create an uncontrolled retry loop.
+
+All display calls dispatched with `asyncio.to_thread()` use a
+cancellation-safe wait. If Idle is cancelled during a frame transfer, the
+calling task still owns the display lock until the worker thread exits, then
+propagates cancellation. This prevents the next Thinking, Speaking, behavior,
+or safety frame from entering SPI concurrently with the cancelled transfer.
 
 Agent chat recovery uses the same IDE-owned `system.resume` capability as the
 interactive IDE tool. `AgentRuntime.resume_system()` first requires explicit
@@ -1365,6 +1385,8 @@ Implemented suites include:
   explicit motion-arm tests
 - presentation-directive filtering and IDE face-lifecycle tests
 - restartable Level 2 device lifecycle and one-shot camera redaction tests
+- cancellation-safe SPI serialization, repeated display/buzzer reconstruction,
+  and rapid Idle-restart stress tests
 - opt-in Tavily and Raspberry Pi acceptance tests
 
 Run the configured project scope with:

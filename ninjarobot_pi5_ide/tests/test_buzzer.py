@@ -228,3 +228,49 @@ def test_unavailable_gpio_becomes_structured_failure(tmp_path: Path) -> None:
         await engine.close()
 
     asyncio.run(exercise())
+
+
+def test_explicit_recovery_discards_stale_driver_and_constructs_a_fresh_one() -> None:
+    async def exercise() -> None:
+        first = FakeBuzzerDriver()
+        second = FakeBuzzerDriver()
+        drivers = iter((first, second))
+        device = BuzzerDevice(driver_factory=lambda _pin, _volume: next(drivers))
+
+        await device.start()
+        assert first.is_initialized is True
+        await device.stop()
+        assert first.is_initialized is False
+
+        await device.recover()
+
+        assert first.off_calls == 2
+        assert second.is_initialized is True
+        assert await device.health() is ResourceHealth.READY
+        await device.close()
+
+    asyncio.run(exercise())
+
+
+def test_repeated_recovery_releases_every_replaced_buzzer_driver() -> None:
+    async def exercise() -> None:
+        drivers: list[FakeBuzzerDriver] = []
+
+        def factory(_pin: int, _volume: int) -> FakeBuzzerDriver:
+            driver = FakeBuzzerDriver()
+            drivers.append(driver)
+            return driver
+
+        device = BuzzerDevice(driver_factory=factory)
+        await device.start()
+        for _ in range(20):
+            await device.recover()
+
+        assert len(drivers) == 21
+        assert all(driver.off_calls == 1 for driver in drivers[:-1])
+        assert all(not driver.is_initialized for driver in drivers[:-1])
+        assert drivers[-1].is_initialized is True
+        await device.close()
+        assert drivers[-1].off_calls == 1
+
+    asyncio.run(exercise())
