@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -79,7 +81,11 @@ class _EchoProvider:
         return None
 
 
-def build_runtime(tmp_path) -> AgentRuntime:
+def build_runtime(
+    tmp_path,
+    *,
+    robot_status: Callable[[], Mapping[str, Any]] | None = None,
+) -> AgentRuntime:
     provider = _EchoProvider()
     tools = ToolRegistry(())
     store = ConversationStore(tmp_path / "conversation.sqlite3")
@@ -104,12 +110,87 @@ def build_runtime(tmp_path) -> AgentRuntime:
         motion_arms=arms,
         skills=SkillRepository(tmp_path / "skills"),
         events=events,
+        robot_status=robot_status,
     )
+
+
+def test_runtime_status_exposes_startup_safety_and_recovery(tmp_path) -> None:
+    async def exercise() -> None:
+        safety = {
+            "schema_version": 1,
+            "motion_latched": True,
+            "system_latched": True,
+            "reason": "driver_failure",
+            "fault_detail": "DISPLAY_UNAVAILABLE: simulated startup failure",
+            "updated_at": "2026-08-01T05:46:21Z",
+        }
+        runtime = build_runtime(
+            tmp_path,
+            robot_status=lambda: {
+                "safety": safety,
+                "recovery_required": safety["system_latched"],
+            },
+        )
+        runtime.begin_startup_liveliness()
+        await runtime.start()
+
+        starting = await runtime.status()
+        assert starting["ready"] is False
+        assert starting["operational_state"] == "starting"
+        assert starting["startup"]["complete"] is False
+
+        failure = RuntimeError("system is stopped (driver_failure)")
+        runtime.fail_startup_liveliness(failure)
+        degraded = await runtime.status()
+        assert degraded["ready"] is False
+        assert degraded["operational_state"] == "recovery_required"
+        assert degraded["startup"]["liveliness"] == "failed"
+        assert degraded["robot"]["safety"] == safety
+        assert degraded["recovery"] == {
+            "required": True,
+            "reason": "driver_failure",
+            "detail": "DISPLAY_UNAVAILABLE: simulated startup failure",
+            "instructions": (
+                "Open `ninjarobot-agent chat`, enter `/resume`, and explicitly confirm "
+                "the non-moving health checks. Do not delete the safety state file."
+            ),
+        }
+
+        safety.update(motion_latched=False, system_latched=False, reason=None, fault_detail=None)
+        runtime.complete_startup_recovery()
+        recovered = await runtime.status()
+        assert recovered["ready"] is True
+        assert recovered["operational_state"] == "ready"
+        assert recovered["startup"]["liveliness"] == "recovered"
+        assert recovered["recovery"]["required"] is False
+        await runtime.close()
+
+    asyncio.run(exercise())
+
+
+def test_runtime_status_failure_is_degraded_instead_of_hiding_status(tmp_path) -> None:
+    def unavailable_status() -> Mapping[str, Any]:
+        raise OSError("safety state cannot be read")
+
+    async def exercise() -> None:
+        runtime = build_runtime(tmp_path, robot_status=unavailable_status)
+        await runtime.start()
+        status = await runtime.status()
+        assert status["started"] is True
+        assert status["ready"] is False
+        assert status["operational_state"] == "status_degraded"
+        assert status["robot"] is None
+        assert status["robot_status_error"] == "OSError: safety state cannot be read"
+        await runtime.close()
+
+    asyncio.run(exercise())
 
 
 def test_runtime_resume_is_confirmed_health_checked_and_does_not_rearm(tmp_path) -> None:
     async def exercise() -> None:
         runtime = build_runtime(tmp_path)
+        runtime.begin_startup_liveliness()
+        runtime.fail_startup_liveliness(RuntimeError("startup failed"))
         await runtime.start()
         runtime.arm_motion("local-cli", confirmed=True)
         succeeded = ToolExecutionResult(
@@ -129,6 +210,7 @@ def test_runtime_resume_is_confirmed_health_checked_and_does_not_rearm(tmp_path)
 
         assert result is succeeded
         assert runtime.motion_arms.is_armed("local-cli") is False
+        assert (await runtime.status())["startup"]["liveliness"] == "recovered"
         execute_tool.assert_awaited_once_with(
             tool_name="robot.system.resume",
             arguments={"confirmed": True},

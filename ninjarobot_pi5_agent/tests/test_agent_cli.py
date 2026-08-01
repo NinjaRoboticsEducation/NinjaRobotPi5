@@ -5,7 +5,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from ninjarobot_pi5_agent.agent_cli import main
@@ -306,3 +306,79 @@ def test_provider_login_compatibility_command_explains_api_key_migration(
 
     assert exit_info.value.code == 2
     assert "provider set-api-key gemini" in capsys.readouterr().err
+
+
+def test_service_start_waits_for_liveliness_result_before_reporting(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    pending = {
+        "started": True,
+        "ready": False,
+        "startup": {"complete": False, "liveliness": "pending"},
+    }
+    degraded = {
+        "started": True,
+        "ready": False,
+        "operational_state": "recovery_required",
+        "startup": {"complete": True, "liveliness": "failed"},
+    }
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.responses = iter(
+                (
+                    agent_cli.AgentIPCError("not running"),
+                    {"data": pending},
+                    {"data": degraded},
+                )
+            )
+
+        async def request(self, _payload):
+            response = next(self.responses)
+            if isinstance(response, Exception):
+                raise response
+            return response
+
+    fake_client = FakeClient()
+    process = SimpleNamespace(pid=4242, poll=Mock(return_value=None), terminate=Mock())
+    namespace = SimpleNamespace(
+        socket=tmp_path / "agent.sock",
+        lock=tmp_path / "agent.lock",
+        database=tmp_path / "conversation.sqlite3",
+        ledger=tmp_path / "ledger.sqlite3",
+        config=tmp_path / "config.toml",
+        mcp_config=tmp_path / "mcp.toml",
+        secret_file=tmp_path / "secrets.env",
+        skill_dir=tmp_path / "skills",
+        benchmark_dir=tmp_path / "benchmarks",
+        whisper_command=tmp_path / "whisper-cli",
+        whisper_model=tmp_path / "whisper.bin",
+        whisper_threads=4,
+        web_host="127.0.0.1",
+        web_port=8443,
+        web_certificate=tmp_path / "cert.pem",
+        web_key=tmp_path / "key.pem",
+        model=None,
+        base_url=None,
+        real=True,
+    )
+    monkeypatch.setattr(agent_cli, "AgentIPCClient", lambda _socket: fake_client)
+    monkeypatch.setattr(agent_cli, "_service_namespace", lambda _arguments: namespace)
+    monkeypatch.setattr(agent_cli, "DEFAULT_SERVICE_LOG", tmp_path / "agent.log")
+    monkeypatch.setattr(agent_cli.subprocess, "Popen", Mock(return_value=process))
+    sleep = AsyncMock()
+    monkeypatch.setattr(agent_cli.asyncio, "sleep", sleep)
+
+    result = asyncio.run(
+        agent_cli._spawn_service(SimpleNamespace(service_socket=namespace.socket))  # noqa: SLF001
+    )
+
+    assert result == 0
+    sleep.assert_awaited_once_with(0.1)
+    process.terminate.assert_not_called()
+    output = json.loads(capsys.readouterr().out)
+    assert output["started"] is True
+    assert output["ready"] is False
+    assert output["status"] == degraded

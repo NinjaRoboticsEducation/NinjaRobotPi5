@@ -755,7 +755,7 @@ async def _spawn_service(arguments: argparse.Namespace) -> int:
             stderr=subprocess.STDOUT,
             start_new_session=True,
         )
-    for _ in range(100):
+    for _ in range(600):
         if process.poll() is not None:
             raise AgentIPCError(f"agent service exited during startup; inspect {log_path}")
         try:
@@ -763,13 +763,19 @@ async def _spawn_service(arguments: argparse.Namespace) -> int:
         except AgentIPCError:
             await asyncio.sleep(0.1)
             continue
+        status_data = status["data"]
+        startup = status_data.get("startup")
+        if isinstance(startup, dict) and startup.get("complete") is False:
+            await asyncio.sleep(0.1)
+            continue
         _print_json(
             {
                 "started": True,
+                "ready": status_data.get("ready", True),
                 "pid": process.pid,
                 "real_hardware": namespace.real,
                 "log": str(log_path),
-                "status": status["data"],
+                "status": status_data,
             }
         )
         return 0

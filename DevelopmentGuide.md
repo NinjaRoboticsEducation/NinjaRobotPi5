@@ -1254,6 +1254,23 @@ as degraded health instead of being discarded silently. Level 1, Level 2,
 driver-failure, and shutdown screens are never overwritten by Idle; a
 successful Resume re-enables it.
 
+Startup readiness is explicit. `AgentRuntime.begin_startup_liveliness()` is
+called before the IPC socket is bound, so a concurrent status request sees
+`startup.complete: false` instead of a false-ready service. The detached CLI
+launcher polls until the Greeting/Idle attempt completes, for up to 60 seconds.
+Success reports `ready: true`. Failure leaves the service available for local
+recovery but reports `ready: false` and either `degraded` or
+`recovery_required`. `RobotIDEClient.status()` reads only the durable safety
+snapshot; it does not move a servo, sound the buzzer, capture media, or clear a
+latch. Startup exceptions and tracebacks go to the service log, while status
+returns a bounded diagnostic string.
+
+Readiness is deliberately separate from model and tool-provider health. A
+Gemini connection and the MCP catalogs can be ready while a persisted Level 2
+latch blocks all integrated behaviors. After a confirmed `system.resume`
+succeeds, runtime status changes the failed startup state to `recovered`, Idle
+is restored, and AI motion remains disarmed.
+
 Level 2 uses restartable `suspend()` operations for the distance, camera, and
 microphone services. Suspension releases active hardware resources but does
 not permanently end their lifecycle. Resume calls `start()` and health-checks
@@ -1277,6 +1294,16 @@ runtime boundary and now includes the IDE's required confirmation argument.
 After web recovery, deterministic D-pad control is reactivated for the active
 lease, but the separate AI chat session remains disarmed until the operator
 uses **Arm AI Motion**. Terminal users likewise run `/arm` after `/resume`.
+
+The repository is not the state boundary. Private configuration is normally
+under `~/.config/ninjarobot_pi5`, and safety, ownership, logs, ledgers, and
+conversation state are under `~/.local`. Recloning into another directory does
+not reset these files. If a clean checkout reports `recovery_required`, inspect
+`robot.safety.reason` and `robot.safety.fault_detail`, close standalone `pi5*`
+programs, and use the confirmed recovery path. Never remove `safety.json` as a
+repair. See
+[`docs/validation/agent-startup-readiness-validation-2026-08-01.md`](docs/validation/agent-startup-readiness-validation-2026-08-01.md)
+for the staged Raspberry Pi procedure.
 
 Terminal and web chat also intercept `/camera` locally. Every invocation grants
 one new temporary preview without sending the slash command to Ollama. The IPC

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from ninjarobot_pi5_ide import RiskLevel
@@ -40,6 +41,7 @@ class AgentRuntime:
         skills: SkillRepository,
         events: EventBroker,
         model_manager: ModelManager | None = None,
+        robot_status: Callable[[], Mapping[str, Any]] | None = None,
     ) -> None:
         self.provider = provider
         self.tools = tools
@@ -51,12 +53,60 @@ class AgentRuntime:
         self.skills = skills
         self.events = events
         self.models = model_manager
+        self._robot_status = robot_status
+        self._startup: dict[str, Any] = {
+            "phase": "runtime_ready",
+            "complete": True,
+            "liveliness": "not_managed",
+            "detail": None,
+        }
         self._started = False
         self._closed = False
         self._active_operations = 0
         self._switching_model = False
         self._chat_lock = asyncio.Lock()
         self._motion_cancellations: dict[str, set[CancellationToken]] = {}
+
+    def begin_startup_liveliness(self) -> None:
+        """Mark Greeting/Idle startup as pending before the IPC socket is bound."""
+        self._startup = {
+            "phase": "starting",
+            "complete": False,
+            "liveliness": "pending",
+            "detail": "Waiting for the startup Greeting and Idle supervisor.",
+        }
+
+    def complete_startup_liveliness(self) -> None:
+        """Mark the startup Greeting and Idle handoff as successful."""
+        self._startup = {
+            "phase": "ready",
+            "complete": True,
+            "liveliness": "ready",
+            "detail": "Startup Greeting completed; silent Idle is supervised by the IDE.",
+        }
+
+    def fail_startup_liveliness(self, error: BaseException) -> None:
+        """Record a bounded startup failure while leaving recovery operator-controlled."""
+        detail = f"{type(error).__name__}: {error}"
+        self._startup = {
+            "phase": "degraded",
+            "complete": True,
+            "liveliness": "failed",
+            "detail": detail[:1000],
+        }
+
+    def complete_startup_recovery(self) -> None:
+        """Mark the service ready after an explicitly confirmed system resume."""
+        if self._startup["liveliness"] != "failed":
+            return
+        self._startup = {
+            "phase": "ready",
+            "complete": True,
+            "liveliness": "recovered",
+            "detail": (
+                "Confirmed health checks cleared the system latch; silent Idle was restored."
+            ),
+        }
 
     async def start(self) -> None:
         """Start persistence and all tool providers transactionally."""
@@ -109,15 +159,46 @@ class AgentRuntime:
             self._end_operation()
 
     async def status(self) -> dict[str, Any]:
-        """Return provider, tool-provider, session, and motion-arm status."""
+        """Return service, model, tool, startup, and persistent robot status."""
         self._ensure_started()
         self._begin_operation()
         try:
             provider = await self.provider.health()
             tool_health = await self.tools.health()
             sessions = await self.store.sessions()
+            robot, robot_status_error = self._read_robot_status()
+            safety = robot.get("safety") if robot is not None else None
+            system_latched = bool(
+                isinstance(safety, Mapping) and safety.get("system_latched") is True
+            )
+            motion_latched = bool(
+                isinstance(safety, Mapping) and safety.get("motion_latched") is True
+            )
+            startup_complete = self._startup["complete"] is True
+            startup_failed = self._startup["liveliness"] == "failed"
+            ready = startup_complete and not startup_failed and not system_latched
+            if not startup_complete:
+                operational_state = "starting"
+            elif system_latched:
+                operational_state = "recovery_required"
+            elif robot_status_error is not None:
+                operational_state = "status_degraded"
+                ready = False
+            elif startup_failed:
+                operational_state = "degraded"
+            elif motion_latched:
+                operational_state = "motion_latched"
+            else:
+                operational_state = "ready"
+            recovery = self._recovery_status(safety, system_latched=system_latched)
             return {
                 "started": True,
+                "ready": ready,
+                "operational_state": operational_state,
+                "startup": dict(self._startup),
+                "robot": robot,
+                "robot_status_error": robot_status_error,
+                "recovery": recovery,
                 "provider": provider.model_dump(mode="json"),
                 "model_selection": self.models.selection() if self.models else None,
                 "tool_providers": [report.model_dump(mode="json") for report in tool_health],
@@ -126,6 +207,34 @@ class AgentRuntime:
             }
         finally:
             self._end_operation()
+
+    def _read_robot_status(self) -> tuple[dict[str, Any] | None, str | None]:
+        if self._robot_status is None:
+            return None, None
+        try:
+            return dict(self._robot_status()), None
+        except Exception as exc:
+            detail = f"{type(exc).__name__}: {exc}"
+            return None, detail[:1000]
+
+    @staticmethod
+    def _recovery_status(
+        safety: object,
+        *,
+        system_latched: bool,
+    ) -> dict[str, Any]:
+        snapshot = safety if isinstance(safety, Mapping) else {}
+        return {
+            "required": system_latched,
+            "reason": snapshot.get("reason") if system_latched else None,
+            "detail": snapshot.get("fault_detail") if system_latched else None,
+            "instructions": (
+                "Open `ninjarobot-agent chat`, enter `/resume`, and explicitly confirm "
+                "the non-moving health checks. Do not delete the safety state file."
+                if system_latched
+                else None
+            ),
+        }
 
     async def history(self, session_id: str) -> list[dict[str, Any]]:
         """Return one ordered transcript."""
@@ -241,6 +350,7 @@ class AgentRuntime:
         if result.status is not ToolExecutionStatus.SUCCEEDED:
             detail = result.error or "a required robot health check failed"
             raise RuntimeError(f"system resume failed: {detail}")
+        self.complete_startup_recovery()
         return result
 
     async def execute_tool(

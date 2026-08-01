@@ -1,5 +1,52 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-01 — Authoritative agent startup and safety readiness
+
+### Summary
+
+- changed detached service startup to wait for the Greeting/Idle result instead
+  of returning when the IPC socket first became reachable
+- added separate `started`, `ready`, `operational_state`, and structured
+  `startup` fields while preserving the existing status fields
+- exposed the IDE-owned persistent safety snapshot through a non-invasive
+  status callback, including the latch reason, original fault detail, recovery
+  requirement, and operator instructions
+- retained the Level 2 fail-closed policy and explicit confirmed resume; no
+  latch is automatically cleared and recovery still leaves AI motion disarmed
+- added traceback logging for Greeting/Idle failure and made event-publishing
+  failure unable to hide the actual startup result
+- marked readiness as recovered after successful health-checked resume
+
+### Root cause addressed
+
+The service previously bound its IPC socket before running Greeting. The
+detached launcher treated the first successful status response as complete
+startup, so it could print `started: true` while Greeting was still pending or
+had failed because of a persistent safety latch. Model and MCP health remained
+ready, making the output appear to say the complete robot was ready. Safety
+state lives outside the checkout and correctly survived repository reinstall,
+but status did not expose that boundary.
+
+### Validation
+
+- immutable-driver verification passed after both code and regression-test
+  phases: 222 tracked files and 25 authorized repairs
+- focused compilation, Ruff lint, Ruff formatting, and 31 startup/IPC/IDE/CLI
+  tests passed
+- regression coverage verifies pending, ready, degraded,
+  `recovery_required`, status-read failure, explicit recovery, launcher wait,
+  traceback logging, and non-invasive IDE safety serialization
+- full `compileall`, Ruff lint, Ruff formatting, and strict mypy passed; the
+  complete suite passed with 369 tests and the one pre-existing Starlette
+  test-client deprecation warning
+
+### Raspberry Pi status
+
+No actuator, camera, microphone, or real recovery action was executed during
+implementation. Follow
+`docs/validation/agent-startup-readiness-validation-2026-08-01.md`; run the
+safe smoke and communication checks before Greeting/buzzer or servo tests.
+
 ## 2026-08-01 — API-key-only cloud auth and trusted robot-control MCP
 
 ### Summary

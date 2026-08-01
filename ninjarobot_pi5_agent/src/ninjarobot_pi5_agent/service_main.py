@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 import signal
 from pathlib import Path
 
-from ninjarobot_pi5_ide import build_robot_ide_client, load_robot_config
+from ninjarobot_pi5_ide import RobotIDEClient, build_robot_ide_client, load_robot_config
 
 from .agent_loop import AgentLoop, AgentLoopConfig
 from .cloud_registry import ConfiguredProviderRegistry
@@ -37,6 +38,8 @@ from .tools import IDEToolProvider, ToolProvider, ToolRegistry
 from .web_app import WebServerManager, create_web_app
 from .web_control import ControllerLeaseManager, WebRobotController
 
+LOGGER = logging.getLogger(__name__)
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the NinjaRobot agent service.")
@@ -63,8 +66,44 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     arguments = build_parser().parse_args(argv)
     asyncio.run(run_service(arguments))
+
+
+async def _complete_startup_liveliness(
+    *,
+    ide: RobotIDEClient,
+    runtime: AgentRuntime,
+    events: EventBroker,
+) -> None:
+    """Complete startup reporting without hiding Greeting/Idle failures."""
+    try:
+        await ide.start_liveliness()
+    except Exception as exc:
+        runtime.fail_startup_liveliness(exc)
+        LOGGER.exception("Startup Greeting/Idle failed; operator recovery may be required.")
+        try:
+            await events.publish(
+                AgentEventType.ERROR,
+                "Startup greeting failed; inspect service status before using the robot.",
+                data={"error": f"{type(exc).__name__}: {exc}"[:1000]},
+            )
+        except Exception:
+            LOGGER.exception("Failed to publish the startup failure event.")
+        return
+    runtime.complete_startup_liveliness()
+    LOGGER.info("Startup Greeting completed; silent Idle is active.")
+    try:
+        await events.publish(
+            AgentEventType.SERVICE,
+            "Startup greeting completed; silent idle animation is active.",
+        )
+    except Exception:
+        LOGGER.exception("Failed to publish the startup completion event.")
 
 
 async def run_service(arguments: argparse.Namespace) -> None:
@@ -192,7 +231,9 @@ async def run_service(arguments: argparse.Namespace) -> None:
         skills=SkillRepository(arguments.skill_dir),
         events=events,
         model_manager=model,
+        robot_status=ide.status,
     )
+    runtime.begin_startup_liveliness()
     web_controller = WebRobotController(runtime)
     leases = ControllerLeaseManager(on_revoke=web_controller.lease_revoked)
     web_app = create_web_app(
@@ -219,18 +260,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
     for signal_number in (signal.SIGINT, signal.SIGTERM):
         loop_object.add_signal_handler(signal_number, server.request_stop)
     await server.start()
-    try:
-        await ide.start_liveliness()
-        await events.publish(
-            AgentEventType.SERVICE,
-            "Startup greeting completed; silent idle animation is active.",
-        )
-    except Exception as exc:
-        await events.publish(
-            AgentEventType.ERROR,
-            "Startup greeting failed; the agent service remains available.",
-            data={"error": f"{type(exc).__name__}: {exc}"},
-        )
+    await _complete_startup_liveliness(ide=ide, runtime=runtime, events=events)
     try:
         await server.serve()
     finally:

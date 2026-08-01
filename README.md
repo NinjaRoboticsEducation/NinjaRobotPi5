@@ -401,6 +401,27 @@ uv run --frozen --extra hardware ninjarobot-agent \
 uv run --frozen ninjarobot-agent web start
 ```
 
+`service start` now waits for the startup Greeting/Idle attempt to finish
+before it returns. The JSON response separates process availability from robot
+readiness:
+
+- `started` means the single-owner service process is running.
+- `ready` means startup completed and no Level 2 system latch blocks robot
+  behavior.
+- `operational_state` is `starting`, `ready`, `motion_latched`,
+  `recovery_required`, `degraded`, or `status_degraded`.
+- `startup` reports whether Greeting/Idle is pending, ready, failed, or
+  recovered.
+- `robot.safety` includes the persistent latch reason, original bounded
+  `fault_detail`, and timestamp.
+- `recovery` explains how to run the explicit, health-checked `/resume` path.
+
+Provider and MCP health can still be ready while `ready` is false; these are
+different subsystems. Inspect `operational_state`, `startup`, and
+`robot.safety` before assuming hardware is available. A Greeting/Idle exception
+is written with its traceback to
+`~/.local/state/ninjarobot_pi5/agent-service.log`.
+
 Inside the interactive chat, use `/arm`, type `ARM`, and then ask naturally
 for a new combination:
 
@@ -443,6 +464,11 @@ module is health-checked before the safety latch clears. A successful resume
 restores the looping Idle face but deliberately leaves AI motion disarmed.
 Enter `/arm` separately before requesting another servo movement. If any
 health check fails, the latch and Emergency Stop display remain active.
+Do not delete `safety.json` to bypass recovery. Robot configuration, safety
+state, action history, and conversation data live under `~/.config` and
+`~/.local`; they intentionally survive deleting, recloning, or moving the
+repository. Two repository copies therefore do not create independent robot
+installations, and only one integrated service may own the hardware at a time.
 
 To authorize one AI photo, enter `/camera` or press **AI camera**, then ask the
 agent to take a photograph. A successful capture appears in the temporary web
