@@ -73,6 +73,21 @@ def test_ide_provider_namespaces_and_executes_capabilities() -> None:
     asyncio.run(exercise())
 
 
+def test_ide_provider_can_delegate_selected_capabilities() -> None:
+    async def exercise() -> None:
+        ide = FakeIDEClient((descriptor(), descriptor("behavior.preview")))
+        provider = IDEToolProvider(
+            ide,
+            excluded_capabilities={"behavior.preview"},
+        )
+        await provider.start()
+
+        assert [tool.name for tool in await provider.list_tools()] == ["robot.distance.read"]
+        await provider.close()
+
+    asyncio.run(exercise())
+
+
 class _StaticProvider:
     def __init__(
         self,

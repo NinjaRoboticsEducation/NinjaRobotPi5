@@ -854,6 +854,36 @@ IDE tools use `robot.*`. External tools use
 `mcp.<configured-server-id>.*`. The configured ID is validated locally; an MCP
 server's self-reported name is not trusted as a global namespace.
 
+### Trusted robot-control MCP façade
+
+`RobotControlMCPProvider` is a fixed, in-process MCP server owned by the agent
+service. Unlike a configured external server, its manifest is project source,
+its tools are classified from authoritative IDE descriptors, and its trust is
+`TRUSTED`. It exposes five focused tools:
+
+| Agent tool | IDE capability | Purpose |
+|---|---|---|
+| `robot.behavior.catalog` | `behavior.list` | List available definitions |
+| `robot.behavior.preview` | `behavior.preview` | Compile to canonical IDE format without hardware |
+| `robot.behavior.execute_expression` | same name without `robot.` | Run face/text/buzzer stages |
+| `robot.behavior.execute_movement` | same name without `robot.` | Run motion combinations after session arming |
+| `robot.behavior.stop` | `behavior.stop` | Request the existing Level 2 stop |
+
+The ordinary `IDEToolProvider` excludes the four same-named delegated
+capabilities so the shared registry remains collision-free; `behavior.list`
+remains available under its historical `robot.behavior.list` name for
+compatibility. The façade carries the trusted session and action identity
+outside model arguments, validates each call against the IDE JSON Schema,
+creates an `ActionRequest`, and returns the IDE's authoritative normalized
+result. Cancellation propagates to `IDEClient.cancel`. It does not own or close
+the IDE because the primary IDE provider owns that lifecycle.
+
+`behavior.preview` uses the same `BehaviorDraftCompiler` as execution but its
+adapter does not start `RobotAssembly`. It returns the canonical definition,
+motion presence, and required resources without opening GPIO, I2C, SPI, PWM,
+camera, or audio. Never add raw GPIO fields or hardware-library objects to this
+MCP surface.
+
 ### MCP client and configuration rules
 
 The MCP manager supports local `stdio` and remote Streamable HTTP transports.
@@ -990,7 +1020,7 @@ ToolRegistry: robot.* + allowlisted mcp.*
               |
            ModelTurn
               |
-PolicyEngine -> ToolRegistry -> IDE or MCP provider
+PolicyEngine -> ToolRegistry -> IDE, trusted robot MCP, or external MCP
 ```
 
 The adapter boundary has four important consequences:
@@ -1028,28 +1058,21 @@ still refused while a chat or robot action is active.
 
 - `auth_method = "api_key"` resolves `api_key_env` from the process
   environment first, then `~/.config/ninjarobot_pi5/secrets.env`.
-- Gemini `auth_method = "oauth"` loads a Google authorized-user credential
-  managed by NinjaRobotAgent and requires a configured Google Cloud
-  `project_id`. `google-auth-oauthlib` performs the Desktop installed-app
-  authorization flow. The user opens the printed URL on another device and
-  pastes the final loopback redirect URL into a hidden terminal prompt.
-  `GoogleOAuthCredential` refreshes an expired access token in a worker thread
-  and atomically rewrites the credential with owner-only permissions.
-- Anthropic `auth_method = "oauth"` resolves a refreshed bearer token with
-  `ant auth print-credentials --access-token` under `oauth_profile`.
-- OpenAI account/ChatGPT web login is not a supported authentication method
-  for third-party OpenAI API inference, so the schema rejects it and the
-  interactive menu offers API-key choices only.
+- OpenAI, Gemini, and Anthropic all use the same API-key-only flow. The
+  interactive menu offers no web-login choice.
+- Legacy `auth_method = "oauth"` files load as `api_key` and are rewritten
+  without `oauth_profile`; no old bearer or refresh credential is consumed.
+- `provider login` remains for one compatibility release only. It raises an
+  actionable migration message pointing to `provider set-api-key` and does not
+  start a browser or external authentication command.
 
 The web interface never accepts provider secrets. The terminal uses hidden,
 double-entry prompts. Errors report provider/type/status categories and do not
 include response bodies or authorization headers. `SecretStore` writes with
 mode `0600`, reports presence without values, supports deletion, and redacts
-known values from nested diagnostics. Gemini refresh credentials use a
-provider-ID hash for the filename, are confined to
-`~/.config/ninjarobot_pi5/oauth/`, reject symbolic-link targets, and are
-deleted by `provider logout gemini`. Cloud adapter validators accept only
-HTTPS and the official `api.openai.com`,
+known values from nested diagnostics. `provider logout` removes only the
+selected provider's saved API key. Cloud adapter validators accept only HTTPS
+and the official `api.openai.com`,
 `generativelanguage.googleapis.com`, or `api.anthropic.com` host, preventing a
 configuration change from forwarding provider credentials to another server.
 

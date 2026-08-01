@@ -255,24 +255,26 @@ class ProviderConfig(ConfigModel):
     model: NonEmptyText
     enabled: bool = False
     base_url: Annotated[str, StringConstraints(min_length=8, max_length=500)] | None = None
-    auth_method: Literal["api_key", "oauth"] = "api_key"
+    auth_method: Literal["api_key"] = "api_key"
     api_key_env: EnvironmentVariable | None = None
-    oauth_profile: NonEmptyText | None = None
+    # Accepted only so pre-2026-08-01 files can load and be rewritten without
+    # their removed web-login profile becoming an unknown-field error.
+    oauth_profile: NonEmptyText | None = Field(default=None, exclude=True)
     project_id: NonEmptyText | None = None
+
+    @field_validator("auth_method", mode="before")
+    @classmethod
+    def migrate_removed_web_login(cls, value: object) -> object:
+        """Load legacy OAuth selections as API-key mode without using old tokens."""
+        return "api_key" if value == "oauth" else value
 
     @model_validator(mode="after")
     def enabled_cloud_provider_requires_secret_reference(self) -> ProviderConfig:
         """Require the metadata needed by the selected cloud authentication mode."""
         if self.kind == "ollama":
-            if self.auth_method != "api_key":
-                raise ValueError("Ollama does not support cloud OAuth authentication")
             return self
-        if self.auth_method == "api_key" and self.api_key_env is None:
+        if self.api_key_env is None:
             raise ValueError("cloud providers using API keys require api_key_env")
-        if self.kind == "openai" and self.auth_method == "oauth":
-            raise ValueError("OpenAI API inference does not support ChatGPT web login")
-        if self.kind == "gemini" and self.auth_method == "oauth" and self.project_id is None:
-            raise ValueError("Gemini OAuth requires project_id")
         return self
 
 

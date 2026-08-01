@@ -81,9 +81,16 @@ class ToolProvider(Protocol):
 class IDEToolProvider:
     """Expose IDE capabilities without importing any managed hardware library."""
 
-    def __init__(self, ide: IDEClient, *, provider_id: str = "ide") -> None:
+    def __init__(
+        self,
+        ide: IDEClient,
+        *,
+        provider_id: str = "ide",
+        excluded_capabilities: Iterable[str] = (),
+    ) -> None:
         self._ide = ide
         self._provider_id = provider_id
+        self._excluded_capabilities = frozenset(excluded_capabilities)
         self._definitions: dict[str, ToolDefinition] = {}
         self._capability_names: dict[str, str] = {}
         self._started = False
@@ -105,6 +112,8 @@ class IDEToolProvider:
         definitions: dict[str, ToolDefinition] = {}
         capability_names: dict[str, str] = {}
         for descriptor in descriptors:
+            if descriptor.name in self._excluded_capabilities:
+                continue
             tool_name = f"robot.{descriptor.name}"
             definitions[tool_name] = ToolDefinition(
                 name=tool_name,

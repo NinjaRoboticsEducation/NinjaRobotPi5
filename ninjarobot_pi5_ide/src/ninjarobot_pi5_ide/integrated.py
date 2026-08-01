@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -127,6 +128,80 @@ class _InlineBehaviorAdapter:
             if health and all(value == "ready" for value in health.values())
             else ResourceHealth.DEGRADED
         )
+
+    async def close(self) -> None:
+        return
+
+
+class _BehaviorPreviewAdapter:
+    """Compile a compact behavior draft without starting or touching hardware."""
+
+    def __init__(self, robot: RobotAssembly, *, servo_roles: tuple[str, ...]) -> None:
+        self._compiler = BehaviorDraftCompiler(
+            assets=robot.assets,
+            servo_roles=servo_roles,
+        )
+        input_schema = deepcopy(self._compiler.input_schema(motion=True))
+        input_schema["description"] = (
+            "Compile one finite expression or movement draft without executing it."
+        )
+        input_schema["properties"]["category"] = {
+            "type": "string",
+            "enum": ["expression", "movement"],
+        }
+        required = list(input_schema["required"])
+        if "category" not in required:
+            required.append("category")
+        input_schema["required"] = required
+        self.descriptor = CapabilityDescriptor(
+            name="behavior.preview",
+            version="1.0.0",
+            description=(
+                "Validate and translate one compact robot behavior into the canonical "
+                "IDE format without running display, buzzer, or servo hardware."
+            ),
+            input_schema=input_schema,
+            output_schema={"type": "object"},
+            risk=RiskLevel.READ_ONLY,
+            resources=("behavior_catalog",),
+            default_timeout_seconds=2.0,
+            idempotent=True,
+            cancellable=False,
+            confirmation_required=False,
+        )
+
+    async def start(self) -> None:
+        return
+
+    async def execute(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        category = arguments.get("category")
+        if category not in {"expression", "movement"}:
+            raise ValueError("behavior preview category must be expression or movement")
+        try:
+            definition = self._compiler.compile(
+                arguments,
+                motion=category == "movement",
+            )
+        except BehaviorDraftError as exc:
+            raise IDEError(
+                ErrorDetails(
+                    code="BEHAVIOR_DRAFT_INVALID",
+                    message=f"Behavior draft is invalid and no hardware action ran: {exc}.",
+                    technical_detail=str(exc),
+                    definitely_not_executed=True,
+                    retry_safety=RetrySafety.SAFE,
+                    capability=self.descriptor.name,
+                )
+            ) from exc
+        return {
+            "valid": True,
+            "definition": definition.model_dump(mode="json"),
+            "contains_motion": definition.contains_motion,
+            "required_resources": list(definition.required_resources),
+        }
+
+    async def health(self) -> ResourceHealth:
+        return ResourceHealth.READY
 
     async def close(self) -> None:
         return
@@ -457,6 +532,10 @@ def build_robot_ide_client(
     registry = CapabilityRegistry()
     for adapter in (
         _BehaviorListAdapter(robot),
+        _BehaviorPreviewAdapter(
+            robot,
+            servo_roles=tuple(config.behaviors.servo_roles),
+        ),
         _BehaviorRunAdapter(robot),
         _InlineBehaviorAdapter(
             robot,

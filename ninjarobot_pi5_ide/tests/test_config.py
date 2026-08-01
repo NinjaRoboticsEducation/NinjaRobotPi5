@@ -196,20 +196,19 @@ def test_enabled_cloud_provider_requires_environment_secret_reference() -> None:
         RobotConfig.model_validate(payload)
 
 
-def test_cloud_oauth_configuration_rejects_unsupported_or_incomplete_login() -> None:
+def test_legacy_cloud_oauth_configuration_migrates_to_api_key_only() -> None:
     payload = load_robot_config(EXAMPLE).model_dump()
     payload["providers"]["openai"]["auth_method"] = "oauth"
-    with pytest.raises(ValidationError, match="does not support ChatGPT web login"):
-        RobotConfig.model_validate(payload)
-
-    payload = load_robot_config(EXAMPLE).model_dump()
     payload["providers"]["gemini"]["auth_method"] = "oauth"
-    with pytest.raises(ValidationError, match="requires project_id"):
-        RobotConfig.model_validate(payload)
-
-    payload["providers"]["gemini"]["project_id"] = "robot-cloud-project"
+    payload["providers"]["anthropic"]["auth_method"] = "oauth"
+    payload["providers"]["anthropic"]["oauth_profile"] = "legacy"
     config = RobotConfig.model_validate(payload)
-    assert config.providers["gemini"].auth_method == "oauth"
+
+    assert all(
+        config.providers[provider_id].auth_method == "api_key"
+        for provider_id in ("openai", "gemini", "anthropic")
+    )
+    assert config.providers["anthropic"].oauth_profile == "legacy"
 
 
 def test_fallback_providers_must_be_enabled_and_exclude_the_primary() -> None:

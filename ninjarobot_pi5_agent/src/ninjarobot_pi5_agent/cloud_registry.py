@@ -10,9 +10,8 @@ from pydantic import HttpUrl
 from ninjarobot_pi5_ide import load_robot_config
 
 from .anthropic_provider import AnthropicConfig, AnthropicProvider
-from .cloud_common import APIKeyCredential, CommandBearerCredential, CredentialSource
+from .cloud_common import APIKeyCredential, CredentialSource
 from .gemini_provider import GeminiConfig, GeminiProvider
-from .google_oauth import GoogleOAuthCredential, gemini_credential_path
 from .model_selection import ModelCatalogEntry, ProviderRegistration
 from .ollama import OllamaConfig, OllamaProvider
 from .openai_provider import OpenAIConfig, OpenAIProvider
@@ -166,22 +165,4 @@ class ConfiguredProviderRegistry:
                     provider.api_key_env,
                     "x-api-key",
                 )
-        if provider.kind == "gemini":
-            return GoogleOAuthCredential(
-                credential_file=gemini_credential_path(self._secrets.path, provider_id),
-            )
-        if provider.kind == "anthropic":
-            profile = provider.oauth_profile or "default"
-            return CommandBearerCredential(
-                command=(
-                    "ant",
-                    "auth",
-                    "print-credentials",
-                    "--profile",
-                    profile,
-                    "--access-token",
-                ),
-                provider="Anthropic",
-                profile=profile,
-            )
-        raise ValueError(f"{provider.kind} does not support web-login authentication")
+        raise ValueError(f"{provider.kind} does not have an API-key credential mapping")

@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
-import shutil
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -62,41 +60,6 @@ class APIKeyCredential:
             "method": "api_key",
             "environment_name": self.environment_name,
             "configured": self.store.contains(self.environment_name),
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class CommandBearerCredential:
-    """Resolve a short-lived OAuth bearer token through an official provider CLI."""
-
-    command: tuple[str, ...]
-    provider: str
-    profile: str | None = None
-
-    async def headers(self) -> dict[str, str]:
-        if shutil.which(self.command[0]) is None:
-            raise CloudAuthenticationError(
-                f"{self.provider} web login requires the '{self.command[0]}' command"
-            )
-        process = await asyncio.create_subprocess_exec(
-            *self.command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, _stderr = await process.communicate()
-        token = stdout.decode("utf-8", errors="replace").strip()
-        if process.returncode != 0 or not token:
-            raise CloudAuthenticationError(
-                f"{self.provider} web-login credentials are unavailable or expired"
-            )
-        return {"Authorization": f"Bearer {token}"}
-
-    def status(self) -> dict[str, object]:
-        return {
-            "method": "oauth",
-            "profile": self.profile,
-            "credential_cli": self.command[0],
-            "cli_installed": shutil.which(self.command[0]) is not None,
         }
 
 

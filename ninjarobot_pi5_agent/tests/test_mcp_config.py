@@ -92,6 +92,9 @@ def test_secret_store_permissions_environment_override_and_redaction(
     assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
     assert store.redact({"message": "token=stored-secret-value"}) == {"message": "token=[REDACTED]"}
 
+    store.set("LEADING_EQUALS_SECRET", "=round-trip-value==")
+    assert SecretStore(path).get("LEADING_EQUALS_SECRET") == "=round-trip-value=="
+
     monkeypatch.setenv("TAVILY_API_KEY", "environment-value")
     assert store.get("TAVILY_API_KEY") == "environment-value"
 

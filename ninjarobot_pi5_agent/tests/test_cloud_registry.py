@@ -4,9 +4,8 @@ import asyncio
 from pathlib import Path
 
 import pytest
-from ninjarobot_pi5_agent.provider_auth import persist_auth_method
+from ninjarobot_pi5_agent.provider_auth import persist_api_key_authentication
 from ninjarobot_pi5_agent.secrets import SecretStore
-from ninjarobot_pi5_ide.config_import import save_robot_config
 from pydantic import ValidationError
 
 from ninjarobot_pi5_agent import (
@@ -69,19 +68,23 @@ def test_registry_credential_status_never_contains_secret_values(tmp_path) -> No
     assert "never-show-this-value" not in repr(status)
 
 
-def test_auth_method_persistence_revalidates_the_complete_configuration(
+def test_api_key_persistence_rewrites_legacy_oauth_metadata(
     tmp_path,
 ) -> None:
     config_path = tmp_path / "config.toml"
-    save_robot_config(load_robot_config(EXAMPLE), config_path, overwrite=False)
+    text = EXAMPLE.read_text(encoding="utf-8")
+    text = text.replace(
+        'auth_method = "api_key"\napi_key_env = "ANTHROPIC_API_KEY"',
+        'auth_method = "oauth"\napi_key_env = "ANTHROPIC_API_KEY"\noauth_profile = "legacy"',
+    )
+    config_path.write_text(text, encoding="utf-8")
 
-    with pytest.raises(ValidationError, match="does not support ChatGPT web login"):
-        persist_auth_method(config_path, "openai", "oauth")
-    with pytest.raises(ValidationError, match="requires project_id"):
-        persist_auth_method(config_path, "gemini", "oauth")
+    persist_api_key_authentication(config_path, "anthropic")
 
-    persist_auth_method(config_path, "anthropic", "oauth")
-    assert load_robot_config(config_path).providers["anthropic"].auth_method == "oauth"
+    persisted = config_path.read_text(encoding="utf-8")
+    assert 'auth_method = "api_key"' in persisted
+    assert "oauth_profile" not in persisted
+    assert load_robot_config(config_path).providers["anthropic"].auth_method == "api_key"
 
 
 @pytest.mark.parametrize(

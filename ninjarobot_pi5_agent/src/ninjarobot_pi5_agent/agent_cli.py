@@ -39,7 +39,7 @@ from .model_selection import (
 )
 from .models import ProviderHealthStatus, ToolCall, ToolDefinition, ToolInvocation
 from .ollama import OllamaConfig, OllamaError, OllamaProvider
-from .provider_auth import persist_auth_method, web_login, web_logout
+from .provider_auth import persist_api_key_authentication, web_login_removed
 from .secrets import SecretStore
 from .service_main import run_service
 from .skills import LoadedSkill, SkillRepository, SkillValidationError
@@ -219,10 +219,10 @@ def build_parser() -> argparse.ArgumentParser:
     provider_health.add_argument("provider_id")
     provider_login = provider_commands.add_parser(
         "login",
-        help="Run an official provider web login.",
+        help="Explain the API-key migration for the retired web-login command.",
     )
     provider_login.add_argument("provider_id")
-    provider_login.add_argument("--client-id-file", type=Path)
+    provider_login.add_argument("--client-id-file", type=Path, help=argparse.SUPPRESS)
     provider_key = provider_commands.add_parser(
         "set-api-key",
         help="Save an API key using a hidden terminal prompt.",
@@ -230,7 +230,7 @@ def build_parser() -> argparse.ArgumentParser:
     provider_key.add_argument("provider_id")
     provider_logout = provider_commands.add_parser(
         "logout",
-        help="Remove configured provider credentials.",
+        help="Remove a stored provider API key.",
     )
     provider_logout.add_argument("provider_id")
 
@@ -914,20 +914,7 @@ async def _run_provider_command(arguments: argparse.Namespace) -> int:
         _print_json(health.model_dump(mode="json"))
         return 0 if health.status is ProviderHealthStatus.READY else 1
     if arguments.provider_command == "login":
-        await web_login(
-            arguments.config,
-            arguments.provider_id,
-            secret_file=arguments.secret_file,
-            client_id_file=arguments.client_id_file,
-        )
-        _print_json(
-            {
-                "provider": arguments.provider_id,
-                "authenticated": True,
-                "method": "oauth",
-            }
-        )
-        return 0
+        web_login_removed(arguments.provider_id)
     if arguments.provider_command == "set-api-key":
         if provider.kind == "ollama" or provider.api_key_env is None:
             raise ValueError(f"{provider.kind} does not have an API-key configuration")
@@ -936,7 +923,7 @@ async def _run_provider_command(arguments: argparse.Namespace) -> int:
         if value != confirmation:
             raise ValueError("API key values did not match")
         secrets.set(provider.api_key_env, value)
-        persist_auth_method(arguments.config, arguments.provider_id, "api_key")
+        persist_api_key_authentication(arguments.config, arguments.provider_id)
         _print_json(
             {
                 "provider": arguments.provider_id,
@@ -947,13 +934,7 @@ async def _run_provider_command(arguments: argparse.Namespace) -> int:
         )
         return 0
     if arguments.provider_command == "logout":
-        if provider.auth_method == "oauth":
-            removed = await web_logout(
-                arguments.config,
-                arguments.provider_id,
-                secret_file=arguments.secret_file,
-            )
-        elif provider.api_key_env is not None:
+        if provider.api_key_env is not None:
             removed = secrets.delete(provider.api_key_env)
         else:
             raise ValueError(f"{provider.kind} does not have removable credentials")
@@ -1250,57 +1231,22 @@ async def _interactive_model_selection(arguments: argparse.Namespace) -> None:
             SecretStore(arguments.secret_file),
         )
         status = registry.credential_status(provider_id)
-        configured = status.get("configured") is True or (
-            status.get("method") == "oauth" and status.get("cli_installed") is True
-        )
+        configured = status.get("configured") is True
         print(
             f"\n{provider_id} authentication is set to {provider.auth_method}. "
             f"Credential source ready: {'yes' if configured else 'not confirmed'}."
         )
-        if provider.kind == "openai":
-            print("1. Enter API Key")
-            print("2. Continue with Current API Key")
-            print("0. Back")
-            auth_choice = (await asyncio.to_thread(input, "Select authentication: ")).strip()
-            if auth_choice == "0":
-                return
-            if auth_choice == "1":
-                await _interactive_set_api_key(arguments, provider_id, provider.api_key_env)
-            elif auth_choice != "2":
-                print("Please choose 0, 1, or 2.")
-                return
-        else:
-            print("1. Web Login")
-            print("2. Enter API Key")
-            print("3. Continue with Current Authentication")
-            print("0. Back")
-            auth_choice = (await asyncio.to_thread(input, "Select authentication: ")).strip()
-            if auth_choice == "0":
-                return
-            if auth_choice == "1":
-                client_id_file: Path | None = None
-                if provider.kind == "gemini":
-                    raw_path = (
-                        await asyncio.to_thread(
-                            input,
-                            "Google Desktop OAuth client JSON path: ",
-                        )
-                    ).strip()
-                    if not raw_path:
-                        print("Gemini Web Login requires a Desktop OAuth client JSON file.")
-                        return
-                    client_id_file = Path(raw_path)
-                await web_login(
-                    arguments.config,
-                    provider_id,
-                    secret_file=arguments.secret_file,
-                    client_id_file=client_id_file,
-                )
-            elif auth_choice == "2":
-                await _interactive_set_api_key(arguments, provider_id, provider.api_key_env)
-            elif auth_choice != "3":
-                print("Please choose 0, 1, 2, or 3.")
-                return
+        print("1. Enter API Key")
+        print("2. Continue with Current API Key")
+        print("0. Back")
+        auth_choice = (await asyncio.to_thread(input, "Select authentication: ")).strip()
+        if auth_choice == "0":
+            return
+        if auth_choice == "1":
+            await _interactive_set_api_key(arguments, provider_id, provider.api_key_env)
+        elif auth_choice != "2":
+            print("Please choose 0, 1, or 2.")
+            return
     models = await _available_models(arguments, provider=provider_id)
     if not models:
         print(f"No compatible {provider_id} models are available.")
@@ -1362,7 +1308,7 @@ async def _interactive_set_api_key(
     if secret != confirmation:
         raise ValueError("API key values did not match")
     SecretStore(arguments.secret_file).set(api_key_env, secret)
-    persist_auth_method(arguments.config, provider_id, "api_key")
+    persist_api_key_authentication(arguments.config, provider_id)
 
 
 def _human_size(value: object) -> str | None:

@@ -791,3 +791,59 @@ These rules apply to all three documents and must be enforced uniformly:
 ---
 
 *End of Section 9 — Documentation Standards*
+
+---
+
+## 10. Maintainer Verification Addendum — 2026-08-01
+
+This addendum preserves the original audit as historical evidence while
+correcting claims against executable source and dynamic tests. The original
+audit was static only; this verification used targeted source review plus the
+complete project quality gate. It does not mean every valid recommendation was
+implemented by the 2026-08-01 authentication/MCP refinement.
+
+| Finding | Verified assessment | Evidence / disposition |
+|---|---|---|
+| R-01 | Partially supported UX concern | Config discovery/import is preview-first and documented, and servo calibration is read directly at IDE startup. A unified setup wizard could still improve first-time installation but is separate product work. |
+| R-02 | Incorrect | A line is written as `NAME=<value>`. If the value begins with `=`, `partition("=")` returns the valid name and a value beginning with `=`. The audited report incorrectly treated the value as the variable name. Round-trip regression coverage passes. |
+| R-03 | Partially correct configuration observation; security impact overstated | The example does enable cloud entries, but API keys are never sent to the model, fallback is empty by default, and a provider secret is resolved only when that provider is created. Missing credentials cause a bounded authentication failure. A disabled-by-default example remains a possible UX hardening task. |
+| R-04 | Incorrect | `service_main.run_service` registers both `SIGINT` and `SIGTERM` with the asyncio server stop path, and `finally: await server.close()` closes the runtime and IDE. The daemon-watchdog observation does not establish a missing service shutdown path. Abrupt power loss remains a hardware limitation, not a SIGTERM defect. |
+| R-05 | Confirmed hardening opportunity | The 18-second subprocess and 20-second capability timeouts exist. No failure or leaked file was reproduced. Increasing the cleanup margin should be a focused camera change with Pi validation, outside this refinement. |
+| R-06 | Confirmed defense-in-depth observation | The regex is advisory content screening, not the authorization boundary. Skills remain schema/path/tool confined and subordinate to immutable policy. Multilingual patterns and human review guidance remain backlog work. |
+| R-07 | Confirmed documentation/deprecation concern | The compatibility fields are intentionally accepted and have no effect. A future schema revision should warn before removing them. |
+| R-08 | Correct maintainability note | The `BaseException` cleanup/re-raise is correct. An explanatory comment would reduce future refactor risk but does not change runtime behavior. |
+| R-09 | Confirmed documentation-structure concern | The guide remains comprehensive but mixes standard and advanced paths in places. The 2026-08-01 pass removes obsolete web-login setup and labels built-in/external MCP boundaries; a full information-architecture rewrite remains separate. |
+| R-10 | Confirmed | Uninstall uses a recoverable directory move, but the update section still needs a commit-based rollback procedure. Treat this as release-documentation backlog. |
+
+Two additional installation claims were not correct at audit time:
+
+- `InstallationGuide.md` already contained complete `whisper.cpp` clone,
+  CMake build, multilingual model download, executable/file checks, and
+  heat-limited `-j2` guidance.
+- Provider configuration does not expose environment-secret values to model
+  selection. The model receives provider-neutral tool definitions and messages,
+  not the secret store.
+
+### 10.1 Refinement completed from this review
+
+- Google Gemini and Anthropic web-login execution was removed. OpenAI, Gemini,
+  and Anthropic now use API keys only.
+- Legacy OAuth configuration loads in API-key mode and is rewritten without
+  the old profile field. `provider login` is explanatory compatibility only.
+- A trusted built-in robot-control MCP façade now provides focused catalog,
+  preview, expression, movement, and stop tools.
+- Behavior preview compiles compact face, buzzer, melody, text, and movement
+  combinations to canonical IDE format without starting hardware.
+- Behavior execution retains existing public tool names and flows through the
+  IDE with the existing action ledger, session arm, policy, obstacle guard,
+  cancellation, latch, and emergency stop.
+
+### 10.2 Verification result
+
+The final local gate passed on 2026-08-01: immutable-driver verification (222
+tracked files and 25 authorized repairs), Python compilation, Ruff lint and
+format, strict mypy across 66 source files, 363 pytest tests, `git diff
+--check`, and IDE/agent source and wheel builds. One pre-existing Starlette
+test-client deprecation warning remains. Physical hardware was not operated;
+the required staged checklist is
+`docs/validation/robot-control-mcp-validation-2026-08-01.md`.

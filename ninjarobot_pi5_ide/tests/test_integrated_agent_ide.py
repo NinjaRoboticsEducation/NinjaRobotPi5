@@ -88,6 +88,7 @@ def test_integrated_agent_ide_exposes_shared_simulated_robot_capabilities(
         names = set(descriptors)
         assert {
             "behavior.list",
+            "behavior.preview",
             "behavior.run",
             "behavior.execute_expression",
             "behavior.execute_movement",
@@ -115,6 +116,55 @@ def test_integrated_agent_ide_exposes_shared_simulated_robot_capabilities(
         target_schema = movement_stage["properties"]["drive_targets"]
         assert set(target_schema["properties"]) == {"left_motor", "right_motor"}
         assert target_schema["additionalProperties"] is False
+
+        preview = await client.execute(
+            ActionRequest(
+                action_id="behavior-preview-1",
+                capability="behavior.preview",
+                arguments={
+                    "category": "movement",
+                    "name": "preview_turn",
+                    "description": "Preview a turn with a face and tone.",
+                    "stages": [
+                        {
+                            "face": "happy",
+                            "tone": {"frequency_hz": 660},
+                            "movement": "turn_left",
+                            "duration_seconds": 0.05,
+                        }
+                    ],
+                },
+                requested_by="test",
+                session_id="test-session",
+                idempotency_key="behavior-preview-key-1",
+            )
+        )
+        assert preview.status is ActionStatus.SUCCEEDED
+        assert preview.data is not None
+        assert preview.data["valid"] is True
+        assert preview.data["contains_motion"] is True
+        assert preview.data["definition"]["category"] == "movement"
+        assert {"display", "buzzer", "servo_bus"} <= set(preview.data["required_resources"])
+
+        invalid_preview = await client.execute(
+            ActionRequest(
+                action_id="invalid-preview-1",
+                capability="behavior.preview",
+                arguments={
+                    "category": "expression",
+                    "name": "invalid_preview",
+                    "description": "An invalid expression preview.",
+                    "stages": [{"movement": "move_forward"}],
+                },
+                requested_by="test",
+                session_id="test-session",
+                idempotency_key="invalid-preview-key-1",
+            )
+        )
+        assert invalid_preview.status is ActionStatus.FAILED
+        assert invalid_preview.error is not None
+        assert invalid_preview.error.definitely_not_executed is True
+        assert invalid_preview.retry_safety.value == "safe"
 
         invalid_draft = await client.execute(
             ActionRequest(

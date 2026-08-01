@@ -25,6 +25,10 @@ from .policy import CameraGrantManager, MotionArmManager, PolicyEngine
 from .presentation import RobotPresentationController
 from .prompts import PromptComposer
 from .recovery import RecoveryPolicy
+from .robot_control_mcp import (
+    ROBOT_CONTROL_DELEGATED_CAPABILITIES,
+    RobotControlMCPProvider,
+)
 from .runtime import AgentRuntime
 from .secrets import SecretStore
 from .service import ServiceOwnership
@@ -74,7 +78,13 @@ async def run_service(arguments: argparse.Namespace) -> None:
         whisper_model=arguments.whisper_model,
         whisper_threads=arguments.whisper_threads,
     )
-    providers: list[ToolProvider] = [IDEToolProvider(ide)]
+    providers: list[ToolProvider] = [
+        IDEToolProvider(
+            ide,
+            excluded_capabilities=ROBOT_CONTROL_DELEGATED_CAPABILITIES,
+        ),
+        RobotControlMCPProvider(ide),
+    ]
     optional_ids: set[str] = set()
     secrets = SecretStore(arguments.secret_file)
     for server_config in load_mcp_configuration(arguments.mcp_config).servers:

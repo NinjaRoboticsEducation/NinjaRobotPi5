@@ -54,7 +54,6 @@ def default_robot_config() -> RobotConfig:
                     "enabled": True,
                     "auth_method": "api_key",
                     "api_key_env": "ANTHROPIC_API_KEY",
-                    "oauth_profile": "default",
                 },
             },
         }
@@ -314,8 +313,6 @@ def robot_config_to_toml(config: RobotConfig) -> str:
             lines.append(f"base_url = {_toml(provider.base_url)}")
         if provider.api_key_env is not None:
             lines.append(f"api_key_env = {_toml(provider.api_key_env)}")
-        if provider.oauth_profile is not None:
-            lines.append(f"oauth_profile = {_toml(provider.oauth_profile)}")
         if provider.project_id is not None:
             lines.append(f"project_id = {_toml(provider.project_id)}")
     return "\n".join(lines) + "\n"

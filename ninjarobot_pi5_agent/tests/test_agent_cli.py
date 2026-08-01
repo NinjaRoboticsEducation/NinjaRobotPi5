@@ -283,3 +283,26 @@ def test_agent_cli_lists_cloud_capabilities_without_requiring_credentials(
     assert set(by_id) == {"ollama", "openai", "gemini", "anthropic"}
     assert all(provider["capabilities"]["native_tools"] for provider in by_id.values())
     assert all(provider["capabilities"]["streaming"] for provider in by_id.values())
+
+
+def test_provider_login_compatibility_command_explains_api_key_migration(
+    tmp_path,
+    capsys,
+) -> None:
+    example = Path(__file__).resolve().parents[2] / "config" / "ninjarobot_pi5.toml.example"
+
+    with pytest.raises(SystemExit) as exit_info:
+        main(
+            [
+                "--config",
+                str(example),
+                "--secret-file",
+                str(tmp_path / "secrets.env"),
+                "provider",
+                "login",
+                "gemini",
+            ]
+        )
+
+    assert exit_info.value.code == 2
+    assert "provider set-api-key gemini" in capsys.readouterr().err

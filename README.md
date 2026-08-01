@@ -1,5 +1,10 @@
 # NinjaRobotPi5V4
 
+> [!WARNING]
+> **Alpha release.** Simulation and automated validation are comprehensive, but
+> physical-device acceptance must be completed on the target Raspberry Pi before
+> normal floor operation.
+
 NinjaRobotPi5V4 is a clean, modular robot-control platform for Raspberry Pi 5.
 It replaces the historical OpenClaw-based orchestration with two project-owned
 layers:
@@ -25,8 +30,13 @@ tool-normalization, fallback, secret-redaction, lint, format, typing, and
 hardware-free integration tests. Live OpenAI, Gemini, and Anthropic checks
 remain opt-in because they require the owner's account, credentials, network,
 and may incur provider charges.
-Raspberry Pi
-acceptance—including the Qwen3:4B
+The 2026-08-01 refinement removes Google and Anthropic web-login execution;
+all cloud providers now use API keys only. It also adds a trusted built-in
+robot-control MCP façade that validates and translates behavior combinations
+through the IDE while preserving the existing motion and emergency policies.
+Its staged operator checklist is
+[`docs/validation/robot-control-mcp-validation-2026-08-01.md`](docs/validation/robot-control-mcp-validation-2026-08-01.md).
+Broader Raspberry Pi acceptance—including the Qwen3:4B
 performance benchmark, live Tavily search, LAN browser checks, camera,
 microphone, and raised-wheel motion—still requires the operator checklist in
 [`docs/validation/phase-5-agent-model-ui-refinement-validation-2026-07-29.md`](docs/validation/phase-5-agent-model-ui-refinement-validation-2026-07-29.md)
@@ -149,6 +159,21 @@ passes initialization, repeated reading, normalization, ledger recording,
 close, and restart validation. The earlier physical failure is cleared, though
 its hardware root cause was not established.
 
+## System requirements
+
+| Item | Supported baseline |
+|---|---|
+| Computer | Raspberry Pi 5, 8 GB recommended for local AI |
+| Operating system | Raspberry Pi OS Lite 64-bit |
+| Python | 3.11 through 3.13, installed and locked by `uv` |
+| Storage | microSD or NVMe; allow several GB for local models |
+| Cooling | Active cooling for sustained model inference |
+| Hardware | DFR0566 board and the wiring recorded in `docs/hardware/hardware-profile.md` |
+
+Start with the software-only simulation in the
+[Installation Guide](InstallationGuide.md) before connecting or energizing
+actuators.
+
 ## Three-layer architecture
 
 1. **Managed Pi5 libraries** — `pi5buzzer`, `pi5servo`, `pi5disp`,
@@ -199,11 +224,14 @@ Japanese capture requests such as `Take a photo` or `写真を撮ってくださ
 routed deterministically through policy and the IDE. They do not depend on the
 selected language model correctly choosing the camera tool.
 
-The agent is also an MCP host. MCP means Model Context Protocol, a standard
-connection for separately installed tools. The official hosted Tavily MCP
-server is the bundled real-time web-search preset after the owner adds a
-personal API key. Search output remains untrusted and cannot bypass the IDE or
-robot safety policy.
+The agent has two distinct MCP boundaries. The trusted built-in robot-control
+MCP façade exposes catalog, preview, expression, movement, and stop tools. It
+accepts bounded face, text, buzzer, melody, and logical-servo stages, translates
+them into canonical IDE behavior definitions, and returns the IDE's execution
+result. Every action still passes through the IDE; movement still requires the
+same session arm. Separately installed MCP servers such as the bundled Tavily
+search preset remain external and untrusted, and cannot bypass policy or the
+IDE.
 
 Validated agent skills are confined data-and-instruction packages, not
 executable code. The exact MCP and skill formats are recorded in the
@@ -327,9 +355,9 @@ The `ninjarobot-agent` additionally provides:
 - `web start|status|stop` for the HTTPS local-network interface
 - `motion arm --confirm` for one CLI chat session's physical-motion consent
 - `provider list|status|health|login|set-api-key|logout` for terminal-only
-  cloud authentication; OpenAI uses API keys, Gemini supports native browser
-  OAuth or an API key, and Anthropic supports the official `ant` login or an
-  API key
+  cloud authentication; OpenAI, Gemini, and Anthropic use API keys.
+  `provider login` is a temporary compatibility command that explains the
+  migration and does not open a browser
 - provider-scoped `model list|current|select` for dynamic model discovery,
   persistent selection, and idle-time hot switching across Ollama and cloud
   providers
@@ -345,12 +373,9 @@ agent. That request includes the same allowlisted `robot.*` and `mcp.*` tools
 and the same selected Agent Skill instructions. Cloud adapters only translate
 and normalize model traffic; they never execute a tool or access a Pi5 driver.
 API keys are entered only in the terminal and stored in the owner-private
-secret file. OpenAI API inference supports API keys, not ChatGPT account
-login. Gemini supports API keys or a native Google Desktop OAuth login that
-does not require `gcloud`. Gemini OAuth refresh credentials are stored under
-the owner's `~/.config/ninjarobot_pi5/oauth/` directory with mode `0600`.
-Anthropic supports API keys or the separately installed official `ant` CLI
-web login.
+secret file. OpenAI, Gemini, and Anthropic API inference all use this same
+API-key-only boundary. Browser/account logins, Google Desktop OAuth files,
+`gcloud`, and the Anthropic `ant` login are not used by NinjaRobotAgent.
 
 For example:
 

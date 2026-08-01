@@ -10,7 +10,6 @@ requires-python = ">=3.11,<3.14"
 dependencies = [
     "cryptography>=45,<47",
     "fastapi>=0.116,<1",
-    "google-auth-oauthlib>=1.2,<2",
     "httpx>=0.28,<1",
     "jsonschema>=4.26,<5",
     "mcp>=1.12,<2",

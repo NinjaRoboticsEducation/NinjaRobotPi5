@@ -94,6 +94,11 @@ from .presentation import (
 from .prompts import IDENTITY_PROMPT, IMMUTABLE_SAFETY_PROMPT, PromptComposer
 from .providers import LLMProvider
 from .recovery import RecoveryAction, RecoveryDecision, RecoveryPolicy
+from .robot_control_mcp import (
+    ROBOT_CONTROL_DELEGATED_CAPABILITIES,
+    ROBOT_CONTROL_PROVIDER_ID,
+    RobotControlMCPProvider,
+)
 from .runtime import AgentRuntime
 from .secrets import SecretStore
 from .service import AgentService, ServiceAlreadyRunningError, ServiceOwnership
@@ -184,6 +189,9 @@ __all__ = [
     "RecoveryDecision",
     "RecoveryPolicy",
     "RobotPresentationController",
+    "RobotControlMCPProvider",
+    "ROBOT_CONTROL_DELEGATED_CAPABILITIES",
+    "ROBOT_CONTROL_PROVIDER_ID",
     "SessionRecord",
     "ServiceAlreadyRunningError",
     "ServiceOwnership",

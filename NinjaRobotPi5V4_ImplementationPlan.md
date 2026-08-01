@@ -1,12 +1,12 @@
 # NinjaRobotPi5V4 Implementation Plan
 
 Status: Approved architecture and active delivery record
-Last updated: 2026-07-30 (Phase 5 recovery, Idle, and one-shot camera refinement)
+Last updated: 2026-08-01 (API-key-only cloud auth and robot-control MCP refinement)
 Primary development computer: Raspberry Pi 5, 8 GB RAM
 Target computer: Raspberry Pi 5, 8 GB RAM
 Implementation status: Phases 0–4 implemented and operator-validated; Phase
-5.0–5.7 implemented with the local software gate passing and Raspberry Pi
-operator acceptance pending
+5.0–5.12 and Phase 6 implemented with the local software gate passing; the
+2026-08-01 refinement is implemented and Raspberry Pi operator acceptance is pending
 
 ## 1. Purpose of this document
 
@@ -28,6 +28,41 @@ The redesign has three main goals:
 This plan deliberately separates design from implementation. No V4 production
 code should be written until this plan is approved. After approval, each phase
 should be implemented and reviewed separately.
+
+### 1.1 Approved 2026-08-01 refinement
+
+The owner approved this compatibility-preserving refinement after review of
+`AuditReport_260731.md`:
+
+| Phase | Objective | Primary files/modules | Validation | Hardware risk | Documentation |
+|---|---|---|---|---|---|
+| 0 | Verify the audit and baseline | audit, config, auth, service, behavior, safety | immutable drivers; focused/full baseline | none | correction matrix |
+| 1 | Make Google and Anthropic API-key-only | provider config/auth, CLI, cloud registry, lockfile | migration, menu, registry, full gate | none | auth setup |
+| 2 | Add deterministic behavior translation | IDE integration, behavior compiler, built-in MCP provider | schema, preview, mapping, cancellation | preview none; execution deferred | MCP contract |
+| 3 | Integrate without changing existing behavior names | service composition, IDE provider filtering, policy tests | collision, trust, motion-arm, emergency-stop regression | motion path, simulated only | architecture |
+| 4 | Release gate | both packages and complete workspace | build, compile, Ruff, mypy, pytest, driver hashes | none | validation results |
+| 5 | Operator handoff | README, guides, log, audit, validation checklist | doc consistency and final full gate | staged Pi checklist | all required docs |
+
+Confirmed implementation decisions:
+
+- The first consumer is NinjaRobotAgent's built-in in-process MCP server;
+  external MCP clients are deferred.
+- Five focused MCP tools are used instead of one unbounded behavior tool.
+- The MCP layer translates and validates only. Every action becomes an IDE
+  `ActionRequest`, and only the IDE may access robot resources.
+- `robot.behavior.execute_expression`,
+  `robot.behavior.execute_movement`, and `robot.behavior.stop` retain their
+  public names. Existing prompts, Skills, browser controls, and session `/arm`
+  behavior therefore remain compatible.
+- Preview is read-only and returns canonical IDE format. Movement execution
+  remains `MOTION`, trusted, confirmation-required, session-armed, cancellable,
+  obstacle-guarded, and fail-safe.
+- `provider login` remains temporarily as an explanatory error; it performs no
+  browser or external-CLI login. `provider logout` deletes the saved API key.
+
+Implementation is complete in source. The full local gate passed with 363
+tests, strict typing, package builds, and unchanged managed-driver hashes.
+Physical acceptance remains governed by the 2026-08-01 Pi checklist.
 
 ## 2. Plain-English glossary
 

@@ -1,5 +1,9 @@
 # NinjaRobotPi5V4 Installation Guide
 
+> [!WARNING]
+> **Alpha release.** Complete the simulation and raised-wheel validation steps
+> before allowing the robot to move on the floor.
+
 This guide takes you from a blank microSD card to a configured and tested
 NinjaRobotPi5. Follow the numbered installation steps in order. Testing,
 troubleshooting, and advanced configuration are collected later so the main
@@ -63,10 +67,7 @@ physical 45-degree position.
 - PortAudio and ALSA audio tools for the USB microphone
 - Ollama for the local language model
 - Optional OpenAI, Google Gemini, or Anthropic cloud model accounts
-- `google-auth-oauthlib`, installed automatically by `uv`, for optional native
-  Gemini Web Login
-- Optional official Anthropic `ant` CLI, installed separately only when using
-  Anthropic Web Login
+- API keys for any optional cloud providers you choose to enable
 - whisper.cpp for local English and Japanese speech-to-text
 - FastAPI and HTTPS for the local browser controller
 - NinjaRobotPi5 and its six managed `pi5*` hardware libraries
@@ -779,149 +780,14 @@ uv run --frozen ninjarobot-agent \
 
 Choose **3. Change Agent Model**, select Ollama, OpenAI, Google, or Anthropic,
 choose the available terminal authentication method, then select a numbered
-model. OpenAI displays API-key choices only because ChatGPT account login
-cannot authenticate OpenAI API requests.
+model. Every cloud provider displays API-key choices only; account/browser
+login cannot authenticate these API requests in NinjaRobotAgent.
 
-##### Optional Gemini Web Login without gcloud
-
-Gemini Web Login uses Google's Desktop OAuth flow directly from Python.
-OAuth means browser-based permission: Google gives NinjaRobotAgent a
-short-lived access token and a renewable refresh token without revealing your
-Google password. The Google Cloud CLI (`gcloud`) is not required.
-
-1. Open Google's
-   [Gemini OAuth guide](https://ai.google.dev/gemini-api/docs/oauth) on your
-   computer.
-2. Create or select a Google Cloud project.
-3. Enable the **Generative Language API**.
-4. Configure the Google OAuth consent screen. If the app is in testing mode,
-   add your Google account as a test user.
-5. Create an OAuth client with application type **Desktop app** and download
-   its JSON file.
-6. Copy that file to the Pi outside the NinjaRobotPi5 repository. For example,
-   run this on the computer that contains the downloaded file. Replace the
-   username and downloaded-file path where necessary:
-
-   ```bash
-   PI_USER="replace-with-your-pi-username"
-   scp "$HOME/Downloads/client_secret_"*.json \
-     "$PI_USER@ninjarobotpi5.local:/home/$PI_USER/google-client.json"
-   ```
-
-7. On the Pi, protect the file:
-
-   ```bash
-   chmod 600 "$HOME/google-client.json"
-   ```
-
-8. Edit the private robot configuration:
-
-   ```bash
-   nano "$NINJAROBOT_CONFIG"
-   ```
-
-   Find the existing `[providers.gemini]` block and add this one line inside
-   it. Do not add a second `[providers.gemini]` heading:
-
-   ```toml
-   project_id = "your-google-cloud-project-id"
-   ```
-
-   Save with **Ctrl+O**, press **Enter**, then exit with **Ctrl+X**. The login
-   command changes `auth_method` to `oauth` only after authorization succeeds.
-
-9. Start Gemini Web Login:
-
-   ```bash
-   uv run --frozen ninjarobot-agent \
-     --config "$NINJAROBOT_CONFIG" \
-     provider login gemini \
-     --client-id-file "$HOME/google-client.json"
-   ```
-
-10. Copy the displayed Google authorization URL into a browser on your phone
-    or computer. Sign in and approve access.
-11. Google redirects the browser to `http://localhost:8080/`. Because the
-    browser is not running on the Pi, the page may say it cannot connect. This
-    is expected. Copy the complete URL from the browser address bar.
-12. Paste the complete localhost URL into the hidden terminal prompt and press
-    **Enter**.
-13. Confirm the credential and model catalog:
-
-    ```bash
-    uv run --frozen ninjarobot-agent \
-      --config "$NINJAROBOT_CONFIG" provider status gemini
-
-    uv run --frozen ninjarobot-agent \
-      --config "$NINJAROBOT_CONFIG" provider health gemini
-
-    uv run --frozen ninjarobot-agent \
-      --config "$NINJAROBOT_CONFIG" model list --provider gemini
-    ```
-
-Expected result: status reports `"method": "oauth"` and
-`"configured": true`, health reports `ready`, and no command asks for
-`gcloud`. NinjaRobotAgent saves the renewable credential in
-`~/.config/ninjarobot_pi5/oauth/` with permissions that allow only your Linux
-user to read it.
-
-To remove that saved Gemini credential:
-
-```bash
-uv run --frozen ninjarobot-agent \
-  --config "$NINJAROBOT_CONFIG" provider logout gemini
-```
-
-##### Optional Anthropic Web Login with the official ant CLI
-
-`uv sync` installs Python packages, but Anthropic's official `ant` command is
-a separate Go application. Install it only if you want Anthropic Web Login.
-An Anthropic API key does not need `ant`.
-
-1. Install Go and check its version:
-
-   ```bash
-   sudo apt update
-   sudo apt install -y golang-go
-   go version
-   ```
-
-   `ant` requires Go 1.22 or newer. If the displayed version is older, stop
-   here and install a current Go release using the
-   [official Go installation guide](https://go.dev/doc/install).
-
-2. Install Anthropic's official CLI and place it on the system command path:
-
-   ```bash
-   go install 'github.com/anthropics/anthropic-cli/cmd/ant@latest'
-   sudo install -m 0755 "$(go env GOPATH)/bin/ant" /usr/local/bin/ant
-   ant --version
-   ```
-
-   These commands follow Anthropic's
-   [official ant CLI quickstart](https://platform.claude.com/docs/en/cli-sdks-libraries/cli/quickstart).
-
-3. Start the account login:
-
-   ```bash
-   uv run --frozen ninjarobot-agent \
-     --config "$NINJAROBOT_CONFIG" provider login anthropic
-   ```
-
-4. Open the displayed URL on a phone or computer and enter the displayed code.
-5. Verify the login:
-
-   ```bash
-   ant auth status
-
-   uv run --frozen ninjarobot-agent \
-     --config "$NINJAROBOT_CONFIG" provider health anthropic
-   ```
-
-Anthropic owns and refreshes this OAuth profile through `ant`.
-NinjaRobotAgent does not copy the profile token into its TOML configuration
-or general secret file. Use `provider logout anthropic` to remove the selected
-Anthropic profile.
+Google and Anthropic web login are no longer supported. Use
+`provider set-api-key gemini` or `provider set-api-key anthropic`. The retained
+`provider login` command only explains this migration and never starts a
+browser, reads a Google client file, or calls the Anthropic `ant` command.
+`provider logout PROVIDER_ID` removes the provider's saved API key.
 
 Optional automatic provider fallback is off by default. To enable it, add
 configured provider IDs to the private TOML file:
@@ -1936,6 +1802,35 @@ engine; it does not connect to Tavily, execute a Skill, or control hardware on
 its own. Restart the agent service after changing an MCP server so the shared
 registry is rebuilt. A model change alone does not require reinstalling an MCP
 server or Skill.
+
+#### Built-in robot-control MCP tools
+
+The agent service starts one trusted in-process robot-control MCP server
+automatically. It is not configured in `mcp.toml` and needs no separate
+installation. Its tools are:
+
+- `robot.behavior.catalog` — list validated behaviors
+- `robot.behavior.preview` — validate and translate a behavior without running hardware
+- `robot.behavior.execute_expression` — combine face, text, tone, or melody stages
+- `robot.behavior.execute_movement` — combine those outputs with named movement or logical servo targets
+- `robot.behavior.stop` — request the existing full stop
+
+The preview result contains the canonical NinjaRobot IDE definition,
+`contains_motion`, and required resources. Execution returns the IDE action
+result. The MCP layer cannot bypass the IDE: movement still requires the active
+chat session to be armed, all stages remain bounded, and obstacle, watchdog,
+calibration, latch, cancellation, and stop behavior remain unchanged.
+
+Use simulation first:
+
+```bash
+uv run --frozen ninjarobot-agent service start
+uv run --frozen ninjarobot-agent chat \
+  "Create a two-stage happy face and short tone expression, preview it, then execute it."
+```
+
+Expected result: the agent uses preview and expression tools, reports a
+successful simulated IDE action, and does not move a servo.
 
 #### Set up the default Tavily web-search MCP server
 

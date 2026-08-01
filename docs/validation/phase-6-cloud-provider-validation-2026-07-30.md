@@ -1,13 +1,15 @@
 # Phase 6 Cloud Provider Validation — 2026-07-30
 
+Authentication revision: 2026-08-01 (API-key-only)
+
 Use this checklist on the Raspberry Pi after installing the Phase 6 source.
 Run one provider at a time. OpenAI, Google Gemini, and Anthropic can charge for
 requests, so check the account's price and spending limit first.
 
 API means Application Programming Interface, the network service used to talk
-to a cloud model. OAuth means a browser-based login that produces a temporary
-access token. MCP means Model Context Protocol, the boundary used to add
-external tools such as Tavily web search.
+to a cloud model. MCP means Model Context Protocol, the boundary used to add
+external tools such as Tavily web search. As of 2026-08-01, every cloud model
+provider uses API-key authentication only.
 
 Never paste an API key into this document, a chat prompt, a shell command,
 Git, a screenshot, an MCP file, or an Agent Skill. The commands below use a
@@ -22,11 +24,11 @@ cd "$HOME/NinjaRobotPi5"
 source .venv/bin/activate
 
 uv sync --frozen --extra hardware --group dev
-uv run python scripts/verify_immutable_drivers.py
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy .
-uv run pytest -q
+uv run --frozen python scripts/verify_immutable_drivers.py
+uv run --frozen ruff check .
+uv run --frozen ruff format --check .
+uv run --frozen mypy .
+uv run --frozen pytest -q
 ```
 
 Expected result:
@@ -123,44 +125,9 @@ uv run --frozen ninjarobot-agent \
   model select GEMINI_MODEL_ID --provider gemini
 ```
 
-Optional OAuth test:
-
-1. Create a Google Desktop OAuth client and download its JSON file by
-   following the Gemini Web Login section of `InstallationGuide.md`. The
-   Google Cloud CLI is not needed.
-2. Put the Google Cloud project ID in the private Gemini provider block:
-
-   ```toml
-   project_id = "your-google-cloud-project"
-   ```
-
-3. Run:
-
-   ```bash
-   uv run --frozen ninjarobot-agent \
-     --config "$NINJAROBOT_CONFIG" \
-     provider login gemini \
-     --client-id-file "$HOME/path/to/client_secret.json"
-   ```
-
-4. Open the displayed authorization URL on a phone or computer.
-5. After approval, the localhost page may fail to open. Copy the complete
-   `http://localhost:8080/...` URL from the browser address bar and paste it
-   into the hidden terminal prompt.
-6. Check:
-
-   ```bash
-   uv run --frozen ninjarobot-agent \
-     --config "$NINJAROBOT_CONFIG" provider status gemini
-
-   uv run --frozen ninjarobot-agent \
-     --config "$NINJAROBOT_CONFIG" provider health gemini
-   ```
-
-Expected result: status reports OAuth configured through the
-`ninjarobot_pi5` credential store, health says `ready`, and `gcloud` is never
-requested. The credential file under `~/.config/ninjarobot_pi5/oauth/` must
-have mode `0600`, meaning only its owner can read and write it.
+Expected result: status reports API-key authentication without printing the
+key. The retired `provider login gemini` command only explains the migration
+and must not start a browser.
 
 ## 4. Anthropic communication test
 
@@ -188,27 +155,9 @@ uv run --frozen ninjarobot-agent \
   model select ANTHROPIC_MODEL_ID --provider anthropic
 ```
 
-Optional OAuth test:
-
-1. Follow the separate **Optional Anthropic Web Login with the official ant
-   CLI** instructions in `InstallationGuide.md`.
-2. Confirm the independently installed command:
-
-   ```bash
-   ant --version
-   ```
-
-3. Run:
-
-   ```bash
-   uv run --frozen ninjarobot-agent \
-     --config "$NINJAROBOT_CONFIG" provider login anthropic
-   ```
-
-4. Follow the displayed no-browser URL and code.
-
-The adapter asks `ant` for a refreshed bearer token when needed. It does not
-copy the profile token into NinjaRobotPi5 configuration.
+Expected result: status reports API-key authentication without printing the
+key. The retired `provider login anthropic` command only explains the
+migration and must not invoke an external CLI or start a browser.
 
 ## 5. Simulation test for each provider
 

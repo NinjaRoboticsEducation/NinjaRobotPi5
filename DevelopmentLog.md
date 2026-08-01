@@ -1,5 +1,55 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-01 — API-key-only cloud auth and trusted robot-control MCP
+
+### Summary
+
+- removed Google Desktop OAuth and Anthropic `ant` web-login execution while
+  preserving a one-release `provider login` migration message
+- normalized legacy `auth_method = "oauth"` configuration to `api_key` and
+  stopped persisting `oauth_profile`
+- removed `google-auth-oauthlib` and its transitive OAuth dependencies from the
+  locked environment
+- added a read-only `behavior.preview` IDE capability that compiles compact
+  expression or movement drafts into canonical behavior definitions without
+  starting hardware
+- added a fixed, trusted, in-process MCP façade for behavior catalog, preview,
+  expression, movement, and stop operations
+- delegated existing model-visible behavior execution names to the MCP façade,
+  retained all other IDE tools, and preserved the existing session motion arm,
+  emergency policy, action IDs, cancellation, and IDE-only hardware boundary
+- reviewed `AuditReport_260731.md` against executable code and recorded a
+  correction addendum instead of treating every static finding as confirmed
+
+### Safety and compatibility
+
+The façade never imports a managed driver and never accepts raw GPIO fields.
+It derives risk, confirmation, timeout, idempotency, and cancellation metadata
+from project-owned IDE descriptors. External MCP servers remain separately
+namespaced and untrusted. Existing expression and movement tool names are
+unchanged, so current prompts, skills, web controls, and stored workflows keep
+working. Legacy OAuth configuration loads but no former refresh token or CLI
+profile is used.
+
+### Validation
+
+- immutable-driver verification passed before and after every phase: 222
+  tracked files and 25 authorized repairs
+- `compileall`, Ruff lint, Ruff format, and strict mypy passed
+- 363 automated tests passed; the only warning is the pre-existing Starlette
+  `httpx` test-client deprecation
+- focused tests cover fixed MCP discovery, authoritative risk classification,
+  schema rejection before execution, IDE action translation, ownership-aware
+  close ordering, cancellation propagation, legacy auth migration, and
+  simulated canonical behavior preview
+- source distributions and wheels for the IDE and agent both built successfully
+
+### Raspberry Pi status
+
+No physical device was operated during this refinement. Follow
+`docs/validation/robot-control-mcp-validation-2026-08-01.md`; complete safe
+smoke and device-communication checks before raised-wheel actuator tests.
+
 ## 2026-07-30 — Integrated hardware recovery and false-latch repair
 
 ### Summary
