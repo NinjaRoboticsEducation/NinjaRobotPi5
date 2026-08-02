@@ -61,7 +61,7 @@ The boundary has three concrete safety consequences:
 NinjaRobotPi5/
 ├── ninjarobot_pi5_ide/
 │   ├── src/ninjarobot_pi5_ide/
-│   │   ├── adapters/           Per-device adapter modules (buzzer, camera, display, …)
+│   │   ├── adapters.py         Shared adapter protocols and deterministic fakes
 │   │   ├── behavior_assets.py  Bundled and private behavior catalog
 │   │   ├── behavior_models.py  Strict immutable stage/operation definitions
 │   │   ├── behavior_runtime.py Ordered-stage, concurrent-operation executor
@@ -69,30 +69,34 @@ NinjaRobotPi5/
 │   │   ├── cli.py              ninjarobot-ide-tool entry point
 │   │   ├── config.py           V4 configuration schema (TOML)
 │   │   ├── config_import.py    Preview-first import from standalone pi5* JSON files
-│   │   ├── contracts.py        Shared data contracts (capabilities, results, errors)
+│   │   ├── models.py           Shared data models (capabilities, results, errors)
 │   │   ├── face_renderer.py    Procedural Pillow face animations
 │   │   ├── interactive_tool.py Blessed-style direct-control menus
 │   │   ├── robot.py            Shared RobotAssembly (all devices in one object)
 │   │   ├── runtime_control.py  Owner-private active-process registration
 │   │   ├── safety.py           Motion guard, watchdog, stop levels, recovery
-│   │   └── scheduler.py        ResourceScheduler and ActionLedger
+│   │   └── ledger.py           Durable ActionLedger
 │   └── pyproject.toml
 │
 ├── ninjarobot_pi5_agent/
 │   ├── src/ninjarobot_pi5_agent/
-│   │   ├── providers/          OllamaProvider, OpenAIProvider, GeminiProvider, AnthropicProvider
+│   │   ├── providers.py        Provider-neutral LLMProvider protocol
+│   │   ├── ollama.py           Ollama provider adapter
+│   │   ├── openai_provider.py  OpenAI Responses API adapter
+│   │   ├── gemini_provider.py  Gemini API adapter
+│   │   ├── anthropic_provider.py Anthropic Messages API adapter
 │   │   ├── agent_loop.py       Main AI turn loop, tool routing, camera-intent boundary
 │   │   ├── benchmark.py        Ollama performance and safety benchmark
-│   │   ├── camera_grant.py     Repeatable one-photo AI camera consent manager
+│   │   ├── runtime.py          Shared runtime, session, consent, and tool coordination
 │   │   ├── cli.py              ninjarobot-agent entry point
-│   │   ├── google_oauth.py     Legacy OAuth migration shim (API-key migration only)
-│   │   ├── ipc_server.py       Owner-only Unix-domain socket service
+│   │   ├── provider_auth.py    API-key-only cloud provider configuration helpers
+│   │   ├── ipc.py              Owner-only Unix-domain socket protocol and server
 │   │   ├── mcp_config.py       MCP server catalog loader and validator
-│   │   ├── model_manager.py    Provider-neutral model selection and hot-switching
-│   │   ├── motion_arm.py       Session-lived motion authorization manager
+│   │   ├── model_selection.py  Provider-neutral model selection and hot-switching
+│   │   ├── persistence.py      Bounded local conversation persistence
 │   │   ├── policy.py           Tool call policy engine
 │   │   ├── prompts.py          PromptComposer — ordered system prompt builder
-│   │   ├── robot_mcp.py        Trusted in-process robot-control MCP façade
+│   │   ├── robot_control_mcp.py Trusted in-process robot-control MCP façade
 │   │   ├── secrets.py          SecretStore — owner-only, atomic, redacted
 │   │   ├── skills.py           Skill validation, confinement, and registry
 │   │   └── web_app.py          FastAPI HTTPS controller and WebSocket lease
@@ -140,7 +144,7 @@ NinjaRobotPi5/
 ### First-Time Setup (Simulation — No Hardware)
 
 ```bash
-git clone --branch NinjaPi5Agent --single-branch \
+git clone --branch alpha01 --single-branch \
   https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
 cd NinjaRobotPi5
 
@@ -251,7 +255,8 @@ Because the drivers are editable path dependencies, a pulled or locally authoriz
 
 | Prohibited action | Why |
 |---|---|
-| `import pi5servo` (or any `pi5*`) inside `ninjarobot_pi5_ide` or `ninjarobot_pi5_agent` | Breaks the containment boundary; drivers are reached only through IDE adapter contracts |
+| Importing a `pi5*` package in `ninjarobot_pi5_agent` | Breaks the containment boundary; the agent reaches hardware only through IDE capability contracts |
+| Exposing a raw `pi5*` driver object outside `ninjarobot_pi5_ide` | Bypasses the IDE's ownership, safety, and serialization boundary; the IDE may use controlled lazy driver imports internally |
 | Editing a `pi5*` source file without recording an authorization | The SHA-256 baseline check will fail the quality gate |
 | Adding a `pi5*` directory as a `[tool.uv.sources]` workspace member | Drivers are editable path dependencies, not workspace members |
 | Running `uv sync` inside a `pi5*` folder for normal NinjaRobotPi5 use | Use the root environment; package-local environments are for standalone driver validation only |
@@ -410,9 +415,9 @@ Runtime disarm also cancels any in-flight motion tokens and requests `robot.serv
 - Triggers: three consecutive front-obstacle readings ≤ 50 mm, Raspberry Pi undervoltage, software watchdog timeout
 - Recovery: `ninjarobot-ide-tool motion resume --confirm`
 
-**Level 2 (Emergency Stop)** — stops servos and ranging, closes camera and microphone, silences the buzzer, and displays a red octagonal Emergency Stop sign:
+**Level 2 (Emergency Stop)** — stops servos and ranging, suspends the camera and microphone backends, silences the buzzer, and displays a red octagonal Emergency Stop sign. A confirmed resume performs health checks and reconstructs/restarts modules as needed.
 
-- Triggers: Ctrl+C, explicit behavior stop, shutdown cleanup, hardware driver failure
+- Triggers: explicit emergency-stop behavior, shutdown cleanup, or hardware driver failure. An operator `behavior stop` performs the same immediate cleanup without writing a persistent driver-failure latch.
 - Recovery: `ninjarobot-ide-tool system resume --confirm` (or `/resume` in chat)
 - Recovery checks every configured module by health probe — refuses to clear the latch if any probe fails
 
@@ -762,7 +767,7 @@ See the [Installation Guide](InstallationGuide.md) Agent Skills section. For dev
 | Unit | Single module, simulation only | (default) |
 | Integration | Multi-module, simulation | (default) |
 | Hardware | Real device communication | `@pytest.mark.hardware` |
-| Provider (live) | Real cloud API | `@pytest.mark.live_provider` |
+| Provider (live) | Real cloud API | `@pytest.mark.provider_live` |
 
 ### Phase Validation Flow
 

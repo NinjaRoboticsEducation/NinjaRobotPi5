@@ -1,5 +1,23 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-02 — Documentation accuracy correction
+
+### Summary
+
+- Reconciled the README checkout branch with the installation guide's current `alpha01` branch.
+- Removed the unbacked root MIT licence claim and broken `LICENSE` link.
+- Corrected the developer module map and the managed-driver boundary to match the IDE's controlled lazy imports and the agent's strict IDE-only access.
+- Clarified Level 2 suspend/recovery behavior, the non-persistent operator stop, the live-provider pytest marker, session-motion revocation, and local data locations.
+
+### Validation
+
+- `uv run --frozen python scripts/verify_immutable_drivers.py` passed before the documentation edit.
+- No implementation or managed-driver source changed; Raspberry Pi hardware was not accessed.
+
+### Follow-up
+
+- Add a root licence file only after the project owner confirms the intended legal licence and copyright terms.
+
 ## 2026-08-01 — Long-run agent hardware ownership and recovery repair
 
 ### Summary

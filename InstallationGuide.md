@@ -64,8 +64,8 @@ Your personal settings and captured media are stored **outside** the project fol
 ```text
 ~/.config/pi5*/                    Standalone module settings (JSON)
 ~/.config/ninjarobot_pi5/          Integrated robot settings (TOML) and behaviors
-~/.local/share/ninjarobot_pi5/     Retained camera and microphone files
-~/.local/state/ninjarobot_pi5/     Safety state, service logs, and transcripts
+~/.local/share/ninjarobot_pi5/     Retained camera/microphone media, conversation database, and benchmarks
+~/.local/state/ninjarobot_pi5/     Safety state, service log, IPC socket, lock, and action ledger
 ```
 
 `~` means your Linux home directory, for example `/home/rogerchang`.
@@ -724,7 +724,7 @@ To let the AI move the robot's wheels, raise the wheels first, then:
 # Type ARM when prompted
 ```
 
-Motion authorization is session-lived. It stays active while a local model is reasoning and ends only on `/disarm`, Emergency Stop, browser disconnect, model change, or service stop.
+Motion authorization is session-lived. It stays active while a local model is reasoning and ends on `/disarm`, an Emergency Stop, successful `/resume`, browser disconnect, model change, or service stop. Recovery deliberately leaves AI motion disarmed, so `/arm` is required again before another servo movement.
 
 Try a non-moving expression first:
 

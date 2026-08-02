@@ -7,7 +7,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Platform: Raspberry Pi 5](https://img.shields.io/badge/platform-Raspberry%20Pi%205-red.svg)](https://www.raspberrypi.com/)
 [![AI: Local + Cloud](https://img.shields.io/badge/AI-Ollama%20%7C%20OpenAI%20%7C%20Gemini%20%7C%20Anthropic-4285F4.svg)](https://ollama.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Release: Alpha](https://img.shields.io/badge/release-alpha-orange.svg)](InstallationGuide.md)
 
 </div>
 
@@ -117,7 +117,7 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 
 ```bash
 # 1. Clone the repository
-git clone --branch NinjaPi5Agent --single-branch \
+git clone --branch alpha01 --single-branch \
   https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
 cd NinjaRobotPi5
 
@@ -214,14 +214,6 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 - **Never change wiring while the robot is powered.**
 - The current robot has no accessible physical servo cutoff. Software stop and the watchdog reduce risk but cannot replace a physical power disconnect.
 - Camera and microphone operations require explicit consent from everyone nearby before you add `--real --confirm-camera` or `--real --confirm-microphone`.
-
----
-
-## 📄 License
-
-This project is licensed under the **MIT License**.
-
-**Copyright © 2026 Chihkuang Chang**
 
 ---
 
