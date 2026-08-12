@@ -24,6 +24,7 @@ from ninjarobot_pi5_agent import (
     ModelManager,
     ModelMessage,
     ModelRequest,
+    ModelSelectionError,
     ModelStreamEvent,
     ModelTurn,
     MotionArmManager,
@@ -165,6 +166,42 @@ def test_model_fallback_is_opt_in_and_never_persists_an_automatic_switch(
         assert persisted == []
         with pytest.raises(CloudUnavailableError):
             await manager.generate(request.model_copy(update={"allow_provider_fallback": False}))
+        await manager.close()
+
+    asyncio.run(exercise())
+
+
+def test_model_fallback_error_retains_safe_provider_failure_detail(tmp_path) -> None:
+    async def exercise() -> None:
+        async def catalog() -> tuple[ModelCatalogEntry, ...]:
+            return ()
+
+        manager = ModelManager(
+            active_provider_id="gemini",
+            active_model="gemini-3.6-flash",
+            active_provider=_FailingCloudProvider("gemini"),
+            registrations=(
+                ProviderRegistration(
+                    provider_id="gemini",
+                    factory=_FailingCloudProvider,
+                    catalog=catalog,
+                    default_model="gemini-3.6-flash",
+                ),
+            ),
+            benchmarks=BenchmarkRegistry(tmp_path / "reports"),
+            selection_writer=lambda _provider, _model: None,
+        )
+        request = ModelRequest(
+            request_id="failure-request",
+            session_id="failure-session",
+            messages=(ModelMessage(role=MessageRole.USER, content="Hello"),),
+            allow_provider_fallback=True,
+        )
+        with pytest.raises(
+            ModelSelectionError,
+            match="model providers failed before tool execution: gemini: provider unavailable",
+        ):
+            await manager.generate(request)
         await manager.close()
 
     asyncio.run(exercise())

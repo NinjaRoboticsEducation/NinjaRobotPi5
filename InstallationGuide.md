@@ -1275,6 +1275,16 @@ uv run --frozen ninjarobot-agent \
 
 Do not copy a model name from an old guide — provider catalogs change over time.
 
+Gemini 3.5/3.6 can use the same local robot and memory tools as the other
+providers. NinjaRobot automatically retries a Gemini `429` rate-limit response
+up to two times before any streamed reply or tool execution; it never repeats a
+completed robot action. If the final message still says that quota was reached,
+wait briefly and check the active project limits in Google AI Studio. An
+`INVALID_ARGUMENT` message means Gemini rejected the request format, not that
+the API key, camera, or hardware is unavailable; update to the current
+NinjaRobot release and include the exact error plus the service-log timestamp in
+any support report.
+
 ---
 
 ### 🔄 Synchronize Changed Module Settings with the IDE

@@ -118,6 +118,10 @@ def test_conversation_store_migrates_and_persists_assistant_tool_calls(
             call_id="call-1",
             name="robot.distance.read",
             arguments={},
+            provider_metadata={
+                "provider": "gemini",
+                "thought_signature": "opaque-signature",
+            },
         )
         await store.append_message(
             "session-1",

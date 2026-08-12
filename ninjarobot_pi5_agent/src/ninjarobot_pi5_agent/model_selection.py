@@ -30,6 +30,11 @@ CatalogLoader = Callable[[], Awaitable[tuple["ModelCatalogEntry", ...]]]
 SelectionWriter = Callable[[str, str], None]
 
 
+def _safe_provider_failure(error: CloudProviderError | OllamaUnavailableError) -> str:
+    """Keep user-facing failover detail actionable without exposing request data."""
+    return " ".join(str(error).split())[:300] or type(error).__name__
+
+
 class ModelSelectionError(RuntimeError):
     """Raised when a requested provider or model cannot be selected safely."""
 
@@ -138,19 +143,23 @@ class ModelManager:
         self._ensure_open()
         try:
             return await self._provider.generate(request)
-        except (CloudProviderError, OllamaUnavailableError):
+        except (CloudProviderError, OllamaUnavailableError) as exc:
             if not request.allow_provider_fallback:
                 raise
+            failures = [f"{self._provider_id}: {_safe_provider_failure(exc)}"]
         for provider_id in self._fallback_provider_ids:
             registration = self._registrations[provider_id]
             candidate = registration.factory(registration.default_model)
             try:
                 return await candidate.generate(request)
-            except (CloudProviderError, OllamaUnavailableError):
+            except (CloudProviderError, OllamaUnavailableError) as exc:
+                failures.append(f"{provider_id}: {_safe_provider_failure(exc)}")
                 continue
             finally:
                 await candidate.close()
-        raise ModelSelectionError("every configured provider failed before tool execution")
+        raise ModelSelectionError(
+            "model providers failed before tool execution: " + "; ".join(failures)
+        )
 
     async def stream(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
         self._ensure_open()
@@ -161,9 +170,10 @@ class ModelManager:
                     emitted_public_output = True
                 yield event
             return
-        except (CloudProviderError, OllamaUnavailableError):
+        except (CloudProviderError, OllamaUnavailableError) as exc:
             if not request.allow_provider_fallback or emitted_public_output:
                 raise
+            failures = [f"{self._provider_id}: {_safe_provider_failure(exc)}"]
         for provider_id in self._fallback_provider_ids:
             registration = self._registrations[provider_id]
             candidate = registration.factory(registration.default_model)
@@ -174,12 +184,15 @@ class ModelManager:
                         emitted_candidate_output = True
                     yield event
                 return
-            except (CloudProviderError, OllamaUnavailableError):
+            except (CloudProviderError, OllamaUnavailableError) as exc:
+                failures.append(f"{provider_id}: {_safe_provider_failure(exc)}")
                 if emitted_candidate_output:
                     raise
             finally:
                 await candidate.close()
-        raise ModelSelectionError("every configured provider failed before tool execution")
+        raise ModelSelectionError(
+            "model providers failed before tool execution: " + "; ".join(failures)
+        )
 
     async def health(self) -> ProviderHealth:
         self._ensure_open()

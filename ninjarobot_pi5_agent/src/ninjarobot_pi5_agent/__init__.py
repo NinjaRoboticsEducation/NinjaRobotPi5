@@ -15,6 +15,7 @@ from .cloud_common import (
     CloudAuthenticationError,
     CloudProtocolError,
     CloudProviderError,
+    CloudRateLimitError,
     CloudUnavailableError,
 )
 from .cloud_registry import ConfiguredProviderRegistry
@@ -154,6 +155,7 @@ __all__ = [
     "CloudAuthenticationError",
     "CloudProtocolError",
     "CloudProviderError",
+    "CloudRateLimitError",
     "CloudUnavailableError",
     "ConfiguredProviderRegistry",
     "ConversationStore",

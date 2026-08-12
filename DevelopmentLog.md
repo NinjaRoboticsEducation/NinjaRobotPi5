@@ -1,5 +1,35 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-13 — Gemini 3 tool-continuation and quota-retry correction
+
+### Root cause and correction
+
+- audited the live service log and confirmed Gemini model discovery and normal
+  chat requests succeeded, while HTTP 400 appeared immediately after a Gemini
+  `memory.*` or `robot.*` tool result
+- corrected the Gemini `generateContent`/stream continuation format to retain
+  the provider-issued function-call ID and opaque thought signature, then send
+  that exact ID in the matching function response
+- added bounded conversion of old persisted or other-provider tool traces to
+  reference text when Gemini is selected, preventing a model switch from
+  forging an invalid Gemini function-call history
+- added up to two bounded pre-output Gemini 429 retries, including a bounded
+  `Retry-After` delay, without retrying or replaying any local tool action
+- replaced the misleading generic failover message with provider-specific,
+  redaction-safe reasons; Gemini 400 reports only its safe error category
+
+### Validation and Raspberry Pi status
+
+- added recorded-response coverage for Gemini IDs/signatures, persistence,
+  foreign history, 400 redaction, 429 generate/stream retry, and explicit
+  fallback diagnostics; the full suite passed with 421 tests
+- no managed driver, GPIO behavior, or hardware ownership path changed and no
+  live cloud request or actuator was operated
+- the Phase 6 checklist now requires a non-moving Gemini tool-continuation test
+  before the existing raised-wheel movement test; rollback remains selecting a
+  known-good provider/model or restoring the prior source revision while the
+  service is stopped
+
 ## 2026-08-12 — Phase 7 personalization consistency field fix
 
 ### Root cause and correction

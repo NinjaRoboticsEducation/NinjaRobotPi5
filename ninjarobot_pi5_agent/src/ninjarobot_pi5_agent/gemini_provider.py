@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
@@ -11,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
 from .cloud_common import (
     CloudProtocolError,
+    CloudRateLimitError,
     CloudUnavailableError,
     CredentialSource,
     canonical_tool_name,
@@ -46,6 +48,8 @@ class GeminiConfig(BaseModel):
     base_url: HttpUrl = HttpUrl("https://generativelanguage.googleapis.com/v1beta")
     project_id: str | None = None
     max_output_tokens: int = Field(default=2048, ge=1, le=32768)
+    max_rate_limit_retries: int = Field(default=2, ge=0, le=3)
+    max_rate_limit_retry_delay_seconds: float = Field(default=10.0, ge=0.1, le=30.0)
 
     @field_validator("base_url")
     @classmethod
@@ -89,16 +93,7 @@ class GeminiProvider:
 
     async def generate(self, request: ModelRequest) -> ModelTurn:
         self._ensure_open()
-        try:
-            response = await self._client.post(
-                self._model_path("generateContent"),
-                headers=await self._headers(),
-                json=self._payload(request),
-                timeout=request.timeout_seconds,
-            )
-            payload = await checked_json(response, provider="Gemini")
-        except httpx.HTTPError as exc:
-            raise CloudUnavailableError(f"Gemini request failed: {type(exc).__name__}") from exc
+        payload = await self._generate_with_retry(request)
         return _normalize_response(
             request.request_id,
             payload,
@@ -116,41 +111,47 @@ class GeminiProvider:
         usage: dict[str, Any] = {}
         finish_reason: str | None = None
         tool_names = wire_tool_map(tuple(tool.name for tool in request.tools))
-        try:
-            async with self._client.stream(
-                "POST",
-                self._model_path("streamGenerateContent"),
-                params={"alt": "sse"},
-                headers=await self._headers(),
-                json=self._payload(request),
-                timeout=request.timeout_seconds,
-            ) as response:
-                if response.status_code >= 400:
-                    await response.aread()
-                    await checked_json(response, provider="Gemini")
-                async for _event_name, payload in iter_sse_json(
-                    response,
-                    provider="Gemini",
-                ):
-                    chunk_text, chunk_calls, chunk_finish, chunk_usage = _response_parts(
-                        request.request_id,
-                        payload,
-                        tool_names,
-                        call_offset=len(calls),
-                    )
-                    if chunk_text:
-                        text.append(chunk_text)
-                        yield ModelStreamEvent(
-                            request_id=request.request_id,
-                            event=StreamEventType.TEXT_DELTA,
-                            text=chunk_text,
+        for attempt in range(self.config.max_rate_limit_retries + 1):
+            try:
+                async with self._client.stream(
+                    "POST",
+                    self._model_path("streamGenerateContent"),
+                    params={"alt": "sse"},
+                    headers=await self._headers(),
+                    json=self._payload(request),
+                    timeout=request.timeout_seconds,
+                ) as response:
+                    if response.status_code >= 400:
+                        await response.aread()
+                        await checked_json(response, provider="Gemini")
+                    async for _event_name, payload in iter_sse_json(
+                        response,
+                        provider="Gemini",
+                    ):
+                        chunk_text, chunk_calls, chunk_finish, chunk_usage = _response_parts(
+                            request.request_id,
+                            payload,
+                            tool_names,
+                            call_offset=len(calls),
                         )
-                    calls.extend(chunk_calls)
-                    finish_reason = chunk_finish or finish_reason
-                    if chunk_usage:
-                        usage = chunk_usage
-        except httpx.HTTPError as exc:
-            raise CloudUnavailableError(f"Gemini stream failed: {type(exc).__name__}") from exc
+                        if chunk_text:
+                            text.append(chunk_text)
+                            yield ModelStreamEvent(
+                                request_id=request.request_id,
+                                event=StreamEventType.TEXT_DELTA,
+                                text=chunk_text,
+                            )
+                        calls.extend(chunk_calls)
+                        finish_reason = chunk_finish or finish_reason
+                        if chunk_usage:
+                            usage = chunk_usage
+                break
+            except CloudRateLimitError as exc:
+                if attempt >= self.config.max_rate_limit_retries:
+                    raise
+                await self._wait_rate_limit_retry(exc, attempt)
+            except httpx.HTTPError as exc:
+                raise CloudUnavailableError(f"Gemini stream failed: {type(exc).__name__}") from exc
         turn = _turn(
             request.request_id,
             "".join(text),
@@ -238,6 +239,30 @@ class GeminiProvider:
         if self._owns_client:
             await self._client.aclose()
 
+    async def _generate_with_retry(self, request: ModelRequest) -> dict[str, Any]:
+        for attempt in range(self.config.max_rate_limit_retries + 1):
+            try:
+                response = await self._client.post(
+                    self._model_path("generateContent"),
+                    headers=await self._headers(),
+                    json=self._payload(request),
+                    timeout=request.timeout_seconds,
+                )
+                return await checked_json(response, provider="Gemini")
+            except CloudRateLimitError as exc:
+                if attempt >= self.config.max_rate_limit_retries:
+                    raise
+                await self._wait_rate_limit_retry(exc, attempt)
+            except httpx.HTTPError as exc:
+                raise CloudUnavailableError(f"Gemini request failed: {type(exc).__name__}") from exc
+        raise AssertionError("bounded Gemini retry loop did not return or raise")
+
+    async def _wait_rate_limit_retry(self, error: CloudRateLimitError, attempt: int) -> None:
+        delay = error.retry_after_seconds
+        if delay is None:
+            delay = float(2**attempt)
+        await asyncio.sleep(min(delay, self.config.max_rate_limit_retry_delay_seconds))
+
     async def _headers(self) -> dict[str, str]:
         headers = {
             **await self._credentials.headers(),
@@ -283,36 +308,60 @@ class GeminiProvider:
 
 
 def _contents(messages: tuple[ModelMessage, ...]) -> list[dict[str, Any]]:
+    """Translate only Gemini-native tool traces into Gemini function parts.
+
+    Gemini 3 rejects a manually replayed function trace if it has lost its
+    provider-issued correlation data. Old persisted traces and traces created by
+    a different provider are retained as bounded reference text instead.
+    """
     contents: list[dict[str, Any]] = []
+    incompatible_tool_call_ids: set[str] = set()
     for message in messages:
         if message.role is MessageRole.SYSTEM:
             continue
         role = "model" if message.role is MessageRole.ASSISTANT else "user"
         parts: list[dict[str, Any]] = []
         if message.role is MessageRole.TOOL:
-            parts.append(
-                {
-                    "functionResponse": {
-                        "name": wire_tool_name(message.name or "unknown.tool"),
-                        "response": tool_result_payload(message.content),
+            if message.tool_call_id in incompatible_tool_call_ids:
+                parts.append({"text": _legacy_tool_result(message)})
+            else:
+                parts.append(
+                    {
+                        "functionResponse": {
+                            "name": wire_tool_name(message.name or "unknown.tool"),
+                            "id": message.tool_call_id,
+                            "response": tool_result_payload(message.content),
+                        }
                     }
-                }
-            )
+                )
         else:
             if message.content:
                 parts.append({"text": message.content})
-            parts.extend(
-                {
-                    "functionCall": {
-                        "name": wire_tool_name(call.name),
-                        "args": call.arguments,
-                    }
+            for call in message.tool_calls:
+                if call.provider_metadata.get("provider") != "gemini":
+                    incompatible_tool_call_ids.add(call.call_id)
+                    continue
+                function_call: dict[str, Any] = {
+                    "name": wire_tool_name(call.name),
+                    "args": call.arguments,
+                    "id": call.call_id,
                 }
-                for call in message.tool_calls
-            )
+                thought_signature = call.provider_metadata.get("thought_signature")
+                if thought_signature:
+                    function_call["thoughtSignature"] = thought_signature
+                parts.append({"functionCall": function_call})
         if parts:
             contents.append({"role": role, "parts": parts})
     return contents
+
+
+def _legacy_tool_result(message: ModelMessage) -> str:
+    """Bound a foreign/legacy tool result without impersonating a Gemini call."""
+    content = " ".join(message.content.split())
+    return (
+        "Trusted historical tool result, supplied as reference data only, for "
+        f"{message.name or 'an unavailable tool'}: {content[:4000]}"
+    )
 
 
 def _tool_payload(tool: ToolDefinition) -> dict[str, Any]:
@@ -376,6 +425,10 @@ def _response_parts(
                 call_id = function_call.get("id")
                 if not isinstance(call_id, str) or not call_id:
                     call_id = f"gemini-{request_id}-{call_offset + len(calls)}"
+                provider_metadata = {"provider": "gemini"}
+                thought_signature = part.get("thoughtSignature")
+                if isinstance(thought_signature, str) and thought_signature:
+                    provider_metadata["thought_signature"] = thought_signature
                 calls.append(
                     ToolCall(
                         call_id=call_id,
@@ -385,6 +438,7 @@ def _response_parts(
                             provider="Gemini",
                         ),
                         arguments=arguments,
+                        provider_metadata=provider_metadata,
                     )
                 )
     raw_usage = payload.get("usageMetadata", {})

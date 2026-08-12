@@ -129,6 +129,12 @@ Expected result: status reports API-key authentication without printing the
 key. The retired `provider login gemini` command only explains the migration
 and must not start a browser.
 
+For Gemini 3.5/3.6, continue with the simulation tool-continuation check in
+section 6. A successful first tool call followed by a final answer is required;
+`Gemini rejected the request (INVALID_ARGUMENT)` is a provider-protocol failure,
+not a hardware failure. Do not retry the physical action manually after that
+error. Record the service-log timestamp and stop this provider's validation.
+
 ## 4. Anthropic communication test
 
 The recommended Raspberry Pi setup uses an Anthropic API key:
@@ -198,6 +204,13 @@ same safety prompt and can use only its declared tool.
 
 Repeat this command after selecting Ollama, OpenAI, Gemini, and Anthropic.
 Passing all four proves the Skill structure is provider independent.
+
+For Gemini 3.5/3.6, this is also the required non-moving function-continuation
+test: the response must contain the final distance result after the one local
+tool call. If a `429` occurs before text appears, NinjaRobot retries the model
+request at most twice and must not execute the distance tool more than once.
+If quota remains exhausted, wait and check the Google AI Studio project limit;
+do not change robot wiring or calibration.
 
 ## 7. MCP web-search parity
 
@@ -337,6 +350,8 @@ Phase 6 physical validation passes only when:
 - all safe software checks pass
 - credentials never appear in output or files other than their approved store
 - every selected provider streams text and normalizes a read-only tool call
+- Gemini 3.5/3.6 returns a final answer after a local tool result without HTTP
+  400, and a pre-output 429 never repeats a local tool
 - the same MCP server and Agent Skills work without provider-specific changes
 - no provider repeats a completed action after network failure
 - any actuator-moving test stops safely and returns to Idle

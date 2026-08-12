@@ -81,6 +81,7 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 - **Talk to your robot** — use natural language in English or Japanese
 - **Fully local** — the AI model runs on the Pi; no cloud account required for basic use
 - **Cloud optional** — connect OpenAI, Gemini, or Anthropic with an API key for more powerful models
+- **Gemini 3 tool continuity** — Gemini 3.5/3.6 function-call IDs and opaque reasoning state are retained only for the matching Gemini continuation; older or other-provider tool traces remain safe reference context after a model switch
 - **Session-safe motion** — you explicitly arm and disarm AI control over physical movement
 - **Behavior generation** — ask the AI to compose custom face + sound + movement combinations
 - **Personalization** — separate local profiles, preferences, and memories for each user

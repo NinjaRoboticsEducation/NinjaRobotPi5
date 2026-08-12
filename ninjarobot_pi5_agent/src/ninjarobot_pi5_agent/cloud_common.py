@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -23,6 +24,17 @@ class CloudAuthenticationError(CloudProviderError):
 
 class CloudUnavailableError(CloudProviderError):
     """The provider could not be reached or rejected the request."""
+
+
+class CloudRateLimitError(CloudUnavailableError):
+    """The provider requested a bounded retry after rate limiting."""
+
+    def __init__(self, provider: str, retry_after_seconds: float | None) -> None:
+        self.retry_after_seconds = retry_after_seconds
+        detail = ""
+        if retry_after_seconds is not None:
+            detail = f"; retry after {retry_after_seconds:g} seconds"
+        super().__init__(f"{provider} rate limit or account quota was reached{detail}")
 
 
 class CloudProtocolError(CloudProviderError):
@@ -76,8 +88,13 @@ async def checked_json(response: httpx.Response, *, provider: str) -> dict[str, 
                 f"{provider} rejected the configured credentials"
             ) from exc
         if response.status_code == 429:
+            raise CloudRateLimitError(
+                provider,
+                _retry_after_seconds(response),
+            ) from exc
+        if response.status_code == 400:
             raise CloudUnavailableError(
-                f"{provider} rate limit or account quota was reached"
+                f"{provider} rejected the request ({_safe_error_status(response)})"
             ) from exc
         raise CloudUnavailableError(
             f"{provider} request failed with HTTP {response.status_code}"
@@ -89,6 +106,35 @@ async def checked_json(response: httpx.Response, *, provider: str) -> dict[str, 
     if not isinstance(payload, dict):
         raise CloudProtocolError(f"{provider} response must be a JSON object")
     return payload
+
+
+def _retry_after_seconds(response: httpx.Response) -> float | None:
+    """Parse a bounded numeric Retry-After value without exposing the body."""
+    raw = response.headers.get("Retry-After")
+    if raw is None:
+        return None
+    try:
+        value = float(raw)
+    except ValueError:
+        return None
+    return value if 0 <= value <= 120 else None
+
+
+def _safe_error_status(response: httpx.Response) -> str:
+    """Return only a provider error category, never its potentially sensitive text."""
+    try:
+        payload = response.json()
+    except json.JSONDecodeError:
+        return "BAD_REQUEST"
+    if not isinstance(payload, dict):
+        return "BAD_REQUEST"
+    error = payload.get("error")
+    if not isinstance(error, dict):
+        return "BAD_REQUEST"
+    status = error.get("status")
+    if isinstance(status, str) and re.fullmatch(r"[A-Z_]{1,64}", status):
+        return status
+    return "BAD_REQUEST"
 
 
 async def iter_sse_json(

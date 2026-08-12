@@ -96,6 +96,14 @@ def test_tool_metadata_and_finish_reason_are_consistent() -> None:
     )
     assert mcp_call.name == "mcp.tavily.tavily-search"
 
+    with pytest.raises(ValidationError, match="provider metadata key is invalid"):
+        ToolCall(
+            call_id="call-3",
+            name=tool.name,
+            arguments={},
+            provider_metadata={"invalid-key": "value"},
+        )
+
 
 def test_tool_messages_and_session_timestamps_are_validated() -> None:
     with pytest.raises(ValidationError, match="tool messages require tool_call_id"):

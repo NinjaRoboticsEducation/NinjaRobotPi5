@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Any
@@ -111,6 +112,23 @@ class ToolCall(AgentContractModel):
     call_id: Identifier
     name: ToolName
     arguments: dict[str, Any]
+    provider_metadata: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("provider_metadata")
+    @classmethod
+    def provider_metadata_is_small_and_textual(
+        cls,
+        value: dict[str, str],
+    ) -> dict[str, str]:
+        """Retain only bounded provider state needed to replay a tool call."""
+        if len(value) > 4:
+            raise ValueError("tool-call provider metadata may contain at most four values")
+        if sum(len(key) + len(item) for key, item in value.items()) > 16_384:
+            raise ValueError("tool-call provider metadata exceeds 16384 characters")
+        for key in value:
+            if not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", key):
+                raise ValueError("tool-call provider metadata key is invalid")
+        return value
 
 
 class ModelMessage(AgentContractModel):
