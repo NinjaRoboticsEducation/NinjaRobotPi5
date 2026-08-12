@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 import threading
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 
-from ninjarobot_pi5_ide import CameraDevice, FaceIdentityDevice
+from ninjarobot_pi5_ide import CameraDevice, FaceIdentityDevice, Pi5CameraFaceIdentityBackend
+from ninjarobot_pi5_ide import identity as identity_module
 
 
 class _CaptureResult:
@@ -148,3 +150,50 @@ def test_cancelled_identity_waits_for_worker_before_deleting_full_frame(tmp_path
         await camera.close()
 
     asyncio.run(exercise())
+
+
+def test_pi5camera_backend_refreshes_the_same_registered_identity(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    enrolled: list[dict[str, str]] = []
+
+    def recognize_faces(_config: dict[str, Any], *, image_path: Path) -> dict[str, Any]:
+        assert image_path == tmp_path / "profile.jpg"
+        return {
+            "face_count": 1,
+            "recognition_id": "recognition-1",
+            "faces": [
+                {
+                    "status": "known",
+                    "name": "face-local-user",
+                    "face_id": "face-1",
+                }
+            ],
+        }
+
+    def enroll_pending_face(_config: dict[str, Any], **arguments: str) -> dict[str, str]:
+        enrolled.append(arguments)
+        return {"saved_image_path": str(tmp_path / "refreshed.jpg")}
+
+    module = SimpleNamespace(
+        recognize_faces=recognize_faces,
+        enroll_pending_face=enroll_pending_face,
+    )
+    monkeypatch.setattr(identity_module.importlib, "import_module", lambda _name: module)
+
+    result = Pi5CameraFaceIdentityBackend().enroll(
+        {"paths": {"data_dir": str(tmp_path)}},
+        tmp_path / "profile.jpg",
+        "face-local-user",
+    )
+
+    assert result["status"] == "enrolled"
+    assert result["refreshed"] is True
+    assert enrolled == [
+        {
+            "recognition_id": "recognition-1",
+            "face_id": "face-1",
+            "name": "face-local-user",
+        }
+    ]

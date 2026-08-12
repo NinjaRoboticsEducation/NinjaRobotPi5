@@ -93,6 +93,19 @@
       },
       "reason": "Standalone installation, dependency, and CLI validation documentation"
     },
+    "pi5camera/pyproject.toml": {
+      "approved": {
+        "sha256": "4dae3cfbb24a119a07076a7e9f6b9e9f1a57472d5016d41df1b246b77c86fa75",
+        "size": 792
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-12",
+      "baseline": {
+        "sha256": "21b12fb406506a9e9a9e4e5a3b142512a3212651283fa8601332d5f4d833162d",
+        "size": 789
+      },
+      "reason": "Constrain OpenCV below version 5 because pi5camera's Raspberry Pi fallback requires the OpenCV 4 CascadeClassifier API; prevent fresh frozen installs from resolving an incompatible backend."
+    },
     "pi5camera/scripts/bootstrap-rpi-standalone.sh": {
       "approved": {
         "sha256": "7cc7ecdec674ef67da3cc22754df5584daaa99fd877105d749fef4dce3280245",

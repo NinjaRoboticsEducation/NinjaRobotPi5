@@ -89,6 +89,8 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 ### 🧠 Persistent Multi-User Memory
 - **First-user owner setup** — the first chat asks for a name and creates the default owner profile
 - **Face identity through the IDE** — enrollment and explicit `/identify` use the existing `pi5camera` API; identity is not authentication
+- **Recoverable profile enrollment** — `/update profile` shows the current name/face state and `register user face` retries or refreshes enrollment
+- **Personal robot name** — the default is `NinjaAgent`; an explicit ordinary-chat rename is stored per user and overrides older transcript claims
 - **Strict user isolation** — `/new user` and `/switch user` change the active profile for one chat session without mixing histories
 - **Bounded retrieval** — relevant profile, preference, success, and failure context is capped before it reaches a model
 - **Read-only model access** — four `memory.*` MCP tools can read only the active user's data; models have no memory mutation tool

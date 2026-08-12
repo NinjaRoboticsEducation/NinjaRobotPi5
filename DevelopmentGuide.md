@@ -682,6 +682,12 @@ Identity workflow:
    full frame is removed in `finally`.
 6. `/identify` switches only when exactly one known identity maps to one profile.
    Unknown, no-face, multiple-face, error, or ambiguous results do not switch.
+7. Every enrollment/identification path restores silent Idle in a
+   cancellation-safe IDE `finally` path, so an error cannot strand the display
+   on the camera icon.
+8. `/update profile` reports the active name and face status. The exact
+   `register user face` action retries pending enrollment or adds a refreshed
+   sample for that same identity; `name=<new name>` changes only the user name.
 
 The agent never imports `pi5camera`. `RobotIDEClient` exposes only deterministic
 identity methods, and normal AI camera preview consent remains a separate path.
@@ -697,6 +703,9 @@ Capture policy:
   failure.
 - Narrow first-person preference forms and successful named behavior runs may
   create inferred preference/task-recipe memories with a visible notice.
+- The assistant defaults to `NinjaAgent`. An explicit ordinary-chat rename is
+  persisted in the active user profile before model reasoning and overrides
+  older conversation claims. `/update profile` does not accept `robot_name`.
 - Memory capture and retrieval failures publish an error event but never change
   the authoritative robot result or interrupt a successful hardware action.
 
@@ -728,6 +737,19 @@ uv run python scripts/benchmark_agent_memory.py --entries 1000 --queries 50
 The script uses a temporary database and fails if p95 retrieval exceeds 100 ms
 or if 1,000 synthetic entries exceed 16 MiB. These are software guardrails,
 not a substitute for the Raspberry Pi checklist.
+
+Face recognition uses the OpenCV 4 `CascadeClassifier` fallback when MediaPipe
+is unavailable. `pi5camera` constrains `opencv-python-headless>=4.8,<5` because
+the current OpenCV 5 wheel does not expose that API. Validate a deployment
+without using the camera:
+
+```bash
+uv run --frozen python scripts/validate_face_recognition_backend.py
+```
+
+If the command reports an incompatible `cv2`, run
+`uv sync --frozen --extra hardware` and restart the service. Install only one
+OpenCV wheel variant in the environment.
 
 ### HTTPS Web Controller
 

@@ -217,7 +217,11 @@ class AgentRuntime:
                     on_text_delta=on_text_delta,
                 )
                 notices: list[str] = []
-                if preference is not None:
+                if isinstance(preference, UserProfile):
+                    notices.append(
+                        f"Memory saved: robot name is {preference.preferred_robot_name}."
+                    )
+                elif preference is not None:
                     notices.append("Memory saved: preference.")
                 for kind in sorted(self._automatic_memory_notices.pop(session_id, set())):
                     notices.append(f"Memory saved: {kind.replace('_', ' ')}.")
@@ -563,10 +567,17 @@ class AgentRuntime:
                     original_text=stripped,
                 )
             self._identity_states[session_id] = "profile_update"
+            profile = await self.memory.profile(self._active_users[session_id])
+            face_state = (
+                "registered"
+                if profile.face_status.value == "enrolled"
+                else f"unregistered ({profile.face_status.value})"
+            )
             return await self._identity_reply(
                 session_id,
-                "Reply with name=<new name> and/or robot_name=<preferred robot name>. "
-                "Separate two fields with a semicolon, or enter /cancel.",
+                f"Current profile:\n- Name: {profile.display_name}\n- Face: {face_state}\n"
+                "To change the name, enter name=<new name>. To register or update the "
+                "profile face, enter register user face. Enter /cancel to stop.",
                 on_text_delta=on_text_delta,
                 user_text=stripped,
             )
@@ -742,17 +753,31 @@ class AgentRuntime:
     async def _enroll_profile_face(self, profile: UserProfile) -> str:
         assert self.memory is not None
         if self._enroll_identity is None:
-            return "Camera enrollment is unavailable, so the face profile remains pending."
+            return (
+                "Camera enrollment is unavailable, so the face profile remains pending. "
+                "The profile is still usable. After camera service is restored, run "
+                "/update profile and enter register user face."
+            )
         try:
             result = await self._enroll_identity(profile.user_id)
         except Exception as error:
             return (
                 "Camera enrollment could not complete, so the face profile remains pending "
-                f"({type(error).__name__}: {error})."
+                f"({type(error).__name__}: {error}). The profile is still usable. Run "
+                "'uv sync --frozen --extra hardware', restart the agent service, then run "
+                "/update profile and enter register user face."
             )
         if result.get("status") != "enrolled":
             status = str(result.get("status", "failed")).replace("_", " ")
-            return f"Face enrollment reported {status}; the face profile remains pending."
+            advice = {
+                "no_face": "Center one face in front of the camera with even lighting.",
+                "multiple_faces": "Keep only the intended user in the camera frame.",
+                "already_known": "That face belongs to another registered profile.",
+            }.get(str(result.get("status")), "Check the camera and recognition backend.")
+            return (
+                f"Face enrollment reported {status}; the face profile remains pending. "
+                f"{advice} Run /update profile and enter register user face to retry."
+            )
         identity = result.get("identity")
         image_path = result.get("profile_image_path")
         if not isinstance(identity, str) or not isinstance(image_path, str):
@@ -766,7 +791,11 @@ class AgentRuntime:
                 "raw_photo_retained": result.get("raw_photo_retained", False),
             },
         )
-        return "Face enrollment completed and only the cropped profile image was retained."
+        action = "updated" if result.get("refreshed") else "completed"
+        return (
+            f"Face enrollment {action} and only cropped profile images were retained. "
+            "The display has returned to Idle."
+        )
 
     async def _switch_user(
         self,
@@ -854,12 +883,24 @@ class AgentRuntime:
         original_text: str | None = None,
     ) -> AgentReply:
         assert self.memory is not None
+        if details.strip().casefold() == "register user face":
+            user_id = self._active_users[session_id]
+            profile = await self.memory.profile(user_id)
+            self._identity_states.pop(session_id, None)
+            enrollment = await self._enroll_profile_face(profile)
+            return await self._identity_reply(
+                session_id,
+                f"Profile face workflow for {profile.display_name}: {enrollment}",
+                on_text_delta=on_text_delta,
+                user_text=original_text or details,
+            )
         updates = _parse_profile_update(details)
         if not updates:
             return await self._identity_reply(
                 session_id,
-                "I could not parse that update. Use name=<new name> and/or "
-                "robot_name=<preferred robot name>, or enter /cancel.",
+                "I could not parse that update. Enter name=<new name>, "
+                "register user face, or /cancel. To rename NinjaAgent, ask it directly "
+                "in ordinary chat.",
                 on_text_delta=on_text_delta,
                 user_text=original_text or details,
             )
@@ -868,7 +909,6 @@ class AgentRuntime:
             profile = await self.memory.update_profile(
                 user_id,
                 display_name=updates.get("display_name"),
-                preferred_robot_name=updates.get("preferred_robot_name"),
             )
         except (ValueError, ProfileConflictError) as error:
             return await self._identity_reply(
@@ -1288,11 +1328,4 @@ def _parse_profile_update(details: str) -> dict[str, str]:
             continue
         if normalized_key in {"name", "display_name", "名前"}:
             updates["display_name"] = normalized_value
-        elif normalized_key in {
-            "robot_name",
-            "preferred_robot_name",
-            "robot",
-            "ロボット名",
-        }:
-            updates["preferred_robot_name"] = normalized_value
     return updates

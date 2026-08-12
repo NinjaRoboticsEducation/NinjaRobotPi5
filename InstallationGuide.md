@@ -630,6 +630,18 @@ profile. In simulation, face enrollment can remain pending because no real
 camera is available; chat must continue normally. Then enter a short greeting
 request to verify the model.
 
+Before real-hardware face enrollment, verify the installed OpenCV API without
+capturing a photo:
+
+```bash
+uv run --frozen python scripts/validate_face_recognition_backend.py
+```
+
+Expected: `PASS` with OpenCV 4.x and the Haar cascade path. If it fails, run
+`uv sync --frozen --extra hardware`, restart the service, and run the check
+again. Do not install multiple OpenCV wheel variants because they share the
+same `cv2` namespace.
+
 Run the non-hardware memory benchmark:
 
 ```bash
@@ -728,7 +740,7 @@ Useful slash commands inside chat:
 | `/new user` | Register another local profile and attempt face enrollment |
 | `/switch user` | Select an existing profile for this chat session |
 | `/identify` | Take one countdown photo and switch only on one unique known face |
-| `/update profile` | Start an explicit deterministic profile update |
+| `/update profile` | Show the active name/face status and start a profile update |
 | `/clear` | Clear the current conversation history |
 | `/exit` | Disconnect this terminal (service keeps running) |
 
@@ -737,6 +749,17 @@ workflows. They show the IDE-owned `3 → 2 → 1` countdown and do not require 
 one-shot `/camera` AI-preview grant. An unavailable camera leaves enrollment
 pending. Unknown, uncertain, or multiple faces never switch the active user.
 Face recognition identifies a local profile; it is not authentication.
+
+After `/update profile`, enter `name=<new name>` to change the user name or
+`register user face` to enroll an unregistered face or refresh the current
+profile face. Every attempt returns the display to silent Idle, including
+backend failure and cancellation. A failed attempt leaves the profile usable
+and can be retried through the same workflow.
+
+The assistant's default conversational name is `NinjaAgent`. `robot_name=...`
+is not a profile-update field. Rename the assistant in ordinary chat with an
+explicit request such as “Please rename yourself to Ninja.” The active user's
+saved name overrides older assistant messages that mention a previous name.
 
 ### Managing Persistent Memory
 

@@ -1,5 +1,45 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-12 — Phase 7 field-test correction: face enrollment and identity precedence
+
+### Summary
+
+- reproduced the Raspberry Pi failure with `opencv-python-headless 5.0.0.93`:
+  its `cv2` namespace does not provide the `CascadeClassifier` API used by the
+  existing `pi5camera` fallback
+- constrained the managed camera dependency to `opencv-python-headless>=4.8,<5`,
+  regenerated the lock at 4.14.0.94, recorded the approved driver hash, and
+  added a non-capturing backend diagnostic
+- made IDE enrollment and recognition restore silent Idle after success,
+  failure, and cancellation, and prevented capture when the countdown cannot
+  start
+- changed `/update profile` to show the active name and face status and accept
+  `name=<new name>` or the explicit `register user face` action
+- added retry guidance for backend/no-face/multiple-face failures and permitted
+  a registered user to refresh the same face identity
+- changed the default conversational name to `NinjaAgent`; explicit chat
+  renames are persisted per active user before model reasoning and override old
+  assistant messages, while `robot_name=...` is no longer accepted by the
+  profile command
+
+### Validation
+
+- immutable-driver verification passed with 222 tracked files and 26
+  authorized repairs
+- the OpenCV diagnostic passed with 4.14.0 and a loadable frontal-face cascade
+- compilation, Ruff lint/format, and strict mypy passed after every phase
+- the repository suite passed with 405 tests and one pre-existing Starlette
+  `httpx` test-client deprecation warning
+- regression coverage includes dependency incompatibility, Idle recovery,
+  cancellation, stopped presentation, enrollment retry/refresh, profile status,
+  chat-only robot naming, and refusal of ambiguous rename questions
+
+### Raspberry Pi status
+
+No physical hardware was operated during the correction. The updated Phase 7
+checklist separates the backend diagnostic, camera/display tests, optional
+actuator tests, expected outcomes, and rollback steps.
+
 ## 2026-08-12 — Phase 7 persistent multi-user memory implementation
 
 ### Summary

@@ -42,6 +42,8 @@ def test_prompt_order_keeps_safety_before_skill_and_conversation(tmp_path) -> No
     assert '"armed": true' in messages[2].content
     assert "may execute trusted robot motion tools" in messages[2].content
     assert "call the tool instead of merely describing" in messages[1].content
+    assert "You are NinjaAgent" in messages[1].content
+    assert "overrides older user or" in messages[1].content
     assert "robot.behavior.execute_expression" in messages[1].content
     assert "robot.behavior.execute_movement" in messages[1].content
     assert "compact stage fields" in messages[1].content

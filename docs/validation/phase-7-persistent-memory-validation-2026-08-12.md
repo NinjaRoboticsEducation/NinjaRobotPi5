@@ -47,6 +47,7 @@ cd "$HOME/NinjaRobotPi5"
 git branch --show-current
 uv sync --frozen --extra hardware
 uv run python scripts/verify_immutable_drivers.py
+uv run python scripts/validate_face_recognition_backend.py
 uv run python -m compileall -q .
 uv run ruff check .
 uv run ruff format --check .
@@ -58,9 +59,10 @@ uv run python scripts/benchmark_agent_memory.py --entries 1000 --queries 50
 Expected:
 
 - branch is `alpha02`
-- immutable check reports 222 tracked files and 25 authorized repairs
+- immutable check reports 222 tracked files and 26 authorized repairs
+- face backend check reports OpenCV 4.x and a loadable Haar cascade
 - compilation, Ruff, and mypy succeed
-- 398 tests pass (or a documented later count with no regression)
+- 405 tests pass (or a documented later count with no regression)
 - benchmark reports `passed: true`, p95 at or below 100 ms, and database size
   at or below 16 MiB
 
@@ -100,6 +102,17 @@ These tests do not move actuators.
    Expected: no secrets, face encoding, or other user's raw content is printed
    by the profile list.
 
+6. Run `/update profile`.
+
+   Expected: the current user name and registered/unregistered face state are
+   shown. `name=<new name>` changes the user name. `robot_name=...` is rejected
+   with guidance to rename NinjaAgent through ordinary chat.
+
+7. Say “Please rename yourself to Ninja,” then ask its name again.
+
+   Expected: a visible memory-saved notice appears and the answer uses Ninja,
+   even if an older transcript message used another assistant name.
+
 ## Device communication tests (camera/display, no actuator motion)
 
 1. Start real hardware:
@@ -113,6 +126,11 @@ These tests do not move actuators.
 
    Expected: the existing `3 → 2 → 1` countdown is visible; one camera capture
    occurs; exactly one face enrolls; the result returns to silent Idle.
+
+   If enrollment fails, run `/update profile`, confirm the displayed face state,
+   then enter `register user face`. Expected: another visible countdown starts;
+   success enrolls/refreshes the face, while failure reports the cause and next
+   step and still returns the display to silent Idle.
 
 3. Verify data permissions and raw-frame cleanup:
 

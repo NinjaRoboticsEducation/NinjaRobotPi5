@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from .memory_models import BehaviorAttemptStatus, MemoryItem
+from .memory_models import BehaviorAttemptStatus, MemoryItem, UserProfile
 from .memory_store import MemoryStore
 from .models import MemoryKind, ToolExecutionResult, ToolExecutionStatus, ToolInvocation
 
@@ -125,8 +125,15 @@ class MemoryCaptureService:
         text: str,
         *,
         session_id: str,
-    ) -> MemoryItem | None:
+    ) -> MemoryItem | UserProfile | None:
         """Capture only narrow, first-person preference forms with a visible notice."""
+        robot_name = _robot_name_update(text)
+        if robot_name is not None:
+            return await self._store.update_profile(
+                user_id,
+                preferred_robot_name=robot_name,
+                actor="explicit-chat-robot-rename",
+            )
         if _is_profile_update(text.casefold()):
             return None
         content = _preference_content(text)
@@ -173,7 +180,7 @@ class MemoryRetrievalService:
         )
         lines = [
             f"Active user: {profile.display_name} ({profile.role.value}).",
-            f"Preferred robot name: {profile.preferred_robot_name or 'not set'}.",
+            f"Current robot name: {profile.preferred_robot_name or 'NinjaAgent'}.",
         ]
         lines.extend(f"Preference: {_single_line(item.content)}" for item in preferences)
         lines.extend(
@@ -247,6 +254,24 @@ def _preference_content(text: str) -> str | None:
         if match:
             value = " ".join(part.strip() for part in match.groups() if part is not None)
             return f"User preference: {value}"
+    return None
+
+
+def _robot_name_update(text: str) -> str | None:
+    """Extract only explicit commands that rename the assistant itself."""
+    stripped = " ".join(text.strip().split())
+    patterns = (
+        r"(?i)(?:^|[.!?]\s+)(?:please\s+)?rename yourself to\s+(.{1,80}?)[.!?]?$",
+        r"(?i)^(?:please\s+)?change your name to\s+(.{1,80}?)[.!?]?$",
+        r"(?i)^from now on[,]?\s+(?:your name is|you are)\s+(.{1,80}?)[.!?]?$",
+        r"^あなたの名前を(.{1,40}?)に変更してください[。！!]?$",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, stripped)
+        if match:
+            name = match.group(1).strip(" \"'“”‘’")
+            if name and not any(character in name for character in "=;；"):
+                return name
     return None
 
 

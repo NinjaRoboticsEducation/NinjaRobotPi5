@@ -45,11 +45,13 @@ class Pi5CameraFaceIdentityBackend:
             }
         faces = result.get("faces", [])
         face = faces[0] if isinstance(faces, list) and faces else {}
-        if face.get("status") == "known":
+        known_identity = face.get("name") if face.get("status") == "known" else None
+        if isinstance(known_identity, str) and known_identity != identity:
+            self._discard_pending(config, result.get("recognition_id"))
             return {
                 "status": "already_known",
                 "face_count": 1,
-                "identity": face.get("name"),
+                "identity": known_identity,
             }
         recognition_id = result.get("recognition_id")
         face_id = face.get("face_id")
@@ -67,6 +69,7 @@ class Pi5CameraFaceIdentityBackend:
             "face_count": 1,
             "identity": identity,
             "profile_image_path": enrolled["saved_image_path"],
+            "refreshed": known_identity == identity,
         }
 
     def recognize(self, config: dict[str, Any], image_path: Path) -> dict[str, Any]:

@@ -127,7 +127,37 @@ def test_automatic_preferences_recipes_and_bounded_retrieval(tmp_path: Path) -> 
         assert "Active user: Owner" in context
         assert "blue face animations" in context
         assert "greeting" in context
+        assert "Current robot name: NinjaAgent" in context
         assert len(context) <= (await store.settings()).retrieval_character_budget
+        await store.close()
+
+    asyncio.run(exercise())
+
+
+def test_explicit_chat_rename_updates_canonical_robot_name_only(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        store = MemoryStore(tmp_path / "memory.sqlite3")
+        await store.start()
+        owner = await store.create_profile("Owner")
+        capture = MemoryCaptureService(store)
+
+        renamed = await capture.capture_inferred_preference(
+            owner.user_id,
+            "I want to change your name. Please rename yourself to Ninja.",
+            session_id="session-1",
+        )
+        assert renamed is not None
+        assert (await store.profile(owner.user_id)).preferred_robot_name == "Ninja"
+        context = await MemoryRetrievalService(store).context(owner.user_id, "your name")
+        assert "Current robot name: Ninja." in context
+
+        ignored = await capture.capture_inferred_preference(
+            owner.user_id,
+            "Can I change your name to Pocky?",
+            session_id="session-1",
+        )
+        assert ignored is None
+        assert (await store.profile(owner.user_id)).preferred_robot_name == "Ninja"
         await store.close()
 
     asyncio.run(exercise())

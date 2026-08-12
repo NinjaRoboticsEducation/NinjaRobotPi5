@@ -74,6 +74,7 @@ def test_first_chat_enrolls_owner_and_camera_failure_does_not_block_chat(tmp_pat
         created = await runtime.chat(session_id="terminal", text="Roger")
         assert "profile created" in created.text.casefold()
         assert "remains pending" in created.text.casefold()
+        assert "register user face" in created.text.casefold()
         profiles = await runtime.memory.profiles()  # type: ignore[union-attr]
         assert len(profiles) == 1
         assert profiles[0].role is UserRole.OWNER
@@ -141,9 +142,21 @@ def test_new_switch_identify_and_restart_default_are_user_isolated(tmp_path: Pat
     asyncio.run(exercise())
 
 
-def test_profile_updates_require_explicit_deterministic_syntax(tmp_path: Path) -> None:
+def test_profile_update_shows_status_and_supports_face_registration(tmp_path: Path) -> None:
+    enrolled_ids: list[str] = []
+
+    async def enroll(user_id: str) -> dict:
+        enrolled_ids.append(user_id)
+        return {
+            "status": "enrolled",
+            "identity": f"face-{user_id}",
+            "profile_image_path": str(tmp_path / f"{user_id}.jpg"),
+            "backend": "test",
+            "raw_photo_retained": False,
+        }
+
     async def exercise() -> None:
-        runtime = _runtime(tmp_path)
+        runtime = _runtime(tmp_path, enroll_identity=enroll)
         await runtime.start()
         await runtime.chat(session_id="terminal", text="start")
         await runtime.chat(session_id="terminal", text="Owner")
@@ -152,15 +165,28 @@ def test_profile_updates_require_explicit_deterministic_syntax(tmp_path: Path) -
             text="Please update my profile",
         )
         assert "name=<new name>" in prompt.text
+        assert "Name: Owner" in prompt.text
+        assert "Face: registered" in prompt.text
+        assert "register user face" in prompt.text
         updated = await runtime.chat(
             session_id="terminal",
-            text="name=Roger; robot_name=Ninja",
+            text="name=Roger",
         )
         assert "profile updated for roger" in updated.text.casefold()
+        rejected = await runtime.chat(
+            session_id="terminal",
+            text="/update profile robot_name=Pocky",
+        )
+        assert "ask it directly" in rejected.text.casefold()
+        retry_prompt = await runtime.chat(session_id="terminal", text="/update profile")
+        assert "Name: Roger" in retry_prompt.text
+        refreshed = await runtime.chat(session_id="terminal", text="register user face")
+        assert "face enrollment completed" in refreshed.text.casefold()
         owner = await runtime.memory.owner()  # type: ignore[union-attr]
         assert owner is not None
         assert owner.display_name == "Roger"
-        assert owner.preferred_robot_name == "Ninja"
+        assert owner.preferred_robot_name is None
+        assert enrolled_ids == ["local-user", "local-user"]
         await runtime.close()
 
     asyncio.run(exercise())

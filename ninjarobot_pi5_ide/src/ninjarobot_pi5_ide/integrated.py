@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 from copy import deepcopy
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from .behavior_drafts import BehaviorDraftCompiler, BehaviorDraftError
 from .behavior_models import (
@@ -503,15 +504,68 @@ class RobotIDEClient:
         """Run an IDE-owned countdown and deterministic face enrollment."""
         if not self._started:
             raise RuntimeError("robot IDE client is not started")
-        await self.robot.show_camera_capture()
-        return await self._identity.enroll(user_id)
+        return await self._run_face_identity(lambda: self._identity.enroll(user_id))
 
     async def identify_face(self) -> dict[str, Any]:
         """Run an IDE-owned countdown and explicit face recognition."""
         if not self._started:
             raise RuntimeError("robot IDE client is not started")
-        await self.robot.show_camera_capture()
-        return await self._identity.identify()
+        return await self._run_face_identity(self._identity.identify)
+
+    async def _run_face_identity(
+        self,
+        operation: Callable[[], Awaitable[dict[str, Any]]],
+    ) -> dict[str, Any]:
+        """Run one visible identity operation and always restore silent Idle."""
+        result: dict[str, Any] | None = None
+        operation_error: BaseException | None = None
+        try:
+            if not await self.robot.show_camera_capture():
+                raise IDEError(
+                    ErrorDetails(
+                        code="IDENTITY_PRESENTATION_STOPPED",
+                        message=(
+                            "Face capture countdown could not start because robot presentation "
+                            "is stopped. Resume the system, then retry the profile workflow."
+                        ),
+                        definitely_not_executed=True,
+                        retry_safety=RetrySafety.SAFE,
+                    )
+                )
+            result = await operation()
+        except BaseException as error:
+            operation_error = error
+
+        restore_task = asyncio.create_task(self.robot.restore_idle_face())
+        try:
+            try:
+                await asyncio.shield(restore_task)
+            except asyncio.CancelledError:
+                try:
+                    await asyncio.shield(restore_task)
+                except BaseException:
+                    pass
+                raise
+        except BaseException as restore_error:
+            if operation_error is None:
+                raise
+            operation_error.add_note(
+                "The IDE also failed to restore the Idle presentation: "
+                f"{type(restore_error).__name__}: {restore_error}"
+            )
+
+        if operation_error is not None:
+            raise operation_error
+        if result is None:
+            raise IDEError(
+                ErrorDetails(
+                    code="IDENTITY_RESULT_MISSING",
+                    message="Face identity operation returned no result; no profile was changed.",
+                    definitely_not_executed=False,
+                    retry_safety=RetrySafety.UNKNOWN,
+                )
+            )
+        return result
 
     async def delete_face_identity(self, user_id: str) -> bool:
         """Remove face data selected by the deterministic management interface."""
