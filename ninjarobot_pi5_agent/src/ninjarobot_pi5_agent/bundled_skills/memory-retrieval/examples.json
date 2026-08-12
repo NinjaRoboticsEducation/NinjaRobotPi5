@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "examples": [
+    {
+      "input": {
+        "query": "successful birthday behavior"
+      },
+      "expected_tools": [
+        "memory.search"
+      ],
+      "simulation_only": true
+    },
+    {
+      "input": {},
+      "expected_tools": [
+        "memory.profile.get"
+      ],
+      "simulation_only": true
+    }
+  ]
+}

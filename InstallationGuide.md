@@ -193,7 +193,7 @@ Expected result: a `uv` version number is printed. The installer also adds `uv` 
 **Clone the project:**
 
 ```bash
-git clone -b alpha01 https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
+git clone -b alpha02 https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
 cd NinjaRobotPi5
 ```
 
@@ -622,9 +622,23 @@ uv run --frozen ninjarobot-agent \
   service start
 
 uv run --frozen ninjarobot-agent status
-uv run --frozen ninjarobot-agent chat \
-  "Reply with one short greeting and do not use a tool."
+uv run --frozen ninjarobot-agent chat
 ```
+
+The first chat asks for your name. Enter it to create the robot owner/default
+profile. In simulation, face enrollment can remain pending because no real
+camera is available; chat must continue normally. Then enter a short greeting
+request to verify the model.
+
+Run the non-hardware memory benchmark:
+
+```bash
+uv run --frozen python scripts/benchmark_agent_memory.py \
+  --entries 1000 --queries 50
+```
+
+Expected result: `"passed": true`. The benchmark uses a temporary database and
+does not open GPIO, SPI, I2C, PWM, camera, microphone, or the robot action ledger.
 
 **Start the HTTPS web interface:**
 
@@ -711,8 +725,53 @@ Useful slash commands inside chat:
 | `/camera` | Grant one AI-controlled photo for this session |
 | `/resume` | Recover from Emergency Stop |
 | `/confirm <request>` | Approve a sensitive one-off action |
+| `/new user` | Register another local profile and attempt face enrollment |
+| `/switch user` | Select an existing profile for this chat session |
+| `/identify` | Take one countdown photo and switch only on one unique known face |
+| `/update profile` | Start an explicit deterministic profile update |
 | `/clear` | Clear the current conversation history |
 | `/exit` | Disconnect this terminal (service keeps running) |
+
+Face enrollment during `/new user` and explicit `/identify` are trusted profile
+workflows. They show the IDE-owned `3 → 2 → 1` countdown and do not require the
+one-shot `/camera` AI-preview grant. An unavailable camera leaves enrollment
+pending. Unknown, uncertain, or multiple faces never switch the active user.
+Face recognition identifies a local profile; it is not authentication.
+
+### Managing Persistent Memory
+
+Open the interactive tool and choose **Manage Memory**:
+
+```bash
+uv run --frozen ninjarobot-agent
+```
+
+The menu can list profiles, transfer the owner role, delete an inactive member
+profile, list/delete individual behavior memories, and change raw-conversation
+or failed-behavior retention. Profile deletion is intentionally unavailable in
+terminal/web chat. The same deterministic operations are scriptable:
+
+```bash
+uv run --frozen ninjarobot-agent memory profiles
+uv run --frozen ninjarobot-agent memory settings
+uv run --frozen ninjarobot-agent memory list local-user \
+  --kind successful_behavior
+uv run --frozen ninjarobot-agent memory set-retention \
+  --conversations 7 --failed 180 --failed-cap 1000
+uv run --frozen ninjarobot-agent memory delete USER_ID MEMORY_ID --confirm
+uv run --frozen ninjarobot-agent memory transfer-owner USER_ID --confirm
+uv run --frozen ninjarobot-agent memory delete-profile USER_ID --confirm
+```
+
+The service must be running. An active profile cannot be deleted. The current
+owner must be transferred first. Deleting a profile removes that user's raw
+messages, structured memory, face index entry, and cropped profile image.
+
+Default retention is 7 days for raw conversations and 180 days for failed
+behaviors (maximum 1,000 failed entries per user). Profiles, preferences, task
+recipes, and confirmed successful behaviors remain until manually deleted.
+Local data is owner-only under `~/.local/share/ninjarobot_pi5/`; Raspberry Pi
+administrators can read the cropped profile photos and face-recognition data.
 
 ### Enabling AI Motion (Physical Movement)
 

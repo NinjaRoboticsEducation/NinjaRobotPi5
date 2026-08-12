@@ -248,6 +248,18 @@ class AgentConfig(ConfigModel):
         return migrated
 
 
+class MemoryConfig(ConfigModel):
+    """Local Phase 7 memory, identity, retention, and retrieval bounds."""
+
+    enabled: bool = True
+    conversation_retention_days: Annotated[int, Field(ge=1, le=365)] = 7
+    failed_behavior_retention_days: Annotated[int, Field(ge=1, le=3650)] = 180
+    failed_behavior_cap: Annotated[int, Field(ge=10, le=100_000)] = 1000
+    retrieval_limit: Annotated[int, Field(ge=1, le=20)] = 6
+    retrieval_character_budget: Annotated[int, Field(ge=256, le=20_000)] = 4000
+    face_data_directory: NonEmptyText = "~/.local/share/ninjarobot_pi5/faces"
+
+
 class ProviderConfig(ConfigModel):
     """Provider reference containing names and secret references, never secrets."""
 
@@ -285,6 +297,7 @@ class RobotConfig(ConfigModel):
     hardware: HardwareConfig = Field(default_factory=HardwareConfig)
     behaviors: BehaviorConfig = Field(default_factory=BehaviorConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
+    memory: MemoryConfig = Field(default_factory=MemoryConfig)
     providers: dict[str, ProviderConfig] = Field(default_factory=dict)
 
     @model_validator(mode="after")

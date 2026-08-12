@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "memory-retrieval",
+  "version": "1.0.0",
+  "name": "Memory Retrieval",
+  "description": "Read bounded profile and behavior memories for the active user only.",
+  "activation_examples": [
+    "What do you remember about me?",
+    "Find a successful behavior like this one",
+    "Check whether this behavior failed before"
+  ],
+  "allowed_tools": [
+    "memory.profile.get",
+    "memory.search",
+    "memory.behavior.successful",
+    "memory.behavior.failed"
+  ],
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "maxLength": 500
+      }
+    },
+    "additionalProperties": false
+  },
+  "limits": {
+    "max_model_turns": 3,
+    "max_tool_calls": 3,
+    "timeout_seconds": 30.0
+  },
+  "safety": {
+    "external_content": "untrusted",
+    "physical_motion": "session_armed"
+  }
+}

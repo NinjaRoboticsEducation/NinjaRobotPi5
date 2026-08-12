@@ -21,6 +21,7 @@ from .display import (
 )
 from .engine import ExecutionEngine
 from .errors import IDEError
+from .identity import FaceIdentityDevice
 from .ledger import ActionLedger
 from .microphone import (
     MicrophoneCaptureAdapter,
@@ -443,9 +444,15 @@ class _ResumeAdapter:
 class RobotIDEClient:
     """Delegate IDE contracts while ensuring RobotAssembly closes last."""
 
-    def __init__(self, robot: RobotAssembly, engine: ExecutionEngine) -> None:
+    def __init__(
+        self,
+        robot: RobotAssembly,
+        engine: ExecutionEngine,
+        identity: FaceIdentityDevice,
+    ) -> None:
         self.robot = robot
         self._engine = engine
+        self._identity = identity
         self._started = False
         self._closed = False
 
@@ -492,6 +499,26 @@ class RobotIDEClient:
             raise RuntimeError("robot IDE client is not started")
         return await self.robot.show_camera_capture()
 
+    async def enroll_face_identity(self, user_id: str) -> dict[str, Any]:
+        """Run an IDE-owned countdown and deterministic face enrollment."""
+        if not self._started:
+            raise RuntimeError("robot IDE client is not started")
+        await self.robot.show_camera_capture()
+        return await self._identity.enroll(user_id)
+
+    async def identify_face(self) -> dict[str, Any]:
+        """Run an IDE-owned countdown and explicit face recognition."""
+        if not self._started:
+            raise RuntimeError("robot IDE client is not started")
+        await self.robot.show_camera_capture()
+        return await self._identity.identify()
+
+    async def delete_face_identity(self, user_id: str) -> bool:
+        """Remove face data selected by the deterministic management interface."""
+        if not self._started:
+            raise RuntimeError("robot IDE client is not started")
+        return await self._identity.delete(user_id)
+
     async def action(self, action_id: str) -> ActionRecord | None:
         return await self._engine.action(action_id)
 
@@ -509,6 +536,7 @@ class RobotIDEClient:
         if self._closed:
             return
         self._closed = True
+        await self._identity.close()
         await self._engine.close()
         await self.robot.close()
 
@@ -573,4 +601,8 @@ def build_robot_ide_client(
     ):
         registry.register(adapter)
     engine = ExecutionEngine(registry, ActionLedger(ledger_path))
-    return RobotIDEClient(robot, engine)
+    identity = FaceIdentityDevice(
+        robot.camera,
+        data_directory=config.memory.face_data_directory,
+    )
+    return RobotIDEClient(robot, engine, identity)

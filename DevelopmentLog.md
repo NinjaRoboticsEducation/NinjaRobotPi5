@@ -1,5 +1,86 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-12 — Phase 7 persistent multi-user memory implementation
+
+### Summary
+
+- added migration-safe, owner-only SQLite persistence for multiple user
+  profiles, face references, preferences, recipes, successful/failed behavior
+  memories, technical attempts, retention settings, and mutation audit events
+- backfilled per-message `user_id` so switching users inside one terminal or web
+  session cannot expose another profile's transcript
+- made the first profile the owner/default and added deterministic `/new user`,
+  `/switch user`, `/identify`, and explicit `/update profile` workflows
+- added IDE-owned face enrollment/recognition through the existing `pi5camera`
+  API with the existing display countdown; full capture frames are deleted and
+  unknown/ambiguous/multiple faces never switch users
+- added shared final-result behavior capture for both model chat and direct web
+  controller execution, explicit confirmation for new dynamic successes,
+  automatic technical failure capture, and visible conservative
+  preference/task-recipe notices
+- added bounded automatic retrieval plus a fixed in-process FastMCP server with
+  four trusted, read-only, active-user `memory.*` tools and the bundled
+  `memory-retrieval` skill; no model-accessible memory mutation surface exists
+- added the interactive **Manage Memory** menu and scriptable `memory` CLI for
+  confirmed profile/behavior deletion, owner transfer, and retention changes
+
+### Data lifecycle and compatibility
+
+Raw conversations default to seven days. Failed behaviors default to 180 days
+and 1,000 entries per user. Profiles, preferences, recipes, and confirmed
+successful behaviors persist until deterministic deletion. Configuration
+supplies database defaults only once; later CLI settings survive restart.
+Existing conversation databases migrate transactionally and retain old tool
+calls. Provider switching, current robot tools, motion/camera authorization,
+Greeting/Idle presentation, and simulation/real-hardware modes remain intact.
+
+Profile deletion is restricted to inactive non-owner profiles, erases that
+user's raw messages and structured memory, and asks the IDE to delete the face
+index/cropped image first. Ownership must be transferred before owner deletion.
+Raspberry Pi administrators can read the local cropped face photo and encoding
+index, as explicitly approved for this educational project.
+
+### Safety and hardware boundary
+
+The agent still imports no managed `pi5*` package. All enrollment and
+recognition operations cross `RobotIDEClient` and reuse the serialized
+`CameraDevice`. Registration uses a visible countdown but does not consume an
+AI camera-preview grant. A camera or recognition failure leaves the profile
+pending and does not block chat. Face recognition is identity/personalization,
+not authentication. No managed driver or `NinjaClawBot/` file changed.
+
+Memory capture/retrieval errors are auxiliary: they publish bounded diagnostic
+events but cannot replace the IDE action result, retry hardware, or destabilize
+an otherwise successful robot action.
+
+### Validation
+
+- immutable-driver verification: 222 tracked files across six drivers plus 25
+  authorized repairs matched before and after every implementation phase
+- `compileall`, Ruff lint, Ruff format, and strict mypy passed
+- complete repository suite: 398 tests passed; the only warning remains the
+  existing Starlette `httpx` test-client deprecation
+- legacy-database migration, cross-user isolation, owner invariants, full-frame
+  deletion, camera-unavailable enrollment, session restart default, technical
+  result capture, confirmation, read-only MCP scoping, and management IPC have
+  dedicated regression coverage
+- synthetic 1,000-entry/50-query benchmark: median 4.186 ms, p95 4.363 ms,
+  database 1,261,568 bytes; all software limits passed
+
+### Raspberry Pi status
+
+No physical hardware was operated during this implementation. Profile-camera,
+visual countdown, long-run restart, and optional actuator validation remain for
+the operator. Follow
+`docs/validation/phase-7-persistent-memory-validation-2026-08-12.md` in order;
+the memory tests themselves do not require servo motion.
+
+### Follow-up
+
+Complete the Phase 7 Pi checklist, retain the result with this log, then review
+measured recognition quality and long-run database growth before changing the
+approved tolerance, retention defaults, or retrieval budget.
+
 ## 2026-08-02 — Documentation accuracy correction
 
 ### Summary

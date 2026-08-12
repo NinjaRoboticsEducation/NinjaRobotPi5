@@ -21,7 +21,7 @@ from .camera import (
     CameraPreviewAdapter,
     CameraStatusAdapter,
 )
-from .config import RobotConfig, load_robot_config
+from .config import MemoryConfig, RobotConfig, load_robot_config
 from .config_import import save_robot_config
 from .display import (
     DisplayBrightnessAdapter,
@@ -32,6 +32,7 @@ from .display import (
 from .distance import VL53L0XDistanceAdapter
 from .engine import ExecutionEngine
 from .errors import IDEError
+from .identity import FaceIdentityBackend, FaceIdentityDevice, Pi5CameraFaceIdentityBackend
 from .integrated import RobotIDEClient, build_robot_ide_client
 from .ledger import ActionLedger
 from .microphone import (
@@ -103,17 +104,21 @@ __all__ = [
     "DisplayShowTextAdapter",
     "DriveOperation",
     "ErrorDetails",
+    "FaceIdentityBackend",
+    "FaceIdentityDevice",
     "ExecutionEngine",
     "FaceOperation",
     "HealthReport",
     "IDEClient",
     "IDEError",
     "LifecycleState",
+    "MemoryConfig",
     "MicrophoneCaptureAdapter",
     "MicrophoneBackend",
     "MicrophoneDevice",
     "MicrophoneStatusAdapter",
     "MicrophoneTranscribeAdapter",
+    "Pi5CameraFaceIdentityBackend",
     "Melody",
     "MelodyOperation",
     "MotionController",

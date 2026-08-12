@@ -187,6 +187,42 @@ def build_parser() -> argparse.ArgumentParser:
     clear = session_commands.add_parser("clear")
     clear.add_argument("session_id")
 
+    memory = commands.add_parser("memory", help="Manage persistent profiles and behavior memory.")
+    memory_commands = memory.add_subparsers(dest="memory_command", required=True)
+    memory_commands.add_parser("profiles", help="List local user profiles.")
+    memory_commands.add_parser("settings", help="Show retention and retrieval settings.")
+    memory_list = memory_commands.add_parser("list", help="List one behavior memory category.")
+    memory_list.add_argument("user_id")
+    memory_list.add_argument(
+        "--kind",
+        choices=("successful_behavior", "failed_behavior", "task_recipe"),
+        default="successful_behavior",
+    )
+    memory_list.add_argument("--limit", type=int, default=100)
+    memory_delete = memory_commands.add_parser("delete", help="Delete one behavior memory item.")
+    memory_delete.add_argument("user_id")
+    memory_delete.add_argument("memory_id")
+    memory_delete.add_argument("--confirm", action="store_true")
+    profile_delete = memory_commands.add_parser(
+        "delete-profile",
+        help="Delete one inactive, non-owner profile and its memory.",
+    )
+    profile_delete.add_argument("user_id")
+    profile_delete.add_argument("--confirm", action="store_true")
+    transfer_owner = memory_commands.add_parser(
+        "transfer-owner",
+        help="Transfer the default owner role before deleting the current owner.",
+    )
+    transfer_owner.add_argument("user_id")
+    transfer_owner.add_argument("--confirm", action="store_true")
+    retention = memory_commands.add_parser(
+        "set-retention",
+        help="Set conversation or failed-behavior retention.",
+    )
+    retention.add_argument("--conversations", type=int)
+    retention.add_argument("--failed", type=int)
+    retention.add_argument("--failed-cap", type=int)
+
     motion = commands.add_parser("motion", help="Manage one-time session motion consent.")
     motion_commands = motion.add_subparsers(dest="motion_command", required=True)
     arm = motion_commands.add_parser("arm")
@@ -345,6 +381,8 @@ async def _run(arguments: argparse.Namespace) -> int:
         return await _run_service_command(arguments)
     if arguments.command == "session":
         return await _run_session_command(arguments)
+    if arguments.command == "memory":
+        return await _run_memory_command(arguments)
     if arguments.command == "motion":
         return await _run_motion_command(arguments)
     if arguments.command == "model":
@@ -561,7 +599,9 @@ async def _chat_repl(arguments: argparse.Namespace, *, session_id: str) -> int:
         if text == "/help":
             print(
                 "/help  /exit  /clear  /status  /resume  /camera  /arm  /disarm  "
-                "/confirm <request>\nOrdinary text is sent to NinjaRobot."
+                "/confirm <request>\n"
+                "/new user  /switch user  /identify  /update profile\n"
+                "Ordinary text is sent to NinjaRobot."
             )
             continue
         if text == "/clear":
@@ -826,6 +866,52 @@ async def _run_session_command(arguments: argparse.Namespace) -> int:
             {"command": "clear", "session_id": arguments.session_id},
         )
     raise AssertionError(f"unhandled session command: {arguments.session_command}")
+
+
+async def _run_memory_command(arguments: argparse.Namespace) -> int:
+    command = arguments.memory_command
+    if command == "profiles":
+        return await _service_request(arguments, {"command": "memory_profiles"})
+    if command == "settings":
+        return await _service_request(arguments, {"command": "memory_settings"})
+    if command == "list":
+        return await _service_request(
+            arguments,
+            {
+                "command": "memory_list",
+                "user_id": arguments.user_id,
+                "kind": arguments.kind,
+                "limit": arguments.limit,
+            },
+        )
+    if command in {"delete", "delete-profile", "transfer-owner"}:
+        if not arguments.confirm:
+            raise ValueError(f"memory {command} requires --confirm")
+        payload: dict[str, object] = {
+            "command": f"memory_{command.replace('-', '_')}",
+            "user_id": arguments.user_id,
+            "confirmed": True,
+        }
+        if command == "delete":
+            payload["memory_id"] = arguments.memory_id
+        return await _service_request(arguments, payload)
+    if command == "set-retention":
+        if (
+            arguments.conversations is None
+            and arguments.failed is None
+            and arguments.failed_cap is None
+        ):
+            raise ValueError("set-retention requires at least one retention option")
+        return await _service_request(
+            arguments,
+            {
+                "command": "memory_update_settings",
+                "conversation_retention_days": arguments.conversations,
+                "failed_behavior_retention_days": arguments.failed,
+                "failed_behavior_cap": arguments.failed_cap,
+            },
+        )
+    raise AssertionError(f"unhandled memory command: {command}")
 
 
 async def _run_motion_command(arguments: argparse.Namespace) -> int:
@@ -1111,6 +1197,109 @@ async def _service_request(
     return 0
 
 
+async def _interactive_memory(arguments: argparse.Namespace) -> None:
+    while True:
+        print(
+            "\nManage Memory\n"
+            "1. List User Profiles\n"
+            "2. Delete User Profile\n"
+            "3. Transfer Robot Owner\n"
+            "4. List Behavioral Memory\n"
+            "5. Delete Behavioral Memory\n"
+            "6. Set Raw Conversation Retention\n"
+            "7. Set Failed Behavior Retention\n"
+            "8. Back\n"
+        )
+        choice = (await asyncio.to_thread(input, "Select an option: ")).strip()
+        if choice == "8":
+            return
+        if choice == "1":
+            await _service_request(arguments, {"command": "memory_profiles"})
+            continue
+        if choice in {"2", "3"}:
+            user_id = (await asyncio.to_thread(input, "Enter the exact user_id: ")).strip()
+            confirmation = (
+                await asyncio.to_thread(
+                    input,
+                    "Type CONFIRM to continue with this profile operation: ",
+                )
+            ).strip()
+            if confirmation != "CONFIRM":
+                print("Profile operation cancelled.")
+                continue
+            await _service_request(
+                arguments,
+                {
+                    "command": (
+                        "memory_delete_profile" if choice == "2" else "memory_transfer_owner"
+                    ),
+                    "user_id": user_id,
+                    "confirmed": True,
+                },
+            )
+            continue
+        if choice in {"4", "5"}:
+            user_id = (await asyncio.to_thread(input, "Enter the exact user_id: ")).strip()
+            kind_choice = (
+                await asyncio.to_thread(
+                    input,
+                    "Category 1) successful 2) failed 3) task recipe [1]: ",
+                )
+            ).strip()
+            kind = {
+                "2": "failed_behavior",
+                "3": "task_recipe",
+            }.get(kind_choice, "successful_behavior")
+            if choice == "4":
+                await _service_request(
+                    arguments,
+                    {
+                        "command": "memory_list",
+                        "user_id": user_id,
+                        "kind": kind,
+                        "limit": 100,
+                    },
+                )
+                continue
+            memory_id = (await asyncio.to_thread(input, "Enter the exact memory_id: ")).strip()
+            confirmation = (
+                await asyncio.to_thread(input, "Type DELETE to remove this memory: ")
+            ).strip()
+            if confirmation != "DELETE":
+                print("Behavior memory deletion cancelled.")
+                continue
+            await _service_request(
+                arguments,
+                {
+                    "command": "memory_delete",
+                    "user_id": user_id,
+                    "memory_id": memory_id,
+                    "confirmed": True,
+                },
+            )
+            continue
+        if choice in {"6", "7"}:
+            prompt = (
+                "Raw conversation retention in days (1-365): "
+                if choice == "6"
+                else "Failed behavior retention in days (1-3650): "
+            )
+            days = int((await asyncio.to_thread(input, prompt)).strip())
+            await _service_request(
+                arguments,
+                {
+                    "command": "memory_update_settings",
+                    (
+                        "conversation_retention_days"
+                        if choice == "6"
+                        else "failed_behavior_retention_days"
+                    ): days,
+                },
+            )
+            continue
+        print("Please choose a number from 1 through 8.")
+
+
 async def _interactive(arguments: argparse.Namespace) -> int:
     while True:
         print(
@@ -1120,14 +1309,15 @@ async def _interactive(arguments: argparse.Namespace) -> int:
             "3. Change Agent Model\n"
             "4. Start Agent Service\n"
             "5. Conversation Sessions\n"
-            "6. Start Web Interface\n"
-            "7. Web Interface Status\n"
-            "8. Stop Web Interface\n"
-            "9. Export Browser Trust Certificate\n"
-            "10. MCP Tools\n"
-            "11. Agent Skills\n"
-            "12. Stop Agent Service\n"
-            "13. Quit CLI\n"
+            "6. Manage Memory\n"
+            "7. Start Web Interface\n"
+            "8. Web Interface Status\n"
+            "9. Stop Web Interface\n"
+            "10. Export Browser Trust Certificate\n"
+            "11. MCP Tools\n"
+            "12. Agent Skills\n"
+            "13. Stop Agent Service\n"
+            "14. Quit CLI\n"
         )
         choice = (await asyncio.to_thread(input, "Select an option: ")).strip()
         try:
@@ -1151,12 +1341,14 @@ async def _interactive(arguments: argparse.Namespace) -> int:
             elif choice == "5":
                 await _service_request(arguments, {"command": "sessions"})
             elif choice == "6":
-                await _service_request(arguments, {"command": "web_start"})
+                await _interactive_memory(arguments)
             elif choice == "7":
-                await _service_request(arguments, {"command": "web_status"})
+                await _service_request(arguments, {"command": "web_start"})
             elif choice == "8":
-                await _service_request(arguments, {"command": "web_stop"})
+                await _service_request(arguments, {"command": "web_status"})
             elif choice == "9":
+                await _service_request(arguments, {"command": "web_stop"})
+            elif choice == "10":
                 output = export_local_ca_certificate(
                     arguments.web_certificate,
                     arguments.web_key,
@@ -1172,12 +1364,12 @@ async def _interactive(arguments: argparse.Namespace) -> int:
                         ),
                     }
                 )
-            elif choice == "10":
+            elif choice == "11":
                 configuration = load_mcp_configuration(arguments.mcp_config)
                 _print_json(
                     {"servers": [server.redacted_dict() for server in configuration.servers]}
                 )
-            elif choice == "11":
+            elif choice == "12":
                 _print_json(
                     {
                         "skills": [
@@ -1190,13 +1382,13 @@ async def _interactive(arguments: argparse.Namespace) -> int:
                         ]
                     }
                 )
-            elif choice == "12":
-                await _service_request(arguments, {"command": "stop"})
             elif choice == "13":
+                await _service_request(arguments, {"command": "stop"})
+            elif choice == "14":
                 print("CLI disconnected. Any running agent service continues.")
                 return 0
             else:
-                print("Please choose a number from 1 through 13.")
+                print("Please choose a number from 1 through 14.")
         except (
             AgentIPCError,
             CloudProviderError,

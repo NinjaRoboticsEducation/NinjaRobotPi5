@@ -42,6 +42,9 @@ from .tools import CancellationToken, ToolRegistry
 
 IDFactory = Callable[[], str]
 RuntimeStateProvider = Callable[[str, str | None], dict[str, Any]]
+ActiveUserProvider = Callable[[str], str | None]
+MemoryContextProvider = Callable[[str, str], Awaitable[str]]
+ToolResultObserver = Callable[[ToolInvocation, ToolExecutionResult], Awaitable[None]]
 TextDeltaHandler = Callable[[str], Awaitable[None]]
 
 
@@ -89,6 +92,9 @@ class AgentLoop:
         runtime_state: RuntimeStateProvider | None = None,
         id_factory: IDFactory | None = None,
         presentation: PresentationController | None = None,
+        active_user: ActiveUserProvider | None = None,
+        memory_context: MemoryContextProvider | None = None,
+        tool_result_observer: ToolResultObserver | None = None,
     ) -> None:
         self._provider = provider
         self._tools = tools
@@ -103,7 +109,22 @@ class AgentLoop:
         )
         self._id_factory = id_factory or (lambda: uuid.uuid4().hex)
         self._presentation = presentation or NullPresentationController()
+        self._active_user = active_user or (lambda _session_id: None)
+        self._memory_context = memory_context
+        self._tool_result_observer = tool_result_observer
         self._active_cancellations: dict[str, CancellationToken] = {}
+
+    def set_active_user_provider(self, provider: ActiveUserProvider) -> None:
+        """Bind the runtime-owned, per-session profile selector before startup."""
+        self._active_user = provider
+
+    def set_memory_context_provider(self, provider: MemoryContextProvider | None) -> None:
+        """Bind bounded automatic retrieval before runtime startup."""
+        self._memory_context = provider
+
+    def set_tool_result_observer(self, observer: ToolResultObserver | None) -> None:
+        """Bind one final-result observer shared with direct controller execution."""
+        self._tool_result_observer = observer
 
     async def chat(
         self,
@@ -179,6 +200,11 @@ class AgentLoop:
         await self._ensure_session(session_id)
         user_message = ModelMessage(role=MessageRole.USER, content=text.strip())
         await self._append(session_id, user_message)
+        memory_context = (
+            await self._memory_context(session_id, text.strip())
+            if self._memory_context is not None
+            else None
+        )
         await self._events.publish(
             AgentEventType.CHAT,
             "User message accepted.",
@@ -230,13 +256,20 @@ class AgentLoop:
         for model_turn_number in range(1, max_model_turns + 1):
             if token.cancelled:
                 raise asyncio.CancelledError
-            history = tuple(stored.message for stored in await self._store.messages(session_id))
+            history = tuple(
+                stored.message
+                for stored in await self._store.messages(
+                    session_id,
+                    user_id=self._active_user(session_id),
+                )
+            )
             request_id = self._id_factory()
             request = ModelRequest(
                 request_id=request_id,
                 session_id=session_id,
                 messages=self._prompts.compose(
                     runtime_state=self._runtime_state(session_id, lease_id),
+                    memory_context=memory_context,
                     skill=skill,
                     conversation=history,
                 ),
@@ -682,18 +715,24 @@ class AgentLoop:
                 "action_id": result.action_id,
             },
         )
+        if self._tool_result_observer is not None:
+            await self._tool_result_observer(invocation, result)
         return result
 
     async def _ensure_session(self, session_id: str) -> None:
         sessions = await self._store.sessions()
         if not any(record.session_id == session_id for record in sessions):
-            await self._store.create_session(session_id)
+            await self._store.create_session(
+                session_id,
+                user_id=self._active_user(session_id) or "local-user",
+            )
 
     async def _append(self, session_id: str, message: ModelMessage) -> None:
         await self._store.append_message(
             session_id,
             message,
             message_id=f"message-{self._id_factory()}",
+            user_id=self._active_user(session_id),
         )
 
     async def _present(

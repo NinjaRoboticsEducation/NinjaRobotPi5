@@ -48,6 +48,10 @@ def test_example_configuration_matches_confirmed_wiring() -> None:
     assert config.agent.request_timeout_seconds == 600.0
     assert config.agent.model_inactivity_timeout_seconds == 120.0
     assert config.agent.fallback_providers == ()
+    assert config.memory.conversation_retention_days == 7
+    assert config.memory.failed_behavior_retention_days == 180
+    assert config.memory.failed_behavior_cap == 1000
+    assert config.memory.retrieval_limit == 6
     assert config.providers["ollama"].api_key_env is None
     assert config.providers["openai"].api_key_env == "OPENAI_API_KEY"
     assert config.providers["gemini"].api_key_env == "GEMINI_API_KEY"

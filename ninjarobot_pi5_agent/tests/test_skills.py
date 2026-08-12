@@ -69,6 +69,7 @@ def test_bundled_skills_validate_and_simulate_without_execution(tmp_path) -> Non
     skills = repository.list()
     assert [skill.manifest.id for skill in skills] == [
         "current-web-answer",
+        "memory-retrieval",
         "offline-robot-check",
         "robot-behavior-generation",
     ]
@@ -79,6 +80,18 @@ def test_bundled_skills_validate_and_simulate_without_execution(tmp_path) -> Non
     preview = repository.simulate(offline, {})
     assert preview["simulation_only"] is True
     assert preview["allowed_tools"] == ["robot.distance.read"]
+    memory = repository.get(
+        "memory-retrieval",
+        available_tools={
+            "memory.profile.get",
+            "memory.search",
+            "memory.behavior.successful",
+            "memory.behavior.failed",
+        },
+    )
+    memory_preview = repository.simulate(memory, {"query": "birthday"})
+    assert memory_preview["simulation_only"] is True
+    assert "memory.search" in memory_preview["allowed_tools"]
     behavior = repository.get(
         "robot-behavior-generation",
         available_tools={

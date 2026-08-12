@@ -70,12 +70,14 @@ class ProviderHealthStatus(StrEnum):
 
 
 class MemoryKind(StrEnum):
-    """Initial provider-neutral memory categories."""
+    """Provider-neutral persistent memory categories."""
 
     USER_PROFILE = "user_profile"
     PREFERENCE = "preference"
     TASK_RECIPE = "task_recipe"
     EPISODIC_SUMMARY = "episodic_summary"
+    SUCCESSFUL_BEHAVIOR = "successful_behavior"
+    FAILED_BEHAVIOR = "failed_behavior"
 
 
 class ToolTrust(StrEnum):

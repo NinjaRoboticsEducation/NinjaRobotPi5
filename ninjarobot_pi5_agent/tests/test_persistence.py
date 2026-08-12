@@ -39,6 +39,7 @@ def test_conversation_store_persists_orders_clears_and_prunes(tmp_path: Path) ->
 
         messages = await store.messages("session-current")
         assert [item.message.content for item in messages] == ["hello", "hi"]
+        assert {item.user_id for item in messages} == {"local-user"}
         assert messages[0].metadata == {"source": "test"}
         assert store.path.stat().st_mode & 0o777 == 0o600
 
@@ -47,6 +48,36 @@ def test_conversation_store_persists_orders_clears_and_prunes(tmp_path: Path) ->
         assert await store.clear_session("session-current") == 2
         assert await store.messages("session-current") == ()
         await store.close()
+        await store.close()
+
+    asyncio.run(exercise())
+
+
+def test_conversation_store_keeps_switched_user_histories_isolated(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        store = ConversationStore(tmp_path / "agent.sqlite3")
+        await store.start()
+        await store.create_session("session-1", user_id="user-a")
+        await store.append_message(
+            "session-1",
+            ModelMessage(role=MessageRole.USER, content="A secret"),
+            message_id="message-a",
+        )
+        await store.set_session_user("session-1", "user-b")
+        await store.append_message(
+            "session-1",
+            ModelMessage(role=MessageRole.USER, content="B secret"),
+            message_id="message-b",
+        )
+
+        assert [
+            item.message.content for item in await store.messages("session-1", user_id="user-a")
+        ] == ["A secret"]
+        assert [
+            item.message.content for item in await store.messages("session-1", user_id="user-b")
+        ] == ["B secret"]
+        assert await store.clear_session("session-1", user_id="user-a") == 1
+        assert [item.message.content for item in await store.messages("session-1")] == ["B secret"]
         await store.close()
 
     asyncio.run(exercise())

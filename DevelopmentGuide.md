@@ -144,7 +144,7 @@ NinjaRobotPi5/
 ### First-Time Setup (Simulation — No Hardware)
 
 ```bash
-git clone --branch alpha01 --single-branch \
+git clone --branch alpha02 --single-branch \
   https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
 cd NinjaRobotPi5
 
@@ -305,6 +305,11 @@ The example at `config/ninjarobot_pi5.toml.example` is the authoritative referen
 - ST7789V display on DC4/RST5/BL6, rotation 90°, brightness 75%
 - Fixed-focus OV5647 camera at 1280×720, retention disabled by default
 - USB PnP microphone at 16 kHz (actual rate may fall back to 44.1 kHz)
+- Phase 7 memory retention, retrieval bounds, and local face-data directory
+
+The `[memory]` section supplies first-run defaults only. After the database is
+initialized, confirmed changes made through `ninjarobot-agent memory
+set-retention` persist across restart and are not overwritten by the TOML file.
 
 Validate any configuration file:
 
@@ -644,6 +649,86 @@ Invalid model output raises `BEHAVIOR_DRAFT_INVALID` with field-specific correct
 
 The matching is conservative: it recognizes explicit requests to take a photo and rejects camera questions and negated requests. Any new language form needs positive, negative, no-grant, failure, and redaction tests before merging.
 
+### Phase 7 Persistent Multi-User Memory
+
+Phase 7 extends the existing owner-only conversation SQLite database. It does
+not add a vector database or a second hardware owner. SQLite runs in WAL mode,
+uses idempotent numbered migrations, and remains mode `0600` under an owner-only
+directory.
+
+Core modules:
+
+| Module | Responsibility |
+|---|---|
+| `memory_migrations.py` | Transactional schema creation and legacy transcript backfill |
+| `memory_models.py` | Strict profile, face, memory, attempt, and settings contracts |
+| `memory_store.py` | Deterministic mutations, user-scoped reads, FTS5 fallback, pruning, audit events |
+| `memory_services.py` | Conservative capture policy and bounded automatic retrieval |
+| `memory_mcp.py` | Fixed in-process FastMCP catalog with four trusted read-only tools scoped from the invocation session |
+| `identity.py` (IDE) | Countdown capture, existing `pi5camera` API, full-frame deletion, face-data permissions |
+
+Important tables are `users`, `face_profiles`, `preferences`, `memory_items`,
+`behavior_attempts`, `pending_memory_confirmations`, `memory_settings`, and
+`memory_audit_events`. `messages.user_id` is backfilled during migration so one
+session can switch users without reassigning or exposing earlier messages.
+
+Identity workflow:
+
+1. The first chat asks for a name and creates `local-user` as owner/default.
+2. The IDE shows its existing `3 → 2 → 1` camera animation.
+3. `FaceIdentityDevice` takes a temporary retained frame through `CameraDevice`.
+4. The existing `pi5camera` recognition/enrollment API must find exactly one face.
+5. Only the cropped known-face image and encoding/index metadata remain; the
+   full frame is removed in `finally`.
+6. `/identify` switches only when exactly one known identity maps to one profile.
+   Unknown, no-face, multiple-face, error, or ambiguous results do not switch.
+
+The agent never imports `pi5camera`. `RobotIDEClient` exposes only deterministic
+identity methods, and normal AI camera preview consent remains a separate path.
+Face identity is personalization, not authentication.
+
+Capture policy:
+
+- Raw conversations retain their active `user_id` and default to seven days.
+- New dynamic expression/movement success creates a 15-minute confirmation;
+  only an explicit Yes/No consumes it. Yes creates `successful_behavior`.
+- Technical behavior failure records the authoritative normalized tool result
+  automatically as `failed_behavior`; policy denial alone is not a technical
+  failure.
+- Narrow first-person preference forms and successful named behavior runs may
+  create inferred preference/task-recipe memories with a visible notice.
+- Memory capture and retrieval failures publish an error event but never change
+  the authoritative robot result or interrupt a successful hardware action.
+
+Retrieval policy:
+
+- Automatic context is restricted to the active user, six items by default,
+  and 4,000 characters including profile/preference context.
+- Retrieved text is inserted after safety/runtime state as reference data, not
+  authorization or instructions.
+- `memory.profile.get`, `memory.search`, `memory.behavior.successful`, and
+  `memory.behavior.failed` accept no user identifier. The provider resolves the
+  user from out-of-band trusted session context and executes every read through
+  the fixed FastMCP server.
+- No model-facing memory mutation tool exists. Mutations are available only by
+  deterministic service/IPC/CLI operations.
+
+Retention defaults are seven days for messages and 180 days/1,000 entries per
+user for failed behaviors. Profiles, preferences, recipes, and confirmed
+successes persist until an administrator deletes them. Deleting a profile is
+limited to inactive non-owners and removes its transcript, structured memory,
+face index, and cropped image. Transfer ownership before deleting an owner.
+
+Run the synthetic retrieval benchmark without hardware:
+
+```bash
+uv run python scripts/benchmark_agent_memory.py --entries 1000 --queries 50
+```
+
+The script uses a temporary database and fails if p95 retrieval exceeds 100 ms
+or if 1,000 synthetic entries exceed 16 MiB. These are software guardrails,
+not a substitute for the Raspberry Pi checklist.
+
 ### HTTPS Web Controller
 
 - Started and stopped through IPC — cannot create a second IDE or hardware owner
@@ -931,6 +1016,7 @@ A configuration change that points to another host is rejected — preventing cr
 | Phase 4 | ✅ Complete | Integrated behaviors, 20 faces, IDE tool, safety engine |
 | Phase 5 | ✅ Complete | NinjaRobotAgent, Ollama, HTTPS web controller, MCP, Skills |
 | Phase 6 | ✅ Complete | OpenAI, Gemini, Anthropic cloud provider adapters |
+| Phase 7 | ✅ Software complete | Multi-user memory, face identity, capture, bounded retrieval, management |
 | Pi Acceptance | 🔲 Pending | Full Raspberry Pi hardware validation by operator |
 
 The implementation plan `NinjaRobotPi5V4_ImplementationPlan.md` remains the authoritative source for all design decisions and phase requirements.

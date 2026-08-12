@@ -9,6 +9,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
+from .models import MemoryKind
 from .runtime import AgentRuntime
 from .service import ServiceOwnership
 from .tools import CancellationToken
@@ -211,6 +212,70 @@ class AgentIPCServer:
                 {"type": "result", "data": {"cleared_messages": count}},
             )
             return
+        if command == "memory_profiles":
+            await _write_message(
+                writer,
+                {"type": "result", "data": await self._runtime.memory_profiles()},
+            )
+            return
+        if command == "memory_list":
+            items = await self._runtime.memory_items(
+                _required_text(payload, "user_id"),
+                kind=MemoryKind(_required_text(payload, "kind")),
+                limit=_required_integer(payload, "limit", minimum=1, maximum=1000),
+            )
+            await _write_message(writer, {"type": "result", "data": items})
+            return
+        if command == "memory_settings":
+            await _write_message(
+                writer,
+                {"type": "result", "data": await self._runtime.memory_settings()},
+            )
+            return
+        if command == "memory_update_settings":
+            conversation_days = _optional_integer(
+                payload,
+                "conversation_retention_days",
+                minimum=1,
+                maximum=365,
+            )
+            failed_days = _optional_integer(
+                payload,
+                "failed_behavior_retention_days",
+                minimum=1,
+                maximum=3650,
+            )
+            failed_cap = _optional_integer(
+                payload,
+                "failed_behavior_cap",
+                minimum=10,
+                maximum=100_000,
+            )
+            if conversation_days is None and failed_days is None and failed_cap is None:
+                raise ValueError("at least one memory setting must be provided")
+            result = await self._runtime.update_memory_settings(
+                conversation_retention_days=conversation_days,
+                failed_behavior_retention_days=failed_days,
+                failed_behavior_cap=failed_cap,
+            )
+            await _write_message(writer, {"type": "result", "data": result})
+            return
+        if command in {"memory_delete_profile", "memory_transfer_owner", "memory_delete"}:
+            if payload.get("confirmed") is not True:
+                raise ValueError("memory mutation requires confirmed=true")
+            user_id = _required_text(payload, "user_id")
+            if command == "memory_delete_profile":
+                await self._runtime.delete_memory_profile(user_id)
+                data = {"user_id": user_id, "deleted": True}
+            elif command == "memory_transfer_owner":
+                await self._runtime.transfer_memory_owner(user_id)
+                data = {"user_id": user_id, "owner": True}
+            else:
+                memory_id = _required_text(payload, "memory_id")
+                deleted = await self._runtime.delete_behavior_memory(user_id, memory_id)
+                data = {"user_id": user_id, "memory_id": memory_id, "deleted": deleted}
+            await _write_message(writer, {"type": "result", "data": data})
+            return
         if command == "arm_motion":
             self._runtime.arm_motion(
                 _required_text(payload, "session_id"),
@@ -235,7 +300,7 @@ class AgentIPCServer:
             )
             return
         if command == "resume_system":
-            result = await self._runtime.resume_system(
+            resume_result = await self._runtime.resume_system(
                 _required_text(payload, "session_id"),
                 confirmed=payload.get("confirmed") is True,
                 lease_id=_optional_text(payload, "lease_id"),
@@ -243,7 +308,7 @@ class AgentIPCServer:
             )
             await _write_message(
                 writer,
-                {"type": "result", "data": result.model_dump(mode="json")},
+                {"type": "result", "data": resume_result.model_dump(mode="json")},
             )
             return
         if command == "grant_camera":
@@ -381,3 +446,28 @@ def _optional_text(payload: dict[str, Any], name: str) -> str | None:
     if not isinstance(value, str) or not value.strip():
         raise AgentIPCError(f"{name} must be non-empty text when provided")
     return value
+
+
+def _required_integer(
+    payload: dict[str, Any],
+    name: str,
+    *,
+    minimum: int,
+    maximum: int,
+) -> int:
+    value = payload.get(name)
+    if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
+        raise AgentIPCError(f"{name} must be an integer between {minimum} and {maximum}")
+    return value
+
+
+def _optional_integer(
+    payload: dict[str, Any],
+    name: str,
+    *,
+    minimum: int,
+    maximum: int,
+) -> int | None:
+    if name not in payload or payload[name] is None:
+        return None
+    return _required_integer(payload, name, minimum=minimum, maximum=maximum)

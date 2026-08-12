@@ -11,6 +11,7 @@ from pathlib import Path
 
 from pydantic import Field
 
+from .memory_migrations import migrate_agent_database
 from .models import (
     AgentContractModel,
     Identifier,
@@ -26,6 +27,7 @@ class StoredMessage(AgentContractModel):
 
     message_id: Identifier
     session_id: Identifier
+    user_id: Identifier
     message: ModelMessage
     created_at: datetime
     metadata: dict[str, str] = Field(default_factory=dict)
@@ -72,6 +74,7 @@ class ConversationStore:
         message: ModelMessage,
         *,
         message_id: str,
+        user_id: str | None = None,
         now: datetime | None = None,
         metadata: dict[str, str] | None = None,
     ) -> StoredMessage:
@@ -81,21 +84,37 @@ class ConversationStore:
             session_id,
             message,
             message_id,
+            user_id,
             now or datetime.now(UTC),
             metadata or {},
         )
 
-    async def messages(self, session_id: str) -> tuple[StoredMessage, ...]:
-        """Read one session in insertion order."""
-        return await asyncio.to_thread(self._messages_sync, session_id)
+    async def messages(
+        self,
+        session_id: str,
+        *,
+        user_id: str | None = None,
+    ) -> tuple[StoredMessage, ...]:
+        """Read one session, optionally enforcing an active-user boundary."""
+        return await asyncio.to_thread(self._messages_sync, session_id, user_id)
+
+    async def set_session_user(self, session_id: str, user_id: str) -> SessionRecord:
+        """Switch the active profile without reassigning historical messages."""
+        return await asyncio.to_thread(self._set_session_user_sync, session_id, user_id)
 
     async def sessions(self) -> tuple[SessionRecord, ...]:
         """List sessions from most recently updated to oldest."""
         return await asyncio.to_thread(self._sessions_sync)
 
-    async def clear_session(self, session_id: str) -> int:
+    async def clear_session(self, session_id: str, *, user_id: str | None = None) -> int:
         """Delete a session transcript while retaining its identity."""
-        return await asyncio.to_thread(self._clear_session_sync, session_id)
+        return await asyncio.to_thread(self._clear_session_sync, session_id, user_id)
+
+    def set_retention_days(self, retention_days: int) -> None:
+        """Apply a validated persisted retention setting to future pruning."""
+        if not 1 <= retention_days <= 365:
+            raise ValueError("retention_days must be between 1 and 365")
+        self._retention = timedelta(days=retention_days)
 
     async def prune(self, *, now: datetime | None = None) -> int:
         """Delete messages older than the configured retention window."""
@@ -115,41 +134,8 @@ class ConversationStore:
             connection.row_factory = sqlite3.Row
             connection.execute("PRAGMA foreign_keys = ON")
             connection.execute("PRAGMA journal_mode = WAL")
-            connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS sessions (
-                    session_id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS messages (
-                    message_id TEXT PRIMARY KEY,
-                    session_id TEXT NOT NULL REFERENCES sessions(session_id)
-                        ON DELETE CASCADE,
-                    role TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    name TEXT,
-                    tool_call_id TEXT,
-                    tool_calls_json TEXT NOT NULL DEFAULT '[]',
-                    created_at TEXT NOT NULL,
-                    metadata_json TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS messages_session_time
-                    ON messages(session_id, created_at, message_id);
-                """
-            )
-            message_columns = {
-                row["name"] for row in connection.execute("PRAGMA table_info(messages)")
-            }
-            if "tool_calls_json" not in message_columns:
-                connection.execute(
-                    """
-                    ALTER TABLE messages
-                    ADD COLUMN tool_calls_json TEXT NOT NULL DEFAULT '[]'
-                    """
-                )
-            connection.commit()
+            connection.execute("PRAGMA busy_timeout = 5000")
+            migrate_agent_database(connection)
             self._connection = connection
             os.chmod(self._path, 0o600)
 
@@ -183,6 +169,7 @@ class ConversationStore:
         session_id: str,
         message: ModelMessage,
         message_id: str,
+        user_id: str | None,
         now: datetime,
         metadata: dict[str, str],
     ) -> StoredMessage:
@@ -191,24 +178,24 @@ class ConversationStore:
         timestamp = _utc(now)
         with self._lock:
             connection = self._require_connection()
-            if (
-                connection.execute(
-                    "SELECT 1 FROM sessions WHERE session_id = ?",
-                    (session_id,),
-                ).fetchone()
-                is None
-            ):
+            session = connection.execute(
+                "SELECT user_id FROM sessions WHERE session_id = ?",
+                (session_id,),
+            ).fetchone()
+            if session is None:
                 raise KeyError(f"unknown session: {session_id}")
+            effective_user_id = user_id or session["user_id"]
             connection.execute(
                 """
                 INSERT INTO messages(
-                    message_id, session_id, role, content, name, tool_call_id,
+                    message_id, session_id, user_id, role, content, name, tool_call_id,
                     tool_calls_json, created_at, metadata_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     message_id,
                     session_id,
+                    effective_user_id,
                     message.role.value,
                     message.content,
                     message.name,
@@ -229,31 +216,36 @@ class ConversationStore:
         return StoredMessage(
             message_id=message_id,
             session_id=session_id,
+            user_id=effective_user_id,
             message=message,
             created_at=timestamp,
             metadata=metadata,
         )
 
-    def _messages_sync(self, session_id: str) -> tuple[StoredMessage, ...]:
+    def _messages_sync(
+        self,
+        session_id: str,
+        user_id: str | None,
+    ) -> tuple[StoredMessage, ...]:
         import json
 
         with self._lock:
-            rows = (
-                self._require_connection()
-                .execute(
-                    """
-                SELECT * FROM messages
-                WHERE session_id = ?
-                ORDER BY created_at, message_id
-                """,
-                    (session_id,),
-                )
-                .fetchall()
-            )
+            sql = """
+                SELECT messages.*, COALESCE(messages.user_id, sessions.user_id) AS effective_user_id
+                FROM messages JOIN sessions USING(session_id)
+                WHERE messages.session_id = ?
+            """
+            parameters: list[str] = [session_id]
+            if user_id is not None:
+                sql += " AND COALESCE(messages.user_id, sessions.user_id) = ?"
+                parameters.append(user_id)
+            sql += " ORDER BY messages.created_at, messages.message_id"
+            rows = self._require_connection().execute(sql, parameters).fetchall()
         return tuple(
             StoredMessage(
                 message_id=row["message_id"],
                 session_id=row["session_id"],
+                user_id=row["effective_user_id"],
                 message=ModelMessage(
                     role=MessageRole(row["role"]),
                     content=row["content"],
@@ -278,13 +270,36 @@ class ConversationStore:
             )
         return tuple(_session_from_row(row) for row in rows)
 
-    def _clear_session_sync(self, session_id: str) -> int:
+    def _set_session_user_sync(self, session_id: str, user_id: str) -> SessionRecord:
+        timestamp = datetime.now(UTC).isoformat()
         with self._lock:
             connection = self._require_connection()
             cursor = connection.execute(
-                "DELETE FROM messages WHERE session_id = ?",
-                (session_id,),
+                "UPDATE sessions SET user_id = ?, updated_at = ? WHERE session_id = ?",
+                (user_id, timestamp, session_id),
             )
+            if not cursor.rowcount:
+                raise KeyError(f"unknown session: {session_id}")
+            connection.commit()
+            row = connection.execute(
+                "SELECT * FROM sessions WHERE session_id = ?", (session_id,)
+            ).fetchone()
+            assert row is not None
+        return _session_from_row(row)
+
+    def _clear_session_sync(self, session_id: str, user_id: str | None) -> int:
+        with self._lock:
+            connection = self._require_connection()
+            if user_id is None:
+                cursor = connection.execute(
+                    "DELETE FROM messages WHERE session_id = ?",
+                    (session_id,),
+                )
+            else:
+                cursor = connection.execute(
+                    "DELETE FROM messages WHERE session_id = ? AND user_id = ?",
+                    (session_id, user_id),
+                )
             connection.commit()
             return cursor.rowcount
 

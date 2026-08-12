@@ -37,6 +37,7 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 - The AI runs **locally on the Pi** — no cloud required for basic operation
 - The hardware is guarded by a dedicated safety layer the AI cannot bypass
 - A phone-friendly browser lets you drive or chat without any extra app
+- Local, user-separated memory lets the robot remember preferences and confirmed behaviors
 - The whole system can be extended with MCP web tools and reusable AI skills
 
 ---
@@ -69,6 +70,7 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 | **Local AI Model** | Ollama + Qwen3:4B (local, no internet required) |
 | **Web Interface** | FastAPI + HTTPS, browser-based D-pad and AI chat |
 | **Speech** | `whisper.cpp` for local USB microphone transcription |
+| **Persistent Memory** | Owner-only SQLite + FTS5, local multi-user profiles, bounded retrieval |
 | **Package Manager** | `uv` (manages Python 3.11 and all dependencies) |
 
 ---
@@ -81,6 +83,17 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 - **Cloud optional** — connect OpenAI, Gemini, or Anthropic with an API key for more powerful models
 - **Session-safe motion** — you explicitly arm and disarm AI control over physical movement
 - **Behavior generation** — ask the AI to compose custom face + sound + movement combinations
+- **Personalization** — separate local profiles, preferences, and memories for each user
+- **Behavior learning** — confirm successful new behaviors and retain technical failures for analysis
+
+### 🧠 Persistent Multi-User Memory
+- **First-user owner setup** — the first chat asks for a name and creates the default owner profile
+- **Face identity through the IDE** — enrollment and explicit `/identify` use the existing `pi5camera` API; identity is not authentication
+- **Strict user isolation** — `/new user` and `/switch user` change the active profile for one chat session without mixing histories
+- **Bounded retrieval** — relevant profile, preference, success, and failure context is capped before it reaches a model
+- **Read-only model access** — four `memory.*` MCP tools can read only the active user's data; models have no memory mutation tool
+- **Deterministic management** — the interactive **Manage Memory** menu and `ninjarobot-agent memory` CLI perform confirmed deletes and retention changes
+- **Default retention** — raw conversations 7 days, failed behaviors 180 days, profiles and confirmed successes until manual deletion
 
 ### 📱 HTTPS Web Controller
 - **Phone-friendly** — full D-pad, AI chat, and live camera from any browser on your local network
@@ -117,7 +130,7 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 
 ```bash
 # 1. Clone the repository
-git clone --branch alpha01 --single-branch \
+git clone --branch alpha02 --single-branch \
   https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
 cd NinjaRobotPi5
 
@@ -130,7 +143,8 @@ uv run --frozen ninjarobot_pi5_cli capabilities
 
 # 4. Start the agent in simulation (no hardware opened)
 uv run --frozen ninjarobot-agent service start
-uv run --frozen ninjarobot-agent chat "Hello! What can you do?"
+uv run --frozen ninjarobot-agent chat
+# The first chat asks for your name and creates the owner profile.
 
 # 5. Open the web controller (simulation, no hardware)
 uv run --frozen ninjarobot-agent web start
@@ -152,7 +166,7 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 ```
 ┌────────────────────────────────────────────────────────────┐
 │  Layer 3 — NinjaRobotAgent                                 │
-│  AI chat, web controller, provider adapters, MCP, skills   │
+│  AI chat, web controller, memory, provider adapters, MCP   │
 │  ↓  (calls only through IDE contracts — never imports pi5*)│
 ├────────────────────────────────────────────────────────────┤
 │  Layer 2 — NinjaRobotPi5 IDE                               │
@@ -180,12 +194,13 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 | [Audit Report](AuditReport_260731.md) | Security, reliability, and documentation audit findings |
 | [Implementation Plan](NinjaRobotPi5V4_ImplementationPlan.md) | Authoritative design and phase decisions |
 | [Hardware Profile](docs/hardware/hardware-profile.md) | Confirmed wiring and electrical records |
+| [Phase 7 Pi Validation](docs/validation/phase-7-persistent-memory-validation-2026-08-12.md) | Memory, identity, retention, and hardware checklist |
 
 ---
 
 ## 📊 Current Status
 
-**Version:** Alpha (Phase 6 complete)  
+**Version:** Alpha (Phase 7 implemented)
 **Status:** All software gates pass ✅ | Raspberry Pi acceptance pending 🔲
 
 | Feature Area | Status |
@@ -203,6 +218,9 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 | ✅ Level 1 / Level 2 stop and resume | Complete |
 | ✅ USB microphone + local whisper.cpp transcription | Complete |
 | ✅ Behavior draft compiler (AI → IDE behavior format) | Complete |
+| ✅ Persistent multi-user memory, face identity, bounded retrieval | Software complete |
+| ✅ Read-only memory MCP + bundled retrieval skill | Complete |
+| ✅ Interactive/scriptable memory management | Complete |
 | 🔲 Full Raspberry Pi acceptance (benchmark, live hardware) | Pending operator validation |
 
 ---
@@ -214,6 +232,7 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 - **Never change wiring while the robot is powered.**
 - The current robot has no accessible physical servo cutoff. Software stop and the watchdog reduce risk but cannot replace a physical power disconnect.
 - Camera and microphone operations require explicit consent from everyone nearby before you add `--real --confirm-camera` or `--real --confirm-microphone`.
+- Profile enrollment intentionally captures a photo after the visible countdown. Cropped profile photos and face data remain readable by the Raspberry Pi administrator and must be treated as personal data.
 
 ---
 

@@ -11,12 +11,15 @@ from ninjarobot_pi5_agent.models import ToolExecutionResult, ToolExecutionStatus
 
 from ninjarobot_pi5_agent import (
     AgentIPCClient,
+    AgentIPCError,
     AgentIPCServer,
     AgentLoop,
     AgentRuntime,
     ConversationStore,
     EventBroker,
     FinishReason,
+    MemoryKind,
+    MemoryStore,
     ModelRequest,
     ModelStreamEvent,
     ModelTurn,
@@ -85,6 +88,7 @@ def build_runtime(
     tmp_path,
     *,
     robot_status: Callable[[], Mapping[str, Any]] | None = None,
+    with_memory: bool = False,
 ) -> AgentRuntime:
     provider = _EchoProvider()
     tools = ToolRegistry(())
@@ -111,6 +115,7 @@ def build_runtime(
         skills=SkillRepository(tmp_path / "skills"),
         events=events,
         robot_status=robot_status,
+        memory=MemoryStore(tmp_path / "conversation.sqlite3") if with_memory else None,
     )
 
 
@@ -401,6 +406,71 @@ def test_ipc_allows_reconnect_stream_history_clear_arm_and_stop(tmp_path) -> Non
         await serve_task
         await server.close()
         assert not socket_path.exists()
+
+    asyncio.run(exercise())
+
+
+def test_ipc_memory_management_is_confirmed_and_category_bounded(tmp_path) -> None:
+    async def exercise() -> None:
+        socket_path = tmp_path / "memory-agent.sock"
+        runtime = build_runtime(tmp_path, with_memory=True)
+        server = AgentIPCServer(
+            runtime=runtime,
+            socket_path=socket_path,
+            ownership=ServiceOwnership(tmp_path / "memory-agent.lock"),
+        )
+        await server.start()
+        serve_task = asyncio.create_task(server.serve())
+        client = AgentIPCClient(socket_path)
+        await client.request({"command": "chat", "session_id": "session-1", "text": "hello"})
+        await client.request({"command": "chat", "session_id": "session-1", "text": "Owner"})
+        assert runtime.memory is not None
+        member = await runtime.memory.create_profile("Member")
+        item = await runtime.memory.add_memory(
+            member.user_id,
+            MemoryKind.SUCCESSFUL_BEHAVIOR,
+            "Confirmed wave",
+        )
+
+        profiles = await client.request({"command": "memory_profiles"})
+        assert [profile["display_name"] for profile in profiles["data"]] == ["Owner", "Member"]
+        listed = await client.request(
+            {
+                "command": "memory_list",
+                "user_id": member.user_id,
+                "kind": "successful_behavior",
+                "limit": 20,
+            }
+        )
+        assert listed["data"][0]["memory_id"] == item.memory_id
+        with pytest.raises(AgentIPCError, match="confirmed=true"):
+            await client.request(
+                {
+                    "command": "memory_delete",
+                    "user_id": member.user_id,
+                    "memory_id": item.memory_id,
+                }
+            )
+        deleted = await client.request(
+            {
+                "command": "memory_delete",
+                "user_id": member.user_id,
+                "memory_id": item.memory_id,
+                "confirmed": True,
+            }
+        )
+        assert deleted["data"]["deleted"] is True
+        settings = await client.request(
+            {
+                "command": "memory_update_settings",
+                "conversation_retention_days": 21,
+                "failed_behavior_retention_days": 120,
+            }
+        )
+        assert settings["data"]["settings"]["conversation_retention_days"] == 21
+        await client.request({"command": "stop"})
+        await serve_task
+        await server.close()
 
     asyncio.run(exercise())
 

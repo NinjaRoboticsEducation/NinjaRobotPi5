@@ -16,6 +16,10 @@ from .events import AgentEventType, EventBroker
 from .ipc import AgentIPCServer
 from .mcp_client import MCPToolProvider
 from .mcp_config import load_mcp_configuration
+from .memory_mcp import MemoryMCPProvider
+from .memory_models import MemorySettings
+from .memory_services import MemoryRetrievalService
+from .memory_store import MemoryStore
 from .model_selection import (
     BenchmarkRegistry,
     ModelManager,
@@ -117,6 +121,11 @@ async def run_service(arguments: argparse.Namespace) -> None:
         whisper_model=arguments.whisper_model,
         whisper_threads=arguments.whisper_threads,
     )
+    store = ConversationStore(
+        arguments.database,
+        retention_days=config.memory.conversation_retention_days,
+    )
+    memory = MemoryStore(arguments.database) if config.memory.enabled else None
     providers: list[ToolProvider] = [
         IDEToolProvider(
             ide,
@@ -124,6 +133,8 @@ async def run_service(arguments: argparse.Namespace) -> None:
         ),
         RobotControlMCPProvider(ide),
     ]
+    if memory is not None:
+        providers.append(MemoryMCPProvider(MemoryRetrievalService(memory), store))
     optional_ids: set[str] = set()
     secrets = SecretStore(arguments.secret_file)
     for server_config in load_mcp_configuration(arguments.mcp_config).servers:
@@ -164,7 +175,6 @@ async def run_service(arguments: argparse.Namespace) -> None:
         ),
         fallback_provider_ids=config.agent.fallback_providers,
     )
-    store = ConversationStore(arguments.database, retention_days=7)
     arms = MotionArmManager()
     camera_grants = CameraGrantManager()
     events = EventBroker()
@@ -232,6 +242,21 @@ async def run_service(arguments: argparse.Namespace) -> None:
         events=events,
         model_manager=model,
         robot_status=ide.status,
+        memory=memory,
+        enroll_identity=ide.enroll_face_identity if memory is not None else None,
+        recognize_identity=ide.identify_face if memory is not None else None,
+        delete_identity=ide.delete_face_identity if memory is not None else None,
+        initial_memory_settings=(
+            MemorySettings(
+                conversation_retention_days=config.memory.conversation_retention_days,
+                failed_behavior_retention_days=config.memory.failed_behavior_retention_days,
+                failed_behavior_cap=config.memory.failed_behavior_cap,
+                retrieval_limit=config.memory.retrieval_limit,
+                retrieval_character_budget=config.memory.retrieval_character_budget,
+            )
+            if memory is not None
+            else None
+        ),
     )
     runtime.begin_startup_liveliness()
     web_controller = WebRobotController(runtime)

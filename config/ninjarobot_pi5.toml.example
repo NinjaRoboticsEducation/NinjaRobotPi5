@@ -74,6 +74,15 @@ model_inactivity_timeout_seconds = 120.0
 # only when you accept their network cost and data handling.
 fallback_providers = []
 
+[memory]
+enabled = true
+conversation_retention_days = 7
+failed_behavior_retention_days = 180
+failed_behavior_cap = 1000
+retrieval_limit = 6
+retrieval_character_budget = 4000
+face_data_directory = "~/.local/share/ninjarobot_pi5/faces"
+
 [providers.ollama]
 kind = "ollama"
 model = "configured-by-user"

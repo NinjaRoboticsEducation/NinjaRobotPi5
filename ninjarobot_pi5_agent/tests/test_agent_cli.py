@@ -104,6 +104,42 @@ def test_chat_camera_grants_one_temporary_capture(monkeypatch, capsys) -> None:
     assert "use /camera again" in output
 
 
+def test_memory_cli_requires_confirmation_and_sends_bounded_settings(monkeypatch) -> None:
+    service_request = AsyncMock(return_value=0)
+    monkeypatch.setattr(agent_cli, "_service_request", service_request)
+    parser = agent_cli.build_parser()
+
+    delete_arguments = parser.parse_args(["memory", "delete", "user-1", "memory-1", "--confirm"])
+    assert asyncio.run(agent_cli._run_memory_command(delete_arguments)) == 0  # noqa: SLF001
+    service_request.assert_awaited_with(
+        delete_arguments,
+        {
+            "command": "memory_delete",
+            "user_id": "user-1",
+            "memory_id": "memory-1",
+            "confirmed": True,
+        },
+    )
+
+    retention_arguments = parser.parse_args(
+        ["memory", "set-retention", "--conversations", "14", "--failed", "90"]
+    )
+    assert asyncio.run(agent_cli._run_memory_command(retention_arguments)) == 0  # noqa: SLF001
+    service_request.assert_awaited_with(
+        retention_arguments,
+        {
+            "command": "memory_update_settings",
+            "conversation_retention_days": 14,
+            "failed_behavior_retention_days": 90,
+            "failed_behavior_cap": None,
+        },
+    )
+
+    unconfirmed = parser.parse_args(["memory", "delete-profile", "user-1"])
+    with pytest.raises(ValueError, match="requires --confirm"):
+        asyncio.run(agent_cli._run_memory_command(unconfirmed))  # noqa: SLF001
+
+
 def test_agent_cli_manages_tavily_configuration(tmp_path, capsys) -> None:
     config = tmp_path / "mcp.toml"
     secrets = tmp_path / "secrets.env"
