@@ -341,15 +341,17 @@ def _contents(messages: tuple[ModelMessage, ...]) -> list[dict[str, Any]]:
                 if call.provider_metadata.get("provider") != "gemini":
                     incompatible_tool_call_ids.add(call.call_id)
                     continue
-                function_call: dict[str, Any] = {
-                    "name": wire_tool_name(call.name),
-                    "args": call.arguments,
-                    "id": call.call_id,
+                function_part: dict[str, Any] = {
+                    "functionCall": {
+                        "name": wire_tool_name(call.name),
+                        "args": call.arguments,
+                        "id": call.call_id,
+                    }
                 }
                 thought_signature = call.provider_metadata.get("thought_signature")
                 if thought_signature:
-                    function_call["thoughtSignature"] = thought_signature
-                parts.append({"functionCall": function_call})
+                    function_part["thoughtSignature"] = thought_signature
+                parts.append(function_part)
         if parts:
             contents.append({"role": role, "parts": parts})
     return contents

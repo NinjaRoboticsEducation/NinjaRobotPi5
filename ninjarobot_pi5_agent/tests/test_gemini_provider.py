@@ -212,7 +212,7 @@ def test_gemini_replays_native_function_call_ids_and_thought_signatures(tmp_path
         function_call = contents[-2]["parts"][0]["functionCall"]
         function_response = contents[-1]["parts"][0]["functionResponse"]
         assert function_call["id"] == "gemini-call-1"
-        assert function_call["thoughtSignature"] == "opaque-signature"
+        assert contents[-2]["parts"][0]["thoughtSignature"] == "opaque-signature"
         assert function_response["id"] == "gemini-call-1"
         assert function_response["name"] == function_call["name"]
         await provider.close()
