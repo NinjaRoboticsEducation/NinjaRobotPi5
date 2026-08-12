@@ -295,6 +295,7 @@ def create_web_app(
     @app.websocket("/ws")
     async def websocket_controller(websocket: WebSocket) -> None:
         reconnect_token = websocket.query_params.get("reconnect_token")
+        browser_chat_id = websocket.query_params.get("browser_chat_id")
         try:
             lease = await leases.acquire(reconnect_token)
         except ControllerLockedError:
@@ -310,7 +311,12 @@ def create_web_app(
             return
 
         await websocket.accept()
-        controller.activate(lease.lease_id)
+        try:
+            controller.activate(lease.lease_id, browser_chat_id=browser_chat_id)
+        except ValueError as error:
+            await leases.release(lease.lease_id)
+            await websocket.close(code=4400, reason=str(error))
+            return
         send_lock = asyncio.Lock()
         operation_lock = asyncio.Lock()
         client_tasks: set[asyncio.Task[None]] = set()

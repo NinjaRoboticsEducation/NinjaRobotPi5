@@ -178,6 +178,21 @@ class MemoryRetrievalService:
             ),
             limit=settings.retrieval_limit,
         )
+        recent_successes = await self._store.memories(
+            user_id,
+            kind=MemoryKind.SUCCESSFUL_BEHAVIOR,
+            limit=min(2, settings.retrieval_limit),
+        )
+        recent_recipes = await self._store.memories(
+            user_id,
+            kind=MemoryKind.TASK_RECIPE,
+            limit=1,
+        )
+        anchored = (*recent_successes, *recent_recipes)
+        anchored_ids = {item.memory_id for item in anchored}
+        selected = (*anchored, *(item for item in relevant if item.memory_id not in anchored_ids))[
+            : settings.retrieval_limit
+        ]
         lines = [
             f"Active user: {profile.display_name} ({profile.role.value}).",
             f"Current robot name: {profile.preferred_robot_name or 'NinjaAgent'}.",
@@ -185,7 +200,7 @@ class MemoryRetrievalService:
         lines.extend(f"Preference: {_single_line(item.content)}" for item in preferences)
         lines.extend(
             f"{item.kind.value}: {_single_line(item.content)}"
-            for item in relevant
+            for item in selected
             if not item.sensitive
         )
         return _bounded_lines(lines, settings.retrieval_character_budget)

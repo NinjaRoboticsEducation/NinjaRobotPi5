@@ -34,6 +34,7 @@ from starlette.testclient import TestClient, WebSocketDenialResponse
 class _FakeRuntime:
     def __init__(self) -> None:
         self.events = EventBroker()
+        self.history_sessions: list[str] = []
 
     async def provider_health(self) -> ProviderHealth:
         return ProviderHealth(
@@ -51,7 +52,8 @@ class _FakeRuntime:
             "session_count": 0,
         }
 
-    async def history(self, _session_id: str) -> list[dict[str, Any]]:
+    async def history(self, session_id: str) -> list[dict[str, Any]]:
+        self.history_sessions.append(session_id)
         return []
 
 
@@ -59,12 +61,15 @@ class _FakeController:
     def __init__(self) -> None:
         self.activated: list[str] = []
         self.revoked: list[tuple[str, str]] = []
+        self.sessions: dict[str, str] = {}
 
-    def activate(self, lease_id: str) -> None:
+    def activate(self, lease_id: str, *, browser_chat_id: str | None = None) -> None:
         self.activated.append(lease_id)
+        if browser_chat_id is not None:
+            self.sessions[lease_id] = f"web-chat-{browser_chat_id}"
 
     def chat_session(self, lease_id: str) -> str:
-        return f"web-chat-{lease_id.removeprefix('lease-')}"
+        return self.sessions.get(lease_id, f"web-chat-{lease_id.removeprefix('lease-')}")
 
     async def lease_revoked(self, lease_id: str, reason: str) -> None:
         self.revoked.append((lease_id, reason))
@@ -213,6 +218,25 @@ def test_controller_lease_is_exclusive_and_reconnectable() -> None:
     asyncio.run(exercise())
 
 
+def test_browser_chat_identity_is_stable_across_independent_controller_leases() -> None:
+    runtime = _RacingRuntime()
+    controller = WebRobotController(cast(AgentRuntime, runtime))
+    browser_id = "persistent-browser-identity-0001"
+
+    controller.activate("lease-first", browser_chat_id=browser_id)
+    first = controller.chat_session("lease-first")
+    controller.activate("lease-second", browser_chat_id=browser_id)
+    second = controller.chat_session("lease-second")
+    controller.activate("lease-third", browser_chat_id="another-browser-identity-02")
+    third = controller.chat_session("lease-third")
+
+    assert first == second
+    assert first.startswith("web-chat-")
+    assert third != first
+    with pytest.raises(ValueError, match="16-128 URL-safe"):
+        controller.activate("lease-invalid", browser_chat_id="bad id")
+
+
 def test_missed_heartbeat_revokes_the_controller_lease() -> None:
     async def exercise() -> None:
         revoked = asyncio.Event()
@@ -252,13 +276,15 @@ def test_second_websocket_receives_http_423_locked() -> None:
     )
 
     with TestClient(app) as client:
-        with client.websocket_connect("/ws") as first:
+        with client.websocket_connect("/ws?browser_chat_id=persistent-browser-0001") as first:
             lease = first.receive_json()
             assert lease["type"] == "lease"
             system_status = first.receive_json()
             assert system_status["type"] == "system_status"
             history = first.receive_json()
             assert history == {"type": "conversation_history", "data": []}
+            assert lease["session_id"] == "web-chat-persistent-browser-0001"
+            assert runtime.history_sessions == ["web-chat-persistent-browser-0001"]
             with pytest.raises(WebSocketDenialResponse) as exc_info:
                 with client.websocket_connect("/ws"):
                     pass
@@ -356,6 +382,8 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert 'elements.webMic.querySelector("strong")' in javascript
     assert 'elements.webMic.querySelector("span")' not in javascript
     assert "state.recognitionActive" in javascript
+    assert 'localStorage.getItem("ninjarobotBrowserChatId")' in javascript
+    assert "browser_chat_id: state.browserChatId" in javascript
     assert "recognition.stop()" in javascript
     assert "requestFullscreen" in javascript
     assert "webkitRequestFullscreen" in javascript

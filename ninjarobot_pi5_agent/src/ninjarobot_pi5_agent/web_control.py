@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import secrets
 import time
 from collections.abc import Awaitable, Callable
@@ -202,6 +203,7 @@ class WebRobotController:
 
     def __init__(self, runtime: AgentRuntime) -> None:
         self._runtime = runtime
+        self._chat_sessions: dict[str, str] = {}
         self._movement: (
             tuple[
                 str,
@@ -226,9 +228,14 @@ class WebRobotController:
         return f"web-control-{lease_id.removeprefix('lease-')}"
 
     def chat_session(self, lease_id: str) -> str:
-        return f"web-chat-{lease_id.removeprefix('lease-')}"
+        return self._chat_sessions.get(
+            lease_id,
+            f"web-chat-{lease_id.removeprefix('lease-')}",
+        )
 
-    def activate(self, lease_id: str) -> None:
+    def activate(self, lease_id: str, *, browser_chat_id: str | None = None) -> None:
+        if browser_chat_id is not None:
+            self._chat_sessions[lease_id] = _browser_chat_session(browser_chat_id)
         self._runtime.arm_motion(
             self.control_session(lease_id),
             confirmed=True,
@@ -434,6 +441,7 @@ class WebRobotController:
         self._runtime.revoke_camera(self.chat_session(lease_id))
 
     async def lease_revoked(self, lease_id: str, reason: str) -> None:
+        chat_session = self.chat_session(lease_id)
         try:
             async with self._motion_command_lock:
                 await self._cancel_movement()
@@ -449,8 +457,9 @@ class WebRobotController:
                 await self.stop_transcription(lease_id)
             finally:
                 self._runtime.disarm_motion(self.control_session(lease_id))
-                self._runtime.disarm_motion(self.chat_session(lease_id))
-                self._runtime.revoke_camera(self.chat_session(lease_id))
+                self._runtime.disarm_motion(chat_session)
+                self._runtime.revoke_camera(chat_session)
+                self._chat_sessions.pop(lease_id, None)
 
     async def _cancel_movement(self) -> None:
         async with self._movement_lock:
@@ -469,3 +478,14 @@ class WebRobotController:
             task.result()
         except Exception:
             return
+
+
+def _browser_chat_session(browser_chat_id: str) -> str:
+    normalized = browser_chat_id.strip()
+    if not 16 <= len(normalized) <= 128 or any(
+        character not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+        for character in normalized
+    ):
+        raise ValueError("browser_chat_id must be 16-128 URL-safe characters")
+    digest = hashlib.sha256(normalized.encode("ascii")).hexdigest()[:32]
+    return f"web-chat-{digest}"

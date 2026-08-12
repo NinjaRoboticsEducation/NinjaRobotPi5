@@ -706,7 +706,17 @@ Capture policy:
 
 - Raw conversations retain their active `user_id` and default to seven days.
 - New dynamic expression/movement success creates a 15-minute confirmation;
-  only an explicit Yes/No consumes it. Yes creates `successful_behavior`.
+  a bounded leading Yes/No form consumes it without consulting the model.
+- An affirmative may include a quoted name, for example
+  `Yes, name it "Exciting one step forward"`. The runtime uses the user's reply
+  as explicit confirmation, saves the searchable `successful_behavior`, and
+  submits the exact IDE-compiled definition to confirmation-gated
+  `behavior.save_user`. No second confirmation UI exists or is required.
+- The catalog identifier is a safe lowercase ASCII form such as
+  `exciting_one_step_forward`; non-ASCII display names remain searchable and
+  receive a stable fallback catalog identifier. Catalog collisions never
+  overwrite an asset. A failed dual-save rolls back the success memory and
+  restores the pending confirmation for retry.
 - Technical behavior failure records the authoritative normalized tool result
   automatically as `failed_behavior`; policy denial alone is not a technical
   failure.
@@ -722,6 +732,10 @@ Retrieval policy:
 
 - Automatic context is restricted to the active user, six items by default,
   and 4,000 characters including profile/preference context.
+- Within that cap, recent successful behaviors and a recent task recipe are
+  included even for generic prompts; query-relevant results are merged and
+  deduplicated. This makes retrieval consistent across local/cloud providers
+  instead of depending on a model to choose the read-only memory tool.
 - Retrieved text is inserted after safety/runtime state as reference data, not
   authorization or instructions.
 - `memory.profile.get`, `memory.search`, `memory.behavior.successful`, and
@@ -780,6 +794,10 @@ OpenCV wheel variant in the environment.
 - Started and stopped through IPC — cannot create a second IDE or hardware owner
 - Generated local CA + `.local` server certificate stored under `~/.config/ninjarobot_pi5/tls/`
 - One exclusive WebSocket controller lease — a second browser receives HTTP `423 Locked`
+- Each browser stores a random, non-secret chat identifier in `localStorage`;
+  the server hashes it into a stable session ID across lease renewal/reconnect
+- Browser/terminal sessions never silently switch each other. Interfaces that
+  independently select the same user read the same user-scoped long-term memory
 - A missed heartbeat revokes the lease and requests `robot.servo.stop`
 - D-pad controls, Emergency Stop, Resume, Greeting, Celebrate, AI camera, USB speech transcription, and browser speech recognition
 
@@ -846,6 +864,13 @@ Private behaviors are stored under `~/.config/ninjarobot_pi5/behaviors`. Write r
 - Files use mode `0600`
 - Writes are atomic
 - Existing assets are never overwritten silently
+
+After a new dynamic behavior succeeds, an affirmative recording reply installs
+the exact definition compiled and executed by the IDE. The entry is therefore
+both a searchable per-user successful-behavior memory and a runnable private
+catalog behavior. The runtime, not the model, carries the confirmation through
+the normal policy boundary with `confirmed=True`; catalog saving never
+re-executes the robot action.
 
 `stop` and `resume` are safety commands, not behavior assets — they cannot be embedded or redefined.
 

@@ -1,5 +1,54 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-12 — Phase 7 cross-interface memory and deterministic behavior saving
+
+### Summary
+
+- replaced lease-derived web chat IDs with a stable per-browser identifier;
+  controller reconnects retain that browser session while terminal and other
+  browser sessions remain independent
+- kept the active user's SQLite profile and long-term memory shared across
+  interfaces and unchanged across provider/model selection; model switching
+  still revokes motion authorization as designed
+- made bounded automatic retrieval include recent successful behaviors and a
+  recent task recipe in addition to query matches, removing provider-dependent
+  reliance on a model deciding to call a memory tool
+- changed successful-behavior confirmation to a deterministic bounded parser;
+  the tested form `Yes, and please record and name this behavior "Exciting one
+  step forward"` no longer reaches the model or invents a confirmation button
+- retained the exact IDE-compiled behavior definition after successful dynamic
+  execution, then used the user's Yes as explicit confirmation to save both a
+  searchable user memory and a runnable private IDE catalog entry
+- added safe ASCII catalog-name normalization, no-overwrite behavior, rollback,
+  retry preservation, and explicit partial-failure reporting
+
+### Compatibility and safety
+
+Terminal and web transcripts are not merged. Switching one interface never
+switches another; both interfaces share memory only after independently
+selecting the same user. Catalog persistence does not rerun hardware and still
+passes through `PolicyEngine` plus the IDE `behavior.save_user` capability.
+Managed drivers and `NinjaClawBot/` were not changed.
+
+### Validation
+
+- immutable-driver verification: 222 tracked files across six drivers and 26
+  authorized repairs passed before/after every implementation phase
+- compileall, Ruff lint/format, and mypy passed
+- complete repository suite: 414 tests passed; the only warning is the existing
+  Starlette/httpx test-client deprecation
+- focused coverage confirms stable browser identity, independent browser
+  sessions, cross-model memory/transcript continuity, provider-independent
+  recent-memory retrieval, named affirmative parsing, IDE-compiled definition
+  retention, and dual memory/catalog save
+
+### Raspberry Pi status
+
+No physical hardware was operated. The Phase 7 validation checklist now covers
+same-user terminal/web consistency, browser reconnect, model switching, named
+dual-save, collision retry, optional raised-wheel replay, expected outcomes,
+and rollback.
+
 ## 2026-08-12 — Phase 7 full reset and face-verified switching refinement
 
 ### Summary

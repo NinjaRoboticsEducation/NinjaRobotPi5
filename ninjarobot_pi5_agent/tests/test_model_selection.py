@@ -17,6 +17,8 @@ from ninjarobot_pi5_agent import (
     ConversationStore,
     EventBroker,
     FinishReason,
+    MemoryKind,
+    MemoryStore,
     MessageRole,
     ModelCatalogEntry,
     ModelManager,
@@ -42,6 +44,7 @@ class _Provider:
     def __init__(self, model: str) -> None:
         self.model = model
         self.closed = False
+        self.requests: list[ModelRequest] = []
 
     @property
     def capabilities(self) -> ProviderCapabilities:
@@ -56,6 +59,7 @@ class _Provider:
         )
 
     async def generate(self, request: ModelRequest) -> ModelTurn:
+        self.requests.append(request)
         return ModelTurn(
             request_id=request.request_id,
             text=self.model,
@@ -301,6 +305,93 @@ def test_runtime_allows_confirmed_motion_arm_but_refuses_model_switch_while_busy
 
         selected = await runtime.select_model("ollama", "small:2b")
         assert selected.name == "small:2b"
+        await runtime.close()
+
+    asyncio.run(exercise())
+
+
+def test_model_switch_preserves_session_history_and_long_term_memory_context(tmp_path) -> None:
+    async def exercise() -> None:
+        database = tmp_path / "conversation.sqlite3"
+        memory = MemoryStore(database)
+        await memory.start()
+        owner = await memory.create_profile("Owner")
+        await memory.add_memory(
+            owner.user_id,
+            MemoryKind.SUCCESSFUL_BEHAVIOR,
+            'Confirmed successful behavior: "Exciting one step forward".',
+        )
+        await memory.close()
+
+        original = _Provider("qwen")
+        created: list[_Provider] = []
+
+        def factory(model: str) -> _Provider:
+            provider = _Provider(model)
+            created.append(provider)
+            return provider
+
+        async def catalog() -> tuple[ModelCatalogEntry, ...]:
+            return (
+                ModelCatalogEntry(provider="ollama", name="qwen"),
+                ModelCatalogEntry(provider="ollama", name="gemma"),
+            )
+
+        manager = ModelManager(
+            active_provider_id="ollama",
+            active_model="qwen",
+            active_provider=original,
+            registrations=(
+                ProviderRegistration(
+                    provider_id="ollama",
+                    factory=factory,
+                    catalog=catalog,
+                ),
+            ),
+            benchmarks=BenchmarkRegistry(tmp_path / "reports"),
+            selection_writer=lambda _provider, _model: None,
+        )
+        tools = ToolRegistry(())
+        store = ConversationStore(database)
+        arms = MotionArmManager()
+        policy = PolicyEngine(arms)
+        events = EventBroker()
+        loop = AgentLoop(
+            provider=manager,
+            tools=tools,
+            policy=policy,
+            recovery=RecoveryPolicy(),
+            store=store,
+            prompts=PromptComposer(),
+            events=events,
+        )
+        runtime = AgentRuntime(
+            provider=manager,
+            model_manager=manager,
+            tools=tools,
+            store=store,
+            loop=loop,
+            policy=policy,
+            motion_arms=arms,
+            skills=SkillRepository(tmp_path / "skills"),
+            events=events,
+            memory=memory,
+        )
+        await runtime.start()
+
+        await runtime.chat(session_id="local-cli", text="What do you remember?")
+        await runtime.select_model("ollama", "gemma")
+        await runtime.chat(session_id="local-cli", text="Do you still remember?")
+
+        remembered = 'Confirmed successful behavior: "Exciting one step forward".'
+        assert any(remembered in message.content for message in original.requests[0].messages)
+        assert any(remembered in message.content for message in created[0].requests[0].messages)
+        assert any(
+            message.role is MessageRole.ASSISTANT and message.content == "qwen"
+            for message in created[0].requests[0].messages
+        )
+        assert (await memory.owner()) == owner
+        assert len(await memory.memories(owner.user_id, kind=MemoryKind.SUCCESSFUL_BEHAVIOR)) == 1
         await runtime.close()
 
     asyncio.run(exercise())

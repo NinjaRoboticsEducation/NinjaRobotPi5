@@ -1,10 +1,23 @@
 (() => {
   "use strict";
 
+  function persistentBrowserChatId() {
+    const stored = localStorage.getItem("ninjarobotBrowserChatId");
+    if (stored && /^[A-Za-z0-9_-]{16,128}$/.test(stored)) {
+      return stored;
+    }
+    const bytes = new Uint8Array(24);
+    window.crypto.getRandomValues(bytes);
+    const created = Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
+    localStorage.setItem("ninjarobotBrowserChatId", created);
+    return created;
+  }
+
   const state = {
     socket: null,
     leaseId: null,
     reconnectToken: sessionStorage.getItem("ninjarobotReconnectToken"),
+    browserChatId: persistentBrowserChatId(),
     heartbeatTimer: null,
     requestCounter: 0,
     pending: new Map(),
@@ -101,10 +114,11 @@
   function connect() {
     state.released = false;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const query = state.reconnectToken
-      ? `?reconnect_token=${encodeURIComponent(state.reconnectToken)}`
-      : "";
-    const socket = new WebSocket(`${protocol}//${window.location.host}/ws${query}`);
+    const query = new URLSearchParams({ browser_chat_id: state.browserChatId });
+    if (state.reconnectToken) {
+      query.set("reconnect_token", state.reconnectToken);
+    }
+    const socket = new WebSocket(`${protocol}//${window.location.host}/ws?${query}`);
     state.socket = socket;
     setConnection("Connecting", "badge-wait");
 

@@ -121,7 +121,14 @@ class _InlineBehaviorAdapter:
                     capability=self.descriptor.name,
                 )
             ) from exc
-        return await self._robot.run_definition(definition)
+        result = await self._robot.run_definition(definition)
+        return {
+            **result,
+            # Retain the exact definition that passed IDE validation and ran. The
+            # agent uses this only after a user confirms that the successful
+            # behavior should become a persistent catalog entry.
+            "compiled_definition": definition.model_dump(mode="json", exclude_none=False),
+        }
 
     async def health(self) -> ResourceHealth:
         health = await self._robot.health()

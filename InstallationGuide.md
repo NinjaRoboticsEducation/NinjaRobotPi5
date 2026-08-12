@@ -805,6 +805,14 @@ recipes, and confirmed successful behaviors remain until manually deleted.
 Local data is owner-only under `~/.local/share/ninjarobot_pi5/`; Raspberry Pi
 administrators can read the cropped profile photos and face-recognition data.
 
+Terminal chat and each browser keep separate transcripts and independently
+selected users. Reconnecting the same browser preserves its chat identity while
+the service remains active; switching a terminal or another browser never
+silently switches it. Once two interfaces independently select the same user,
+they share that user's profile, preferences, and long-term behavior memory.
+Changing the AI model/provider preserves the current session, active user, and
+long-term memory, but intentionally revokes motion authorization.
+
 ### Enabling AI Motion (Physical Movement)
 
 To let the AI move the robot's wheels, raise the wheels first, then:
@@ -834,8 +842,16 @@ and move forward for one second, then stop and return to Idle.
 Save the result:
 
 ```text
-/confirm Save the successful behavior as my_exciting_move.
+Do you want to record this new behavior in long-term memory and the IDE catalog?
+Yes, name it "my exciting move"
 ```
+
+The confirmation is handled deterministically; there is no IDE confirmation
+button and `/confirm` is not required. A successful reply creates searchable
+long-term memory and a runnable private catalog entry named
+`my_exciting_move`. Existing catalog entries are never overwritten; if a name
+conflicts, the agent reports the failure and leaves the confirmation retryable
+with a different name.
 
 ### Recovering from Emergency Stop
 

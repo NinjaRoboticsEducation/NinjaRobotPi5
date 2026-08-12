@@ -64,7 +64,7 @@ Expected:
 - immutable check reports 222 tracked files and 26 authorized repairs
 - face backend check reports OpenCV 4.x and a loadable Haar cascade
 - compilation, Ruff, and mypy succeed
-- 411 tests pass (or a documented later count with no regression)
+- 414 tests pass (or a documented later count with no regression)
 - benchmark reports `passed: true`, p95 at or below 100 ms, and database size
   at or below 16 MiB
 
@@ -194,19 +194,30 @@ These tests do not move actuators.
    Expected: technical success is returned, followed by “Do you want to record
    this new behavior?” Reply No; no successful behavior memory appears.
 
-2. Repeat with a different expression and reply Yes.
+2. Repeat with a different expression and reply
+   `Yes, name it "Pi validation smile"`.
 
-   Expected: visible `Memory saved` notice and one `successful_behavior` entry
-   containing the normalized request/result reference.
+   Expected: the reply reports both destinations, one `successful_behavior`
+   entry contains the normalized request/result plus display/catalog names, and
+   the private IDE catalog contains runnable `pi_validation_smile`. No model
+   turn, `/confirm`, or nonexistent confirmation button is involved. Running
+   the catalog entry later remains subject to normal motion/safety policy.
 
-3. Induce a safe technical failure without moving hardware, for example by
+3. Repeat a new successful expression, give it the same name, then retry with
+   a unique quoted name.
+
+   Expected: the existing catalog asset is not overwritten; the failed
+   dual-save does not leave a successful memory and remains retryable. The
+   unique-name retry saves both destinations.
+
+4. Induce a safe technical failure without moving hardware, for example by
    disabling the buzzer in a test configuration and requesting a tone.
 
    Expected: authoritative tool failure remains unchanged and one
    `failed_behavior` entry is created automatically. A policy denial alone must
    not be classified as technical hardware failure.
 
-4. Say “I prefer blue face animations.”
+5. Say “I prefer blue face animations.”
 
    Expected: chat continues and displays `Memory saved: preference.` Repeating
    the exact sentence does not create a duplicate.
@@ -222,6 +233,17 @@ Expected: simulation lists only `memory.*` reads and no hardware/mutation tool.
 Ask the agent about a saved behavior after switching between two users.
 Expected: each user sees only their own profile and memories. Retrieved content
 must never arm motion, authorize a camera, or override safety instructions.
+
+Open terminal chat and web chat. Independently switch both to the same enrolled
+user, save a behavior in one interface, and ask a generic “What do you remember
+about my behaviors?” in the other. Then change the configured AI model and ask
+again in the original session.
+
+Expected: transcripts and active-user switching stay independent, while the
+same user's profile and long-term memories are visible from both interfaces.
+The model switch preserves the transcript and memory but revokes motion
+authorization. Renew or reconnect the same browser controller lease and verify
+that its transcript remains; a different browser gets a different chat session.
 
 ## Actuator-moving tests (optional, separate authorization)
 
@@ -254,6 +276,11 @@ appear.
 - [ ] 50 service restarts/migrations complete without database corruption
 - [ ] 100 user switches show no cross-user transcript or memory
 - [ ] 100 bounded retrievals remain responsive and within 4,000 characters
+- [ ] same-user memory is consistent across terminal, web, and model changes
+- [ ] terminal/browser transcripts and user switching remain independent
+- [ ] browser lease reconnect preserves only that browser's stable chat session
+- [ ] named confirmations save both memory and a runnable IDE catalog entry
+- [ ] catalog collision preserves the original asset and remains retryable
 - [ ] face full frames are absent after success, failure, and cancellation
 - [ ] unknown/multiple faces never switch users
 - [ ] selected-user switches require an exact face match in terminal and web

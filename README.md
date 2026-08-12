@@ -84,7 +84,7 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 - **Session-safe motion** — you explicitly arm and disarm AI control over physical movement
 - **Behavior generation** — ask the AI to compose custom face + sound + movement combinations
 - **Personalization** — separate local profiles, preferences, and memories for each user
-- **Behavior learning** — confirm successful new behaviors and retain technical failures for analysis
+- **Behavior learning** — confirm successful new behaviors into both searchable memory and the private IDE behavior catalog; technical failures remain available for analysis
 
 ### 🧠 Persistent Multi-User Memory
 - **First-user owner setup** — the first chat asks for a name and creates the default owner profile
@@ -92,7 +92,9 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 - **Recoverable profile enrollment** — `/update profile` shows the current name/face state and `register user face` retries or refreshes enrollment
 - **Personal robot name** — the default is `NinjaAgent`; an explicit ordinary-chat rename is stored per user and overrides older transcript claims
 - **Face-verified switching** — `/switch user` changes the active profile only after the camera matches the selected user's registered face; every failure keeps the original user
-- **Bounded retrieval** — relevant profile, preference, success, and failure context is capped before it reaches a model
+- **Bounded retrieval** — profile/preferences plus recent successful behaviors and task recipes are always available within a strict cap; query matches add only relevant success/failure context
+- **Provider continuity** — changing the AI provider/model does not replace the active user's profile, long-term memory, or current transcript
+- **Interface isolation with shared memory** — terminal and browser transcripts and selected-user state stay independent; after each interface selects the same user, both read that user's same long-term memory
 - **Read-only model access** — four `memory.*` MCP tools can read only the active user's data; models have no memory mutation tool
 - **Deterministic management** — the interactive **Manage Memory** menu and `ninjarobot-agent memory` CLI perform confirmed deletes, face recovery, retention changes, and a separately confirmed full reset
 - **Clean initial-state reset** — “Clean All Robot Memory” removes every user (including the owner), transcript, learned behavior, preference, retrieval index, and face record; the next chat starts owner registration again
@@ -101,6 +103,7 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 ### 📱 HTTPS Web Controller
 - **Phone-friendly** — full D-pad, AI chat, and live camera from any browser on your local network
 - **Exclusive controller lease** — only one browser controls the robot at a time
+- **Stable browser chat identity** — controller lease renewal or reconnect keeps that browser's chat session without switching terminal sessions or other browsers
 - **Live events panel** — see service and tool activity in real time
 - **Browser speech** — speak commands directly (English and Japanese) on supported browsers
 - **Fullscreen on mobile** — add the controller to your iPhone Home Screen for a standalone app view

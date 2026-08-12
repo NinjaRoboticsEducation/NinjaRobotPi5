@@ -361,6 +361,9 @@ def test_integrated_agent_ide_exposes_shared_simulated_robot_capabilities(
             )
         )
         assert movement.status is ActionStatus.SUCCEEDED, movement.model_dump(mode="json")
+        assert movement.data is not None
+        assert movement.data["compiled_definition"]["name"] == "agent_roll"
+        assert movement.data["compiled_definition"]["category"] == "movement"
 
         compact_movement = await client.execute(
             ActionRequest(

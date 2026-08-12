@@ -3,6 +3,10 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+from ninjarobot_pi5_agent.runtime import (
+    _catalog_behavior_name,
+    _parse_behavior_confirmation,
+)
 from ninjarobot_pi5_agent.testing import FakeProvider
 
 from ninjarobot_pi5_agent import (
@@ -129,6 +133,19 @@ def test_automatic_preferences_recipes_and_bounded_retrieval(tmp_path: Path) -> 
         assert "greeting" in context
         assert "Current robot name: NinjaAgent" in context
         assert len(context) <= (await store.settings()).retrieval_character_budget
+
+        successful = await store.add_memory(
+            owner.user_id,
+            MemoryKind.SUCCESSFUL_BEHAVIOR,
+            'Confirmed successful behavior: "Exciting one step forward".',
+        )
+        generic_context = await retrieval.context(owner.user_id, "What do you remember?")
+        assert successful.content in generic_context
+        second_interface_context = await retrieval.context(
+            owner.user_id,
+            "Tell me about yourself",
+        )
+        assert successful.content in second_interface_context
         await store.close()
 
     asyncio.run(exercise())
@@ -208,6 +225,9 @@ def test_memory_mcp_is_read_only_and_bound_to_session_user(tmp_path: Path) -> No
 class _BehaviorToolProvider:
     provider_id = "behavior-test"
 
+    def __init__(self) -> None:
+        self.requests: list[ToolInvocation] = []
+
     async def start(self) -> None:
         return None
 
@@ -226,6 +246,19 @@ class _BehaviorToolProvider:
                 confirmation_required=False,
                 source=self.provider_id,
             ),
+            ToolDefinition(
+                name="robot.behavior.save_user",
+                version="1.0.0",
+                description="Save test expression.",
+                input_schema={"type": "object"},
+                output_schema={"type": "object"},
+                risk=RiskLevel.MAINTENANCE,
+                default_timeout_seconds=2.0,
+                idempotent=False,
+                cancellable=False,
+                confirmation_required=True,
+                source=self.provider_id,
+            ),
         )
 
     async def call(
@@ -234,11 +267,42 @@ class _BehaviorToolProvider:
         cancellation: CancellationToken,
     ) -> ToolExecutionResult:
         del cancellation
+        self.requests.append(invocation)
+        if invocation.call.name == "robot.behavior.save_user":
+            return ToolExecutionResult(
+                call_id=invocation.call.call_id,
+                tool_name=invocation.call.name,
+                status=ToolExecutionStatus.SUCCEEDED,
+                data={"saved": True, "name": invocation.call.arguments["name"]},
+                action_id="action-save",
+                definitely_not_executed=False,
+                retry_safety=RetrySafety.UNKNOWN,
+            )
         return ToolExecutionResult(
             call_id=invocation.call.call_id,
             tool_name=invocation.call.name,
             status=ToolExecutionStatus.SUCCEEDED,
-            data={"completed": True},
+            data={
+                "completed": True,
+                "compiled_definition": {
+                    "schema_version": 1,
+                    "name": "birthday",
+                    "description": "Celebrate",
+                    "category": "expression",
+                    "stages": [
+                        {
+                            "name": "celebrate",
+                            "operations": [
+                                {
+                                    "kind": "face",
+                                    "expression": "happy",
+                                    "hold_seconds": 1.0,
+                                }
+                            ],
+                        }
+                    ],
+                },
+            },
             action_id="action-expression",
             definitely_not_executed=False,
             retry_safety=RetrySafety.UNKNOWN,
@@ -275,7 +339,8 @@ def test_runtime_prompts_then_saves_confirmed_successful_behavior(tmp_path: Path
                 ),
             )
         )
-        tools = ToolRegistry((_BehaviorToolProvider(),))
+        behavior_tools = _BehaviorToolProvider()
+        tools = ToolRegistry((behavior_tools,))
         database = tmp_path / "memory.sqlite3"
         store = ConversationStore(database)
         memory = MemoryStore(database)
@@ -307,9 +372,13 @@ def test_runtime_prompts_then_saves_confirmed_successful_behavior(tmp_path: Path
         await runtime.chat(session_id="chat", text="hello")
         await runtime.chat(session_id="chat", text="Owner")
         reply = await runtime.chat(session_id="chat", text="Celebrate my birthday")
-        assert "Do you want to record this new behavior?" in reply.text
-        saved = await runtime.chat(session_id="chat", text="Yes")
-        assert saved.text == "Memory saved: successful behavior."
+        assert "Do you want to record this new behavior in long-term memory" in reply.text
+        saved = await runtime.chat(
+            session_id="chat",
+            text='Yes, and please record and name this behavior "Exciting one step forward"',
+        )
+        assert "Memory saved: successful behavior" in saved.text
+        assert 'IDE catalog entry saved as "exciting_one_step_forward"' in saved.text
         owner = await memory.owner()
         assert owner is not None
         memories = await memory.memories(
@@ -318,15 +387,40 @@ def test_runtime_prompts_then_saves_confirmed_successful_behavior(tmp_path: Path
         )
         assert len(memories) == 1
         assert memories[0].payload["request"]["name"] == "birthday"
+        assert memories[0].payload["display_name"] == "Exciting one step forward"
+        assert memories[0].payload["catalog_name"] == "exciting_one_step_forward"
+        assert [request.call.name for request in behavior_tools.requests] == [
+            "robot.behavior.execute_expression",
+            "robot.behavior.save_user",
+        ]
+        assert behavior_tools.requests[-1].call.arguments["name"] == ("exciting_one_step_forward")
         transcript = await runtime.history("chat")
         assert any(
             item["message"]
             == ModelMessage(
                 role=MessageRole.ASSISTANT,
-                content="Memory saved: successful behavior.",
+                content=saved.text,
             ).model_dump(mode="json")
             for item in transcript
         )
         await runtime.close()
 
     asyncio.run(exercise())
+
+
+def test_behavior_confirmation_parser_is_bounded_and_supports_names() -> None:
+    assert _parse_behavior_confirmation("Yes") == (True, None)
+    assert _parse_behavior_confirmation('Yes, name it "Happy dance"') == (
+        True,
+        "Happy dance",
+    )
+    assert _parse_behavior_confirmation("はい、名前を「楽しいダンス」にしてください") == (
+        True,
+        "楽しいダンス",
+    )
+    assert _parse_behavior_confirmation("No, do not save it") == (False, None)
+    assert _parse_behavior_confirmation("yesterday") is None
+    assert _catalog_behavior_name("Exciting one step forward", "attempt-1") == (
+        "exciting_one_step_forward"
+    )
+    assert _catalog_behavior_name("楽しいダンス", "attempt-123") == ("saved_behavior_attempt123")

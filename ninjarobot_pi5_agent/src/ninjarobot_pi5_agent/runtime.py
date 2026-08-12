@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import unicodedata
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
 from typing import Any
@@ -236,7 +237,10 @@ class AgentRuntime:
                     notices.append(f"Memory saved: {kind.replace('_', ' ')}.")
                 if session_id in self._pending_confirmation_prompts:
                     self._pending_confirmation_prompts.discard(session_id)
-                    notices.append("Do you want to record this new behavior? Reply Yes or No.")
+                    notices.append(
+                        "Do you want to record this new behavior in long-term memory and the "
+                        'IDE catalog? Reply `Yes`, `No`, or `Yes, name it "my behavior"`.'
+                    )
                 if notices:
                     suffix = "\n\n" + " ".join(notices)
                     await self._append_memory_notice(
@@ -667,43 +671,123 @@ class AgentRuntime:
     ) -> AgentReply | None:
         if self.memory is None or session_id not in self._active_users:
             return None
-        normalized = text.strip().casefold()
-        accepted = normalized in {"yes", "y", "はい", "保存する"}
-        declined = normalized in {"no", "n", "いいえ", "保存しない"}
-        if not accepted and not declined:
+        confirmation = _parse_behavior_confirmation(text)
+        if confirmation is None:
             return None
+        accepted, requested_name = confirmation
         attempt = await self.memory.take_pending_behavior_confirmation(
             self._active_users[session_id],
             session_id,
         )
         if attempt is None:
             return None
-        if declined:
+        if not accepted:
             return await self._identity_reply(
                 session_id,
-                "The successful behavior was not saved to long-term memory.",
+                "The successful behavior was not saved to long-term memory or the IDE catalog.",
                 on_text_delta=on_text_delta,
                 user_text=text.strip(),
             )
-        behavior_name = attempt.request.get("name") or attempt.tool_name
-        memory = await self.memory.add_memory(
-            attempt.user_id,
-            MemoryKind.SUCCESSFUL_BEHAVIOR,
-            f"Confirmed successful behavior: {behavior_name}.",
-            payload={
-                "tool_name": attempt.tool_name,
-                "request": attempt.request,
-                "result": attempt.result,
-                "attempt_id": attempt.attempt_id,
-            },
-            source_session_id=session_id,
-            source_action_id=attempt.action_id,
-            actor="confirmed-success-capture",
+        behavior_name = requested_name or str(
+            attempt.request.get("name") or f"saved behavior {attempt.attempt_id[-8:]}"
         )
-        await self.memory.link_behavior_memory(attempt.attempt_id, memory.memory_id)
+        catalog_name = _catalog_behavior_name(behavior_name, attempt.attempt_id)
+        definition = _executed_behavior_definition(attempt.result, attempt.request)
+        definition["name"] = catalog_name
+        definition.setdefault("schema_version", 1)
+        definition.setdefault(
+            "category",
+            "movement" if attempt.tool_name.endswith("execute_movement") else "expression",
+        )
+        definition.setdefault("description", f"User-confirmed behavior: {behavior_name}.")
+        memory_item = None
+        try:
+            memory_item = await self.memory.add_memory(
+                attempt.user_id,
+                MemoryKind.SUCCESSFUL_BEHAVIOR,
+                f'Confirmed successful behavior: "{behavior_name}" (catalog: {catalog_name}).',
+                payload={
+                    "tool_name": attempt.tool_name,
+                    "request": attempt.request,
+                    "result": attempt.result,
+                    "attempt_id": attempt.attempt_id,
+                    "display_name": behavior_name,
+                    "catalog_name": catalog_name,
+                },
+                source_session_id=session_id,
+                source_action_id=attempt.action_id,
+                actor="confirmed-success-capture",
+            )
+            saved = await self._execute_tool(
+                tool_name="robot.behavior.save_user",
+                arguments=definition,
+                session_id=session_id,
+                lease_id=None,
+                confirmed=True,
+                requested_by="confirmed-success-capture",
+                cancellation=None,
+            )
+            if saved.status is not ToolExecutionStatus.SUCCEEDED:
+                raise RuntimeError(saved.error or "the IDE catalog save failed")
+        except Exception as error:
+            recovery_errors: list[str] = []
+            if memory_item is not None:
+                try:
+                    await self.memory.delete_memory(
+                        attempt.user_id,
+                        memory_item.memory_id,
+                        actor="confirmed-success-rollback",
+                    )
+                except Exception as rollback_error:
+                    recovery_errors.append(
+                        f"memory rollback: {type(rollback_error).__name__}: {rollback_error}"
+                    )
+            try:
+                await self.memory.set_pending_behavior_confirmation(
+                    attempt.user_id,
+                    session_id,
+                    attempt.attempt_id,
+                )
+            except Exception as pending_error:
+                recovery_errors.append(
+                    f"confirmation restore: {type(pending_error).__name__}: {pending_error}"
+                )
+            if recovery_errors:
+                await self.events.publish(
+                    AgentEventType.ERROR,
+                    "Behavior-save recovery was incomplete.",
+                    session_id=session_id,
+                    data={"errors": recovery_errors},
+                )
+            return await self._identity_reply(
+                session_id,
+                (
+                    f'Could not save "{behavior_name}" to both memory and the IDE catalog '
+                    f"({type(error).__name__}: {error}). The successful behavior was not "
+                    "recorded in both destinations. "
+                    "Reply Yes again, optionally with a different name such as "
+                    '`Yes, name it "my behavior"`.'
+                )[:900],
+                on_text_delta=on_text_delta,
+                user_text=text.strip(),
+            )
+        if memory_item is None:  # pragma: no cover - guarded by the successful try block
+            raise RuntimeError("successful behavior memory was not created")
+        try:
+            await self.memory.link_behavior_memory(attempt.attempt_id, memory_item.memory_id)
+        except Exception as error:
+            await self.events.publish(
+                AgentEventType.ERROR,
+                "Behavior and catalog were saved, but audit linkage failed.",
+                session_id=session_id,
+                data={"error": f"{type(error).__name__}: {error}"[:500]},
+            )
         return await self._identity_reply(
             session_id,
-            "Memory saved: successful behavior.",
+            (
+                f'Memory saved: successful behavior "{behavior_name}". '
+                f'IDE catalog entry saved as "{catalog_name}".'
+            ),
             on_text_delta=on_text_delta,
             user_text=text.strip(),
         )
@@ -1458,3 +1542,60 @@ def _parse_profile_update(details: str) -> dict[str, str]:
         if normalized_key in {"name", "display_name", "名前"}:
             updates["display_name"] = normalized_value
     return updates
+
+
+def _parse_behavior_confirmation(text: str) -> tuple[bool, str | None] | None:
+    """Parse a bounded affirmative or negative reply without consulting the model."""
+    stripped = text.strip()
+    normalized = stripped.casefold()
+    accepted = bool(
+        re.match(r"^(?:yes|y)(?=$|[\s,.!?:;])", normalized)
+        or re.match(r"^(?:はい|保存する)(?=$|[\s、。,.!！?？:：;；])", normalized)
+    )
+    declined = bool(
+        re.match(r"^(?:no|n)(?=$|[\s,.!?:;])", normalized)
+        or re.match(r"^(?:いいえ|保存しない)(?=$|[\s、。,.!！?？:：;；])", normalized)
+    )
+    if not accepted and not declined:
+        return None
+    if declined:
+        return False, None
+
+    name_patterns = (
+        r"(?:name(?:\s+(?:this\s+behavior|it))?|named)\s*(?:as\s*)?[\"“']([^\"”']{1,120})[\"”']",
+        r"(?:名前|行動名)(?:を)?[^「]{0,20}「([^」]{1,120})」",
+    )
+    for pattern in name_patterns:
+        match = re.search(pattern, stripped, flags=re.IGNORECASE)
+        if match is not None:
+            name = " ".join(match.group(1).split())
+            if name:
+                return True, name
+    return True, None
+
+
+def _catalog_behavior_name(display_name: str, attempt_id: str) -> str:
+    """Convert a user-facing name into the IDE's stable ASCII identifier."""
+    ascii_name = (
+        unicodedata.normalize("NFKD", display_name).encode("ascii", "ignore").decode("ascii")
+    )
+    candidate = re.sub(r"[^a-z0-9]+", "_", ascii_name.casefold()).strip("_")
+    if candidate and not candidate[0].isalpha():
+        candidate = f"behavior_{candidate}"
+    if not candidate:
+        suffix = re.sub(r"[^a-z0-9]", "", attempt_id.casefold())[-12:] or "saved"
+        candidate = f"saved_behavior_{suffix}"
+    return candidate[:64].rstrip("_")
+
+
+def _executed_behavior_definition(
+    result: Mapping[str, Any],
+    request: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return the authoritative IDE-compiled definition, with a legacy fallback."""
+    data = result.get("data")
+    if isinstance(data, Mapping):
+        compiled = data.get("compiled_definition")
+        if isinstance(compiled, Mapping):
+            return dict(compiled)
+    return dict(request)
