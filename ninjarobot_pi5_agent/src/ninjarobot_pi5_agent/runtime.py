@@ -14,7 +14,11 @@ from ninjarobot_pi5_ide import RiskLevel
 from .agent_loop import AgentLoop, AgentReply, TextDeltaHandler
 from .events import AgentEventType, EventBroker
 from .memory_models import MemorySettings, UserProfile
-from .memory_services import MemoryCaptureService, MemoryRetrievalService
+from .memory_services import (
+    MemoryCaptureService,
+    MemoryRetrievalService,
+    PersonalizationCaptureOutcome,
+)
 from .memory_store import MemoryStore, ProfileConflictError, ProfileDeletionError
 from .model_selection import ModelCatalogEntry, ModelManager
 from .models import (
@@ -227,12 +231,16 @@ class AgentRuntime:
                     on_text_delta=on_text_delta,
                 )
                 notices: list[str] = []
-                if isinstance(preference, UserProfile):
-                    notices.append(
-                        f"Memory saved: robot name is {preference.preferred_robot_name}."
-                    )
-                elif preference is not None:
-                    notices.append("Memory saved: preference.")
+                if isinstance(preference, PersonalizationCaptureOutcome):
+                    if preference.robot_name is not None:
+                        notices.append(f"Memory saved: robot name is {preference.robot_name}.")
+                    if preference.preferred_form_of_address is not None:
+                        notices.append(
+                            "Memory saved: preferred form of address is "
+                            f"{preference.preferred_form_of_address}."
+                        )
+                    if preference.preference_saved:
+                        notices.append("Memory saved: preference.")
                 for kind in sorted(self._automatic_memory_notices.pop(session_id, set())):
                     notices.append(f"Memory saved: {kind.replace('_', ' ')}.")
                 if session_id in self._pending_confirmation_prompts:
@@ -1571,6 +1579,15 @@ def _parse_behavior_confirmation(text: str) -> tuple[bool, str | None] | None:
             name = " ".join(match.group(1).split())
             if name:
                 return True, name
+    quoted_names = [
+        *re.findall(r'"([^"\n]{1,120})"', stripped),
+        *re.findall(r"“([^”\n]{1,120})”", stripped),
+        *re.findall(r"「([^」\n]{1,120})」", stripped),
+    ]
+    if len(quoted_names) == 1:
+        name = " ".join(quoted_names[0].split())
+        if name:
+            return True, name
     return True, None
 
 

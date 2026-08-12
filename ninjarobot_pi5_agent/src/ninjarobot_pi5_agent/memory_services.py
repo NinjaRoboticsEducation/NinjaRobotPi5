@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from .memory_models import BehaviorAttemptStatus, MemoryItem, UserProfile
+from .memory_models import BehaviorAttemptStatus, MemoryItem
 from .memory_store import MemoryStore
 from .models import MemoryKind, ToolExecutionResult, ToolExecutionStatus, ToolInvocation
 
@@ -35,6 +35,13 @@ NEW_BEHAVIOR_TOOLS = frozenset(
 class MemoryCaptureOutcome:
     confirmation_needed: bool = False
     automatically_saved_kind: MemoryKind | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PersonalizationCaptureOutcome:
+    robot_name: str | None = None
+    preferred_form_of_address: str | None = None
+    preference_saved: bool = False
 
 
 class MemoryCaptureService:
@@ -125,14 +132,20 @@ class MemoryCaptureService:
         text: str,
         *,
         session_id: str,
-    ) -> MemoryItem | UserProfile | None:
-        """Capture only narrow, first-person preference forms with a visible notice."""
+    ) -> PersonalizationCaptureOutcome | None:
+        """Capture explicit personalization plus narrow first-person preferences."""
         robot_name = _robot_name_update(text)
-        if robot_name is not None:
-            return await self._store.update_profile(
+        form_of_address = _preferred_form_of_address(text)
+        if robot_name is not None or form_of_address is not None:
+            await self._store.update_personalization(
                 user_id,
                 preferred_robot_name=robot_name,
-                actor="explicit-chat-robot-rename",
+                preferred_form_of_address=form_of_address,
+                actor="explicit-chat-personalization",
+            )
+            return PersonalizationCaptureOutcome(
+                robot_name=robot_name,
+                preferred_form_of_address=form_of_address,
             )
         if _is_profile_update(text.casefold()):
             return None
@@ -142,7 +155,7 @@ class MemoryCaptureService:
         existing = await self._store.memories(user_id, kind=MemoryKind.PREFERENCE, limit=100)
         if any(item.content.casefold() == content.casefold() for item in existing):
             return None
-        return await self._store.add_memory(
+        await self._store.add_memory(
             user_id,
             MemoryKind.PREFERENCE,
             content,
@@ -151,6 +164,7 @@ class MemoryCaptureService:
             confidence=0.8,
             actor="automatic-preference-capture",
         )
+        return PersonalizationCaptureOutcome(preference_saved=True)
 
 
 class MemoryRetrievalService:
@@ -162,10 +176,14 @@ class MemoryRetrievalService:
     async def context(self, user_id: str, query: str) -> str:
         settings = await self._store.settings()
         profile = await self._store.profile(user_id)
+        preferred_form_of_address = await self._store.preference_value(
+            user_id,
+            "preferred_form_of_address",
+        )
         preferences = await self._store.memories(
             user_id,
             kind=MemoryKind.PREFERENCE,
-            limit=3,
+            limit=4,
         )
         relevant = await self._store.search(
             user_id,
@@ -197,7 +215,13 @@ class MemoryRetrievalService:
             f"Active user: {profile.display_name} ({profile.role.value}).",
             f"Current robot name: {profile.preferred_robot_name or 'NinjaAgent'}.",
         ]
-        lines.extend(f"Preference: {_single_line(item.content)}" for item in preferences)
+        if isinstance(preferred_form_of_address, str) and preferred_form_of_address:
+            lines.append(f"Preferred form of address: {_single_line(preferred_form_of_address)}.")
+        lines.extend(
+            f"Preference: {_single_line(item.content)}"
+            for item in preferences
+            if item.payload.get("preference_key") != "preferred_form_of_address"
+        )
         lines.extend(
             f"{item.kind.value}: {_single_line(item.content)}"
             for item in selected
@@ -207,10 +231,15 @@ class MemoryRetrievalService:
 
     async def profile_payload(self, user_id: str) -> dict[str, Any]:
         profile = await self._store.profile(user_id)
+        preferred_form_of_address = await self._store.preference_value(
+            user_id,
+            "preferred_form_of_address",
+        )
         return {
             "user_id": profile.user_id,
             "display_name": profile.display_name,
             "preferred_robot_name": profile.preferred_robot_name,
+            "preferred_form_of_address": preferred_form_of_address,
             "role": profile.role.value,
             "face_status": profile.face_status.value,
         }
@@ -276,10 +305,15 @@ def _robot_name_update(text: str) -> str | None:
     """Extract only explicit commands that rename the assistant itself."""
     stripped = " ".join(text.strip().split())
     patterns = (
-        r"(?i)(?:^|[.!?]\s+)(?:please\s+)?rename yourself to\s+(.{1,80}?)[.!?]?$",
-        r"(?i)^(?:please\s+)?change your name to\s+(.{1,80}?)[.!?]?$",
-        r"(?i)^from now on[,]?\s+(?:your name is|you are)\s+(.{1,80}?)[.!?]?$",
+        r"(?i)(?:^|[.!?]\s+)(?:please\s+)?rename yourself to\s+([^.!?]{1,80})",
+        r"(?i)(?:^|[.!?]\s+)(?:please\s+)?change your name to\s+([^.!?]{1,80})",
+        r"(?i)(?:^|[.!?]\s+)from now on[,]?\s+(?:your name is|you are)\s+([^.!?]{1,80})",
+        r"(?i)(?:^|[.!?]\s+)(?:hi[,!]?[ ]+)?I want to call you\s+(.{1,80}?)"
+        r"(?=[.!?]|\s+and\s+(?:please\s+)?call me\b|$)",
+        r"(?i)(?:^|[.!?]\s+)(?:I(?:'ll| will) call you)\s+(.{1,80}?)"
+        r"(?=[.!?]|\s+and\s+(?:please\s+)?call me\b|$)",
         r"^あなたの名前を(.{1,40}?)に変更してください[。！!]?$",
+        r"(?:^|[。！!？?]\s*)あなたを(.{1,40}?)と呼びたい(?:です)?[。！!？?]?",
     )
     for pattern in patterns:
         match = re.search(pattern, stripped)
@@ -287,6 +321,24 @@ def _robot_name_update(text: str) -> str | None:
             name = match.group(1).strip(" \"'“”‘’")
             if name and not any(character in name for character in "=;；"):
                 return name
+    return None
+
+
+def _preferred_form_of_address(text: str) -> str | None:
+    """Extract a direct request for how the assistant should address the user."""
+    stripped = " ".join(text.strip().split())
+    patterns = (
+        r"(?i)(?:^|[.!?]\s+|\band\s+)(?:please\s+)?call me\s+([^.!?]{1,80})",
+        r"(?i)(?:^|[.!?]\s+)I want you to call me\s+([^.!?]{1,80})",
+        r"(?i)(?:^|[.!?]\s+)from now on[,]?\s+(?:please\s+)?call me\s+([^.!?]{1,80})",
+        r"(?:^|[。！!？?]\s*)私を(.{1,40}?)と呼んでください[。！!？?]?",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, stripped)
+        if match:
+            address = match.group(1).strip(" \"'“”‘’,，")
+            if address and not any(character in address for character in "=;；"):
+                return address
     return None
 
 

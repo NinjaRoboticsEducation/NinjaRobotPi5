@@ -1,5 +1,39 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-12 — Phase 7 personalization consistency field fix
+
+### Root cause and correction
+
+- confirmed that behavior memory was shared correctly, while the exact user
+  sentence “I want to call you Pocky ... please call me Master” existed only in
+  the terminal transcript: the rename parser did not accept “want to call you,”
+  the preference parser did not model a form of address, and capture returned
+  after the first match, so neither value reached structured persistence
+- added deterministic compound personalization extraction and one transactional
+  store operation for `preferred_robot_name` plus the structured
+  `preferred_form_of_address` preference; invalid input cannot leave a partial
+  identity update
+- made bounded context and `memory.profile.get` expose the form of address for
+  the active user, while the identity prompt treats it only as a conversational
+  label; terminal, independent browser sessions, and replacement model
+  providers now read the same canonical per-user values
+- hardened successful-behavior confirmation so one quoted name is retained even
+  with natural surrounding wording or the observed `behavor` typo
+- stopped-service verification found the retained explicit owner request,
+  created an adjacent pre-repair SQLite backup, and replayed only that request
+  through the deterministic memory service; `Pocky` and `Master` are now stored
+  for `local-user`, with existing transcripts and behavior memories preserved
+
+### Validation and hardware status
+
+- each implementation phase passed immutable-driver verification, compileall,
+  Ruff lint/format, combined agent+IDE mypy, and the complete 415-test suite;
+  focused tests cover atomic rollback, exact field-test parsing, independent
+  terminal/browser context, provider switching, and quoted behavior names
+- no managed driver or hardware ownership path changed and no actuator was
+  operated; Raspberry Pi validation remains a safe terminal/web/model-switch
+  personalization check followed by the existing optional raised-wheel test
+
 ## 2026-08-12 — Phase 7 cross-interface memory and deterministic behavior saving
 
 ### Summary

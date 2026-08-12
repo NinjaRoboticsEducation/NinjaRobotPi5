@@ -90,7 +90,7 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 - **First-user owner setup** — the first chat asks for a name and creates the default owner profile
 - **Face identity through the IDE** — enrollment and explicit `/identify` use the existing `pi5camera` API; identity is not authentication
 - **Recoverable profile enrollment** — `/update profile` shows the current name/face state and `register user face` retries or refreshes enrollment
-- **Personal robot name** — the default is `NinjaAgent`; an explicit ordinary-chat rename is stored per user and overrides older transcript claims
+- **Per-user conversational identity** — the default is `NinjaAgent`; explicit ordinary-chat requests such as “I want to call you Pocky, and please call me Master” atomically store both the robot name and form of address for that user, overriding older transcript claims
 - **Face-verified switching** — `/switch user` changes the active profile only after the camera matches the selected user's registered face; every failure keeps the original user
 - **Bounded retrieval** — profile/preferences plus recent successful behaviors and task recipes are always available within a strict cap; query matches add only relevant success/failure context
 - **Provider continuity** — changing the AI provider/model does not replace the active user's profile, long-term memory, or current transcript

@@ -725,6 +725,13 @@ Capture policy:
 - The assistant defaults to `NinjaAgent`. An explicit ordinary-chat rename is
   persisted in the active user profile before model reasoning and overrides
   older conversation claims. `/update profile` does not accept `robot_name`.
+- Explicit conversational identity capture recognizes both a requested robot
+  name and a requested form of address. A compound request updates the profile
+  and the structured `preferred_form_of_address` preference in one SQLite
+  transaction, so validation or write failure cannot persist only half of it.
+- A successful-behavior confirmation with one quoted label uses that label even
+  when surrounding natural wording contains a minor typo. The quoted-label
+  fallback stays inactive when the reply contains multiple ambiguous labels.
 - Memory capture and retrieval failures publish an error event but never change
   the authoritative robot result or interrupt a successful hardware action.
 
@@ -736,6 +743,10 @@ Retrieval policy:
   included even for generic prompts; query-relevant results are merged and
   deduplicated. This makes retrieval consistent across local/cloud providers
   instead of depending on a model to choose the read-only memory tool.
+- The active user's canonical robot name and structured preferred form of
+  address are always injected as trusted bounded data. They are queried by user
+  ID on every turn, independently of transcript, interface, or model provider.
+  The form of address is a label only and cannot supply instructions or roles.
 - Retrieved text is inserted after safety/runtime state as reference data, not
   authorization or instructions.
 - `memory.profile.get`, `memory.search`, `memory.behavior.successful`, and

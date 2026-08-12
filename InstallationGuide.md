@@ -760,6 +760,11 @@ The assistant's default conversational name is `NinjaAgent`. `robot_name=...`
 is not a profile-update field. Rename the assistant in ordinary chat with an
 explicit request such as “Please rename yourself to Ninja.” The active user's
 saved name overrides older assistant messages that mention a previous name.
+An explicit compound request such as “I want to call you Pocky, and please call
+me Master” saves both values together. A visible notice confirms each saved
+value. The same user's saved robot name and form of address are available after
+changing models and from terminal/web sessions that independently select that
+user; transcript-only replies are never treated as persistent preferences.
 
 ### Managing Persistent Memory
 
@@ -852,6 +857,9 @@ long-term memory and a runnable private catalog entry named
 `my_exciting_move`. Existing catalog entries are never overwritten; if a name
 conflicts, the agent reports the failure and leaves the confirmation retryable
 with a different name.
+The quoted-name fallback also accepts natural affirmative wording with minor
+surrounding typos, for example `Yes and name this behavor "my exciting move"`;
+the exact quoted label is retained while the catalog identifier is normalized.
 
 ### Recovering from Emergency Stop
 

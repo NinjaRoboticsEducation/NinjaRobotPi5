@@ -180,6 +180,69 @@ def test_explicit_chat_rename_updates_canonical_robot_name_only(tmp_path: Path) 
     asyncio.run(exercise())
 
 
+def test_compound_personalization_is_captured_atomically(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        store = MemoryStore(tmp_path / "memory.sqlite3")
+        await store.start()
+        owner = await store.create_profile("Roger Chang")
+        capture = MemoryCaptureService(store)
+
+        outcome = await capture.capture_inferred_preference(
+            owner.user_id,
+            "Hi I want to call you Pocky. and please call me Master. Remember this in the future.",
+            session_id="terminal-session",
+        )
+
+        assert outcome is not None
+        assert outcome.robot_name == "Pocky"
+        assert outcome.preferred_form_of_address == "Master"
+        assert (await store.profile(owner.user_id)).preferred_robot_name == "Pocky"
+        assert await store.preference_value(owner.user_id, "preferred_form_of_address") == (
+            "Master"
+        )
+        preferences = await store.memories(owner.user_id, kind=MemoryKind.PREFERENCE)
+        assert len(preferences) == 1
+        assert preferences[0].payload == {
+            "inferred": False,
+            "preference_key": "preferred_form_of_address",
+            "source": "explicit-chat-address",
+            "value": "Master",
+        }
+
+        with_value_too_long = "x" * 81
+        try:
+            await store.update_personalization(
+                owner.user_id,
+                preferred_robot_name="ShouldNotPersist",
+                preferred_form_of_address=with_value_too_long,
+            )
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("invalid compound personalization should fail")
+        assert (await store.profile(owner.user_id)).preferred_robot_name == "Pocky"
+
+        context = await MemoryRetrievalService(store).context(
+            owner.user_id,
+            "What should we call each other?",
+        )
+        assert "Current robot name: Pocky." in context
+        assert "Preferred form of address: Master." in context
+        profile_payload = await MemoryRetrievalService(store).profile_payload(owner.user_id)
+        assert profile_payload["preferred_robot_name"] == "Pocky"
+        assert profile_payload["preferred_form_of_address"] == "Master"
+
+        ignored = await capture.capture_inferred_preference(
+            owner.user_id,
+            "Should you call me Captain?",
+            session_id="terminal-session",
+        )
+        assert ignored is None
+        await store.close()
+
+    asyncio.run(exercise())
+
+
 def test_memory_mcp_is_read_only_and_bound_to_session_user(tmp_path: Path) -> None:
     async def exercise() -> None:
         database = tmp_path / "memory.sqlite3"
@@ -375,10 +438,10 @@ def test_runtime_prompts_then_saves_confirmed_successful_behavior(tmp_path: Path
         assert "Do you want to record this new behavior in long-term memory" in reply.text
         saved = await runtime.chat(
             session_id="chat",
-            text='Yes, and please record and name this behavior "Exciting one step forward"',
+            text='Yes and name this behavor "an exciting step forward"',
         )
         assert "Memory saved: successful behavior" in saved.text
-        assert 'IDE catalog entry saved as "exciting_one_step_forward"' in saved.text
+        assert 'IDE catalog entry saved as "an_exciting_step_forward"' in saved.text
         owner = await memory.owner()
         assert owner is not None
         memories = await memory.memories(
@@ -387,13 +450,13 @@ def test_runtime_prompts_then_saves_confirmed_successful_behavior(tmp_path: Path
         )
         assert len(memories) == 1
         assert memories[0].payload["request"]["name"] == "birthday"
-        assert memories[0].payload["display_name"] == "Exciting one step forward"
-        assert memories[0].payload["catalog_name"] == "exciting_one_step_forward"
+        assert memories[0].payload["display_name"] == "an exciting step forward"
+        assert memories[0].payload["catalog_name"] == "an_exciting_step_forward"
         assert [request.call.name for request in behavior_tools.requests] == [
             "robot.behavior.execute_expression",
             "robot.behavior.save_user",
         ]
-        assert behavior_tools.requests[-1].call.arguments["name"] == ("exciting_one_step_forward")
+        assert behavior_tools.requests[-1].call.arguments["name"] == ("an_exciting_step_forward")
         transcript = await runtime.history("chat")
         assert any(
             item["message"]
@@ -413,6 +476,10 @@ def test_behavior_confirmation_parser_is_bounded_and_supports_names() -> None:
     assert _parse_behavior_confirmation('Yes, name it "Happy dance"') == (
         True,
         "Happy dance",
+    )
+    assert _parse_behavior_confirmation('Yes and name this behavor "an exciting step forward"') == (
+        True,
+        "an exciting step forward",
     )
     assert _parse_behavior_confirmation("はい、名前を「楽しいダンス」にしてください") == (
         True,

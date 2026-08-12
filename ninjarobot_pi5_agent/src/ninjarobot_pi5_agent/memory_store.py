@@ -142,6 +142,25 @@ class MemoryStore:
             now or datetime.now(UTC),
         )
 
+    async def update_personalization(
+        self,
+        user_id: str,
+        *,
+        preferred_robot_name: str | None = None,
+        preferred_form_of_address: str | None = None,
+        actor: str = "explicit-chat-personalization",
+        now: datetime | None = None,
+    ) -> tuple[UserProfile, MemoryItem | None]:
+        """Atomically update explicit conversational identity preferences."""
+        return await asyncio.to_thread(
+            self._update_personalization_sync,
+            user_id,
+            preferred_robot_name,
+            preferred_form_of_address,
+            actor,
+            now or datetime.now(UTC),
+        )
+
     async def set_face_profile(
         self,
         user_id: str,
@@ -230,6 +249,10 @@ class MemoryStore:
             actor,
             now or datetime.now(UTC),
         )
+
+    async def preference_value(self, user_id: str, key: str) -> Any | None:
+        """Return one user-scoped structured preference without model-side scanning."""
+        return await asyncio.to_thread(self._preference_value_sync, user_id, key)
 
     async def add_memory(
         self,
@@ -626,6 +649,55 @@ class MemoryStore:
             row = self._user_row(connection, user_id)
         return _profile_from_row(row)
 
+    def _update_personalization_sync(
+        self,
+        user_id: str,
+        preferred_robot_name: str | None,
+        preferred_form_of_address: str | None,
+        actor: str,
+        now: datetime,
+    ) -> tuple[UserProfile, MemoryItem | None]:
+        if preferred_robot_name is None and preferred_form_of_address is None:
+            raise ValueError("at least one personalization field must be updated")
+        robot_name = (
+            _normalize_name(preferred_robot_name)[0] if preferred_robot_name is not None else None
+        )
+        form_of_address = (
+            _normalize_name(preferred_form_of_address)[0]
+            if preferred_form_of_address is not None
+            else None
+        )
+        timestamp = _utc(now)
+        preference_row: sqlite3.Row | None = None
+        with self._lock, self._require_connection() as connection:
+            self._user_row(connection, user_id)
+            if robot_name is not None:
+                connection.execute(
+                    """
+                    UPDATE users SET preferred_robot_name = ?, updated_at = ?
+                    WHERE user_id = ?
+                    """,
+                    (robot_name, timestamp, user_id),
+                )
+                self._audit(connection, "update_profile", actor, target_user_id=user_id)
+            if form_of_address is not None:
+                preference_row = self._upsert_preference_row(
+                    connection,
+                    user_id=user_id,
+                    key="preferred_form_of_address",
+                    value=form_of_address,
+                    source="explicit-chat-address",
+                    confidence=1.0,
+                    inferred=False,
+                    actor=actor,
+                    now=now,
+                )
+            profile_row = self._user_row(connection, user_id)
+        return (
+            _profile_from_row(profile_row),
+            _memory_from_row(preference_row) if preference_row is not None else None,
+        )
+
     def _set_face_profile_sync(
         self,
         user_id: str,
@@ -767,6 +839,50 @@ class MemoryStore:
         actor: str,
         now: datetime,
     ) -> MemoryItem:
+        with self._lock, self._require_connection() as connection:
+            self._user_row(connection, user_id)
+            row = self._upsert_preference_row(
+                connection,
+                user_id=user_id,
+                key=key,
+                value=value,
+                source=source,
+                confidence=confidence,
+                inferred=inferred,
+                actor=actor,
+                now=now,
+            )
+        return _memory_from_row(row)
+
+    def _preference_value_sync(self, user_id: str, key: str) -> Any | None:
+        normalized_key = key.strip().casefold().replace(" ", "_")
+        if not re.fullmatch(r"[a-z0-9_.-]{1,80}", normalized_key):
+            raise ValueError("preference key must contain only letters, digits, '.', '_' or '-'")
+        with self._lock:
+            connection = self._require_connection()
+            self._user_row(connection, user_id)
+            row = connection.execute(
+                """
+                SELECT value_json FROM preferences
+                WHERE user_id = ? AND preference_key = ?
+                """,
+                (user_id, normalized_key),
+            ).fetchone()
+        return None if row is None else json.loads(row["value_json"])
+
+    def _upsert_preference_row(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        user_id: str,
+        key: str,
+        value: Any,
+        source: str,
+        confidence: float,
+        inferred: bool,
+        actor: str,
+        now: datetime,
+    ) -> sqlite3.Row:
         normalized_key = key.strip().casefold().replace(" ", "_")
         if not re.fullmatch(r"[a-z0-9_.-]{1,80}", normalized_key):
             raise ValueError("preference key must contain only letters, digits, '.', '_' or '-'")
@@ -775,80 +891,77 @@ class MemoryStore:
         timestamp = _utc(now)
         preference_id = f"preference:{user_id}:{normalized_key}"
         content = f"{normalized_key}: {json.dumps(value, ensure_ascii=False, sort_keys=True)}"
-        with self._lock, self._require_connection() as connection:
-            self._user_row(connection, user_id)
-            connection.execute(
-                """
-                INSERT INTO preferences(
-                    preference_id, user_id, preference_key, value_json, source,
-                    confidence, inferred, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(user_id, preference_key) DO UPDATE SET
-                    value_json = excluded.value_json, source = excluded.source,
-                    confidence = excluded.confidence, inferred = excluded.inferred,
-                    updated_at = excluded.updated_at
-                """,
-                (
-                    preference_id,
-                    user_id,
-                    normalized_key,
-                    json.dumps(value, ensure_ascii=False, sort_keys=True),
-                    source,
-                    confidence,
-                    int(inferred),
-                    timestamp,
-                    timestamp,
+        connection.execute(
+            """
+            INSERT INTO preferences(
+                preference_id, user_id, preference_key, value_json, source,
+                confidence, inferred, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, preference_key) DO UPDATE SET
+                value_json = excluded.value_json, source = excluded.source,
+                confidence = excluded.confidence, inferred = excluded.inferred,
+                updated_at = excluded.updated_at
+            """,
+            (
+                preference_id,
+                user_id,
+                normalized_key,
+                json.dumps(value, ensure_ascii=False, sort_keys=True),
+                source,
+                confidence,
+                int(inferred),
+                timestamp,
+                timestamp,
+            ),
+        )
+        existing = connection.execute(
+            """
+            SELECT memory_id, created_at FROM memory_items
+            WHERE user_id = ? AND kind = 'preference'
+              AND json_extract(payload_json, '$.preference_key') = ?
+            """,
+            (user_id, normalized_key),
+        ).fetchone()
+        memory_id = existing["memory_id"] if existing else _id("memory")
+        created_at = existing["created_at"] if existing else timestamp
+        connection.execute(
+            """
+            INSERT INTO memory_items(
+                memory_id, user_id, kind, content, payload_json,
+                confidence, sensitive, created_at, updated_at
+            ) VALUES (?, ?, 'preference', ?, ?, ?, 0, ?, ?)
+            ON CONFLICT(memory_id) DO UPDATE SET
+                content = excluded.content, payload_json = excluded.payload_json,
+                confidence = excluded.confidence, updated_at = excluded.updated_at
+            """,
+            (
+                memory_id,
+                user_id,
+                content,
+                json.dumps(
+                    {
+                        "preference_key": normalized_key,
+                        "value": value,
+                        "source": source,
+                        "inferred": inferred,
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
                 ),
-            )
-            existing = connection.execute(
-                """
-                SELECT memory_id, created_at FROM memory_items
-                WHERE user_id = ? AND kind = 'preference'
-                  AND json_extract(payload_json, '$.preference_key') = ?
-                """,
-                (user_id, normalized_key),
-            ).fetchone()
-            memory_id = existing["memory_id"] if existing else _id("memory")
-            created_at = existing["created_at"] if existing else timestamp
-            connection.execute(
-                """
-                INSERT INTO memory_items(
-                    memory_id, user_id, kind, content, payload_json,
-                    confidence, sensitive, created_at, updated_at
-                ) VALUES (?, ?, 'preference', ?, ?, ?, 0, ?, ?)
-                ON CONFLICT(memory_id) DO UPDATE SET
-                    content = excluded.content, payload_json = excluded.payload_json,
-                    confidence = excluded.confidence, updated_at = excluded.updated_at
-                """,
-                (
-                    memory_id,
-                    user_id,
-                    content,
-                    json.dumps(
-                        {
-                            "preference_key": normalized_key,
-                            "value": value,
-                            "source": source,
-                            "inferred": inferred,
-                        },
-                        ensure_ascii=False,
-                        sort_keys=True,
-                    ),
-                    confidence,
-                    created_at,
-                    timestamp,
-                ),
-            )
-            self._sync_fts(connection, memory_id, user_id, MemoryKind.PREFERENCE, content)
-            self._audit(
-                connection,
-                "upsert_preference",
-                actor,
-                target_user_id=user_id,
-                target_memory_id=memory_id,
-            )
-            row = self._memory_row(connection, user_id, memory_id)
-        return _memory_from_row(row)
+                confidence,
+                created_at,
+                timestamp,
+            ),
+        )
+        self._sync_fts(connection, memory_id, user_id, MemoryKind.PREFERENCE, content)
+        self._audit(
+            connection,
+            "upsert_preference",
+            actor,
+            target_user_id=user_id,
+            target_memory_id=memory_id,
+        )
+        return self._memory_row(connection, user_id, memory_id)
 
     def _add_memory_sync(
         self,

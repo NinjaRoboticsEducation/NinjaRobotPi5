@@ -64,7 +64,7 @@ Expected:
 - immutable check reports 222 tracked files and 26 authorized repairs
 - face backend check reports OpenCV 4.x and a loadable Haar cascade
 - compilation, Ruff, and mypy succeed
-- 414 tests pass (or a documented later count with no regression)
+- 415 tests pass (or a documented later count with no regression)
 - benchmark reports `passed: true`, p95 at or below 100 ms, and database size
   at or below 16 MiB
 
@@ -111,10 +111,12 @@ These tests do not move actuators.
    shown. `name=<new name>` changes the user name. `robot_name=...` is rejected
    with guidance to rename NinjaAgent through ordinary chat.
 
-7. Say “Please rename yourself to Ninja,” then ask its name again.
+7. Say “I want to call you Pocky, and please call me Master,” then ask its name.
 
-   Expected: a visible memory-saved notice appears and the answer uses Ninja,
-   even if an older transcript message used another assistant name.
+   Expected: visible notices confirm both saved fields, the answer uses Pocky
+   and naturally addresses the active user as Master, even if older transcript
+   messages contain other names. Restart chat and repeat the questions; both
+   values remain.
 
 8. From **Manage Memory**, choose **Clean All Robot Memory**, but enter an
    incorrect confirmation phrase.
@@ -203,6 +205,10 @@ These tests do not move actuators.
    turn, `/confirm`, or nonexistent confirmation button is involved. Running
    the catalog entry later remains subject to normal motion/safety policy.
 
+   Repeat once with `Yes and name this behavor "Pi typo smile"`. Expected: the
+   exact quoted display label is retained and the catalog entry is
+   `pi_typo_smile`; the typo does not discard the requested name.
+
 3. Repeat a new successful expression, give it the same name, then retry with
    a unique quoted name.
 
@@ -239,11 +245,18 @@ user, save a behavior in one interface, and ask a generic “What do you remembe
 about my behaviors?” in the other. Then change the configured AI model and ask
 again in the original session.
 
+In the terminal, also say “I want to call you Pocky, and please call me Master.”
+Ask “What is your name, and what should you call me?” in terminal, in the web
+session after it independently selects the same user, and again after changing
+the model/provider.
+
 Expected: transcripts and active-user switching stay independent, while the
 same user's profile and long-term memories are visible from both interfaces.
 The model switch preserves the transcript and memory but revokes motion
-authorization. Renew or reconnect the same browser controller lease and verify
-that its transcript remains; a different browser gets a different chat session.
+authorization. Every interface/model answer uses Pocky and Master from
+structured memory, not from the terminal transcript. Renew or reconnect the
+same browser controller lease and verify that its transcript remains; a
+different browser gets a different chat session.
 
 ## Actuator-moving tests (optional, separate authorization)
 
@@ -277,6 +290,7 @@ appear.
 - [ ] 100 user switches show no cross-user transcript or memory
 - [ ] 100 bounded retrievals remain responsive and within 4,000 characters
 - [ ] same-user memory is consistent across terminal, web, and model changes
+- [ ] robot name and form of address survive terminal/web/model changes
 - [ ] terminal/browser transcripts and user switching remain independent
 - [ ] browser lease reconnect preserves only that browser's stable chat session
 - [ ] named confirmations save both memory and a runnable IDE catalog entry

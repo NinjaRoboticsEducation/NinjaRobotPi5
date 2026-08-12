@@ -316,6 +316,11 @@ def test_model_switch_preserves_session_history_and_long_term_memory_context(tmp
         memory = MemoryStore(database)
         await memory.start()
         owner = await memory.create_profile("Owner")
+        await memory.update_personalization(
+            owner.user_id,
+            preferred_robot_name="Pocky",
+            preferred_form_of_address="Master",
+        )
         await memory.add_memory(
             owner.user_id,
             MemoryKind.SUCCESSFUL_BEHAVIOR,
@@ -380,17 +385,45 @@ def test_model_switch_preserves_session_history_and_long_term_memory_context(tmp
         await runtime.start()
 
         await runtime.chat(session_id="local-cli", text="What do you remember?")
+        await runtime.chat(session_id="web-browser", text="What is your name?")
         await runtime.select_model("ollama", "gemma")
         await runtime.chat(session_id="local-cli", text="Do you still remember?")
 
         remembered = 'Confirmed successful behavior: "Exciting one step forward".'
         assert any(remembered in message.content for message in original.requests[0].messages)
+        assert any(
+            "Current robot name: Pocky." in message.content
+            for message in original.requests[0].messages
+        )
+        assert any(
+            "Preferred form of address: Master." in message.content
+            for message in original.requests[0].messages
+        )
+        assert any(
+            "Current robot name: Pocky." in message.content
+            for message in original.requests[1].messages
+        )
+        assert any(
+            "Preferred form of address: Master." in message.content
+            for message in original.requests[1].messages
+        )
         assert any(remembered in message.content for message in created[0].requests[0].messages)
+        assert any(
+            "Current robot name: Pocky." in message.content
+            for message in created[0].requests[0].messages
+        )
+        assert any(
+            "Preferred form of address: Master." in message.content
+            for message in created[0].requests[0].messages
+        )
         assert any(
             message.role is MessageRole.ASSISTANT and message.content == "qwen"
             for message in created[0].requests[0].messages
         )
-        assert (await memory.owner()) == owner
+        persisted_owner = await memory.owner()
+        assert persisted_owner is not None
+        assert persisted_owner.user_id == owner.user_id
+        assert persisted_owner.preferred_robot_name == "Pocky"
         assert len(await memory.memories(owner.user_id, kind=MemoryKind.SUCCESSFUL_BEHAVIOR)) == 1
         await runtime.close()
 
