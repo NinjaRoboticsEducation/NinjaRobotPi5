@@ -152,6 +152,65 @@ def test_cancelled_identity_waits_for_worker_before_deleting_full_frame(tmp_path
     asyncio.run(exercise())
 
 
+def test_identity_reset_quarantines_commits_and_rolls_back_face_data(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        camera = CameraDevice(
+            media_directory=tmp_path / "camera",
+            camera_factory=_Capture,
+            simulated=True,
+        )
+        face_directory = tmp_path / "faces"
+        stored_face = face_directory / "known_faces" / "face-local-user" / "face.jpg"
+        stored_face.parent.mkdir(parents=True)
+        stored_face.write_bytes(b"owner-face")
+        identity = FaceIdentityDevice(
+            camera,
+            data_directory=face_directory,
+            backend=_FaceBackend(),
+        )
+
+        rollback_token = await identity.prepare_reset()
+        assert not stored_face.exists()
+        with pytest.raises(RuntimeError, match="reset is awaiting completion"):
+            await identity.delete("local-user")
+        await identity.rollback_reset(rollback_token)
+        assert stored_face.read_bytes() == b"owner-face"
+
+        commit_token = await identity.prepare_reset()
+        assert await identity.commit_reset(commit_token)
+        assert face_directory.is_dir()
+        assert list(face_directory.iterdir()) == []
+        assert list(tmp_path.glob(".faces.reset-*")) == []
+        await identity.close()
+
+    asyncio.run(exercise())
+
+
+def test_identity_reset_refuses_a_directory_with_unrelated_content(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        camera = CameraDevice(
+            media_directory=tmp_path / "camera",
+            camera_factory=_Capture,
+            simulated=True,
+        )
+        unsafe_directory = tmp_path / "not-dedicated"
+        unsafe_directory.mkdir()
+        unrelated = unsafe_directory / "important.txt"
+        unrelated.write_text("preserve me", encoding="utf-8")
+        identity = FaceIdentityDevice(
+            camera,
+            data_directory=unsafe_directory,
+            backend=_FaceBackend(),
+        )
+
+        with pytest.raises(ValueError, match="unrelated entries"):
+            await identity.prepare_reset()
+        assert unrelated.read_text(encoding="utf-8") == "preserve me"
+        assert list(tmp_path.glob(".not-dedicated.reset-*")) == []
+
+    asyncio.run(exercise())
+
+
 def test_pi5camera_backend_refreshes_the_same_registered_identity(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

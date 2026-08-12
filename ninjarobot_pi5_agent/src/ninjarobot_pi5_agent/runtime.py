@@ -35,6 +35,9 @@ from .tools import CancellationToken, ToolRegistry
 IdentityEnrollment = Callable[[str], Awaitable[dict[str, Any]]]
 IdentityRecognition = Callable[[], Awaitable[dict[str, Any]]]
 IdentityDeletion = Callable[[str], Awaitable[bool]]
+IdentityResetPreparation = Callable[[], Awaitable[str]]
+IdentityResetCommit = Callable[[str], Awaitable[bool]]
+IdentityResetRollback = Callable[[str], Awaitable[None]]
 
 
 class AgentRuntime:
@@ -57,6 +60,9 @@ class AgentRuntime:
         enroll_identity: IdentityEnrollment | None = None,
         recognize_identity: IdentityRecognition | None = None,
         delete_identity: IdentityDeletion | None = None,
+        prepare_identity_reset: IdentityResetPreparation | None = None,
+        commit_identity_reset: IdentityResetCommit | None = None,
+        rollback_identity_reset: IdentityResetRollback | None = None,
         initial_memory_settings: MemorySettings | None = None,
     ) -> None:
         self.provider = provider
@@ -76,6 +82,9 @@ class AgentRuntime:
         self._enroll_identity = enroll_identity
         self._recognize_identity = recognize_identity
         self._delete_identity = delete_identity
+        self._prepare_identity_reset = prepare_identity_reset
+        self._commit_identity_reset = commit_identity_reset
+        self._rollback_identity_reset = rollback_identity_reset
         self._initial_memory_settings = initial_memory_settings
         self._startup: dict[str, Any] = {
             "phase": "runtime_ready",
@@ -446,6 +455,72 @@ class AgentRuntime:
                 if face is not None:
                     await memory.clear_face_profile(user_id)
                 raise
+
+    async def register_memory_profile_face(self, user_id: str) -> dict[str, Any]:
+        """Register or replace one selected profile face without switching users."""
+        self._ensure_started()
+        async with self._chat_lock:
+            memory = self._require_memory()
+            profile = await memory.profile(user_id)
+            message = await self._enroll_profile_face(profile)
+            face = await memory.face_profile(user_id)
+            return {
+                "user_id": user_id,
+                "display_name": profile.display_name,
+                "face_registered": face is not None,
+                "detail": message,
+            }
+
+    async def reset_all_memory(self) -> dict[str, Any]:
+        """Erase all robot memory after coordinated IDE identity quarantine."""
+        self._ensure_started()
+        if self._initial_memory_settings is None:
+            raise RuntimeError("configured memory defaults are unavailable; reset was not started")
+        if (
+            self._prepare_identity_reset is None
+            or self._commit_identity_reset is None
+            or self._rollback_identity_reset is None
+        ):
+            raise RuntimeError("IDE identity reset is unavailable; robot memory was not changed")
+        async with self._chat_lock:
+            self._disarm_all_motion()
+            self.camera_grants.revoke_all()
+            token = await self._prepare_identity_reset()
+            database_reset = False
+            try:
+                deleted = await self._require_memory().reset_all(self._initial_memory_settings)
+                database_reset = True
+            except BaseException as error:
+                try:
+                    await self._rollback_identity_reset(token)
+                except BaseException as rollback_error:
+                    error.add_note(
+                        "The IDE could not restore quarantined face data: "
+                        f"{type(rollback_error).__name__}: {rollback_error}"
+                    )
+                raise
+
+            self._active_users.clear()
+            self._identity_states.clear()
+            self._pending_confirmation_prompts.clear()
+            self._automatic_memory_notices.clear()
+            self.store.set_retention_days(self._initial_memory_settings.conversation_retention_days)
+            try:
+                face_data_removed = await self._commit_identity_reset(token)
+            except BaseException as error:
+                if database_reset:
+                    error.add_note(
+                        "The memory database was reset, but quarantined face data cleanup failed."
+                    )
+                raise
+            return {
+                "reset": True,
+                "owner": None,
+                "deleted": deleted,
+                "face_data_removed": face_data_removed,
+                "settings": self._initial_memory_settings.model_dump(mode="json"),
+                "next_step": "Start chat to register the new default owner.",
+            }
 
     async def delete_behavior_memory(self, user_id: str, memory_id: str) -> bool:
         """Delete one explicitly selected behavior memory, never a profile or preference."""
@@ -819,14 +894,66 @@ class AgentRuntime:
                 on_text_delta=on_text_delta,
                 user_text=selector,
             )
+        original_user_id = self._active_users[session_id]
+        target = matches[0]
         self._identity_states.pop(session_id, None)
-        await self._set_active_user(session_id, matches[0])
+        self.disarm_motion(session_id)
+        self.revoke_camera(session_id)
+        face = await self.memory.face_profile(target.user_id)
+        if face is None or target.face_status.value != "enrolled":
+            return await self._identity_reply(
+                session_id,
+                f"{target.display_name} does not have a registered face, so the active user "
+                "was not changed. Use Manage Memory > Register or Replace User Face, then retry.",
+                on_text_delta=on_text_delta,
+                user_text=selector,
+                persist_user_id=original_user_id,
+            )
+        if self._recognize_identity is None:
+            return await self._identity_reply(
+                session_id,
+                "Face recognition is unavailable, so the active user was not changed. Restore "
+                "the camera service and recognition backend, then retry.",
+                on_text_delta=on_text_delta,
+                user_text=selector,
+                persist_user_id=original_user_id,
+            )
+        try:
+            result = await self._recognize_identity()
+        except Exception as error:
+            return await self._identity_reply(
+                session_id,
+                "Face recognition could not complete, so the active user was not changed "
+                f"({type(error).__name__}: {error}). Check the camera service and retry.",
+                on_text_delta=on_text_delta,
+                user_text=selector,
+                persist_user_id=original_user_id,
+            )
+        status = str(result.get("status", "failed"))
+        identity = result.get("identity")
+        if status != "recognized" or identity != face.face_index_name:
+            advice = {
+                "no_face": "Center the selected user's face in front of the camera and retry.",
+                "multiple_faces": "Keep only the selected user in the camera frame and retry.",
+                "unknown": "The face was not recognized. Check its registration and retry.",
+                "recognized": "The face did not match the selected user.",
+            }.get(status, "Check the camera and recognition backend, then retry.")
+            return await self._identity_reply(
+                session_id,
+                f"Face verification for {target.display_name} failed; the active user was not "
+                f"changed. {advice}",
+                on_text_delta=on_text_delta,
+                user_text=selector,
+                persist_user_id=original_user_id,
+            )
+        await self._set_active_user(session_id, target)
         return await self._identity_reply(
             session_id,
-            f"Switched to {matches[0].display_name}. This session now uses only that user's "
-            "profile, conversation history, and memory.",
+            f"Face verified. Switched to {target.display_name}. This session now uses only that "
+            "user's profile, conversation history, and memory.",
             on_text_delta=on_text_delta,
             user_text=selector,
+            persist_user_id=original_user_id,
         )
 
     async def _identify_user(
@@ -961,21 +1088,23 @@ class AgentRuntime:
         on_text_delta: TextDeltaHandler | None,
         persist: bool = True,
         user_text: str | None = None,
+        persist_user_id: str | None = None,
     ) -> AgentReply:
         if persist and session_id in self._active_users:
+            workflow_user_id = persist_user_id or self._active_users[session_id]
             if user_text:
                 await self.store.append_message(
                     session_id,
                     ModelMessage(role=MessageRole.USER, content=user_text),
                     message_id=f"message-{uuid.uuid4().hex}",
-                    user_id=self._active_users[session_id],
+                    user_id=workflow_user_id,
                     metadata={"workflow": "profile"},
                 )
             await self.store.append_message(
                 session_id,
                 ModelMessage(role=MessageRole.ASSISTANT, content=text),
                 message_id=f"message-{uuid.uuid4().hex}",
-                user_id=self._active_users[session_id],
+                user_id=workflow_user_id,
                 metadata={"workflow": "profile"},
             )
         if on_text_delta is not None:

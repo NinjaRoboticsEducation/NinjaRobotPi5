@@ -573,6 +573,24 @@ class RobotIDEClient:
             raise RuntimeError("robot IDE client is not started")
         return await self._identity.delete(user_id)
 
+    async def prepare_face_identity_reset(self) -> str:
+        """Quarantine all IDE-owned identity data before a database reset."""
+        if not self._started:
+            raise RuntimeError("robot IDE client is not started")
+        return await self._identity.prepare_reset()
+
+    async def commit_face_identity_reset(self, token: str) -> bool:
+        """Permanently erase identity data after the database reset commits."""
+        if not self._started:
+            raise RuntimeError("robot IDE client is not started")
+        return await self._identity.commit_reset(token)
+
+    async def rollback_face_identity_reset(self, token: str) -> None:
+        """Restore identity data when the database reset does not commit."""
+        if not self._started:
+            raise RuntimeError("robot IDE client is not started")
+        await self._identity.rollback_reset(token)
+
     async def action(self, action_id: str) -> ActionRecord | None:
         return await self._engine.action(action_id)
 

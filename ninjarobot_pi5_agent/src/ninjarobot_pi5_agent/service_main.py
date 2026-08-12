@@ -246,6 +246,9 @@ async def run_service(arguments: argparse.Namespace) -> None:
         enroll_identity=ide.enroll_face_identity if memory is not None else None,
         recognize_identity=ide.identify_face if memory is not None else None,
         delete_identity=ide.delete_face_identity if memory is not None else None,
+        prepare_identity_reset=(ide.prepare_face_identity_reset if memory is not None else None),
+        commit_identity_reset=(ide.commit_face_identity_reset if memory is not None else None),
+        rollback_identity_reset=(ide.rollback_face_identity_reset if memory is not None else None),
         initial_memory_settings=(
             MemorySettings(
                 conversation_retention_days=config.memory.conversation_retention_days,

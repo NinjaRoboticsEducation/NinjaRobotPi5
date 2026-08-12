@@ -200,6 +200,102 @@ def test_configured_defaults_initialize_once_without_overwriting_cli_settings(
     asyncio.run(exercise())
 
 
+def test_reset_all_clears_every_memory_category_and_restores_defaults(tmp_path: Path) -> None:
+    database = tmp_path / "memory.sqlite3"
+
+    async def exercise() -> None:
+        store = MemoryStore(database)
+        await store.start()
+        owner = await store.create_profile("Owner")
+        await store.set_face_profile(
+            owner.user_id,
+            face_index_name="face-local-user",
+            profile_image_path="/private/owner.jpg",
+            model_metadata={"backend": "test"},
+        )
+        await store.upsert_preference(
+            owner.user_id,
+            "favorite color",
+            "blue",
+            source="test",
+            inferred=False,
+        )
+        await store.add_memory(
+            owner.user_id,
+            MemoryKind.SUCCESSFUL_BEHAVIOR,
+            "Wave hello",
+        )
+        await store.record_behavior_attempt(
+            owner.user_id,
+            tool_name="robot.servo.move",
+            request={"endpoint": "gpio12"},
+            result={"status": "succeeded"},
+            status=BehaviorAttemptStatus.SUCCEEDED,
+        )
+        await store.update_settings(
+            conversation_retention_days=30,
+            failed_behavior_retention_days=60,
+            failed_behavior_cap=50,
+        )
+
+        connection = sqlite3.connect(database)
+        now = datetime.now(UTC).isoformat()
+        connection.execute(
+            "INSERT INTO sessions VALUES (?, ?, ?, ?)",
+            ("session", owner.user_id, now, now),
+        )
+        connection.execute(
+            """
+            INSERT INTO messages(
+                message_id, session_id, role, content, name, tool_call_id,
+                tool_calls_json, created_at, metadata_json, user_id
+            ) VALUES (?, ?, ?, ?, NULL, NULL, '[]', ?, '{}', ?)
+            """,
+            ("message", "session", "user", "remember me", now, owner.user_id),
+        )
+        connection.commit()
+        connection.close()
+
+        defaults = MemorySettings(
+            conversation_retention_days=7,
+            failed_behavior_retention_days=180,
+            failed_behavior_cap=1000,
+            retrieval_limit=6,
+            retrieval_character_budget=4000,
+        )
+        deleted = await store.reset_all(defaults)
+        assert deleted["users"] == 1
+        assert deleted["face_profiles"] == 1
+        assert deleted["preferences"] == 1
+        assert deleted["memory_items"] == 2
+        assert deleted["behavior_attempts"] == 1
+        assert deleted["sessions"] == 1
+        assert deleted["messages"] == 1
+        assert deleted["memory_audit_events"] > 0
+        assert await store.profiles() == ()
+        assert await store.owner() is None
+        assert await store.settings() == defaults
+        await store.close()
+
+    asyncio.run(exercise())
+
+    connection = sqlite3.connect(database)
+    for table in (
+        "users",
+        "face_profiles",
+        "preferences",
+        "memory_items",
+        "behavior_attempts",
+        "pending_memory_confirmations",
+        "sessions",
+        "messages",
+        "memory_audit_events",
+        "memory_fts",
+    ):
+        assert connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0
+    connection.close()
+
+
 def test_failed_migration_rolls_back_schema_and_version(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

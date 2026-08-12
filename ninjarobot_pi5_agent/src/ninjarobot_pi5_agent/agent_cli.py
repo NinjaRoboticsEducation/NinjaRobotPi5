@@ -215,6 +215,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     transfer_owner.add_argument("user_id")
     transfer_owner.add_argument("--confirm", action="store_true")
+    register_face = memory_commands.add_parser(
+        "register-face",
+        help="Register or replace the face for one existing profile.",
+    )
+    register_face.add_argument("user_id")
+    register_face.add_argument("--confirm", action="store_true")
+    reset_all = memory_commands.add_parser(
+        "reset-all",
+        help="Delete all robot memory, including the owner and face profiles.",
+    )
+    reset_all.add_argument("--confirm", action="store_true")
     retention = memory_commands.add_parser(
         "set-retention",
         help="Set conversation or failed-behavior retention.",
@@ -884,7 +895,7 @@ async def _run_memory_command(arguments: argparse.Namespace) -> int:
                 "limit": arguments.limit,
             },
         )
-    if command in {"delete", "delete-profile", "transfer-owner"}:
+    if command in {"delete", "delete-profile", "transfer-owner", "register-face"}:
         if not arguments.confirm:
             raise ValueError(f"memory {command} requires --confirm")
         payload: dict[str, object] = {
@@ -895,6 +906,13 @@ async def _run_memory_command(arguments: argparse.Namespace) -> int:
         if command == "delete":
             payload["memory_id"] = arguments.memory_id
         return await _service_request(arguments, payload)
+    if command == "reset-all":
+        if not arguments.confirm:
+            raise ValueError("memory reset-all requires --confirm")
+        return await _service_request(
+            arguments,
+            {"command": "memory_reset_all", "confirmed": True},
+        )
     if command == "set-retention":
         if (
             arguments.conversations is None
@@ -1208,10 +1226,12 @@ async def _interactive_memory(arguments: argparse.Namespace) -> None:
             "5. Delete Behavioral Memory\n"
             "6. Set Raw Conversation Retention\n"
             "7. Set Failed Behavior Retention\n"
-            "8. Back\n"
+            "8. Register or Replace User Face\n"
+            "9. Clean All Robot Memory\n"
+            "10. Back\n"
         )
         choice = (await asyncio.to_thread(input, "Select an option: ")).strip()
-        if choice == "8":
+        if choice == "10":
             return
         if choice == "1":
             await _service_request(arguments, {"command": "memory_profiles"})
@@ -1297,7 +1317,42 @@ async def _interactive_memory(arguments: argparse.Namespace) -> None:
                 },
             )
             continue
-        print("Please choose a number from 1 through 8.")
+        if choice == "8":
+            user_id = (await asyncio.to_thread(input, "Enter the exact user_id: ")).strip()
+            confirmation = (
+                await asyncio.to_thread(
+                    input,
+                    "Type CONFIRM to capture and register this user's face: ",
+                )
+            ).strip()
+            if confirmation != "CONFIRM":
+                print("Face registration cancelled.")
+                continue
+            await _service_request(
+                arguments,
+                {
+                    "command": "memory_register_face",
+                    "user_id": user_id,
+                    "confirmed": True,
+                },
+            )
+            continue
+        if choice == "9":
+            confirmation = (
+                await asyncio.to_thread(
+                    input,
+                    "Type DELETE ALL ROBOT MEMORY to erase every profile and memory: ",
+                )
+            ).strip()
+            if confirmation != "DELETE ALL ROBOT MEMORY":
+                print("Full memory reset cancelled.")
+                continue
+            await _service_request(
+                arguments,
+                {"command": "memory_reset_all", "confirmed": True},
+            )
+            continue
+        print("Please choose a number from 1 through 10.")
 
 
 async def _interactive(arguments: argparse.Namespace) -> int:

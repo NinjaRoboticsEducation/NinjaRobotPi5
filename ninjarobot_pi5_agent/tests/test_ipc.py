@@ -19,6 +19,7 @@ from ninjarobot_pi5_agent import (
     EventBroker,
     FinishReason,
     MemoryKind,
+    MemorySettings,
     MemoryStore,
     ModelRequest,
     ModelStreamEvent,
@@ -90,6 +91,25 @@ def build_runtime(
     robot_status: Callable[[], Mapping[str, Any]] | None = None,
     with_memory: bool = False,
 ) -> AgentRuntime:
+    async def enroll_identity(user_id: str) -> dict[str, Any]:
+        return {
+            "status": "enrolled",
+            "identity": f"face-{user_id}",
+            "profile_image_path": str(tmp_path / f"{user_id}.jpg"),
+            "backend": "test",
+            "raw_photo_retained": False,
+        }
+
+    async def prepare_identity_reset() -> str:
+        return "ipc-reset-token"
+
+    async def commit_identity_reset(token: str) -> bool:
+        assert token == "ipc-reset-token"
+        return True
+
+    async def rollback_identity_reset(token: str) -> None:
+        assert token == "ipc-reset-token"
+
     provider = _EchoProvider()
     tools = ToolRegistry(())
     store = ConversationStore(tmp_path / "conversation.sqlite3")
@@ -116,6 +136,11 @@ def build_runtime(
         events=events,
         robot_status=robot_status,
         memory=MemoryStore(tmp_path / "conversation.sqlite3") if with_memory else None,
+        enroll_identity=enroll_identity if with_memory else None,
+        prepare_identity_reset=prepare_identity_reset if with_memory else None,
+        commit_identity_reset=commit_identity_reset if with_memory else None,
+        rollback_identity_reset=rollback_identity_reset if with_memory else None,
+        initial_memory_settings=MemorySettings() if with_memory else None,
     )
 
 
@@ -468,6 +493,21 @@ def test_ipc_memory_management_is_confirmed_and_category_bounded(tmp_path) -> No
             }
         )
         assert settings["data"]["settings"]["conversation_retention_days"] == 21
+        registered = await client.request(
+            {
+                "command": "memory_register_face",
+                "user_id": member.user_id,
+                "confirmed": True,
+            }
+        )
+        assert registered["data"]["face_registered"] is True
+        with pytest.raises(AgentIPCError, match="confirmed=true"):
+            await client.request({"command": "memory_reset_all"})
+        reset = await client.request({"command": "memory_reset_all", "confirmed": True})
+        assert reset["data"]["reset"] is True
+        assert reset["data"]["deleted"]["users"] == 2
+        assert await runtime.memory.profiles() == ()
+        assert (await runtime.memory.settings()).conversation_retention_days == 7
         await client.request({"command": "stop"})
         await serve_task
         await server.close()

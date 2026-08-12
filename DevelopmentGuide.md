@@ -682,12 +682,21 @@ Identity workflow:
    full frame is removed in `finally`.
 6. `/identify` switches only when exactly one known identity maps to one profile.
    Unknown, no-face, multiple-face, error, or ambiguous results do not switch.
-7. Every enrollment/identification path restores silent Idle in a
+7. `/switch user` first resolves a selected profile, then runs the same visible
+   recognition workflow. The session changes only when the returned opaque
+   identity exactly matches that profile's face index. A mismatch, unavailable
+   camera, unknown/no/multiple face, or missing enrollment keeps the original
+   user and revokes that session's motion and camera grants.
+8. Every enrollment/identification path restores silent Idle in a
    cancellation-safe IDE `finally` path, so an error cannot strand the display
    on the camera icon.
-8. `/update profile` reports the active name and face status. The exact
+9. `/update profile` reports the active name and face status. The exact
    `register user face` action retries pending enrollment or adds a refreshed
    sample for that same identity; `name=<new name>` changes only the user name.
+10. An inactive profile with missing or stale face data can be recovered only
+    through deterministic **Manage Memory → Register or Replace User Face** or
+    `memory register-face USER_ID --confirm`; recovery never performs an
+    unverified switch.
 
 The agent never imports `pi5camera`. `RobotIDEClient` exposes only deterministic
 identity methods, and normal AI camera preview consent remains a separate path.
@@ -727,6 +736,21 @@ user for failed behaviors. Profiles, preferences, recipes, and confirmed
 successes persist until an administrator deletes them. Deleting a profile is
 limited to inactive non-owners and removes its transcript, structured memory,
 face index, and cropped image. Transfer ownership before deleting an owner.
+
+The distinct `memory reset-all --confirm` operation can remove the owner. The
+interactive menu additionally requires the exact phrase
+`DELETE ALL ROBOT MEMORY`. The IDE first atomically quarantines its dedicated
+face-data directory; SQLite then deletes all users, messages, preferences,
+behavior attempts/memories, pending confirmations, audit events, and retrieval
+index entries in one transaction and restores configured retention defaults.
+The quarantine is restored if the database transaction fails and permanently
+removed only after it commits. Runtime user state and all motion/camera grants
+are cleared. Reset fails closed if the configured identity directory contains
+entries outside the dedicated face-data layout, preventing an incorrect path
+from moving or deleting unrelated files. API keys, model/provider
+configuration, saved IDE behavior files,
+hardware calibration, and service logs are deliberately outside this reset.
+The next chat sees no owner and begins first-user registration.
 
 Run the synthetic retrieval benchmark without hardware:
 

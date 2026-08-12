@@ -1,5 +1,55 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-12 — Phase 7 full reset and face-verified switching refinement
+
+### Summary
+
+- added a separately confirmed full-memory reset that removes every user,
+  including the owner, plus conversations, preferences, behavior memories and
+  attempts, pending confirmations, audit records, retrieval indexes, and face
+  identity data; configured retention defaults are restored and the next chat
+  starts owner registration
+- retained the existing active-user and owner protections for ordinary profile
+  deletion; only `memory reset-all --confirm` and the interactive phrase
+  `DELETE ALL ROBOT MEMORY` enter the full-reset path
+- coordinated SQLite and IDE face cleanup by quarantining the dedicated face
+  directory before the database transaction, restoring it on rollback, and
+  deleting it only after commit
+- made face cleanup fail closed when a configured identity directory contains
+  unrelated entries, preventing a bad path from moving or deleting other data
+- added deterministic registration/replacement of an existing profile's face
+  through the memory CLI and interactive management menu, without switching to
+  that profile
+- changed `/switch user` so name selection alone never changes identity; the
+  selected profile's exact opaque face identity must be recognized first
+- preserved the original user on missing enrollment, mismatch, unknown/no/
+  multiple faces, camera failure, or timeout; every attempt revokes the
+  session's motion and camera grants and IDE capture still returns to Idle
+
+### Preserved state
+
+The full-memory reset does not remove provider/API-key configuration, selected
+model settings, saved IDE behavior definitions, hardware calibration, or
+service logs. Managed drivers and `NinjaClawBot/` remain unchanged.
+
+### Validation
+
+- immutable-driver verification passed with 222 tracked files and 26
+  authorized repairs after every implementation phase
+- compileall, Ruff lint/format, and strict mypy passed after every phase
+- complete repository suite: 411 tests passed; the only warning is the existing
+  Starlette `httpx` test-client deprecation
+- new regression coverage includes atomic database reset, identity quarantine
+  commit/rollback, inactive-profile face recovery, no-owner onboarding,
+  exact-match switching, mismatch privacy, unregistered profiles, camera
+  failures, authorization revocation, and cross-user transcript isolation
+
+### Raspberry Pi status
+
+No physical hardware was operated. The Phase 7 Pi checklist now includes the
+destructive-reset boundary, face-verified terminal/web switching, camera/Idle
+recovery, expected outcomes, and rollback instructions.
+
 ## 2026-08-12 — Phase 7 field-test correction: face enrollment and identity precedence
 
 ### Summary

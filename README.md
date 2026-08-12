@@ -91,10 +91,11 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 - **Face identity through the IDE** — enrollment and explicit `/identify` use the existing `pi5camera` API; identity is not authentication
 - **Recoverable profile enrollment** — `/update profile` shows the current name/face state and `register user face` retries or refreshes enrollment
 - **Personal robot name** — the default is `NinjaAgent`; an explicit ordinary-chat rename is stored per user and overrides older transcript claims
-- **Strict user isolation** — `/new user` and `/switch user` change the active profile for one chat session without mixing histories
+- **Face-verified switching** — `/switch user` changes the active profile only after the camera matches the selected user's registered face; every failure keeps the original user
 - **Bounded retrieval** — relevant profile, preference, success, and failure context is capped before it reaches a model
 - **Read-only model access** — four `memory.*` MCP tools can read only the active user's data; models have no memory mutation tool
-- **Deterministic management** — the interactive **Manage Memory** menu and `ninjarobot-agent memory` CLI perform confirmed deletes and retention changes
+- **Deterministic management** — the interactive **Manage Memory** menu and `ninjarobot-agent memory` CLI perform confirmed deletes, face recovery, retention changes, and a separately confirmed full reset
+- **Clean initial-state reset** — “Clean All Robot Memory” removes every user (including the owner), transcript, learned behavior, preference, retrieval index, and face record; the next chat starts owner registration again
 - **Default retention** — raw conversations 7 days, failed behaviors 180 days, profiles and confirmed successes until manual deletion
 
 ### 📱 HTTPS Web Controller

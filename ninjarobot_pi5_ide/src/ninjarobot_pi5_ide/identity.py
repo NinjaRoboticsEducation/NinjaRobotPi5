@@ -122,11 +122,13 @@ class FaceIdentityDevice:
         self._data_directory = Path(data_directory).expanduser().resolve()
         self._backend = backend or Pi5CameraFaceIdentityBackend()
         self._lock = asyncio.Lock()
+        self._pending_reset: tuple[str, Path | None] | None = None
 
     async def enroll(self, user_id: str) -> dict[str, Any]:
         """Enroll exactly one face under an opaque profile identifier."""
         identity = _face_identity(user_id)
         async with self._lock:
+            self._ensure_reset_not_pending()
             return await self._with_temporary_capture(
                 lambda path: self._backend.enroll(self._config(), path, identity)
             )
@@ -134,6 +136,7 @@ class FaceIdentityDevice:
     async def identify(self) -> dict[str, Any]:
         """Explicitly identify exactly one known face without switching any session."""
         async with self._lock:
+            self._ensure_reset_not_pending()
             return await self._with_temporary_capture(
                 lambda path: self._backend.recognize(self._config(), path)
             )
@@ -141,6 +144,7 @@ class FaceIdentityDevice:
     async def delete(self, user_id: str) -> bool:
         """Delete IDE-owned face data for a deterministically selected profile."""
         async with self._lock:
+            self._ensure_reset_not_pending()
             removed = await asyncio.to_thread(
                 self._backend.delete,
                 self._config(),
@@ -148,6 +152,51 @@ class FaceIdentityDevice:
             )
             await asyncio.to_thread(self._secure_data_tree)
             return removed
+
+    async def prepare_reset(self) -> str:
+        """Quarantine all identity data before the memory database is reset."""
+        async with self._lock:
+            self._ensure_reset_not_pending()
+            await asyncio.to_thread(self._validate_reset_directory)
+            token = uuid.uuid4().hex
+            backup: Path | None = None
+            self._data_directory.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            if self._data_directory.exists():
+                backup = self._data_directory.with_name(
+                    f".{self._data_directory.name}.reset-{token}"
+                )
+                await asyncio.to_thread(os.replace, self._data_directory, backup)
+            try:
+                self._data_directory.mkdir(parents=True, exist_ok=False, mode=0o700)
+                await asyncio.to_thread(self._secure_data_tree)
+            except BaseException:
+                await asyncio.to_thread(shutil.rmtree, self._data_directory, True)
+                if backup is not None and backup.exists():
+                    await asyncio.to_thread(os.replace, backup, self._data_directory)
+                raise
+            self._pending_reset = (token, backup)
+            return token
+
+    async def commit_reset(self, token: str) -> bool:
+        """Permanently delete quarantined identity data after database commit."""
+        async with self._lock:
+            backup = self._reset_backup(token)
+            if backup is not None:
+                await asyncio.to_thread(shutil.rmtree, backup)
+            self._pending_reset = None
+            return backup is not None
+
+    async def rollback_reset(self, token: str) -> None:
+        """Restore quarantined identity data after a database reset failure."""
+        async with self._lock:
+            backup = self._reset_backup(token)
+            await asyncio.to_thread(shutil.rmtree, self._data_directory, True)
+            if backup is None:
+                self._data_directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+            else:
+                await asyncio.to_thread(os.replace, backup, self._data_directory)
+            await asyncio.to_thread(self._secure_data_tree)
+            self._pending_reset = None
 
     async def _with_temporary_capture(self, operation: Any) -> dict[str, Any]:
         self._data_directory.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -202,6 +251,36 @@ class FaceIdentityDevice:
                 os.chmod(path, 0o700 if path.is_dir() else 0o600)
             except FileNotFoundError:
                 continue
+
+    def _ensure_reset_not_pending(self) -> None:
+        if self._pending_reset is not None:
+            raise RuntimeError("face identity reset is awaiting completion")
+
+    def _reset_backup(self, token: str) -> Path | None:
+        if self._pending_reset is None or self._pending_reset[0] != token:
+            raise ValueError("face identity reset token is invalid or expired")
+        return self._pending_reset[1]
+
+    def _validate_reset_directory(self) -> None:
+        if self._data_directory == Path(self._data_directory.anchor):
+            raise ValueError("face identity data directory cannot be a filesystem root")
+        if self._data_directory.parent == Path(self._data_directory.anchor):
+            raise ValueError("face identity data directory cannot be a top-level directory")
+        if self._data_directory == Path.home().resolve():
+            raise ValueError("face identity data directory cannot be the user's home directory")
+        if self._data_directory.exists():
+            allowed_entries = {"known_faces", "index", "pending", "temporary"}
+            unexpected = sorted(
+                path.name
+                for path in self._data_directory.iterdir()
+                if path.name not in allowed_entries
+            )
+            if unexpected:
+                names = ", ".join(unexpected[:3])
+                raise ValueError(
+                    "face identity data directory contains unrelated entries; reset refused: "
+                    f"{names}"
+                )
 
     async def close(self) -> None:
         """Remove incomplete temporary identity data; camera ownership stays with RobotAssembly."""

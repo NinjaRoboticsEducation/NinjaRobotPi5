@@ -770,9 +770,10 @@ uv run --frozen ninjarobot-agent
 ```
 
 The menu can list profiles, transfer the owner role, delete an inactive member
-profile, list/delete individual behavior memories, and change raw-conversation
-or failed-behavior retention. Profile deletion is intentionally unavailable in
-terminal/web chat. The same deterministic operations are scriptable:
+profile, register or replace an existing profile's face, list/delete individual
+behavior memories, change retention, or clean all robot memory. Profile
+deletion and full reset are intentionally unavailable in terminal/web chat.
+The same deterministic operations are scriptable:
 
 ```bash
 uv run --frozen ninjarobot-agent memory profiles
@@ -784,11 +785,19 @@ uv run --frozen ninjarobot-agent memory set-retention \
 uv run --frozen ninjarobot-agent memory delete USER_ID MEMORY_ID --confirm
 uv run --frozen ninjarobot-agent memory transfer-owner USER_ID --confirm
 uv run --frozen ninjarobot-agent memory delete-profile USER_ID --confirm
+uv run --frozen ninjarobot-agent memory register-face USER_ID --confirm
+uv run --frozen ninjarobot-agent memory reset-all --confirm
 ```
 
 The service must be running. An active profile cannot be deleted. The current
 owner must be transferred first. Deleting a profile removes that user's raw
 messages, structured memory, face index entry, and cropped profile image.
+`reset-all` is the only operation that can delete the owner. In the interactive
+menu it requires typing `DELETE ALL ROBOT MEMORY`; it removes every profile,
+conversation, learned memory, preference, retrieval index, and face record,
+then resets retention to configured defaults. It preserves API keys, provider
+selection, saved IDE behaviors, hardware calibration, and service logs. The
+next chat starts first-owner registration.
 
 Default retention is 7 days for raw conversations and 180 days for failed
 behaviors (maximum 1,000 failed entries per user). Profiles, preferences, task

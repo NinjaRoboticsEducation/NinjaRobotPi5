@@ -139,6 +139,24 @@ def test_memory_cli_requires_confirmation_and_sends_bounded_settings(monkeypatch
     with pytest.raises(ValueError, match="requires --confirm"):
         asyncio.run(agent_cli._run_memory_command(unconfirmed))  # noqa: SLF001
 
+    reset_arguments = parser.parse_args(["memory", "reset-all", "--confirm"])
+    assert asyncio.run(agent_cli._run_memory_command(reset_arguments)) == 0  # noqa: SLF001
+    service_request.assert_awaited_with(
+        reset_arguments,
+        {"command": "memory_reset_all", "confirmed": True},
+    )
+
+    register_arguments = parser.parse_args(["memory", "register-face", "user-1", "--confirm"])
+    assert asyncio.run(agent_cli._run_memory_command(register_arguments)) == 0  # noqa: SLF001
+    service_request.assert_awaited_with(
+        register_arguments,
+        {
+            "command": "memory_register_face",
+            "user_id": "user-1",
+            "confirmed": True,
+        },
+    )
+
 
 def test_agent_cli_manages_tavily_configuration(tmp_path, capsys) -> None:
     config = tmp_path / "mcp.toml"

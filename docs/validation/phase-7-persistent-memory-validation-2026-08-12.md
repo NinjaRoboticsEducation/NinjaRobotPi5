@@ -17,6 +17,8 @@ camera privacy, Greeting/Idle presentation, or provider behavior. The scope is:
 - successful and failed behavior capture
 - bounded automatic and MCP retrieval
 - deterministic profile/memory deletion and retention
+- deterministic inactive-profile face recovery and full-memory reset
+- exact face verification before terminal/web user switching
 - restart, long-run responsiveness, database size, and permissions
 
 No managed `pi5*` driver changed. The agent must continue to reach the camera
@@ -62,7 +64,7 @@ Expected:
 - immutable check reports 222 tracked files and 26 authorized repairs
 - face backend check reports OpenCV 4.x and a loadable Haar cascade
 - compilation, Ruff, and mypy succeed
-- 405 tests pass (or a documented later count with no regression)
+- 411 tests pass (or a documented later count with no regression)
 - benchmark reports `passed: true`, p95 at or below 100 ms, and database size
   at or below 16 MiB
 
@@ -89,8 +91,9 @@ These tests do not move actuators.
 
 3. Run `/new user`, enter a second name, then `/switch user` twice.
 
-   Expected: each switch is explicit; history shown after switching contains
-   only the active user's messages. Switching revokes motion/camera grants.
+   Expected in simulation: a profile without an enrolled face cannot switch;
+   the original user remains active and the response directs the operator to
+   deterministic face recovery. History remains user-isolated.
 
 4. Restart the service and open a new chat session.
 
@@ -112,6 +115,11 @@ These tests do not move actuators.
 
    Expected: a visible memory-saved notice appears and the answer uses Ninja,
    even if an older transcript message used another assistant name.
+
+8. From **Manage Memory**, choose **Clean All Robot Memory**, but enter an
+   incorrect confirmation phrase.
+
+   Expected: the operation is cancelled and all profiles remain.
 
 ## Device communication tests (camera/display, no actuator motion)
 
@@ -144,16 +152,40 @@ These tests do not move actuators.
    Expected: directories are `700`, files are `600`, one cropped known-face
    photo/index exists, and no `identity-*.jpg` full frame remains.
 
-4. Run `/identify` with one registered face, no face, one unknown face, and two
+4. Run `/switch user`, select another enrolled profile, and present that exact
+   user's face.
+
+   Expected: the countdown runs, Idle is restored, and the switch succeeds only
+   for the exact selected profile. Repeat while showing a different registered
+   face: the response reports a mismatch without naming that person, the
+   original user remains active, and motion/camera grants are revoked. Repeat
+   from both terminal chat and web chat.
+
+5. Run `/identify` with one registered face, no face, one unknown face, and two
    faces in view.
 
    Expected: only the unique known-face case switches. Every other case reports
    no switch and preserves the previous active user.
 
-5. Temporarily disconnect/disable the camera and register a profile.
+6. Temporarily disconnect/disable the camera and register or switch a profile.
 
    Expected: profile creation succeeds with pending face status; chat, display,
    buzzer, and other hardware remain usable. Reconnect before continuing.
+
+7. Select **Manage Memory → Register or Replace User Face** for an existing
+   inactive profile.
+
+   Expected: the countdown runs without switching the active chat user; success
+   makes the profile eligible for verified switching and returns to Idle.
+
+8. Back up the database and face directory, then select **Clean All Robot
+   Memory** and type the exact confirmation phrase.
+
+   Expected: all profiles and face files disappear, memory settings return to
+   configured defaults, motion/camera grants are revoked, and the next chat asks
+   for the new owner's name. Provider/model settings, saved IDE behaviors,
+   calibration, and logs remain. Repeat with an induced database failure only
+   in a disposable test environment; quarantined face data must be restored.
 
 ## Behavior capture tests
 
@@ -224,8 +256,13 @@ appear.
 - [ ] 100 bounded retrievals remain responsive and within 4,000 characters
 - [ ] face full frames are absent after success, failure, and cancellation
 - [ ] unknown/multiple faces never switch users
+- [ ] selected-user switches require an exact face match in terminal and web
+- [ ] mismatches retain the original user and reveal no other profile name
+- [ ] inactive-profile face recovery never switches the active chat user
 - [ ] profile deletion rejects active users and owners before transfer
 - [ ] confirmed deletion removes messages, structured memory, face index/photo
+- [ ] cancelled reset preserves all data; confirmed reset leaves no owner/data
+- [ ] first chat after reset starts owner registration with default retention
 - [ ] failed-behavior pruning enforces days and cap per user
 - [ ] display/buzzer/servo behavior remains stable for the full run
 - [ ] immutable-driver verification still passes

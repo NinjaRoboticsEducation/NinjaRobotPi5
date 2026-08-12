@@ -91,6 +91,11 @@ class MemoryStore:
         MemorySettings.model_validate(updated.model_dump())
         return await asyncio.to_thread(self._update_settings_sync, updated, actor)
 
+    async def reset_all(self, defaults: MemorySettings) -> dict[str, int]:
+        """Delete all user-scoped memory and restore configured defaults atomically."""
+        MemorySettings.model_validate(defaults.model_dump())
+        return await asyncio.to_thread(self._reset_all_sync, defaults)
+
     async def create_profile(
         self,
         display_name: str,
@@ -472,6 +477,48 @@ class MemoryStore:
                 detail=settings.model_dump(mode="json"),
             )
         return settings
+
+    def _reset_all_sync(self, defaults: MemorySettings) -> dict[str, int]:
+        table_names = (
+            "users",
+            "face_profiles",
+            "preferences",
+            "memory_items",
+            "behavior_attempts",
+            "pending_memory_confirmations",
+            "sessions",
+            "messages",
+            "memory_audit_events",
+            "memory_fts",
+        )
+        with self._lock, self._require_connection() as connection:
+            deleted = {
+                table: int(connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+                for table in table_names
+            }
+            connection.execute("DELETE FROM memory_fts")
+            connection.execute("DELETE FROM sessions")
+            connection.execute("DELETE FROM users")
+            connection.execute("DELETE FROM memory_audit_events")
+            connection.execute(
+                """
+                UPDATE memory_settings SET
+                    conversation_retention_days = ?,
+                    failed_behavior_retention_days = ?,
+                    failed_behavior_cap = ?,
+                    retrieval_limit = ?,
+                    retrieval_character_budget = ?
+                WHERE settings_id = 1
+                """,
+                (
+                    defaults.conversation_retention_days,
+                    defaults.failed_behavior_retention_days,
+                    defaults.failed_behavior_cap,
+                    defaults.retrieval_limit,
+                    defaults.retrieval_character_budget,
+                ),
+            )
+        return deleted
 
     def _create_profile_sync(
         self,

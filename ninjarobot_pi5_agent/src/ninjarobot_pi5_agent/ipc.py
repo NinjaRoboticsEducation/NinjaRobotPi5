@@ -260,20 +260,31 @@ class AgentIPCServer:
             )
             await _write_message(writer, {"type": "result", "data": result})
             return
-        if command in {"memory_delete_profile", "memory_transfer_owner", "memory_delete"}:
+        if command in {
+            "memory_delete_profile",
+            "memory_transfer_owner",
+            "memory_delete",
+            "memory_register_face",
+            "memory_reset_all",
+        }:
             if payload.get("confirmed") is not True:
                 raise ValueError("memory mutation requires confirmed=true")
-            user_id = _required_text(payload, "user_id")
+            if command == "memory_reset_all":
+                data = await self._runtime.reset_all_memory()
+            else:
+                user_id = _required_text(payload, "user_id")
             if command == "memory_delete_profile":
                 await self._runtime.delete_memory_profile(user_id)
                 data = {"user_id": user_id, "deleted": True}
             elif command == "memory_transfer_owner":
                 await self._runtime.transfer_memory_owner(user_id)
                 data = {"user_id": user_id, "owner": True}
-            else:
+            elif command == "memory_delete":
                 memory_id = _required_text(payload, "memory_id")
                 deleted = await self._runtime.delete_behavior_memory(user_id, memory_id)
                 data = {"user_id": user_id, "memory_id": memory_id, "deleted": deleted}
+            elif command == "memory_register_face":
+                data = await self._runtime.register_memory_profile_face(user_id)
             await _write_message(writer, {"type": "result", "data": data})
             return
         if command == "arm_motion":
