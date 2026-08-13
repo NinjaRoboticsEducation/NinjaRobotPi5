@@ -183,6 +183,7 @@ def test_gemini_replays_native_function_call_ids_and_thought_signatures(tmp_path
         assert initial.tool_calls[0].provider_metadata == {
             "provider": "gemini",
             "thought_signature": "opaque-signature",
+            "call_id_source": "native",
         }
 
         continuation = first_request.model_copy(
@@ -277,6 +278,74 @@ def test_gemini_flattens_foreign_tool_history_to_reference_text(tmp_path) -> Non
         )
         final = await provider.generate(request)
         assert final.text == "Recovered."
+        payload = captured["payload"]
+        assert isinstance(payload, dict)
+        serialized = json.dumps(payload["contents"])
+        assert "functionCall" not in serialized
+        assert "functionResponse" not in serialized
+        assert "Trusted historical tool result" in serialized
+        await provider.close()
+        await client.aclose()
+
+    asyncio.run(exercise())
+
+
+def test_gemini_flattens_legacy_synthetic_gemini_call_ids(tmp_path) -> None:
+    async def exercise() -> None:
+        captured: dict[str, object] = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured["payload"] = json.loads(request.content)
+            return httpx.Response(
+                200,
+                json={
+                    "candidates": [
+                        {
+                            "content": {"role": "model", "parts": [{"text": "Recovered."}]},
+                            "finishReason": "STOP",
+                        }
+                    ]
+                },
+            )
+
+        store = SecretStore(tmp_path / "secrets.env")
+        store.set("GEMINI_API_KEY", "test-gemini-key")
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            base_url="https://generativelanguage.googleapis.com/v1beta",
+        )
+        provider = GeminiProvider(
+            GeminiConfig(model="gemini-3.6-flash"),
+            APIKeyCredential(store, "GEMINI_API_KEY", "x-goog-api-key"),
+            client=client,
+        )
+        request = _request().model_copy(
+            update={
+                "messages": (
+                    ModelMessage(role=MessageRole.USER, content="Read memory."),
+                    ModelMessage(
+                        role=MessageRole.ASSISTANT,
+                        content="",
+                        tool_calls=(
+                            ToolCall(
+                                call_id="gemini-old-request-0",
+                                name="memory.profile.get",
+                                arguments={},
+                                provider_metadata={"provider": "gemini"},
+                            ),
+                        ),
+                    ),
+                    ModelMessage(
+                        role=MessageRole.TOOL,
+                        name="memory.profile.get",
+                        tool_call_id="gemini-old-request-0",
+                        content='{"status":"succeeded"}',
+                    ),
+                    ModelMessage(role=MessageRole.USER, content="Continue."),
+                )
+            }
+        )
+        assert (await provider.generate(request)).text == "Recovered."
         payload = captured["payload"]
         assert isinstance(payload, dict)
         serialized = json.dumps(payload["contents"])

@@ -553,7 +553,7 @@ PolicyEngine → ToolRegistry → IDE, robot MCP, or external MCP
 Cloud adapters use documented HTTPS JSON and Server-Sent Events endpoints:
 
 - **OpenAI**: Responses API with `store=false`, manual function calls, streamed text deltas, `GET /v1/models`
-- **Gemini**: `generateContent`/`streamGenerateContent`, function declarations without callable Python functions, filtered model list. Gemini-native tool calls persist their exact call ID and opaque thought signature; the matching function response replays that ID. Older or non-Gemini tool traces are supplied only as bounded historical reference text after provider switching, never forged as Gemini function calls.
+- **Gemini**: `generateContent`/`streamGenerateContent`, function declarations without callable Python functions, filtered model list. Gemini-native tool calls persist their exact call ID and opaque thought signature; when replayed, the signature is a sibling field of the `functionCall` part and the matching function response replays that exact ID. Older or non-Gemini tool traces are supplied only as bounded historical reference text after provider switching, never forged as Gemini function calls.
 - **Anthropic**: Messages API, streamed content blocks and `tool_use` JSON, paginated Models API
 
 Cloud adapters can **propose** tools but cannot **execute** them. The existing policy and registry remain the only execution path.

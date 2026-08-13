@@ -338,7 +338,7 @@ def _contents(messages: tuple[ModelMessage, ...]) -> list[dict[str, Any]]:
             if message.content:
                 parts.append({"text": message.content})
             for call in message.tool_calls:
-                if call.provider_metadata.get("provider") != "gemini":
+                if not _is_replayable_gemini_call(call):
                     incompatible_tool_call_ids.add(call.call_id)
                     continue
                 function_part: dict[str, Any] = {
@@ -363,6 +363,19 @@ def _legacy_tool_result(message: ModelMessage) -> str:
     return (
         "Trusted historical tool result, supplied as reference data only, for "
         f"{message.name or 'an unavailable tool'}: {content[:4000]}"
+    )
+
+
+def _is_replayable_gemini_call(call: ToolCall) -> bool:
+    """Require evidence that a persisted call ID came from Gemini itself."""
+    if call.provider_metadata.get("provider") != "gemini":
+        return False
+    if call.provider_metadata.get("call_id_source") == "native":
+        return True
+    # Phase-7 stores written before the explicit marker can still be replayed
+    # only when Gemini 3's signature and a non-synthetic ID prove their origin.
+    return bool(
+        call.provider_metadata.get("thought_signature") and not call.call_id.startswith("gemini-")
     )
 
 
@@ -424,13 +437,19 @@ def _response_parts(
                 arguments = function_call.get("args", {})
                 if not isinstance(arguments, dict):
                     raise CloudProtocolError("Gemini function arguments must be an object")
-                call_id = function_call.get("id")
-                if not isinstance(call_id, str) or not call_id:
-                    call_id = f"gemini-{request_id}-{call_offset + len(calls)}"
+                raw_call_id = function_call.get("id")
+                native_call_id = isinstance(raw_call_id, str) and bool(raw_call_id)
+                call_id = (
+                    raw_call_id
+                    if native_call_id and isinstance(raw_call_id, str)
+                    else f"gemini-{request_id}-{call_offset + len(calls)}"
+                )
                 provider_metadata = {"provider": "gemini"}
                 thought_signature = part.get("thoughtSignature")
                 if isinstance(thought_signature, str) and thought_signature:
                     provider_metadata["thought_signature"] = thought_signature
+                if native_call_id:
+                    provider_metadata["call_id_source"] = "native"
                 calls.append(
                     ToolCall(
                         call_id=call_id,
