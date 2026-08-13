@@ -83,6 +83,57 @@ retrieval_limit = 6
 retrieval_character_budget = 4000
 face_data_directory = "~/.local/share/ninjarobot_pi5/faces"
 
+# Phase 8 release features remain opt-in. Enabling voice does not arm motion.
+[voice_input]
+enabled = false
+model_resource = "ninjarobot_pi5_ide/assets/hey_Ninja.onnx"
+inference_framework = "onnx"
+wake_threshold = 0.5
+vad_enabled = true
+wake_vad_threshold = 0.3
+silence_rms_threshold = 200
+noise_suppression_enabled = false
+max_command_seconds = 15.0
+silence_stop_seconds = 1.25
+cooldown_seconds = 1.0
+frame_milliseconds = 80
+language = "en"
+retry_limit = 2
+
+# NGROK_AUTHTOKEN is stored in the private secret file, never in this TOML.
+[remote_access]
+enabled = false
+config_file = "~/.config/ninjarobot_pi5/ngrok.yml"
+executable = "~/.local/share/ninjarobot_pi5/bin/ngrok"
+authtoken_env = "NGROK_AUTHTOKEN"
+pairing_secret_env = "NINJAROBOT_PAIRING_SECRET"
+session_secret_env = "NINJAROBOT_SESSION_SECRET"
+remote_header_secret_env = "NINJAROBOT_REMOTE_HEADER_SECRET"
+local_upstream = "https://127.0.0.1:8443"
+connect_timeout_seconds = 30.0
+retry_initial_seconds = 2.0
+retry_max_seconds = 120.0
+retry_limit = 10
+health_interval_seconds = 30.0
+pairing_lifetime_seconds = 300
+session_lifetime_seconds = 86400
+
+[onboarding]
+enabled = false
+qr_error_correction = "M"
+qr_border_modules = 4
+greeting_behavior = "greeting"
+idle_behavior = "idle"
+connection_timeout_seconds = 60.0
+
+# The installer changes these only after an explicit operator confirmation.
+[deployment]
+auto_start_enabled = false
+web_poweroff_enabled = false
+systemd_unit_name = "ninjarobot-agent.service"
+restart_policy = "on-failure"
+poweroff_helper = "/usr/libexec/ninjarobot-poweroff"
+
 [providers.ollama]
 kind = "ollama"
 model = "configured-by-user"

@@ -25,11 +25,13 @@ from .errors import IDEError
 from .identity import FaceIdentityDevice
 from .ledger import ActionLedger
 from .microphone import (
+    ManagedVoiceAudioSource,
     MicrophoneCaptureAdapter,
     MicrophoneStatusAdapter,
     MicrophoneTranscribeAdapter,
     SimulatedSpeechTranscriber,
     WhisperCppTranscriber,
+    build_managed_wake_detector,
 )
 from .models import (
     ActionRecord,
@@ -45,6 +47,13 @@ from .models import (
 from .registry import CapabilityRegistry
 from .robot import RobotAssembly
 from .servo import ServoMoveAdapter, ServoStatusAdapter, ServoStopAdapter
+from .voice_input import (
+    TranscriptHandler,
+    VoiceInputController,
+    VoiceInputError,
+    VoiceStatusHandler,
+    WakeWordDetector,
+)
 
 
 class _InlineBehaviorAdapter:
@@ -457,10 +466,12 @@ class RobotIDEClient:
         robot: RobotAssembly,
         engine: ExecutionEngine,
         identity: FaceIdentityDevice,
+        voice_input: VoiceInputController | None = None,
     ) -> None:
         self.robot = robot
         self._engine = engine
         self._identity = identity
+        self._voice_input = voice_input
         self._started = False
         self._closed = False
 
@@ -488,6 +499,58 @@ class RobotIDEClient:
         if not self._started:
             raise RuntimeError("robot IDE client is not started")
         return await self.robot.start_liveliness()
+
+    async def show_onboarding_qr(self, url: str) -> dict[str, Any]:
+        """Display a validated pairing QR through the IDE-owned presentation path."""
+        if not self._started:
+            raise RuntimeError("robot IDE client is not started")
+        return await self.robot.show_onboarding_qr(url)
+
+    async def show_onboarding_status(self, state: str) -> dict[str, Any]:
+        """Display one bounded onboarding status, never arbitrary agent text."""
+        if not self._started:
+            raise RuntimeError("robot IDE client is not started")
+        if state not in {"connecting", "error"}:
+            raise ValueError("onboarding state must be connecting or error")
+        return await self.robot.show_onboarding_status(state)
+
+    async def prepare_onboarding_greeting(self) -> dict[str, Any]:
+        """Clear onboarding presentation before Greeting runs exactly once."""
+        if not self._started:
+            raise RuntimeError("robot IDE client is not started")
+        return await self.robot.prepare_onboarding_greeting()
+
+    def bind_voice_handlers(
+        self,
+        *,
+        transcript_handler: TranscriptHandler,
+        status_handler: VoiceStatusHandler,
+    ) -> None:
+        """Connect IDE voice events to the agent after both layers exist."""
+        if self._voice_input is None:
+            raise VoiceInputError("listener_unavailable")
+        self._voice_input.bind_handlers(
+            transcript_handler=transcript_handler,
+            status_handler=status_handler,
+        )
+
+    async def start_voice_input(self) -> dict[str, object]:
+        """Activate the single IDE-owned microphone listener."""
+        if self._voice_input is None:
+            raise VoiceInputError("listener_unavailable")
+        return await self._voice_input.start()
+
+    async def stop_voice_input(self) -> dict[str, object]:
+        """Stop listening and release raw microphone ownership."""
+        if self._voice_input is None:
+            return {"enabled": False, "state": "disabled"}
+        return await self._voice_input.stop()
+
+    def voice_input_status(self) -> dict[str, object]:
+        """Return privacy-safe listener status without probing hardware."""
+        if self._voice_input is None:
+            return {"enabled": False, "state": "disabled"}
+        return self._voice_input.status()
 
     async def show_agent_face(self, expression: str) -> bool:
         """Request an ambient face without exposing display hardware to the agent."""
@@ -615,6 +678,8 @@ class RobotIDEClient:
         if self._closed:
             return
         self._closed = True
+        if self._voice_input is not None:
+            await self._voice_input.stop()
         await self._identity.close()
         await self._engine.close()
         await self.robot.close()
@@ -684,4 +749,43 @@ def build_robot_ide_client(
         robot.camera,
         data_directory=config.memory.face_data_directory,
     )
-    return RobotIDEClient(robot, engine, identity)
+    voice_config = config.voice_input
+    voice_assets = Path(__file__).with_name("assets")
+    model_path = voice_assets / "hey_Ninja.onnx"
+
+    def detector_factory() -> WakeWordDetector:
+        if simulated:
+            raise VoiceInputError("simulation_voice_unavailable")
+        return build_managed_wake_detector(
+            model_path=model_path,
+            threshold=voice_config.wake_threshold,
+            vad_threshold=(voice_config.wake_vad_threshold if voice_config.vad_enabled else 0.0),
+            enable_noise_suppression=voice_config.noise_suppression_enabled,
+            inference_framework=voice_config.inference_framework,
+            runtime_asset_directory=voice_assets / "openwakeword",
+        )
+
+    def source_factory() -> ManagedVoiceAudioSource:
+        if simulated:
+            raise VoiceInputError("simulation_voice_unavailable")
+        microphone = config.hardware.microphone
+        return ManagedVoiceAudioSource(
+            selector=microphone.device_selector,
+            requested_sample_rate=microphone.sample_rate_hz,
+            channels=microphone.channels,
+        )
+
+    voice_input = VoiceInputController(
+        detector_factory=detector_factory,
+        audio_source_factory=source_factory,
+        transcriber=transcriber,
+        max_command_seconds=voice_config.max_command_seconds,
+        silence_stop_seconds=voice_config.silence_stop_seconds,
+        cooldown_seconds=voice_config.cooldown_seconds,
+        vad_enabled=voice_config.vad_enabled,
+        silence_rms_threshold=voice_config.silence_rms_threshold,
+        language=voice_config.language,
+        retry_limit=voice_config.retry_limit,
+    )
+    robot.microphone.set_voice_coordinator(voice_input)
+    return RobotIDEClient(robot, engine, identity, voice_input)

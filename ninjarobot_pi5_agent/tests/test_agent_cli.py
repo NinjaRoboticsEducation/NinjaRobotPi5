@@ -20,6 +20,8 @@ from ninjarobot_pi5_ide import load_robot_config
 
 from .test_skills import write_skill
 
+ROOT = Path(__file__).resolve().parents[2]
+
 
 def run_cli(arguments: list[str]) -> None:
     with pytest.raises(SystemExit) as exit_info:
@@ -102,6 +104,38 @@ def test_chat_camera_grants_one_temporary_capture(monkeypatch, capsys) -> None:
     assert "one temporary photo" in output
     assert "failed capture keeps the grant" in output
     assert "use /camera again" in output
+
+
+def test_chat_voice_commands_bypass_the_model_and_use_exact_service_commands(
+    monkeypatch,
+    capsys,
+) -> None:
+    inputs = iter(
+        (
+            "/voice input status",
+            "/voice input on",
+            "/voice input off",
+            "/exit",
+        )
+    )
+    monkeypatch.setattr("builtins.input", lambda _prompt="": next(inputs))
+    service_request = AsyncMock(return_value=0)
+    monkeypatch.setattr(agent_cli, "_service_request", service_request)
+
+    result = asyncio.run(
+        agent_cli._chat_repl(  # noqa: SLF001
+            SimpleNamespace(),
+            session_id="local-cli",
+        )
+    )
+
+    assert result == 0
+    assert [call.args[1] for call in service_request.await_args_list] == [
+        {"command": "voice_status"},
+        {"command": "voice_enable"},
+        {"command": "voice_disable"},
+    ]
+    assert "/voice input status" not in capsys.readouterr().err
 
 
 def test_memory_cli_requires_confirmation_and_sends_bounded_settings(monkeypatch) -> None:
@@ -210,6 +244,48 @@ def test_agent_cli_secret_prompt_never_prints_value(
     output = capsys.readouterr().out
     assert "private-api-key" not in output
     assert SecretStore(secrets).get("TAVILY_API_KEY") == "private-api-key"
+
+
+def test_remote_setup_hides_token_installs_only_explicitly_and_saves_pairing_secrets(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    token = "ngrok-secret-authtoken-value"
+    prompts = iter((token, token))
+    monkeypatch.setattr(agent_cli.getpass, "getpass", lambda _prompt: next(prompts))
+    installed: list[Path] = []
+
+    def install(path: str | Path) -> Path:
+        destination = Path(path).expanduser()
+        installed.append(destination)
+        return destination
+
+    monkeypatch.setattr(agent_cli, "install_ngrok_binary", install)
+    parser = agent_cli.build_parser()
+    secret_file = tmp_path / "secrets.env"
+    arguments = parser.parse_args(
+        [
+            "--config",
+            str(ROOT / "config/ninjarobot_pi5.toml.example"),
+            "--secret-file",
+            str(secret_file),
+            "remote",
+            "configure",
+        ]
+    )
+
+    assert asyncio.run(agent_cli._run_remote_command(arguments)) == 0  # noqa: SLF001
+
+    output = capsys.readouterr().out
+    store = SecretStore(secret_file)
+    assert token not in output
+    assert installed == [Path("~/.local/share/ninjarobot_pi5/bin/ngrok").expanduser()]
+    assert store.get("NGROK_AUTHTOKEN") == token
+    assert store.contains("NINJAROBOT_PAIRING_SECRET")
+    assert store.contains("NINJAROBOT_SESSION_SECRET")
+    assert store.contains("NINJAROBOT_REMOTE_HEADER_SECRET")
+    assert secret_file.stat().st_mode & 0o777 == 0o600
 
 
 def test_agent_cli_validates_installs_simulates_and_removes_skill(
@@ -450,3 +526,65 @@ def test_service_start_waits_for_liveliness_result_before_reporting(
     assert output["started"] is True
     assert output["ready"] is False
     assert output["status"] == detailed
+
+
+def test_service_start_reports_onboarding_without_waiting_for_greeting(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    onboarding = {
+        "started": True,
+        "ready": True,
+        "operational_state": "onboarding",
+        "startup": {"complete": False, "liveliness": "pending"},
+    }
+
+    class FakeClient:
+        def __init__(self) -> None:
+            self.responses = iter(
+                (
+                    agent_cli.AgentIPCError("not running"),
+                    {"data": onboarding},
+                    {"data": onboarding},
+                )
+            )
+
+        async def request(self, _payload):
+            response = next(self.responses)
+            if isinstance(response, Exception):
+                raise response
+            return response
+
+    namespace = SimpleNamespace(
+        socket=tmp_path / "agent.sock",
+        lock=tmp_path / "agent.lock",
+        database=tmp_path / "conversation.sqlite3",
+        ledger=tmp_path / "ledger.sqlite3",
+        config=tmp_path / "config.toml",
+        mcp_config=tmp_path / "mcp.toml",
+        secret_file=tmp_path / "secrets.env",
+        skill_dir=tmp_path / "skills",
+        benchmark_dir=tmp_path / "benchmarks",
+        whisper_command=tmp_path / "whisper-cli",
+        whisper_model=tmp_path / "whisper.bin",
+        whisper_threads=4,
+        web_host="127.0.0.1",
+        web_port=8443,
+        web_certificate=tmp_path / "cert.pem",
+        web_key=tmp_path / "key.pem",
+        model=None,
+        base_url=None,
+        real=True,
+    )
+    process = SimpleNamespace(pid=4242, poll=Mock(return_value=None), terminate=Mock())
+    monkeypatch.setattr(agent_cli, "AgentIPCClient", lambda _socket: FakeClient())
+    monkeypatch.setattr(agent_cli, "_service_namespace", lambda _arguments: namespace)
+    monkeypatch.setattr(agent_cli, "DEFAULT_SERVICE_LOG", tmp_path / "agent.log")
+    monkeypatch.setattr(agent_cli.subprocess, "Popen", Mock(return_value=process))
+
+    result = asyncio.run(
+        agent_cli._spawn_service(SimpleNamespace(service_socket=namespace.socket))  # noqa: SLF001
+    )
+
+    assert result == 0
+    assert json.loads(capsys.readouterr().out)["status"] == onboarding
+    process.terminate.assert_not_called()

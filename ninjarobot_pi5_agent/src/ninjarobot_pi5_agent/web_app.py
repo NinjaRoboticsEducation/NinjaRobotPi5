@@ -18,12 +18,19 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .events import AgentEvent
+from .pairing import (
+    REMOTE_MARKER_HEADER,
+    SESSION_COOKIE_NAME,
+    PairingError,
+    PairingSessionManager,
+)
 from .runtime import AgentRuntime
+from .shutdown import PoweroffCoordinator
 from .web_control import (
     ControllerLeaseManager,
     ControllerLockedError,
@@ -32,6 +39,24 @@ from .web_control import (
 )
 
 MAX_WEB_MESSAGE_BYTES = 64 * 1024
+_PAIRING_BOOTSTRAP_HTML = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NinjaRobot Pairing</title><style>
+body{font-family:system-ui,sans-serif;background:#101318;color:#fff;display:grid;
+place-items:center;min-height:100vh;margin:0}main{max-width:28rem;padding:2rem;text-align:center}
+</style></head><body><main><h1>NinjaRobot Pairing</h1>
+<p id="status">Checking this one-time pairing link…</p></main><script>
+(async()=>{const output=document.querySelector('#status');
+const token=new URLSearchParams(location.hash.slice(1)).get('pair');
+history.replaceState(null,'',location.pathname);
+if(!token){output.textContent='Scan a fresh QR code shown by NinjaRobot.';return;}
+try{const response=await fetch('/pair',{method:'POST',credentials:'same-origin',
+headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
+if(!response.ok)throw new Error('pairing rejected');location.replace('/');}
+catch(_error){output.textContent='This pairing link is invalid, expired, or already used. '
++'Scan a fresh QR code.';}
+})();</script></body></html>"""
 
 
 def local_ca_paths(certificate_path: str | Path) -> tuple[Path, Path]:
@@ -60,7 +85,9 @@ def ensure_local_ca_certificate(
             ca = x509.load_pem_x509_certificate(ca_certificate.read_bytes())
             if existing.issuer != ca.subject:
                 return certificate, key
-            if _certificate_dns_names(existing) >= _required_dns_names():
+            if _certificate_dns_names(existing) >= _required_dns_names() and _certificate_ip_names(
+                existing
+            ) >= {"127.0.0.1", "::1"}:
                 _ensure_served_certificate_chain(certificate, existing, ca)
                 return certificate, key
             certificate.unlink()
@@ -256,6 +283,14 @@ def _certificate_dns_names(certificate: x509.Certificate) -> set[str]:
     return set(extension.value.get_values_for_type(x509.DNSName))
 
 
+def _certificate_ip_names(certificate: x509.Certificate) -> set[str]:
+    try:
+        extension = certificate.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+    except x509.ExtensionNotFound:
+        return set()
+    return {str(address) for address in extension.value.get_values_for_type(x509.IPAddress)}
+
+
 def _is_legacy_managed_certificate(certificate: x509.Certificate) -> bool:
     organizations = certificate.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)
     return certificate.subject == certificate.issuer and any(
@@ -269,6 +304,10 @@ def create_web_app(
     controller: WebRobotController,
     leases: ControllerLeaseManager,
     static_directory: str | Path,
+    pairing: PairingSessionManager | None = None,
+    poweroff: PoweroffCoordinator | None = None,
+    require_local_pairing: bool = False,
+    on_authenticated_controller: Callable[[bool, bool], Awaitable[None]] | None = None,
 ) -> FastAPI:
     """Build the fixed local-network API; arbitrary tool calls are never exposed."""
     static_root = Path(static_directory).resolve()
@@ -278,7 +317,90 @@ def create_web_app(
         redoc_url=None,
         openapi_url=None,
     )
+
+    @app.middleware("http")
+    async def pairing_boundary(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        if pairing is None:
+            return await call_next(request)
+        try:
+            scope = pairing.request_scope(
+                request.headers.get("host", ""),
+                remote_marker=request.headers.get(REMOTE_MARKER_HEADER),
+            )
+        except PairingError:
+            return PlainTextResponse("Invalid request host.", status_code=421)
+        if scope == "denied":
+            return PlainTextResponse("Unknown request host.", status_code=421)
+        if request.url.path == "/pair":
+            return await call_next(request)
+        if scope == "local" and not require_local_pairing:
+            return await call_next(request)
+        session = request.cookies.get(SESSION_COOKIE_NAME)
+        try:
+            authorized = pairing.authorize_controller(
+                session,
+                origin=request.headers.get("origin"),
+                host=request.headers.get("host", ""),
+                remote_marker=request.headers.get(REMOTE_MARKER_HEADER),
+                require_origin=False,
+            )
+        except PairingError:
+            authorized = False
+        if authorized:
+            response = await call_next(request)
+            response.headers["Cache-Control"] = "no-store"
+            return response
+        if request.method == "GET" and request.url.path == "/":
+            return HTMLResponse(
+                _PAIRING_BOOTSTRAP_HTML,
+                headers={
+                    "Cache-Control": "no-store",
+                    "Content-Security-Policy": (
+                        "default-src 'none'; script-src 'unsafe-inline'; "
+                        "style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'"
+                    ),
+                    "Referrer-Policy": "no-referrer",
+                },
+            )
+        return PlainTextResponse("Remote browser pairing required.", status_code=401)
+
     app.mount("/assets", StaticFiles(directory=static_root), name="assets")
+
+    @app.post("/pair", include_in_schema=False)
+    async def pair_browser(request: Request) -> JSONResponse:
+        if pairing is None:
+            return JSONResponse({"paired": False}, status_code=404)
+        raw = await request.body()
+        if len(raw) > 2048:
+            return JSONResponse({"paired": False}, status_code=413)
+        try:
+            payload = json.loads(raw)
+            token = payload.get("token") if isinstance(payload, dict) else None
+            if not isinstance(token, str):
+                raise PairingError("pairing token is malformed")
+            session = pairing.exchange(
+                token,
+                origin=request.headers.get("origin"),
+                host=request.headers.get("host", ""),
+                remote_marker=request.headers.get(REMOTE_MARKER_HEADER),
+            )
+        except (json.JSONDecodeError, PairingError):
+            return JSONResponse({"paired": False}, status_code=401)
+        response = JSONResponse({"paired": True})
+        response.set_cookie(
+            SESSION_COOKIE_NAME,
+            session,
+            secure=True,
+            httponly=True,
+            samesite="strict",
+            max_age=pairing.session_lifetime_seconds,
+            path="/",
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     @app.get("/", include_in_schema=False)
     async def index() -> FileResponse:
@@ -294,6 +416,36 @@ def create_web_app(
 
     @app.websocket("/ws")
     async def websocket_controller(websocket: WebSocket) -> None:
+        remote_connection = False
+        paired_connection = False
+        if pairing is not None:
+            try:
+                scope = pairing.request_scope(
+                    websocket.headers.get("host", ""),
+                    remote_marker=websocket.headers.get(REMOTE_MARKER_HEADER),
+                )
+                if scope == "denied":
+                    raise PairingError("unknown request host")
+                remote_connection = scope == "remote"
+                try:
+                    paired_connection = pairing.authorize_controller(
+                        websocket.cookies.get(SESSION_COOKIE_NAME),
+                        origin=websocket.headers.get("origin"),
+                        host=websocket.headers.get("host", ""),
+                        remote_marker=websocket.headers.get(REMOTE_MARKER_HEADER),
+                    )
+                except PairingError:
+                    paired_connection = False
+                if (remote_connection or require_local_pairing) and not paired_connection:
+                    raise PairingError("browser pairing required")
+            except PairingError:
+                denial = PlainTextResponse("Remote browser pairing required.", status_code=401)
+                send_denial = getattr(websocket, "send_denial_response", None)
+                if send_denial is not None:
+                    await send_denial(denial)
+                else:
+                    await websocket.close(code=4401, reason="Pairing required")
+                return
         reconnect_token = websocket.query_params.get("reconnect_token")
         browser_chat_id = websocket.query_params.get("browser_chat_id")
         try:
@@ -317,6 +469,8 @@ def create_web_app(
             await leases.release(lease.lease_id)
             await websocket.close(code=4400, reason=str(error))
             return
+        if on_authenticated_controller is not None:
+            await on_authenticated_controller(remote_connection, paired_connection)
         send_lock = asyncio.Lock()
         operation_lock = asyncio.Lock()
         client_tasks: set[asyncio.Task[None]] = set()
@@ -348,6 +502,8 @@ def create_web_app(
                         lease.lease_id,
                         message,
                         send,
+                        poweroff=poweroff,
+                        poweroff_authorized=paired_connection,
                     )
                 else:
                     async with operation_lock:
@@ -356,6 +512,8 @@ def create_web_app(
                             lease.lease_id,
                             message,
                             send,
+                            poweroff=poweroff,
+                            poweroff_authorized=paired_connection,
                         )
                 await send({"type": "result", "request_id": request_id, "data": data})
             except (ValueError, PermissionError, RuntimeError) as exc:
@@ -376,6 +534,8 @@ def create_web_app(
                     "reconnect_token": lease.reconnect_token,
                     "heartbeat_seconds": lease.heartbeat_seconds,
                     "session_id": controller.chat_session(lease.lease_id),
+                    "remote": remote_connection,
+                    "poweroff_authorized": paired_connection,
                 }
             )
             await send(
@@ -448,6 +608,9 @@ async def _dispatch_web_message(
     lease_id: str,
     message: dict[str, Any],
     send: Callable[[dict[str, Any]], Awaitable[None]],
+    *,
+    poweroff: PoweroffCoordinator | None = None,
+    poweroff_authorized: bool = False,
 ) -> dict[str, Any]:
     kind = _required_string(message, "type")
     if kind == "move_start":
@@ -484,6 +647,26 @@ async def _dispatch_web_message(
         )
     if kind == "usb_microphone_stop":
         return await controller.stop_transcription(lease_id)
+    if kind == "voice_enable":
+        return await controller.enable_voice_input()
+    if kind == "voice_disable":
+        return await controller.disable_voice_input()
+    if kind == "voice_status":
+        return controller.voice_input_status()
+    if kind == "poweroff_prepare":
+        if not poweroff_authorized:
+            raise PermissionError("power-off requires a paired controller")
+        if poweroff is None:
+            raise PermissionError("web power-off is unavailable")
+        return await poweroff.issue_nonce(lease_id)
+    if kind == "poweroff_confirm":
+        if not poweroff_authorized:
+            raise PermissionError("power-off requires a paired controller")
+        if message.get("confirmed") is not True:
+            raise PermissionError("power-off requires explicit confirmation")
+        if poweroff is None:
+            raise PermissionError("web power-off is unavailable")
+        return await poweroff.confirm(lease_id, _required_string(message, "nonce"))
     if kind == "chat":
         text = _required_string(message, "text")
 

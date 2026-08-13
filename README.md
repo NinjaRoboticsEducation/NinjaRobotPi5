@@ -7,14 +7,15 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Platform: Raspberry Pi 5](https://img.shields.io/badge/platform-Raspberry%20Pi%205-red.svg)](https://www.raspberrypi.com/)
 [![AI: Local + Cloud](https://img.shields.io/badge/AI-Ollama%20%7C%20OpenAI%20%7C%20Gemini%20%7C%20Anthropic-4285F4.svg)](https://ollama.com/)
-[![Release: Alpha](https://img.shields.io/badge/release-alpha-orange.svg)](InstallationGuide.md)
+[![Release: v1.0.0 RC](https://img.shields.io/badge/release-v1.0.0%20RC-orange.svg)](docs/architecture/v1.0.0-support-matrix.md)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 </div>
 
 ---
 
 > [!WARNING]
-> **Alpha release.** Core features are stable and fully tested in simulation. Physical-device acceptance on the target Raspberry Pi must be completed before normal floor operation. See the [Installation Guide](InstallationGuide.md) before powering the robot.
+> **v1.0.0 release candidate.** The complete software gate passes, but the Phase 8 display, microphone, ngrok, boot, actuator, and power checklists still require operator acceptance on the target Raspberry Pi before public tagging or normal floor operation. See the [support matrix](docs/architecture/v1.0.0-support-matrix.md) and [Installation Guide](InstallationGuide.md).
 
 ---
 
@@ -106,7 +107,7 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 - **Exclusive controller lease** — only one browser controls the robot at a time
 - **Stable browser chat identity** — controller lease renewal or reconnect keeps that browser's chat session without switching terminal sessions or other browsers
 - **Live events panel** — see service and tool activity in real time
-- **Browser speech** — speak commands directly (English and Japanese) on supported browsers
+- **Four-language browser speech** — English, Japanese, Traditional Chinese, and Simplified Chinese on supported browsers
 - **Fullscreen on mobile** — add the controller to your iPhone Home Screen for a standalone app view
 
 ### 🔊 Expression & Sound
@@ -202,6 +203,28 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 | [Implementation Plan](NinjaRobotPi5V4_ImplementationPlan.md) | Authoritative design and phase decisions |
 | [Hardware Profile](docs/hardware/hardware-profile.md) | Confirmed wiring and electrical records |
 | [Phase 7 Pi Validation](docs/validation/phase-7-persistent-memory-validation-2026-08-12.md) | Memory, identity, retention, and hardware checklist |
+| [Phase 8.2 Voice Validation](docs/validation/phase-8-2-voice-input-pi-checklist.md) | Wake word, microphone ownership, privacy, soak, and armed-motion checklist |
+| [Phase 8.3 Remote Validation](docs/validation/phase-8-3-remote-access-pi-checklist.md) | ngrok setup, pairing/replay rejection, recovery, and removal checklist |
+| [Phase 8.4 Web/Power Validation](docs/validation/phase-8-4-web-poweroff-pi-checklist.md) | Four-locale dashboard, accessible menu, preserved controls, shutdown nonce, and power-risk checklist |
+| [Phase 8.5 Onboarding Validation](docs/validation/phase-8-5-onboarding-pi-checklist.md) | QR decoding, remote/local fallback, pairing gate, exactly-once Greeting, and error recovery |
+| [Phase 8.6 systemd Validation](docs/validation/phase-8-6-systemd-pi-checklist.md) | Disabled-by-default install, boot/restart, hardware groups, power-off privilege, upgrade/rollback, and uninstall |
+| [v1.0.0 Release-Candidate Report](docs/validation/v1.0.0-release-candidate-report.md) | Final software, packaging, architecture, privacy/security, residual-risk, and publication status |
+| [v1.0.0 Support Matrix](docs/architecture/v1.0.0-support-matrix.md) | Supported platforms/features, compatibility guarantees, known limitations, and open Pi acceptance |
+
+---
+
+## 📄 License and Release Assets
+
+NinjaRobotPi5 source code is licensed under the [MIT License](LICENSE).
+Third-party dependencies, the optional ngrok service, and model/runtime assets
+retain the terms recorded in [Third-Party Notices](THIRD_PARTY_NOTICES.md).
+
+The approved custom **Hey Ninja** ONNX wake model and its pinned openWakeWord
+feature/VAD assets are packaged with the IDE and protected by recorded SHA-256
+checksums. Always-on voice is opt-in and runs locally: say **Hey Ninja**, speak
+for up to 15 seconds, and the command ends early after silence. No continuous
+audio or command WAV is retained, and v1.0.0 is input-only—replies remain on
+the display/web interface and use existing robot behaviors rather than TTS.
 
 ---
 
@@ -228,6 +251,13 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 | ✅ Persistent multi-user memory, face identity, bounded retrieval | Software complete |
 | ✅ Read-only memory MCP + bundled retrieval skill | Complete |
 | ✅ Interactive/scriptable memory management | Complete |
+| ✅ Phase 8 release configuration, dependency, secret, and status foundations | Complete |
+| ✅ IDE-owned Hey Ninja voice input, four transcription locales, shared safety path | Software complete |
+| ✅ Optional ngrok lifecycle and passwordless, short-lived remote pairing | Software complete; live account validation pending |
+| ✅ Four-locale responsive web menu and safe power-off boundary | Software complete; Pi power-risk validation waits for Phase 8.6 helper installation |
+| ✅ QR onboarding and connection-triggered Greeting | Software complete; Pi display/Greeting validation pending |
+| ✅ Opt-in boot service and narrow power-off deployment | Software complete; Pi boot/power acceptance pending |
+| ✅ v1.0.0 software/package release candidate | Complete; public tag waits for signed Pi acceptance and owner approval |
 | 🔲 Full Raspberry Pi acceptance (benchmark, live hardware) | Pending operator validation |
 
 ---
@@ -240,6 +270,52 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 - The current robot has no accessible physical servo cutoff. Software stop and the watchdog reduce risk but cannot replace a physical power disconnect.
 - Camera and microphone operations require explicit consent from everyone nearby before you add `--real --confirm-camera` or `--real --confirm-microphone`.
 - Profile enrollment intentionally captures a photo after the visible countdown. Cropped profile photos and face data remain readable by the Raspberry Pi administrator and must be treated as personal data.
+- Always-on voice continuously processes short PCM frames locally while it is enabled, but retains no background audio. Use `/voice input off` or the web **VOICE INPUT** control whenever people nearby have not consented.
+- Never share a remote pairing URL or screenshot its fragment. Anyone who possesses a current physical QR/pairing link can claim a browser session until it expires or is rotated.
+
+### Always-on voice commands
+
+Install the hardware/release dependencies and make sure local `whisper.cpp`
+transcription is configured, then start the real service. In terminal chat:
+
+```text
+/voice input on
+/voice input status
+/voice input off
+```
+
+The web **VOICE INPUT** button controls the same global listener. **RECORD
+ONCE** remains available as an independent manual capture; the IDE pauses and
+restores the listener around it. English, Japanese, Traditional Chinese, and
+Simplified Chinese are supported transcription selections. `/arm` or **Arm AI
+motion** also authorizes the independent voice session; voice disablement,
+model replacement, emergency stop, disconnect of the granting browser, and
+service restart revoke that voice motion grant.
+
+### Optional remote access
+
+Remote access is disabled by default. Start the agent service, then use the
+Interactive Tool's **Remote Access** menu, or the scriptable commands:
+
+```bash
+uv run --frozen --extra hardware ninjarobot-agent remote configure
+uv run --frozen --extra hardware ninjarobot-agent remote activate
+uv run --frozen ninjarobot-agent remote pairing-url
+```
+
+`remote configure` is the only operation allowed to download/install the ngrok
+agent. It uses hidden double-entry for the authtoken and stores credentials in
+the owner-only secret store. Service boot never downloads or updates ngrok.
+Open the returned pairing URL on the controlling browser. The URL fragment is
+exchanged once for a Secure/HttpOnly cookie, so there is no second username or
+password prompt. Use `remote rotate-pairing` to revoke browsers and issue a new
+link, or `remote deactivate` to stop the exact tunnel and revoke all sessions.
+
+An ngrok authtoken identifies the Pi agent; it does not authenticate a browser.
+The project therefore enforces its own short-lived pairing, exact Origin/Host
+checks, and an ngrok-injected transport marker before exposing assets or the
+WebSocket controller. ngrok accounts, free-plan interstitials/limits, and
+possible charges remain governed by [ngrok's current limits](https://ngrok.com/docs/pricing-limits/free-plan-limits).
 
 ---
 

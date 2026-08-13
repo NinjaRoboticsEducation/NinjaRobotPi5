@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .models import MemoryKind
+from .remote_access import RemoteAccessService
 from .runtime import AgentRuntime
 from .service import ServiceOwnership
 from .tools import CancellationToken
@@ -32,11 +33,13 @@ class AgentIPCServer:
         socket_path: str | Path,
         ownership: ServiceOwnership,
         web: WebServerManager | None = None,
+        remote_access: RemoteAccessService | None = None,
     ) -> None:
         self._runtime = runtime
         self._socket_path = Path(socket_path).expanduser()
         self._ownership = ownership
         self._web = web
+        self._remote_access = remote_access
         self._server: asyncio.AbstractServer | None = None
         self._stop = asyncio.Event()
 
@@ -78,6 +81,8 @@ class AgentIPCServer:
         if server is not None:
             server.close()
             await server.wait_closed()
+        if self._remote_access is not None:
+            await self._remote_access.close()
         if self._web is not None:
             await self._web.close()
         await self._runtime.close()
@@ -292,6 +297,7 @@ class AgentIPCServer:
                 _required_text(payload, "session_id"),
                 confirmed=payload.get("confirmed") is True,
                 lease_id=_optional_text(payload, "lease_id"),
+                include_voice=True,
             )
             await _write_message(
                 writer,
@@ -304,10 +310,72 @@ class AgentIPCServer:
                 session_id,
                 lease_id=_optional_text(payload, "lease_id"),
                 requested_by="ipc-disarm",
+                include_voice=True,
             )
             await _write_message(
                 writer,
                 {"type": "result", "data": {"motion_armed": False}},
+            )
+            return
+        if command == "voice_enable":
+            await _write_message(
+                writer,
+                {"type": "result", "data": await self._runtime.enable_voice_input()},
+            )
+            return
+        if command == "voice_disable":
+            await _write_message(
+                writer,
+                {"type": "result", "data": await self._runtime.disable_voice_input()},
+            )
+            return
+        if command == "voice_status":
+            await _write_message(
+                writer,
+                {"type": "result", "data": self._runtime.voice_input_status()},
+            )
+            return
+        if command == "remote_activate":
+            if self._remote_access is None:
+                raise AgentIPCError("remote access is not configured")
+            await _write_message(
+                writer,
+                {"type": "result", "data": await self._remote_access.activate()},
+            )
+            return
+        if command == "remote_deactivate":
+            if self._remote_access is None:
+                raise AgentIPCError("remote access is not configured")
+            await _write_message(
+                writer,
+                {"type": "result", "data": await self._remote_access.deactivate()},
+            )
+            return
+        if command == "remote_status":
+            if self._remote_access is None:
+                raise AgentIPCError("remote access is not configured")
+            await _write_message(
+                writer,
+                {"type": "result", "data": self._remote_access.status()},
+            )
+            return
+        if command == "remote_pairing_url":
+            if self._remote_access is None:
+                raise AgentIPCError("remote access is not configured")
+            await _write_message(
+                writer,
+                {
+                    "type": "result",
+                    "data": {"pairing_url": self._remote_access.pairing_url()},
+                },
+            )
+            return
+        if command == "remote_rotate_pairing":
+            if self._remote_access is None:
+                raise AgentIPCError("remote access is not configured")
+            await _write_message(
+                writer,
+                {"type": "result", "data": await self._remote_access.rotate_pairing()},
             )
             return
         if command == "resume_system":

@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import getpass
 import json
+import secrets as secure_random
 import subprocess
 import sys
 from pathlib import Path
@@ -18,6 +19,7 @@ from ninjarobot_pi5_ide import RiskLevel, load_robot_config
 from .benchmark import BenchmarkCase, ModelBenchmark
 from .cloud_common import CloudProviderError
 from .cloud_registry import ConfiguredProviderRegistry
+from .deployment import DeploymentManager, create_backup, current_spec, restore_backup
 from .ipc import AgentIPCClient, AgentIPCError
 from .mcp_client import (
     MCPProtocolError,
@@ -40,6 +42,11 @@ from .model_selection import (
 from .models import ProviderHealthStatus, ToolCall, ToolDefinition, ToolInvocation
 from .ollama import OllamaConfig, OllamaError, OllamaProvider
 from .provider_auth import persist_api_key_authentication, web_login_removed
+from .remote_access import (
+    RemoteAccessError,
+    install_ngrok_binary,
+    persist_remote_access_enabled,
+)
 from .secrets import SecretStore
 from .service_main import run_service
 from .skills import LoadedSkill, SkillRepository, SkillValidationError
@@ -178,6 +185,48 @@ def build_parser() -> argparse.ArgumentParser:
     web_commands.add_parser("certificate-status")
     export_ca = web_commands.add_parser("export-ca")
     export_ca.add_argument("--output", type=Path, default=DEFAULT_WEB_CA_EXPORT)
+
+    remote = commands.add_parser("remote", help="Configure passwordless ngrok access.")
+    remote_commands = remote.add_subparsers(dest="remote_command", required=True)
+    remote_commands.add_parser(
+        "configure",
+        help="Explicitly install ngrok and save its authtoken privately.",
+    )
+    for remote_command in (
+        "activate",
+        "deactivate",
+        "status",
+        "pairing-url",
+        "rotate-pairing",
+    ):
+        remote_commands.add_parser(remote_command)
+    remote_remove = remote_commands.add_parser(
+        "remove-credentials",
+        help="Disable remote access and delete its private credentials.",
+    )
+    remote_remove.add_argument("--confirm", action="store_true")
+
+    deployment = commands.add_parser("deployment", help="Manage opt-in systemd auto-start.")
+    deployment_commands = deployment.add_subparsers(dest="deployment_command", required=True)
+    for deployment_command in ("install", "upgrade", "enable", "uninstall"):
+        item = deployment_commands.add_parser(deployment_command)
+        item.add_argument("--confirm", action="store_true")
+    for deployment_command in (
+        "validate",
+        "disable",
+        "start",
+        "stop",
+        "restart",
+        "status",
+    ):
+        deployment_commands.add_parser(deployment_command)
+    deployment_logs = deployment_commands.add_parser("logs")
+    deployment_logs.add_argument("--lines", type=int, default=100)
+    deployment_backup = deployment_commands.add_parser("backup")
+    deployment_backup.add_argument("--output", type=Path, required=True)
+    deployment_rollback = deployment_commands.add_parser("rollback")
+    deployment_rollback.add_argument("--backup", type=Path, required=True)
+    deployment_rollback.add_argument("--confirm", action="store_true")
 
     session = commands.add_parser("session", help="Inspect or clear local conversations.")
     session_commands = session.add_subparsers(dest="session_command", required=True)
@@ -376,6 +425,7 @@ def main(argv: list[str] | None = None) -> None:
         ModelSelectionError,
         OllamaError,
         CloudProviderError,
+        RemoteAccessError,
     ) as exc:
         parser.error(_safe_error(exc))
     raise SystemExit(exit_code)
@@ -400,6 +450,10 @@ async def _run(arguments: argparse.Namespace) -> int:
         return await _run_model_command(arguments)
     if arguments.command == "provider":
         return await _run_provider_command(arguments)
+    if arguments.command == "remote":
+        return await _run_remote_command(arguments)
+    if arguments.command == "deployment":
+        return await asyncio.to_thread(_run_deployment_command, arguments)
     if arguments.command == "web":
         if arguments.web_command == "certificate-status":
             certificate, key = ensure_local_ca_certificate(
@@ -552,6 +606,79 @@ async def _run_chat_command(arguments: argparse.Namespace) -> int:
     return 0
 
 
+async def _run_remote_command(arguments: argparse.Namespace) -> int:
+    """Run explicit local-owner remote setup and lifecycle commands."""
+    config = load_robot_config(arguments.config)
+    remote = config.remote_access
+    secret_store = SecretStore(arguments.secret_file)
+    command = arguments.remote_command
+    if command == "configure":
+        token = getpass.getpass("Enter the ngrok authtoken: ").strip()
+        confirmation = getpass.getpass("Enter the ngrok authtoken again: ").strip()
+        if token != confirmation:
+            raise ValueError("ngrok authtoken values did not match")
+        if not token:
+            raise ValueError("ngrok authtoken must not be empty")
+        executable = await asyncio.to_thread(install_ngrok_binary, remote.executable)
+        secret_store.set(remote.authtoken_env, token)
+        for name in (
+            remote.pairing_secret_env,
+            remote.session_secret_env,
+            remote.remote_header_secret_env,
+        ):
+            if not secret_store.contains(name):
+                secret_store.set(name, secure_random.token_urlsafe(48))
+        _print_json(
+            {
+                "configured": True,
+                "authtoken_saved": True,
+                "executable": str(executable),
+                "browser_login_required": False,
+                "next_step": "Start the agent service, then run remote activate.",
+            }
+        )
+        return 0
+    if command == "remove-credentials":
+        if not arguments.confirm:
+            raise ValueError("removing remote credentials requires --confirm")
+        try:
+            await _service_request(arguments, {"command": "remote_deactivate"})
+        except AgentIPCError as exc:
+            if "not running" not in str(exc):
+                raise
+        await persist_remote_access_enabled(arguments.config, False)
+        removed = {
+            name: secret_store.delete(name)
+            for name in (
+                remote.authtoken_env,
+                remote.pairing_secret_env,
+                remote.session_secret_env,
+                remote.remote_header_secret_env,
+            )
+        }
+        private_config = Path(remote.config_file).expanduser()
+        if private_config.is_symlink():
+            raise ValueError("ngrok config path must not be a symbolic link")
+        config_removed = private_config.is_file()
+        private_config.unlink(missing_ok=True)
+        _print_json(
+            {
+                "credentials_removed": removed,
+                "private_config_removed": config_removed,
+                "ngrok_executable_retained": True,
+            }
+        )
+        return 0
+    ipc_command = {
+        "activate": "remote_activate",
+        "deactivate": "remote_deactivate",
+        "status": "remote_status",
+        "pairing-url": "remote_pairing_url",
+        "rotate-pairing": "remote_rotate_pairing",
+    }[command]
+    return await _service_request(arguments, {"command": ipc_command})
+
+
 async def _stream_chat(
     arguments: argparse.Namespace,
     *,
@@ -611,6 +738,7 @@ async def _chat_repl(arguments: argparse.Namespace, *, session_id: str) -> int:
             print(
                 "/help  /exit  /clear  /status  /resume  /camera  /arm  /disarm  "
                 "/confirm <request>\n"
+                "/voice input on  /voice input off  /voice input status\n"
                 "/new user  /switch user  /identify  /update profile\n"
                 "Ordinary text is sent to NinjaRobot."
             )
@@ -666,6 +794,18 @@ async def _chat_repl(arguments: argparse.Namespace, *, session_id: str) -> int:
                 arguments,
                 {"command": "disarm_motion", "session_id": session_id},
             )
+            continue
+        if text in {"/voice input on", "/voice input off", "/voice input status"}:
+            action = text.removeprefix("/voice input ")
+            command = {
+                "on": "voice_enable",
+                "off": "voice_disable",
+                "status": "voice_status",
+            }[action]
+            try:
+                await _service_request(arguments, {"command": command})
+            except AgentIPCError as exc:
+                print(f"Voice input failed: {exc}")
             continue
         if text == "/confirm" or text.startswith("/confirm "):
             confirmed_text = text.removeprefix("/confirm").strip()
@@ -742,6 +882,46 @@ async def _run_service_command(arguments: argparse.Namespace) -> int:
     raise AssertionError(f"unhandled service command: {command}")
 
 
+def _run_deployment_command(arguments: argparse.Namespace) -> int:
+    spec = current_spec(arguments)
+    manager = DeploymentManager(spec)
+    command = arguments.deployment_command
+    if command in {"install", "upgrade"}:
+        _print_json(
+            manager.install(
+                confirmed=arguments.confirm,
+                upgrade=command == "upgrade",
+            )
+        )
+    elif command == "enable":
+        _print_json(manager.enable(confirmed=arguments.confirm))
+    elif command == "disable":
+        _print_json(manager.disable())
+    elif command in {"start", "stop", "restart"}:
+        _print_json(manager.action(command))
+    elif command == "validate":
+        _print_json(manager.validate())
+    elif command == "status":
+        _print_json(manager.status())
+    elif command == "logs":
+        result = manager.logs(lines=arguments.lines)
+        print(result.stdout, end="")
+        if result.returncode != 0:
+            raise RuntimeError("journal query failed")
+    elif command == "backup":
+        _print_json({"backup": str(create_backup(spec, arguments.output))})
+    elif command == "rollback":
+        if not arguments.confirm:
+            raise ValueError("backup rollback requires --confirm")
+        manager.action("stop")
+        _print_json(restore_backup(spec, arguments.backup, confirmed=True))
+    elif command == "uninstall":
+        _print_json(manager.uninstall(confirmed=arguments.confirm))
+    else:
+        raise AssertionError(f"unhandled deployment command: {command}")
+    return 0
+
+
 async def _spawn_service(arguments: argparse.Namespace) -> int:
     client = AgentIPCClient(arguments.service_socket)
     try:
@@ -816,7 +996,11 @@ async def _spawn_service(arguments: argparse.Namespace) -> int:
             continue
         status_data = status["data"]
         startup = status_data.get("startup")
-        if isinstance(startup, dict) and startup.get("complete") is False:
+        if (
+            isinstance(startup, dict)
+            and startup.get("complete") is False
+            and status_data.get("operational_state") != "onboarding"
+        ):
             await asyncio.sleep(0.1)
             continue
         try:
@@ -1355,6 +1539,50 @@ async def _interactive_memory(arguments: argparse.Namespace) -> None:
         print("Please choose a number from 1 through 10.")
 
 
+async def _interactive_remote_access(arguments: argparse.Namespace) -> None:
+    while True:
+        print(
+            "\nRemote Access\n"
+            "1. Configure token, install ngrok, and activate\n"
+            "2. Status\n"
+            "3. Show current pairing URL\n"
+            "4. Revoke browsers and rotate pairing\n"
+            "5. Deactivate\n"
+            "6. Remove remote credentials\n"
+            "7. Back\n"
+        )
+        choice = (await asyncio.to_thread(input, "Select an option: ")).strip()
+        if choice == "7":
+            return
+        if choice == "1":
+            arguments.remote_command = "configure"
+            await _run_remote_command(arguments)
+            await _service_request(arguments, {"command": "remote_activate"})
+        elif choice == "2":
+            await _service_request(arguments, {"command": "remote_status"})
+        elif choice == "3":
+            await _service_request(arguments, {"command": "remote_pairing_url"})
+        elif choice == "4":
+            await _service_request(arguments, {"command": "remote_rotate_pairing"})
+        elif choice == "5":
+            await _service_request(arguments, {"command": "remote_deactivate"})
+        elif choice == "6":
+            confirmation = (
+                await asyncio.to_thread(
+                    input,
+                    "Type REMOVE REMOTE CREDENTIALS to continue: ",
+                )
+            ).strip()
+            if confirmation != "REMOVE REMOTE CREDENTIALS":
+                print("Remote credential removal cancelled.")
+                continue
+            arguments.remote_command = "remove-credentials"
+            arguments.confirm = True
+            await _run_remote_command(arguments)
+        else:
+            print("Please choose a number from 1 through 7.")
+
+
 async def _interactive(arguments: argparse.Namespace) -> int:
     while True:
         print(
@@ -1369,10 +1597,12 @@ async def _interactive(arguments: argparse.Namespace) -> int:
             "8. Web Interface Status\n"
             "9. Stop Web Interface\n"
             "10. Export Browser Trust Certificate\n"
-            "11. MCP Tools\n"
-            "12. Agent Skills\n"
-            "13. Stop Agent Service\n"
-            "14. Quit CLI\n"
+            "11. Remote Access\n"
+            "12. MCP Tools\n"
+            "13. Agent Skills\n"
+            "14. Stop Agent Service\n"
+            "15. Auto-Start & Deployment\n"
+            "16. Quit CLI\n"
         )
         choice = (await asyncio.to_thread(input, "Select an option: ")).strip()
         try:
@@ -1420,11 +1650,13 @@ async def _interactive(arguments: argparse.Namespace) -> int:
                     }
                 )
             elif choice == "11":
+                await _interactive_remote_access(arguments)
+            elif choice == "12":
                 configuration = load_mcp_configuration(arguments.mcp_config)
                 _print_json(
                     {"servers": [server.redacted_dict() for server in configuration.servers]}
                 )
-            elif choice == "12":
+            elif choice == "13":
                 _print_json(
                     {
                         "skills": [
@@ -1437,22 +1669,95 @@ async def _interactive(arguments: argparse.Namespace) -> int:
                         ]
                     }
                 )
-            elif choice == "13":
-                await _service_request(arguments, {"command": "stop"})
             elif choice == "14":
+                await _service_request(arguments, {"command": "stop"})
+            elif choice == "15":
+                await _interactive_deployment(arguments)
+            elif choice == "16":
                 print("CLI disconnected. Any running agent service continues.")
                 return 0
             else:
-                print("Please choose a number from 1 through 14.")
+                print("Please choose a number from 1 through 16.")
         except (
             AgentIPCError,
             CloudProviderError,
             KeyError,
             ModelSelectionError,
             OllamaError,
+            RuntimeError,
             ValueError,
         ) as exc:
             print(f"Error: {exc}")
+
+
+async def _interactive_deployment(arguments: argparse.Namespace) -> None:
+    while True:
+        print(
+            "\nAuto-Start & Deployment\n"
+            "1. Show deployment status\n"
+            "2. Install service (disabled)\n"
+            "3. Upgrade installed service\n"
+            "4. Enable automatic real-hardware startup\n"
+            "5. Disable and stop automatic startup\n"
+            "6. Start installed service now\n"
+            "7. Stop installed service\n"
+            "8. Show recent service logs\n"
+            "9. Back up configuration and user data\n"
+            "10. Roll back from a backup\n"
+            "11. Uninstall service (preserve all user data)\n"
+            "12. Back\n"
+        )
+        choice = (await asyncio.to_thread(input, "Select an option: ")).strip()
+        if choice == "12":
+            return
+        command = {
+            "1": "status",
+            "2": "install",
+            "3": "upgrade",
+            "4": "enable",
+            "5": "disable",
+            "6": "start",
+            "7": "stop",
+            "8": "logs",
+            "9": "backup",
+            "10": "rollback",
+            "11": "uninstall",
+        }.get(choice)
+        if command is None:
+            print("Please choose a number from 1 through 12.")
+            continue
+        confirmed = False
+        if command in {"install", "upgrade", "enable", "rollback", "uninstall"}:
+            prompt = (
+                "Type ENABLE to install boot startup and enable real-hardware onboarding: "
+                if command == "enable"
+                else f"Type {command.upper()} to confirm {command}: "
+            )
+            answer = (await asyncio.to_thread(input, prompt)).strip()
+            expected = "ENABLE" if command == "enable" else command.upper()
+            if answer != expected:
+                print("Deployment action cancelled.")
+                continue
+            confirmed = True
+        namespace = argparse.Namespace(**vars(arguments))
+        namespace.deployment_command = command
+        namespace.confirm = confirmed
+        namespace.lines = 100
+        if command in {"backup", "rollback"}:
+            path = (
+                await asyncio.to_thread(
+                    input,
+                    "Backup archive path: ",
+                )
+            ).strip()
+            if not path:
+                print("Deployment action cancelled.")
+                continue
+            if command == "backup":
+                namespace.output = Path(path)
+            else:
+                namespace.backup = Path(path)
+        await asyncio.to_thread(_run_deployment_command, namespace)
 
 
 async def _interactive_model_selection(arguments: argparse.Namespace) -> None:

@@ -100,3 +100,32 @@ def test_secret_store_permissions_environment_override_and_redaction(
 
     with pytest.raises(ValueError, match="single-line"):
         store.set("BAD_SECRET", "line-1\nline-2")
+
+
+def test_secret_store_redacts_environment_ngrok_token(tmp_path, monkeypatch) -> None:
+    store = SecretStore(tmp_path / "secrets.env")
+    monkeypatch.setenv("NGROK_AUTHTOKEN", "ngrok-private-token")
+
+    assert store.get("NGROK_AUTHTOKEN") == "ngrok-private-token"
+    assert store.redact("token=ngrok-private-token") == "token=[REDACTED]"
+
+
+def test_secret_store_rejects_symbolic_link_targets(tmp_path) -> None:
+    victim = tmp_path / "victim.env"
+    victim.write_text("SAFE=value\n", encoding="utf-8")
+    linked_file = tmp_path / "linked.env"
+    linked_file.symlink_to(victim)
+
+    with pytest.raises(ValueError, match="must not be a symbolic link"):
+        SecretStore(linked_file).set("NGROK_AUTHTOKEN", "private")
+    assert victim.read_text(encoding="utf-8") == "SAFE=value\n"
+
+    real_directory = tmp_path / "real"
+    real_directory.mkdir()
+    linked_directory = tmp_path / "linked"
+    linked_directory.symlink_to(real_directory, target_is_directory=True)
+    with pytest.raises(ValueError, match="directory must not be a symbolic link"):
+        SecretStore(linked_directory / "secrets.env").set(
+            "NGROK_AUTHTOKEN",
+            "private",
+        )

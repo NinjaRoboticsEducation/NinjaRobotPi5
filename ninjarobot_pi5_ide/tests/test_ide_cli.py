@@ -235,7 +235,7 @@ def test_interactive_hardware_page_is_configuration_only(tmp_path: Path) -> None
 
     assert result.exit_code == 0
     assert "reads configuration only" in result.output
-    assert '"ninjarobot_pi5_ide": "0.1.0"' in result.output
+    assert '"ninjarobot_pi5_ide": "1.0.0"' in result.output
     assert '"left_motor": "gpio12"' in result.output
     assert '"buzzer_gpio": 27' in result.output
 

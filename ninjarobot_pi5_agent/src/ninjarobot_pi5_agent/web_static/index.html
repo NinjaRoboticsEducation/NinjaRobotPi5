@@ -8,74 +8,68 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/assets/manifest.webmanifest">
     <link rel="stylesheet" href="/assets/styles.css">
-    <title>NinjaRobotAgent</title>
+    <title data-i18n="document.title">NinjaRobotAgent</title>
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <p class="eyebrow">NINJA ROBOT PI5</p>
+        <button id="menuButton" class="menu-button" type="button" aria-expanded="false" aria-controls="robotMenu" data-i18n-aria="menu.open">
+          <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
+          <span class="sr-only" data-i18n="menu.open">Open robot menu</span>
+        </button>
       </header>
 
       <main class="dashboard">
-        <section class="panel controls-panel" aria-label="Direct robot controls">
+        <section class="panel controls-panel" aria-label="Direct robot controls" data-i18n-aria="controls.direct">
           <div class="control-status">
-            <span id="connectionBadge" class="badge badge-wait">Not connected</span>
+            <span id="connectionBadge" class="badge badge-wait" data-i18n="connection.offline">Not connected</span>
             <div class="ai-permissions">
-              <button id="armAiButton" class="small-button motion-arm" aria-pressed="false">Arm AI motion</button>
-              <button id="armAiCameraButton" class="small-button camera-arm" aria-pressed="false">AI camera</button>
+              <button id="armAiButton" class="small-button motion-arm" aria-pressed="false" data-i18n="motion.arm">Arm AI motion</button>
+              <button id="armAiCameraButton" class="small-button camera-arm" aria-pressed="false" data-i18n="camera.arm">AI camera</button>
             </div>
           </div>
 
-          <div class="dpad" aria-label="Movement controls">
-            <button class="dpad-button up" data-direction="forward" draggable="false" aria-label="Move forward">▲</button>
-            <button class="dpad-button left" data-direction="left" draggable="false" aria-label="Turn left">◀</button>
+          <div class="dpad" aria-label="Movement controls" data-i18n-aria="controls.movement">
+            <button class="dpad-button up" data-direction="forward" draggable="false" aria-label="Move forward" data-i18n-aria="motion.forward">▲</button>
+            <button class="dpad-button left" data-direction="left" draggable="false" aria-label="Turn left" data-i18n-aria="motion.left">◀</button>
             <span class="dpad-center" aria-hidden="true">●</span>
-            <button class="dpad-button right" data-direction="right" draggable="false" aria-label="Turn right">▶</button>
-            <button class="dpad-button down" data-direction="backward" draggable="false" aria-label="Move backward">▼</button>
+            <button class="dpad-button right" data-direction="right" draggable="false" aria-label="Turn right" data-i18n-aria="motion.right">▶</button>
+            <button class="dpad-button down" data-direction="backward" draggable="false" aria-label="Move backward" data-i18n-aria="motion.backward">▼</button>
           </div>
 
           <div class="media-controls">
             <button id="cameraButton" class="media-button">
-              <strong>CAMERA</strong><small>Temporary photo preview</small>
-            </button>
-            <button id="usbMicButton" class="media-button">
-              <strong>USB MICROPHONE</strong><small>Record 5 seconds locally</small>
+              <strong data-i18n="camera.title">CAMERA</strong><small data-i18n="camera.preview">Temporary photo preview</small>
             </button>
             <button id="webMicButton" class="media-button">
-              <strong>WEB MICROPHONE</strong><small>Fill the message box</small>
+              <strong data-i18n="browserMic.title">WEB MICROPHONE</strong><small data-i18n="browserMic.detail">Fill the message box</small>
             </button>
-            <label class="language-field">
-              <span>Recognition language</span>
-              <select id="languageSelect">
-                <option value="en-US">English</option>
-                <option value="ja-JP">日本語</option>
-              </select>
-            </label>
           </div>
 
-          <div class="action-pad" aria-label="Special robot controls">
-            <button id="greetingButton" class="action-button action-a"><strong>A</strong><span>Greeting</span></button>
-            <button id="celebrateButton" class="action-button action-b"><strong>B</strong><span>Celebrate</span></button>
-            <button id="emergencyButton" class="action-button action-x"><strong>X</strong><span>Emergency<br>Stop</span></button>
-            <button id="resumeButton" class="action-button action-y"><strong>Y</strong><span>Resume</span></button>
+          <div class="action-pad" aria-label="Special robot controls" data-i18n-aria="controls.special">
+            <button id="greetingButton" class="action-button action-a"><strong>A</strong><span data-i18n="behavior.greeting">Greeting</span></button>
+            <button id="celebrateButton" class="action-button action-b"><strong>B</strong><span data-i18n="behavior.celebrate">Celebrate</span></button>
+            <button id="emergencyButton" class="action-button action-x"><strong>X</strong><span data-i18n="behavior.emergency">Emergency Stop</span></button>
+            <button id="resumeButton" class="action-button action-y"><strong>Y</strong><span data-i18n="behavior.resume">Resume</span></button>
           </div>
         </section>
 
         <section class="panel conversation-panel" aria-labelledby="chatTitle">
           <div class="panel-heading">
             <div>
-              <p class="eyebrow">CONVERSATION</p>
-              <h2 id="chatTitle">Talk to NinjaRobot</h2>
+              <p class="eyebrow" data-i18n="chat.eyebrow">CONVERSATION</p>
+              <h2 id="chatTitle" data-i18n="chat.title">Talk to NinjaRobot</h2>
             </div>
-            <button id="clearChatButton" class="small-button">Clear view</button>
+            <button id="clearChatButton" class="small-button" data-i18n="chat.clear">Clear view</button>
           </div>
           <div id="chatMessages" class="chat-messages" aria-live="polite">
-            <div class="message assistant">Hello. NinjaRobotAgent is ready.</div>
+            <div class="message assistant" data-i18n="chat.ready">Hello. NinjaRobotAgent is ready.</div>
           </div>
           <form id="chatForm" class="chat-form">
-            <label class="sr-only" for="chatInput">Message</label>
-            <textarea id="chatInput" rows="2" maxlength="20000" placeholder="Ask NinjaRobot, or use /new user, /switch user, /identify…"></textarea>
-            <button type="submit">Send</button>
+            <label class="sr-only" for="chatInput" data-i18n="chat.message">Message</label>
+            <textarea id="chatInput" rows="2" maxlength="20000" placeholder="Ask NinjaRobot, or use /new user, /switch user, /identify…" data-i18n-placeholder="chat.placeholder"></textarea>
+            <button type="submit" data-i18n="chat.send">Send</button>
           </form>
         </section>
       </main>
@@ -84,39 +78,92 @@
     <aside id="activityDrawer" class="activity-drawer" aria-labelledby="logTitle">
       <button id="activityToggle" class="activity-tab" type="button" aria-expanded="false" aria-controls="activityDrawer">
         <span class="drawer-grip" aria-hidden="true"></span>
-        Live Activity
+        <span data-i18n="activity.live">Live Activity</span>
       </button>
       <div class="activity-content">
         <div class="activity-heading">
-          <h2 id="logTitle">System activity</h2>
-          <button id="clearLogButton" class="small-button">Clear</button>
+          <h2 id="logTitle" data-i18n="activity.title">System activity</h2>
+          <button id="clearLogButton" class="small-button" data-i18n="activity.clear">Clear</button>
         </div>
         <div id="systemLog" class="system-log" aria-live="polite"></div>
       </div>
     </aside>
 
-    <div id="cameraPreview" class="camera-preview hidden" role="dialog" aria-modal="true" aria-label="Temporary camera preview">
+    <div id="cameraPreview" class="camera-preview hidden" role="dialog" aria-modal="true" aria-label="Temporary camera preview" data-i18n-aria="camera.previewDialog">
       <div class="preview-card">
         <div class="preview-heading">
-          <strong>Temporary preview</strong>
-          <button id="closePreviewButton" aria-label="Close preview">×</button>
+          <strong data-i18n="camera.previewTitle">Temporary preview</strong>
+          <button id="closePreviewButton" aria-label="Close preview" data-i18n-aria="common.close">×</button>
         </div>
-        <img id="cameraImage" alt="Latest temporary robot camera capture">
-        <p>The image is cleared automatically.</p>
+        <img id="cameraImage" alt="Latest temporary robot camera capture" data-i18n-alt="camera.previewAlt">
+        <p data-i18n="camera.autoClear">The image is cleared automatically.</p>
       </div>
     </div>
 
     <div class="orientation-blocker" role="alert">
-      <strong>Portrait mode required</strong>
-      <span>Rotate your phone back to portrait to control NinjaRobot safely.</span>
+      <strong data-i18n="orientation.title">Portrait mode required</strong>
+      <span data-i18n="orientation.detail">Rotate your phone back to portrait to control NinjaRobot safely.</span>
     </div>
     <div id="startOverlay" class="start-overlay">
       <div class="start-card">
         <p class="eyebrow">NINJA ROBOT PI5</p>
-        <h1>Robot Controller</h1>
-        <p>Connect to the robot and enter the largest available portrait view.</p>
-        <button id="startControllerButton" type="button">Tap to Start Controller</button>
-        <small>On iPhone, Add to Home Screen gives the best full-screen experience.</small>
+        <h1 data-i18n="start.title">Robot Controller</h1>
+        <p data-i18n="start.detail">Connect to the robot and enter the largest available portrait view.</p>
+        <button id="startControllerButton" type="button" data-i18n="start.button">Tap to Start Controller</button>
+        <small data-i18n="start.ios">On iPhone, Add to Home Screen gives the best full-screen experience.</small>
+      </div>
+    </div>
+
+    <div id="robotMenu" class="menu-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
+      <div class="menu-sheet">
+        <div class="menu-heading">
+          <div><p class="eyebrow">NINJA ROBOT PI5</p><h2 id="menuTitle" data-i18n="menu.title">Robot menu</h2></div>
+          <button id="closeMenuButton" class="menu-close" type="button" aria-label="Close" data-i18n-aria="common.close">×</button>
+        </div>
+        <section class="menu-section" aria-labelledby="languageTitle">
+          <h3 id="languageTitle" data-i18n="menu.language">Language</h3>
+          <label class="language-field">
+            <span data-i18n="menu.languageDetail">Interface and speech-recognition language</span>
+            <select id="languageSelect">
+              <option value="en">English</option>
+              <option value="ja">日本語</option>
+              <option value="zh-TW">繁體中文</option>
+              <option value="zh-CN">简体中文</option>
+            </select>
+          </label>
+        </section>
+        <section class="menu-section" aria-labelledby="connectionTitle">
+          <h3 id="connectionTitle" data-i18n="menu.connection">Connection</h3>
+          <p id="remoteStatus" class="menu-status" data-i18n="remote.local">Local secure controller</p>
+        </section>
+        <section class="menu-section" aria-labelledby="voiceTitle">
+          <h3 id="voiceTitle" data-i18n="menu.voice">Voice input</h3>
+          <div class="menu-tools">
+            <button id="usbMicButton" class="media-button" aria-pressed="false">
+              <strong data-i18n="voice.title">VOICE INPUT</strong><small data-i18n="voice.off">Always-on Ninja: Off</small>
+            </button>
+            <button id="usbRecordButton" class="media-button">
+              <strong data-i18n="record.title">RECORD ONCE</strong><small data-i18n="record.detail">Record 5 seconds locally</small>
+            </button>
+          </div>
+        </section>
+        <section class="menu-section danger-section" aria-labelledby="powerTitle">
+          <h3 id="powerTitle" data-i18n="power.title">System power</h3>
+          <p data-i18n="power.detail">Stop robot hardware and services, then shut down this Raspberry Pi.</p>
+          <button id="powerOffButton" class="power-button" type="button" disabled data-i18n="power.button">Power off NinjaRobot</button>
+          <small id="powerOffAvailability" data-i18n="power.disabled">Power-off is disabled in deployment settings.</small>
+        </section>
+      </div>
+    </div>
+
+    <div id="powerOffDialog" class="confirm-overlay hidden" role="alertdialog" aria-modal="true" aria-labelledby="powerConfirmTitle" aria-describedby="powerConfirmDetail">
+      <div class="confirm-card">
+        <h2 id="powerConfirmTitle" data-i18n="power.confirmTitle">Power off NinjaRobot?</h2>
+        <p id="powerConfirmDetail" data-i18n="power.confirmDetail">Movement, voice input, remote access, and the agent service will stop before the Raspberry Pi powers off.</p>
+        <div class="confirm-actions">
+          <button id="cancelPowerOffButton" class="small-button" type="button" data-i18n="common.cancel">Cancel</button>
+          <button id="confirmPowerOffButton" class="power-button" type="button" data-i18n="power.confirm">Power off</button>
+        </div>
       </div>
     </div>
     <div id="toast" class="toast hidden" role="status"></div>

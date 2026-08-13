@@ -4,10 +4,18 @@ from __future__ import annotations
 
 import os
 import re
+import stat
+import tempfile
 from pathlib import Path
 from typing import Any
 
 _NAME_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{0,127}$")
+_BUILT_IN_SENSITIVE_NAMES = {
+    "NGROK_AUTHTOKEN",
+    "NINJAROBOT_PAIRING_SECRET",
+    "NINJAROBOT_SESSION_SECRET",
+    "NINJAROBOT_REMOTE_HEADER_SECRET",
+}
 
 
 class SecretStore:
@@ -15,6 +23,7 @@ class SecretStore:
 
     def __init__(self, path: str | Path) -> None:
         self._path = Path(path).expanduser()
+        self._resolved_names: set[str] = set()
 
     @property
     def path(self) -> Path:
@@ -26,20 +35,15 @@ class SecretStore:
         _validate_name(name)
         if not value or "\n" in value or "\r" in value or "\x00" in value:
             raise ValueError("secret values must be non-empty single-line text")
-        secrets = self._read_file()
-        secrets[name] = value
-        self._path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        self._path.parent.chmod(0o700)
-        temporary = self._path.with_suffix(f"{self._path.suffix}.tmp")
-        body = "".join(f"{key}={secrets[key]}\n" for key in sorted(secrets))
-        temporary.write_text(body, encoding="utf-8")
-        temporary.chmod(0o600)
-        temporary.replace(self._path)
-        self._path.chmod(0o600)
+        stored = self._read_file()
+        stored[name] = value
+        self._resolved_names.add(name)
+        self._write_file(stored)
 
     def get(self, name: str) -> str | None:
         """Resolve the process environment first, then the owner secret file."""
         _validate_name(name)
+        self._resolved_names.add(name)
         environment_value = os.environ.get(name)
         if environment_value:
             return environment_value
@@ -66,22 +70,28 @@ class SecretStore:
         if not secrets:
             self._path.unlink(missing_ok=True)
             return True
-        temporary = self._path.with_suffix(f"{self._path.suffix}.tmp")
-        body = "".join(f"{key}={secrets[key]}\n" for key in sorted(secrets))
-        temporary.write_text(body, encoding="utf-8")
-        temporary.chmod(0o600)
-        temporary.replace(self._path)
-        self._path.chmod(0o600)
+        self._write_file(secrets)
         return True
 
     def redact(self, value: Any) -> Any:
         """Recursively replace known secret values in diagnostics."""
-        known = tuple(secret for secret in self._read_file().values() if secret)
+        stored = self._read_file()
+        names = set(stored) | self._resolved_names | _BUILT_IN_SENSITIVE_NAMES
+        known = tuple(
+            dict.fromkeys(
+                secret_value
+                for name in names
+                if (secret_value := os.environ.get(name) or stored.get(name))
+            )
+        )
         return _redact_value(value, known)
 
     def _read_file(self) -> dict[str, str]:
+        if self._path.is_symlink():
+            raise ValueError("secret storage file must not be a symbolic link")
         if not self._path.exists():
             return {}
+        self._validate_private_path(for_write=False)
         secrets: dict[str, str] = {}
         for line in self._path.read_text(encoding="utf-8").splitlines():
             if not line or line.lstrip().startswith("#"):
@@ -90,6 +100,47 @@ class SecretStore:
             if separator and _NAME_PATTERN.fullmatch(name):
                 secrets[name] = value
         return secrets
+
+    def _write_file(self, secrets: dict[str, str]) -> None:
+        self._path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        self._validate_private_path(for_write=True)
+        self._path.parent.chmod(0o700)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{self._path.name}-",
+            suffix=".tmp",
+            dir=self._path.parent,
+            text=True,
+        )
+        temporary = Path(temporary_name)
+        try:
+            os.fchmod(descriptor, 0o600)
+            body = "".join(f"{key}={secrets[key]}\n" for key in sorted(secrets))
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                handle.write(body)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, self._path)
+            self._path.chmod(0o600)
+        except BaseException:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+            temporary.unlink(missing_ok=True)
+            raise
+
+    def _validate_private_path(self, *, for_write: bool) -> None:
+        parent = self._path.parent
+        if parent.is_symlink() or parent.resolve() != parent.absolute():
+            raise ValueError("secret storage directory must not be a symbolic link")
+        if self._path.is_symlink():
+            raise ValueError("secret storage file must not be a symbolic link")
+        if self._path.exists():
+            mode = self._path.stat().st_mode
+            if not stat.S_ISREG(mode):
+                raise ValueError("secret storage path must be a regular file")
+            if not for_write and stat.S_IMODE(mode) & 0o077:
+                raise ValueError("secret storage file permissions must be owner-only")
 
 
 def _validate_name(name: str) -> None:

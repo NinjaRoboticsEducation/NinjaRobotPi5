@@ -313,11 +313,13 @@ class WebRobotController:
             )
         self._runtime.disarm_motion(self.control_session(lease_id))
         self._runtime.disarm_motion(self.chat_session(lease_id))
+        self._runtime.disarm_voice_motion(lease_id=lease_id)
         self._runtime.revoke_camera(self.chat_session(lease_id))
         return result.model_dump(mode="json")
 
     async def resume(self, lease_id: str) -> dict[str, Any]:
         self._runtime.disarm_motion(self.chat_session(lease_id))
+        self._runtime.disarm_voice_motion(lease_id=lease_id)
         result = await self._runtime.resume_system(
             session_id=self.control_session(lease_id),
             lease_id=lease_id,
@@ -399,6 +401,18 @@ class WebRobotController:
         await asyncio.gather(task, return_exceptions=True)
         return {"stopped": True}
 
+    async def enable_voice_input(self) -> dict[str, object]:
+        """Enable the global listener from the authenticated active controller."""
+        return await self._runtime.enable_voice_input()
+
+    async def disable_voice_input(self) -> dict[str, object]:
+        """Disable the listener and revoke its motion authorization."""
+        return await self._runtime.disable_voice_input()
+
+    def voice_input_status(self) -> dict[str, object]:
+        """Return privacy-safe listener state."""
+        return self._runtime.voice_input_status()
+
     async def chat(
         self,
         lease_id: str,
@@ -418,10 +432,12 @@ class WebRobotController:
             self.chat_session(lease_id),
             confirmed=confirmed,
             lease_id=lease_id,
+            include_voice=True,
         )
 
     def disarm_chat_motion(self, lease_id: str) -> None:
         self._runtime.disarm_motion(self.chat_session(lease_id))
+        self._runtime.disarm_voice_motion(lease_id=lease_id)
 
     def grant_chat_camera(
         self,
@@ -458,6 +474,7 @@ class WebRobotController:
             finally:
                 self._runtime.disarm_motion(self.control_session(lease_id))
                 self._runtime.disarm_motion(chat_session)
+                self._runtime.disarm_voice_motion(lease_id=lease_id)
                 self._runtime.revoke_camera(chat_session)
                 self._chat_sessions.pop(lease_id, None)
 

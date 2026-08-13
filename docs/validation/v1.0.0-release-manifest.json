@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "release": "1.0.0",
+  "release_branch": "public_v01",
+  "generated_on": "2026-08-13",
+  "packages": {
+    "ninjarobot-pi5-v4": "1.0.0",
+    "ninjarobot-pi5-agent": "1.0.0",
+    "ninjarobot-pi5-ide": "1.0.0"
+  },
+  "managed_driver_policy": {
+    "tracked_files": 222,
+    "authorized_repairs": 28,
+    "nested_ninjaclawbot_included": false
+  },
+  "release_features": [
+    "ide_owned_always_on_hey_ninja_voice_input",
+    "passwordless_one_use_local_and_ngrok_pairing",
+    "four_locale_accessible_web_controller",
+    "paired_nonce_confirmed_orderly_poweroff",
+    "ide_owned_qr_onboarding_and_exactly_once_greeting",
+    "explicit_disabled_by_default_systemd_deployment"
+  ],
+  "software_validation": "passed_511_tests",
+  "raspberry_pi_acceptance": "pending_operator_validation",
+  "public_git_tag_created": false,
+  "publication_approved": false
+}

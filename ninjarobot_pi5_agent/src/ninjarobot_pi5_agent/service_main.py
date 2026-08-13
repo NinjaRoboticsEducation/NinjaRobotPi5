@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import logging
+import secrets as secure_random
 import signal
 from pathlib import Path
 
@@ -25,11 +27,19 @@ from .model_selection import (
     ModelManager,
     persist_model_selection,
 )
+from .onboarding import OnboardingCoordinator
+from .pairing import PairingSessionManager
 from .persistence import ConversationStore
 from .policy import CameraGrantManager, MotionArmManager, PolicyEngine
 from .presentation import RobotPresentationController
 from .prompts import PromptComposer
 from .recovery import RecoveryPolicy
+from .release_foundations import ReleaseStatusRegistry
+from .remote_access import (
+    PyngrokTunnelBackend,
+    RemoteAccessService,
+    persist_remote_access_enabled,
+)
 from .robot_control_mcp import (
     ROBOT_CONTROL_DELEGATED_CAPABILITIES,
     RobotControlMCPProvider,
@@ -37,9 +47,11 @@ from .robot_control_mcp import (
 from .runtime import AgentRuntime
 from .secrets import SecretStore
 from .service import ServiceOwnership
+from .shutdown import PoweroffCoordinator
 from .skills import SkillRepository
 from .tools import IDEToolProvider, ToolProvider, ToolRegistry
-from .web_app import WebServerManager, create_web_app
+from .voice_service import VoiceInputService, persist_voice_input_enabled
+from .web_app import WebServerManager, create_web_app, local_ca_paths, mdns_hostname
 from .web_control import ControllerLeaseManager, WebRobotController
 
 LOGGER = logging.getLogger(__name__)
@@ -178,6 +190,12 @@ async def run_service(arguments: argparse.Namespace) -> None:
     arms = MotionArmManager()
     camera_grants = CameraGrantManager()
     events = EventBroker()
+    release_status = ReleaseStatusRegistry(
+        voice_enabled=config.voice_input.enabled,
+        remote_access_enabled=config.remote_access.enabled,
+        onboarding_enabled=config.onboarding.enabled,
+        shutdown_enabled=config.deployment.web_poweroff_enabled,
+    )
     policy = PolicyEngine(arms, camera_grants)
 
     def runtime_state(
@@ -260,15 +278,70 @@ async def run_service(arguments: argparse.Namespace) -> None:
             if memory is not None
             else None
         ),
+        release_status=release_status.status,
     )
+    voice_input = VoiceInputService(
+        ide=ide,
+        runtime=runtime,
+        events=events,
+        release_status=release_status,
+        configured_enabled=config.voice_input.enabled,
+        persist_enabled=lambda enabled: persist_voice_input_enabled(
+            arguments.config,
+            enabled,
+        ),
+    )
+    runtime.set_voice_input_service(voice_input)
     runtime.begin_startup_liveliness()
     web_controller = WebRobotController(runtime)
     leases = ControllerLeaseManager(on_revoke=web_controller.lease_revoked)
+    remote_header_secret = _release_secret_value(
+        secrets,
+        config.remote_access.remote_header_secret_env,
+    )
+    pairing = PairingSessionManager(
+        pairing_secret=_release_secret_key(secrets, config.remote_access.pairing_secret_env),
+        session_secret=_release_secret_key(secrets, config.remote_access.session_secret_env),
+        remote_header_secret=remote_header_secret,
+        pairing_lifetime_seconds=config.remote_access.pairing_lifetime_seconds,
+        session_lifetime_seconds=config.remote_access.session_lifetime_seconds,
+    )
+    remote_holder: dict[str, RemoteAccessService] = {}
+    onboarding_holder: dict[str, OnboardingCoordinator] = {}
+
+    async def authenticated_controller(remote: bool, paired: bool) -> None:
+        service = remote_holder.get("service")
+        if service is not None:
+            await service.controller_authenticated(remote)
+        coordinator = onboarding_holder.get("coordinator")
+        if coordinator is not None:
+            await coordinator.controller_connected(paired=paired)
+
+    server_holder: dict[str, AgentIPCServer] = {}
+
+    def request_service_stop() -> None:
+        server_instance = server_holder.get("server")
+        if server_instance is not None:
+            server_instance.request_stop()
+
+    poweroff = PoweroffCoordinator(
+        enabled=config.deployment.web_poweroff_enabled,
+        helper_path=config.deployment.poweroff_helper,
+        runtime=runtime,
+        controller=web_controller,
+        events=events,
+        release_status=release_status,
+        request_service_stop=request_service_stop,
+    )
     web_app = create_web_app(
         runtime=runtime,
         controller=web_controller,
         leases=leases,
         static_directory=Path(__file__).with_name("web_static"),
+        pairing=pairing,
+        poweroff=poweroff,
+        require_local_pairing=config.onboarding.enabled,
+        on_authenticated_controller=authenticated_controller,
     )
     web = WebServerManager(
         app=web_app,
@@ -278,21 +351,84 @@ async def run_service(arguments: argparse.Namespace) -> None:
         certificate_path=arguments.web_certificate,
         key_path=arguments.web_key,
     )
+    ca_certificate, _ca_key = local_ca_paths(arguments.web_certificate)
+    remote_access = RemoteAccessService(
+        backend=PyngrokTunnelBackend(
+            config=config.remote_access,
+            secrets=secrets,
+            local_ca_certificate=ca_certificate,
+            remote_header_secret=remote_header_secret,
+        ),
+        pairing=pairing,
+        events=events,
+        release_status=release_status,
+        config=config.remote_access,
+        start_web=web.start,
+        persist_enabled=lambda enabled: persist_remote_access_enabled(
+            arguments.config,
+            enabled,
+        ),
+    )
+    remote_holder["service"] = remote_access
+    onboarding = OnboardingCoordinator(
+        enabled=config.onboarding.enabled,
+        local_origin=f"https://{mdns_hostname()}:{arguments.web_port}",
+        ide=ide,
+        runtime=runtime,
+        pairing=pairing,
+        events=events,
+        release_status=release_status,
+        remote=remote_access,
+    )
+    onboarding_holder["coordinator"] = onboarding
     server = AgentIPCServer(
         runtime=runtime,
         socket_path=arguments.socket,
         ownership=ServiceOwnership(arguments.lock),
         web=web,
+        remote_access=remote_access,
     )
+    server_holder["server"] = server
     loop_object = asyncio.get_running_loop()
     for signal_number in (signal.SIGINT, signal.SIGTERM):
         loop_object.add_signal_handler(signal_number, server.request_stop)
     await server.start()
-    await _complete_startup_liveliness(ide=ide, runtime=runtime, events=events)
+    if config.onboarding.enabled:
+        await web.start()
+        await onboarding.start(remote_enabled=config.remote_access.enabled)
+    else:
+        await _complete_startup_liveliness(ide=ide, runtime=runtime, events=events)
+    try:
+        await voice_input.start_configured()
+    except Exception:
+        LOGGER.exception("Configured voice input could not start; text interfaces remain ready.")
+    try:
+        await remote_access.start_configured()
+    except Exception:
+        LOGGER.exception("Configured remote access could not start; local interfaces remain ready.")
+    await onboarding.remote_start_completed()
     try:
         await server.serve()
     finally:
+        await onboarding.close()
         await server.close()
+        try:
+            await poweroff.invoke_helper()
+        except RuntimeError:
+            LOGGER.exception(
+                "Orderly power-off could not invoke the approved helper; "
+                "run `sudo systemctl poweroff` locally."
+            )
+
+
+def _release_secret_key(store: SecretStore, name: str) -> bytes:
+    """Derive a fixed-size in-memory key without logging or persisting fallback data."""
+    value = _release_secret_value(store, name)
+    return hashlib.sha256(value.encode("utf-8")).digest()
+
+
+def _release_secret_value(store: SecretStore, name: str) -> str:
+    return store.get(name) or secure_random.token_urlsafe(48)
 
 
 if __name__ == "__main__":

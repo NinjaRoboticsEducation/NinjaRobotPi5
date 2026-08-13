@@ -21,7 +21,15 @@ from .camera import (
     CameraPreviewAdapter,
     CameraStatusAdapter,
 )
-from .config import MemoryConfig, RobotConfig, load_robot_config
+from .config import (
+    DeploymentConfig,
+    MemoryConfig,
+    OnboardingConfig,
+    RemoteAccessConfig,
+    RobotConfig,
+    VoiceInputConfig,
+    load_robot_config,
+)
 from .config_import import save_robot_config
 from .display import (
     DisplayBrightnessAdapter,
@@ -76,6 +84,12 @@ from .servo import (
     ServoStatusAdapter,
     ServoStopAdapter,
 )
+from .voice_input import (
+    VoiceInputController,
+    VoiceInputError,
+    VoiceInputState,
+    VoiceInputStatus,
+)
 
 __all__ = [
     "ActionLedger",
@@ -102,6 +116,7 @@ __all__ = [
     "DisplayClearAdapter",
     "DisplayDevice",
     "DisplayShowTextAdapter",
+    "DeploymentConfig",
     "DriveOperation",
     "ErrorDetails",
     "FaceIdentityBackend",
@@ -113,6 +128,7 @@ __all__ = [
     "IDEError",
     "LifecycleState",
     "MemoryConfig",
+    "OnboardingConfig",
     "MicrophoneCaptureAdapter",
     "MicrophoneBackend",
     "MicrophoneDevice",
@@ -130,6 +146,7 @@ __all__ = [
     "RiskLevel",
     "RobotAssembly",
     "RobotConfig",
+    "RemoteAccessConfig",
     "RobotIDEClient",
     "SafetySnapshot",
     "SafetyStateStore",
@@ -145,6 +162,11 @@ __all__ = [
     "ToneOperation",
     "WhisperCppTranscriber",
     "VL53L0XDistanceAdapter",
+    "VoiceInputConfig",
+    "VoiceInputController",
+    "VoiceInputError",
+    "VoiceInputState",
+    "VoiceInputStatus",
     "WaitOperation",
     "StageResult",
     "load_pi5buzzer_melody",
@@ -154,4 +176,4 @@ __all__ = [
     "save_robot_config",
 ]
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"

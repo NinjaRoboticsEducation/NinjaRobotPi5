@@ -5,11 +5,12 @@ import stat
 from pathlib import Path
 
 import pytest
-from ninjarobot_pi5_ide.config import load_robot_config
+from ninjarobot_pi5_ide.config import RobotConfig, load_robot_config
 from ninjarobot_pi5_ide.config_import import (
     DiscoveredConfig,
     default_robot_config,
     import_pi5_configs,
+    robot_config_to_toml,
     save_robot_config,
 )
 
@@ -87,6 +88,31 @@ def test_saved_config_is_private_valid_and_no_overwrite(tmp_path: Path) -> None:
     assert load_robot_config(saved) == config
     with pytest.raises(FileExistsError, match="already exists"):
         save_robot_config(config, destination, overwrite=False)
+
+
+def test_current_configuration_round_trip_preserves_phase_8_sections(tmp_path: Path) -> None:
+    original = load_robot_config(EXAMPLE)
+    destination = tmp_path / "config.toml"
+    destination.write_text(robot_config_to_toml(original), encoding="utf-8")
+
+    restored = load_robot_config(destination)
+
+    assert restored == original
+    assert restored.voice_input.enabled is False
+    assert restored.remote_access.authtoken_env == "NGROK_AUTHTOKEN"
+    assert restored.onboarding.qr_border_modules == 4
+
+
+def test_phase_7_configuration_migrates_with_release_features_disabled(tmp_path: Path) -> None:
+    phase_7 = load_robot_config(EXAMPLE).model_dump()
+    for section in ("voice_input", "remote_access", "onboarding", "deployment"):
+        phase_7.pop(section)
+    phase_7_config = RobotConfig.model_validate(phase_7)
+
+    assert phase_7_config.voice_input.enabled is False
+    assert phase_7_config.remote_access.enabled is False
+    assert phase_7_config.onboarding.enabled is False
+    assert phase_7_config.deployment.auto_start_enabled is False
 
 
 def test_import_rejects_invalid_json_without_changing_destination(tmp_path: Path) -> None:

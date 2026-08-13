@@ -25,6 +25,11 @@ class AgentEventType(StrEnum):
     RECOVERY = "recovery"
     MEDIA = "media"
     LOG = "log"
+    VOICE = "voice"
+    REMOTE_ACCESS = "remote_access"
+    PAIRING = "pairing"
+    ONBOARDING = "onboarding"
+    SHUTDOWN = "shutdown"
 
 
 class AgentEvent(AgentContractModel):

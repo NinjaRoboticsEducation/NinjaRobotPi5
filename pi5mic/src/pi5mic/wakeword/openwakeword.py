@@ -22,6 +22,9 @@ class OpenWakeWordDetector(WakeWordDetector):
         vad_threshold: float = 0.0,
         enable_noise_suppression: bool = False,
         inference_framework: str = "tflite",
+        melspec_model_path: str | Path | None = None,
+        embedding_model_path: str | Path | None = None,
+        vad_model_path: str | Path | None = None,
     ) -> None:
         if not keyword.strip():
             raise WakeWordError("An openWakeWord keyword label is required.")
@@ -47,13 +50,27 @@ class OpenWakeWordDetector(WakeWordDetector):
         self._threshold = float(threshold)
         self._frame_length = 1280
         self._sample_rate = 16000
-        try:
-            self._model = Model(
-                wakeword_models=[str(resolved_model)],
-                enable_speex_noise_suppression=enable_noise_suppression,
-                vad_threshold=float(vad_threshold),
-                inference_framework=inference_framework,
+        model_arguments: dict[str, object] = {
+            "wakeword_models": [str(resolved_model)],
+            "enable_speex_noise_suppression": enable_noise_suppression,
+            "vad_threshold": (0.0 if vad_model_path is not None else float(vad_threshold)),
+            "inference_framework": inference_framework,
+        }
+        if melspec_model_path is not None:
+            model_arguments["melspec_model_path"] = str(
+                _resolve_runtime_model(melspec_model_path, "melspectrogram")
             )
+        if embedding_model_path is not None:
+            model_arguments["embedding_model_path"] = str(
+                _resolve_runtime_model(embedding_model_path, "embedding")
+            )
+        try:
+            self._model = Model(**model_arguments)
+            if vad_model_path is not None and vad_threshold > 0:
+                from openwakeword.vad import VAD
+
+                self._model.vad = VAD(model_path=str(_resolve_runtime_model(vad_model_path, "VAD")))
+                self._model.vad_threshold = float(vad_threshold)
         except Exception as exc:  # pragma: no cover - backend path
             raise WakeWordError(f"Could not initialize openWakeWord: {exc}") from exc
 
@@ -116,3 +133,10 @@ class OpenWakeWordDetector(WakeWordDetector):
     def close(self) -> None:
         """Release backend state."""
         self.reset()
+
+
+def _resolve_runtime_model(model_path: str | Path, label: str) -> Path:
+    resolved = Path(model_path).expanduser().resolve()
+    if not resolved.is_file():
+        raise WakeWordError(f"openWakeWord {label} model file not found: {resolved}")
+    return resolved

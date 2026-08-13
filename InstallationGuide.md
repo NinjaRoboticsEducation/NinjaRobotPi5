@@ -1,7 +1,7 @@
 # NinjaRobotPi5 Installation Guide
 
 > [!WARNING]
-> **Alpha release.** Complete all simulation and raised-wheel tests before allowing the robot to move freely on the floor.
+> **v1.0.0 release candidate.** The software gate is complete. Finish every applicable Phase 8 Raspberry Pi checklist before public tagging or allowing free floor movement.
 
 This guide takes you from a blank Raspberry Pi to a fully calibrated, running robot. Follow the numbered steps in order. The testing, troubleshooting, and extension sections at the end are available whenever you need them.
 
@@ -1211,6 +1211,149 @@ uv run --frozen --extra hardware ninjarobot-agent \
   --whisper-model /absolute/path/to/ggml-model.bin \
   service start --real
 ```
+
+#### 🥷 Enable or Disable “Hey Ninja” Voice Input
+
+Voice input is disabled until you explicitly enable it. Install the hardware
+extra, start the real agent service, open terminal chat, and use:
+
+```text
+/voice input on
+/voice input status
+/voice input off
+```
+
+The web **VOICE INPUT** button controls the same listener. Say **Hey Ninja**,
+then speak a command for at most 15 seconds; silence ends the recording early.
+English, Japanese, Traditional Chinese, and Simplified Chinese are supported.
+The wake word itself remains English. Audio is processed locally, background
+audio is not retained, and each temporary command clip is deleted after local
+transcription. Replies are shown through the existing web/display/behavior
+flow; this release does not speak replies aloud.
+
+Physical movement still requires the existing `/arm` confirmation or web
+**Arm AI motion** button. Turning voice input off, restarting the service,
+switching models, emergency stop, or losing the browser lease that granted the
+arm revokes voice motion permission.
+
+#### 🌐 Configure Optional ngrok Remote Access
+
+Remote access is opt-in and requires an ngrok account/authtoken. Free accounts
+may show an ngrok-controlled interstitial and have endpoint, request, and data
+limits; review [ngrok's current limits](https://ngrok.com/docs/pricing-limits/free-plan-limits)
+before relying on the service.
+
+Start the agent service first. Then run:
+
+```bash
+uv run --frozen --extra hardware ninjarobot-agent remote configure
+uv run --frozen --extra hardware ninjarobot-agent remote activate
+uv run --frozen ninjarobot-agent remote pairing-url
+```
+
+The first command prompts twice for the ngrok authtoken and explicitly installs
+the ngrok agent. The token is never printed. The service will not download or
+update ngrok on startup. Open the pairing URL on the controlling browser. No
+browser username or password is required: the one-use URL fragment becomes a
+short-lived Secure/HttpOnly session cookie.
+
+Useful management commands:
+
+```bash
+uv run --frozen ninjarobot-agent remote status
+uv run --frozen ninjarobot-agent remote rotate-pairing
+uv run --frozen ninjarobot-agent remote deactivate
+uv run --frozen ninjarobot-agent remote remove-credentials --confirm
+```
+
+Rotation revokes all existing remote browser sessions. Deactivation stops the
+exact tunnel and also revokes sessions. Credential removal deletes the private
+token/pairing files but retains the ngrok executable for a later reconfiguration.
+Local HTTPS, terminal chat, robot memory, and hardware continue working if the
+tunnel or ngrok account is unavailable. Never configure router port forwarding
+to port 8443 as an alternative.
+
+#### 🌏 Use the Multilingual Robot Menu
+
+Open the top-right hamburger menu to select English, Japanese, Traditional
+Chinese, or Simplified Chinese. The selection controls interface labels and
+the recognition locale for manual USB recording and browser speech, and it
+persists in that browser. The menu also contains always-on voice, record-once,
+connection status, and system power. Press Escape, the close button, or the
+menu backdrop to close it; Emergency Stop remains on the main dashboard.
+
+Power-off is disabled unless deployment power control is enabled and the
+active browser has completed pairing. Selecting **Power off NinjaRobot**
+obtains a short-lived confirmation and then shows separate **Power off** and
+**Cancel** actions. Cancel changes nothing. Confirmation first stops hardware
+and voice and closes agent resources. Phase 8.6 installs the narrow helper for
+the final OS shutdown; the agent never receives general passwordless sudo. If
+that OS request is denied, the robot remains stopped and the local recovery is:
+
+```bash
+sudo systemctl poweroff
+```
+
+#### 📱 Enable QR Onboarding
+
+Set `[onboarding].enabled = true` in the robot configuration before starting
+the service. Startup initializes the robot and web server without moving, then
+shows **Connecting…** while configured ngrok access starts. A healthy remote
+endpoint displays its pairing QR and waits; an actual tunnel/configuration/
+network failure displays the local `https://ninjarobot-pi5.local:8443` pairing
+QR while remote retries. If remote access is disabled, the local QR appears
+immediately.
+
+Scan the displayed code. The one-use fragment creates a Secure/HttpOnly browser
+session and removes itself from the address. Only after that paired browser
+obtains the exclusive WebSocket controller lease does the QR clear and Greeting
+run once. Refreshing or reconnecting does not replay Greeting. If the display
+or Greeting fails, the robot shows **Error**, keeps AI/voice motion disarmed,
+attempts to stop servos, and requires a local service restart after the fault is
+corrected.
+
+#### 🚀 Install Opt-In Automatic Startup
+
+Run these commands as the normal non-root Raspberry Pi robot user from the
+installed environment. First validate and back up:
+
+```bash
+ninjarobot-agent deployment validate
+ninjarobot-agent deployment backup --output ~/ninjarobot-backup.tar.gz
+ninjarobot-agent deployment install --confirm
+ninjarobot-agent deployment status
+```
+
+Installation uses sudo only to place the root-owned unit, fixed power-off
+helper, and narrow sudoers rule. It leaves auto-start disabled and does not
+start hardware. Test safely with raised wheels:
+
+```bash
+ninjarobot-agent deployment start
+ninjarobot-agent deployment logs --lines 200
+ninjarobot-agent deployment stop
+```
+
+Enable the next-boot real-hardware workflow only after the test succeeds:
+
+```bash
+ninjarobot-agent deployment enable --confirm
+sudo reboot
+```
+
+Enablement also turns on QR onboarding and paired web power-off. Useful
+maintenance and recovery commands are:
+
+```bash
+ninjarobot-agent deployment disable
+ninjarobot-agent deployment upgrade --confirm
+ninjarobot-agent deployment rollback --backup ~/ninjarobot-backup.tar.gz --confirm
+ninjarobot-agent deployment uninstall --confirm
+```
+
+Upgrade preserves current enablement. Rollback stops the unit and overlays only
+verified archived user-data paths. Disable and uninstall preserve profiles,
+memory, faces, behaviors, secrets, configuration, databases, and backups.
 
 ---
 

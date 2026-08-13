@@ -2730,6 +2730,13 @@ the durable action ledger.
 
 ### Phase 8: Final public-release implementation (`v1.0.0`)
 
+**Implementation status (2026-08-13):** Phases 8.0–8.7 are software-complete
+on branch `public_v01`. The v1.0.0 source/package candidate passes the complete
+software gate. The public tag/release remains intentionally uncreated until
+the documented Raspberry Pi voice, ngrok, UI/power, QR/Greeting, boot, soak,
+and rollback acceptance is recorded and the owner explicitly approves
+publication.
+
 **Objective**
 
 Complete the last-mile voice, remote-access, web, boot, deployment, security,

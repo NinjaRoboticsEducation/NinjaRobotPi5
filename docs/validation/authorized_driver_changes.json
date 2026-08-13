@@ -223,6 +223,32 @@
       },
       "reason": "Standalone installation, dependency, and CLI validation documentation"
     },
+    "pi5mic/src/pi5mic/wakeword/openwakeword.py": {
+      "approved": {
+        "sha256": "d6d5c6fbeacc45ad2f067acd72db9d674b2f3771048e0255919e4175242418c4",
+        "size": 5472
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-13",
+      "baseline": {
+        "sha256": "583abb2de0107d896e245ce297bcceb8eeec624b25c7699cc6188fa311bd7756",
+        "size": 4284
+      },
+      "reason": "Offline explicit openWakeWord feature and VAD asset paths for deterministic Phase 8 voice startup"
+    },
+    "pi5mic/tests/test_wakeword.py": {
+      "approved": {
+        "sha256": "b03c83b8596be356b056b8614b77d88401a6c553fbe388a9216f03a253840eba",
+        "size": 4767
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-13",
+      "baseline": {
+        "sha256": "d7f818fb46e75dfdd934375d77c6ba0b1d45d2510e0f8b47be98966e19c039d6",
+        "size": 2937
+      },
+      "reason": "Validation of explicit offline openWakeWord feature and VAD asset loading"
+    },
     "pi5servo/README.md": {
       "approved": {
         "sha256": "afccff0e1f93436e07e601ea5a070c90e0923cc8a66f88e77d57cf67fd4a7fcb",

@@ -114,6 +114,12 @@ from .presentation import (
 from .prompts import IDENTITY_PROMPT, IMMUTABLE_SAFETY_PROMPT, PromptComposer
 from .providers import LLMProvider
 from .recovery import RecoveryAction, RecoveryDecision, RecoveryPolicy
+from .release_foundations import (
+    ReleaseComponentStatus,
+    ReleaseFeatureState,
+    ReleaseStatusRegistry,
+    ReleaseStatusSnapshot,
+)
 from .robot_control_mcp import (
     ROBOT_CONTROL_DELEGATED_CAPABILITIES,
     ROBOT_CONTROL_PROVIDER_ID,
@@ -224,6 +230,10 @@ __all__ = [
     "RecoveryAction",
     "RecoveryDecision",
     "RecoveryPolicy",
+    "ReleaseComponentStatus",
+    "ReleaseFeatureState",
+    "ReleaseStatusRegistry",
+    "ReleaseStatusSnapshot",
     "RobotPresentationController",
     "RobotControlMCPProvider",
     "ROBOT_CONTROL_DELEGATED_CAPABILITIES",
@@ -265,4 +275,4 @@ __all__ = [
     "persist_model_selection",
 ]
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"

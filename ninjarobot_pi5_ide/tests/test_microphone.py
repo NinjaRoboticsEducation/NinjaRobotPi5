@@ -131,6 +131,17 @@ class FakeBackend:
                 self.active_calls -= 1
 
 
+class FakeVoiceCoordinator:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    async def pause(self) -> None:
+        self.calls.append("pause")
+
+    async def resume(self) -> None:
+        self.calls.append("resume")
+
+
 def test_microphone_can_restart_after_emergency_suspend(tmp_path: Path) -> None:
     async def exercise() -> None:
         backends: list[FakeBackend] = []
@@ -219,11 +230,60 @@ def test_transcription_deletes_its_temporary_audio(tmp_path: Path) -> None:
     asyncio.run(exercise())
 
 
+def test_manual_transcription_pauses_once_until_audio_is_deleted(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        backend = FakeBackend()
+        device = device_for(tmp_path, backend)
+        coordinator = FakeVoiceCoordinator()
+        device.set_voice_coordinator(coordinator)
+        engine = engine_for(tmp_path, device)
+
+        result = await engine.execute(
+            request(
+                "microphone-coordinated-transcribe",
+                "microphone.transcribe",
+                {"duration_seconds": 0.25, "language": "zh-TW"},
+            )
+        )
+
+        assert result.status is ActionStatus.SUCCEEDED
+        assert result.data is not None
+        assert result.data["transcript"] == "Simulated zh-TW microphone prompt"
+        assert coordinator.calls == ["pause", "resume"]
+        assert list((tmp_path / "private-microphone").glob("transcribe-*.wav")) == []
+        await engine.close()
+
+    asyncio.run(exercise())
+
+
+def test_manual_capture_restores_listener_after_failure(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        backend = FakeBackend(fail=True)
+        device = device_for(tmp_path, backend)
+        coordinator = FakeVoiceCoordinator()
+        device.set_voice_coordinator(coordinator)
+        engine = engine_for(tmp_path, device)
+
+        result = await engine.execute(
+            request(
+                "microphone-coordinated-failure",
+                "microphone.capture",
+                {"duration_seconds": 0.25},
+            )
+        )
+
+        assert result.status is ActionStatus.FAILED
+        assert coordinator.calls == ["pause", "resume"]
+        await engine.close()
+
+    asyncio.run(exercise())
+
+
 def test_device_only_loader_never_imports_historical_or_voice_modules() -> None:
     bindings = microphone_module._load_pi5mic_bindings()
 
     imported = {name for name in sys.modules if name == "pi5mic" or name.startswith("pi5mic.")}
-    assert imported == microphone_module.MICROPHONE_ALLOWED_MODULES
+    assert imported == microphone_module.MICROPHONE_DEVICE_MODULES
     assert getattr(sys.modules["pi5mic"], "__file__", None) is None
     assert callable(bindings.list_input_devices)
     assert callable(bindings.record_wav)

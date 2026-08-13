@@ -166,9 +166,19 @@ class MotionArmManager:
             return False
         return True
 
-    def disarm(self, session_id: str) -> None:
-        """Revoke a session arm after stop or disconnect."""
+    def has_arm(self, session_id: str) -> bool:
+        """Return whether any authorization source currently owns the session arm."""
+        return session_id in self._arms
+
+    def disarm(self, session_id: str, *, lease_id: str | None = None) -> bool:
+        """Revoke an arm unconditionally or only for its originating web lease."""
+        arm = self._arms.get(session_id)
+        if arm is None:
+            return False
+        if lease_id is not None and arm.lease_id != lease_id:
+            return False
         self._arms.pop(session_id, None)
+        return True
 
     def disarm_all(self) -> None:
         """Revoke all motion consent during shutdown or model replacement."""

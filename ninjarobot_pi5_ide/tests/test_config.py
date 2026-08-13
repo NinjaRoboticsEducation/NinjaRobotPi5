@@ -52,6 +52,17 @@ def test_example_configuration_matches_confirmed_wiring() -> None:
     assert config.memory.failed_behavior_retention_days == 180
     assert config.memory.failed_behavior_cap == 1000
     assert config.memory.retrieval_limit == 6
+    assert config.voice_input.enabled is False
+    assert config.voice_input.inference_framework == "onnx"
+    assert config.voice_input.max_command_seconds == 15.0
+    assert config.voice_input.language == "en"
+    assert config.remote_access.executable == "~/.local/share/ninjarobot_pi5/bin/ngrok"
+    assert config.remote_access.enabled is False
+    assert config.remote_access.authtoken_env == "NGROK_AUTHTOKEN"
+    assert config.remote_access.local_upstream == "https://127.0.0.1:8443"
+    assert config.onboarding.enabled is False
+    assert config.deployment.auto_start_enabled is False
+    assert config.deployment.web_poweroff_enabled is False
     assert config.providers["ollama"].api_key_env is None
     assert config.providers["openai"].api_key_env == "OPENAI_API_KEY"
     assert config.providers["gemini"].api_key_env == "GEMINI_API_KEY"
@@ -177,6 +188,48 @@ def test_configuration_bounds_microphone_capture_and_retention() -> None:
     payload = load_robot_config(EXAMPLE).model_dump()
     payload["hardware"]["microphone"]["max_capture_seconds"] = 60.0
     with pytest.raises(ValidationError, match="less than or equal to 30"):
+        RobotConfig.model_validate(payload)
+
+
+def test_phase_8_configuration_is_strict_bounded_and_opt_in() -> None:
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["voice_input"]["max_command_seconds"] = 15.1
+    with pytest.raises(ValidationError, match="less than or equal to 15"):
+        RobotConfig.model_validate(payload)
+
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["voice_input"]["inference_framework"] = "tflite"
+    with pytest.raises(ValidationError, match="Input should be 'onnx'"):
+        RobotConfig.model_validate(payload)
+
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["remote_access"]["local_upstream"] = "https://attacker.example"
+    with pytest.raises(ValidationError, match="Input should be 'https://127.0.0.1:8443'"):
+        RobotConfig.model_validate(payload)
+
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["deployment"]["poweroff_helper"] = "/tmp/run-anything"
+    with pytest.raises(ValidationError, match="Input should be '/usr/libexec"):
+        RobotConfig.model_validate(payload)
+
+
+def test_phase_8_configuration_rejects_inconsistent_hardware_and_backoff() -> None:
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["voice_input"]["enabled"] = True
+    payload["hardware"]["microphone"]["enabled"] = False
+    with pytest.raises(ValidationError, match="voice_input requires"):
+        RobotConfig.model_validate(payload)
+
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["onboarding"]["enabled"] = True
+    payload["hardware"]["display"]["enabled"] = False
+    with pytest.raises(ValidationError, match="onboarding requires"):
+        RobotConfig.model_validate(payload)
+
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["remote_access"]["retry_initial_seconds"] = 60.0
+    payload["remote_access"]["retry_max_seconds"] = 10.0
+    with pytest.raises(ValidationError, match="must cover"):
         RobotConfig.model_validate(payload)
 
 

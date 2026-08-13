@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "source_release": "https://github.com/dscripka/openWakeWord/releases/tag/v0.5.1",
+  "runtime_boot_download_allowed": false,
+  "assets": [
+    {
+      "path": "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/assets/openwakeword/embedding_model.onnx",
+      "size_bytes": 1326578,
+      "sha256": "70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/assets/openwakeword/melspectrogram.onnx",
+      "size_bytes": 1087958,
+      "sha256": "ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f",
+      "license": "Apache-2.0"
+    },
+    {
+      "path": "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/assets/openwakeword/silero_vad.onnx",
+      "size_bytes": 1807522,
+      "sha256": "a35ebf52fd3ce5f1469b2a36158dba761bc47b973ea3382b3186ca15b1f5af28",
+      "license": "MIT"
+    }
+  ]
+}

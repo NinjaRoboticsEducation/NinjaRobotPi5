@@ -1,5 +1,279 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-13 — Phase 8.7 v1.0.0 release candidate
+
+### Implementation
+
+- aligned root, agent, IDE, import, and lockfile versions at `1.0.0`
+- completed direct dependency/license notices, release manifest, support and
+  known-limitations matrix, architecture/privacy/remote-threat review, and
+  release-candidate report
+- built both V4 wheels and sdists and verified isolated installed-package
+  imports, CLI discovery, four locale files, deployment templates, custom wake
+  model, and offline runtime assets
+- preserved the publication gate: no Git tag, GitHub release, service install,
+  power action, or external mutation was performed
+
+### Validation and hardware status
+
+- the final software gate passes with 511 tests, 81 strictly typed source files,
+  immutable-driver verification, compilation, Ruff, formatting, JavaScript,
+  QR decode, systemd verification, package build/install, and whitespace checks
+- one existing Starlette/httpx TestClient deprecation warning remains
+  non-functional; physical Phase 8 acceptance is still pending and documented
+
+### Next step
+
+Run and sign every Phase 8 Raspberry Pi checklist on the exact release-candidate
+commit. After another final gate and explicit owner publication approval, tag
+and publish `v1.0.0`.
+
+## 2026-08-13 — Phase 8.6 explicit systemd deployment
+
+### Implementation
+
+- added a versioned, hardened systemd template with absolute installed-runtime
+  paths, non-root device groups, journald, bounded cleanup, start throttling,
+  and `Restart=on-failure`
+- added fixed root-owned power-off helper/sudoers templates; the agent can run
+  only the argument-free helper through noninteractive sudo after cleanup
+- added scriptable and Interactive Tool deployment validation, disabled install,
+  explicit enable/disable, start/stop/restart, status/logs, upgrade, private
+  backup, verified rollback, and data-preserving uninstall
+- made enablement explicitly persist real-hardware QR onboarding and paired web
+  power-off; fixed manual startup reporting so onboarding QR wait is service
+  readiness rather than a 60-second false timeout
+
+### Validation and hardware status
+
+- unit rendering and `systemd-analyze verify`, absolute paths, real-hardware
+  argv, hardening/restart policy, disabled install, fixed privileged targets,
+  enable/disable persistence, private backup/rollback, helper exactness, and
+  onboarding startup reporting tests pass
+- no sudo, systemctl, journal, installation, boot, hardware, or power command
+  was executed; Pi validation remains in
+  `docs/validation/phase-8-6-systemd-pi-checklist.md`
+
+### Next step
+
+Run the Phase 8.6 full gate, then complete v1.0.0 versioning, package/release
+manifests, security/privacy acceptance, and the final public-release audit.
+
+## 2026-08-13 — Phase 8.5 QR onboarding and first-connection Greeting
+
+### Implementation
+
+- added IDE-owned QR validation/rendering with error correction M, automatic
+  sizing, four-module quiet zone, integer modules, and centered 240×320 output
+- extended one-use pairing to exact local HTTPS origins so onboarding assets,
+  WebSockets, Greeting, and paired power control share one trust boundary
+- added remote connecting, failure-triggered local fallback, recovery-time QR
+  replacement, pre-expiry QR refresh, and endpoint/session invalidation
+- replaced service-start Greeting when onboarding is enabled with a serialized
+  first-paired-controller coordinator that runs Greeting and enters Idle once
+- made QR/display/Greeting failures terminal for that process, with degraded
+  startup state, redaction-safe events, Error display, motion revocation, and
+  a deterministic servo-stop attempt
+
+### Validation and hardware status
+
+- exact OpenCV QR round-trip, dimensions/colors, malformed/long URL, local and
+  remote pairing, fallback/recovery, refresh, probe rejection, concurrent and
+  reconnect exactly-once, and injected-failure tests pass
+- no real display, browser, tunnel, GPIO, buzzer, servo, or other hardware was
+  operated; the Pi checklist is
+  `docs/validation/phase-8-5-onboarding-pi-checklist.md`
+
+### Next step
+
+After the complete Phase 8.5 gate, add explicit disabled-by-default systemd
+installation, the narrow power-off helper/policy, and boot lifecycle checks.
+
+## 2026-08-13 — Phase 8.4 multilingual web and safe power-off
+
+### Implementation
+
+- added complete, key-identical English, Japanese, Traditional Chinese, and
+  Simplified Chinese dictionaries with locale selection, persistence, English
+  fallback, and translated accessibility attributes
+- added an accessible hamburger and full-screen overlay with language, voice,
+  recording, connection, and power controls while keeping Emergency Stop and
+  existing controller functions available
+- added a Power Off/Cancel dialog, paired active-controller enforcement, a
+  30-second one-use lease-bound nonce, replay rejection, and deterministic
+  cleanup outside the model/tool path
+- restricted OS privilege to fixed `/usr/libexec/ninjarobot-poweroff` argv,
+  without a shell or symlink, and only after service cleanup; the versioned
+  helper and policy are installed in Phase 8.6
+
+### Validation and hardware status
+
+- locale parity/reference, JavaScript syntax, preserved-control, pairing,
+  second-confirmation, nonce lease/expiry/replay, degraded cleanup, and fixed
+  helper invocation tests pass
+- no browser, camera, microphone, GPIO, display, buzzer, servo, tunnel, service,
+  or OS power action was activated during implementation
+- Pi UI, actuator, and power-risk acceptance is defined in
+  `docs/validation/phase-8-4-web-poweroff-pi-checklist.md`; final power-off waits
+  for the Phase 8.6 helper/policy installation
+
+### Next step
+
+After the complete Phase 8.4 gate, implement deterministic QR onboarding and
+trigger Greeting exactly once after the first paired controller connects.
+
+## 2026-08-13 — Phase 8.3 passwordless ngrok remote access
+
+### Implementation
+
+- added an explicit setup-only ngrok installer, owner-private authtoken and
+  pairing/session/transport secrets, exact process/tunnel teardown, upstream
+  TLS verification with the NinjaRobot local CA, capped retry/recovery, and
+  stable redaction-safe status/events
+- added one-use URL-fragment pairing, expiry/replay protection, keyed session
+  hashes, Secure/HttpOnly/SameSite cookies, exact Origin/Host validation, and
+  remote authentication for dashboard assets and WebSocket control
+- hardened transport identification with an ngrok rule that removes a
+  client-supplied marker and injects the process-owned value; this prevents a
+  remote Host-header spoof from being mistaken for an unpaired LAN request
+- extended scriptable commands and the Interactive Tool with configure,
+  activate, deactivate, status/URL, rotate/revoke, and credential removal
+- preserved local network/web behavior and the existing exclusive controller
+  lease; tunnel failure never executes hardware or disables local control
+
+### Validation and hardware status
+
+- URL, entropy, expiry, replay, wrong-origin, hostile Host, injected-marker,
+  cookie, unauthenticated asset/WebSocket, exact tunnel close, retry recovery,
+  private config, token redaction, persistence, CLI, IPC, and certificate-SAN
+  tests pass
+- compileall, Ruff lint/format, strict MyPy, and the full root suite passed with
+  474 tests and the one existing Starlette test-client warning before the final
+  documentation gate
+- no ngrok executable was downloaded, no account token was entered, and no
+  public endpoint, HTTP request, WebSocket, camera, microphone, display, GPIO,
+  servo, buzzer, or system service was activated during implementation
+
+### Next step
+
+Complete the Phase 8.3 documentation gate and operator live-account checklist,
+then proceed to the four-locale responsive web menu and safe power-off boundary.
+
+## 2026-08-13 — Phase 8.2 IDE-owned always-on voice input
+
+### Implementation
+
+- added one IDE-owned wake/listen/capture/transcribe state machine with bounded
+  16 kHz PCM buffering, 15-second maximum commands, silence completion,
+  cooldown/retry handling, cancellation, and temporary-WAV deletion
+- serialized manual USB capture/transcription with the listener so PortAudio
+  never has competing owners and always restores listening through cleanup
+- dispatched finalized transcripts exactly once through an independent owner
+  voice session using the existing model, policy, IDE, memory, presentation,
+  and event paths; no TTS or alternate hardware execution path was introduced
+- added explicit terminal and web enable/disable/status controls, four local
+  transcription locales, web transcript/reply events, and shared `/arm` / web
+  motion authorization with lease-scoped revocation
+- packaged the openWakeWord feature and Silero VAD assets with exact hashes
+  after a live arm64 load check proved the upstream wheel omits them; extended
+  the managed pi5mic detector with explicit offline asset paths and recorded
+  the two authorized driver-file hashes
+
+### Validation and hardware status
+
+- focused voice, microphone arbitration, identity/session, persistence, CLI,
+  policy, web, overflow, resampling, deletion, and no-OpenClaw-import tests pass
+- the Raspberry Pi 5 arm64 environment loaded the custom wake model, feature
+  models, and VAD model under ONNX Runtime at 16 kHz without a runtime download
+- immutable-driver verification reports 222 baseline files plus 28 authorized
+  repairs; compileall, Ruff lint/format, strict MyPy, `git diff --check`, and
+  the full root suite pass with 453 tests and one existing Starlette warning
+- the complete managed pi5mic suite passes with 91 tests and its existing
+  Python `audioop` deprecation warning; the built IDE wheel contains the custom
+  wake model, all three pinned offline runtime assets, and the asset notice
+- no microphone audio was captured and no display, GPIO, buzzer, servo, or
+  movement action was executed; live wake/false-trigger and actuator acceptance
+  remain operator validation work
+
+### Next step
+
+Proceed only after the Phase 8.2 gate passes. Phase 8.3 adds optional ngrok
+remote access and short-lived passwordless QR pairing without exposing an
+anonymous robot controller.
+
+## 2026-08-13 — Phase 8.1 strict release foundations
+
+### Implementation
+
+- added strict, default-disabled voice, remote access, QR onboarding, and
+  deployment sections while preserving Phase 7 configuration compatibility
+- bounded the wake model/framework, 15-second maximum command, language set,
+  retry policy, fixed local HTTPS upstream, pairing/session lifetimes, QR
+  parameters, systemd unit name, and privileged helper path
+- pinned openWakeWord, ONNX Runtime, pyngrok, and qrcode in opt-in package extras
+  and refreshed the root lock; the hardware extra selects all release runtimes
+- moved the wake model and adjacent notice into the IDE package that owns the
+  microphone boundary, retaining the approved checksum and source manifest
+- hardened `SecretStore` with unique temporary files, fsync, symbolic-link and
+  non-regular-path rejection, owner-only reads, and environment-token redaction
+- added normalized status and event categories for voice, tunnel, pairing,
+  onboarding, and shutdown without performing active hardware/network probes
+
+### Validation and hardware status
+
+- added configuration migration/round-trip/bounds tests, hostile secret-path
+  tests, environment-token redaction tests, dependency-degraded status tests,
+  lifecycle contract tests, and runtime status coverage
+- immutable-driver verification passed with 222 tracked files and 26 authorized
+  repairs; compileall, Ruff lint/format, strict MyPy, and the full suite passed
+  with 435 tests and the one existing Starlette test-client warning
+- the frozen hardware-extra dry run resolved all pinned release dependencies,
+  and the built IDE wheel contained the 206,276-byte model and adjacent notice
+- dependency metadata confirms an ONNX Runtime CPython 3.11/aarch64 wheel; the
+  actual Raspberry Pi import and model-load test remains deferred to device
+  validation
+- no microphone, display, GPIO, actuator, ngrok tunnel, system service, or OS
+  power-off action was performed in this low-risk foundation phase
+
+### Next step
+
+Proceed to the IDE-owned voice controller. Raspberry Pi microphone/model-load
+acceptance remains deferred until the Phase 8 device-communication checklist.
+
+## 2026-08-13 — Phase 8.0 release contract and asset provenance
+
+### Implementation
+
+- added the root MIT license and a third-party notice covering the Phase 8
+  qrcode, pyngrok/ngrok, openWakeWord, and ONNX Runtime boundaries
+- added the approved public-release contract and threat model for voice privacy,
+  QR pairing, remote control, privileged power-off, boot ownership, secrets,
+  supply-chain integrity, backup, rollback, and release blockers
+- copied the owner-approved `hey_Ninja.onnx` model into the IDE package that
+  owns the microphone control plane,
+  recorded its source, size, license, approval, and SHA-256 in a machine-readable
+  manifest, and added a package-adjacent model notice
+- added tests proving that the source and packaged model are byte-identical and
+  that the built consuming-package wheel contains the model and notice
+- added SPDX-compatible MIT metadata to the root, IDE, and agent projects and
+  updated README/DevelopmentGuide licensing and binary-asset guidance
+
+### Validation and hardware status
+
+- the consuming-package wheel build contained the 206,276-byte model and model notice
+- immutable-driver verification passed with 222 tracked files and 26 authorized
+  repairs; compileall, Ruff lint/format, strict MyPy, and the full suite passed
+  with 424 tests and the one existing Starlette test-client warning
+- no dependency was installed for unattended runtime use, no managed driver was
+  modified, and no microphone, display, GPIO, actuator, network tunnel, service,
+  or operating-system power action was performed
+
+### Next step
+
+Proceed to Phase 8.1 strict configuration, pinned optional dependencies, secret
+handling, and normalized lifecycle status. Raspberry Pi ONNX/aarch64 loading
+remains deferred until the Phase 8 device-communication checklist.
+
 ## 2026-08-13 — Phase 8 final public-release roadmap
 
 ### Scope and decisions

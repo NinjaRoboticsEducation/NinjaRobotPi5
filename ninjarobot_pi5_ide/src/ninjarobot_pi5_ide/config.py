@@ -260,6 +260,83 @@ class MemoryConfig(ConfigModel):
     face_data_directory: NonEmptyText = "~/.local/share/ninjarobot_pi5/faces"
 
 
+class VoiceInputConfig(ConfigModel):
+    """Bounded Phase 8 wake-word and command-capture configuration."""
+
+    enabled: bool = False
+    model_resource: Literal["ninjarobot_pi5_ide/assets/hey_Ninja.onnx"] = (
+        "ninjarobot_pi5_ide/assets/hey_Ninja.onnx"
+    )
+    inference_framework: Literal["onnx"] = "onnx"
+    wake_threshold: Annotated[float, Field(ge=0.1, le=0.95)] = 0.5
+    vad_enabled: bool = True
+    wake_vad_threshold: Annotated[float, Field(ge=0.0, le=1.0)] = 0.3
+    silence_rms_threshold: Annotated[int, Field(ge=10, le=5_000)] = 200
+    noise_suppression_enabled: bool = False
+    max_command_seconds: Annotated[float, Field(ge=1.0, le=15.0)] = 15.0
+    silence_stop_seconds: Annotated[float, Field(ge=0.25, le=5.0)] = 1.25
+    cooldown_seconds: Annotated[float, Field(ge=0.25, le=10.0)] = 1.0
+    frame_milliseconds: Literal[80] = 80
+    language: Literal["en", "ja", "zh-TW", "zh-CN"] = "en"
+    retry_limit: Annotated[int, Field(ge=0, le=5)] = 2
+
+
+class RemoteAccessConfig(ConfigModel):
+    """Secret-free, bounded ngrok and pairing configuration."""
+
+    enabled: bool = False
+    config_file: Literal["~/.config/ninjarobot_pi5/ngrok.yml"] = (
+        "~/.config/ninjarobot_pi5/ngrok.yml"
+    )
+    executable: Literal["~/.local/share/ninjarobot_pi5/bin/ngrok"] = (
+        "~/.local/share/ninjarobot_pi5/bin/ngrok"
+    )
+    authtoken_env: Literal["NGROK_AUTHTOKEN"] = "NGROK_AUTHTOKEN"
+    pairing_secret_env: Literal["NINJAROBOT_PAIRING_SECRET"] = "NINJAROBOT_PAIRING_SECRET"
+    session_secret_env: Literal["NINJAROBOT_SESSION_SECRET"] = "NINJAROBOT_SESSION_SECRET"
+    remote_header_secret_env: Literal["NINJAROBOT_REMOTE_HEADER_SECRET"] = (
+        "NINJAROBOT_REMOTE_HEADER_SECRET"
+    )
+    local_upstream: Literal["https://127.0.0.1:8443"] = "https://127.0.0.1:8443"
+    connect_timeout_seconds: Annotated[float, Field(ge=5.0, le=120.0)] = 30.0
+    retry_initial_seconds: Annotated[float, Field(ge=1.0, le=60.0)] = 2.0
+    retry_max_seconds: Annotated[float, Field(ge=5.0, le=600.0)] = 120.0
+    retry_limit: Annotated[int, Field(ge=0, le=100)] = 10
+    health_interval_seconds: Annotated[float, Field(ge=5.0, le=300.0)] = 30.0
+    pairing_lifetime_seconds: Annotated[int, Field(ge=60, le=900)] = 300
+    session_lifetime_seconds: Annotated[int, Field(ge=300, le=2_592_000)] = 86_400
+
+    @model_validator(mode="after")
+    def retry_max_must_cover_initial_delay(self) -> RemoteAccessConfig:
+        """Keep exponential backoff monotonic and deterministically bounded."""
+        if self.retry_max_seconds < self.retry_initial_seconds:
+            raise ValueError("remote retry_max_seconds must cover retry_initial_seconds")
+        return self
+
+
+class OnboardingConfig(ConfigModel):
+    """Trusted QR and first-controller presentation configuration."""
+
+    enabled: bool = False
+    qr_error_correction: Literal["M"] = "M"
+    qr_border_modules: Literal[4] = 4
+    greeting_behavior: Literal["greeting"] = "greeting"
+    idle_behavior: Literal["idle"] = "idle"
+    connection_timeout_seconds: Annotated[float, Field(ge=5.0, le=600.0)] = 60.0
+
+
+class DeploymentConfig(ConfigModel):
+    """Opt-in service and web-power controls without executable injection."""
+
+    auto_start_enabled: bool = False
+    web_poweroff_enabled: bool = False
+    systemd_unit_name: Literal["ninjarobot-agent.service"] = "ninjarobot-agent.service"
+    restart_policy: Literal["on-failure"] = "on-failure"
+    poweroff_helper: Literal["/usr/libexec/ninjarobot-poweroff"] = (
+        "/usr/libexec/ninjarobot-poweroff"
+    )
+
+
 class ProviderConfig(ConfigModel):
     """Provider reference containing names and secret references, never secrets."""
 
@@ -298,6 +375,10 @@ class RobotConfig(ConfigModel):
     behaviors: BehaviorConfig = Field(default_factory=BehaviorConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
+    voice_input: VoiceInputConfig = Field(default_factory=VoiceInputConfig)
+    remote_access: RemoteAccessConfig = Field(default_factory=RemoteAccessConfig)
+    onboarding: OnboardingConfig = Field(default_factory=OnboardingConfig)
+    deployment: DeploymentConfig = Field(default_factory=DeploymentConfig)
     providers: dict[str, ProviderConfig] = Field(default_factory=dict)
 
     @model_validator(mode="after")
@@ -325,6 +406,15 @@ class RobotConfig(ConfigModel):
                 raise ValueError("agent fallback providers must name configured enabled providers")
             if fallback_id == self.agent.default_provider:
                 raise ValueError("agent fallback providers must not include the default provider")
+        return self
+
+    @model_validator(mode="after")
+    def enabled_release_features_require_configured_hardware(self) -> RobotConfig:
+        """Reject release features whose required hardware is explicitly disabled."""
+        if self.voice_input.enabled and not self.hardware.microphone.enabled:
+            raise ValueError("voice_input requires the configured microphone to be enabled")
+        if self.onboarding.enabled and not self.hardware.display.enabled:
+            raise ValueError("onboarding requires the configured display to be enabled")
         return self
 
 

@@ -65,6 +65,7 @@ NinjaRobotPi5/
 │   │   ├── behavior_assets.py  Bundled and private behavior catalog
 │   │   ├── behavior_models.py  Strict immutable stage/operation definitions
 │   │   ├── behavior_runtime.py Ordered-stage, concurrent-operation executor
+│   │   ├── assets/            Checksummed, licensed wake-model assets
 │   │   ├── camera.py           Privacy-bounded camera adapter
 │   │   ├── cli.py              ninjarobot-ide-tool entry point
 │   │   ├── config.py           V4 configuration schema (TOML)
@@ -97,6 +98,13 @@ NinjaRobotPi5/
 │   │   ├── policy.py           Tool call policy engine
 │   │   ├── prompts.py          PromptComposer — ordered system prompt builder
 │   │   ├── robot_control_mcp.py Trusted in-process robot-control MCP façade
+│   │   ├── release_foundations.py Phase 8 dependency and lifecycle status
+│   │   ├── voice_service.py     Always-on wake/listen/dispatch coordinator
+│   │   ├── remote_access.py     ngrok lifecycle and bounded recovery
+│   │   ├── pairing.py           One-use local/remote browser pairing
+│   │   ├── onboarding.py        QR-to-Greeting exactly-once coordinator
+│   │   ├── shutdown.py          Nonce-confirmed orderly power-off
+│   │   ├── deployment.py        Explicit systemd install/backup lifecycle
 │   │   ├── secrets.py          SecretStore — owner-only, atomic, redacted
 │   │   ├── skills.py           Skill validation, confinement, and registry
 │   │   └── web_app.py          FastAPI HTTPS controller and WebSocket lease
@@ -225,6 +233,26 @@ Strict mypy typing is mandatory for `ninjarobot_pi5_ide` and `ninjarobot_pi5_age
 
 ## 🚦 Development Workflow
 
+### Release licensing and binary assets
+
+The repository root [LICENSE](LICENSE) is the project MIT license.
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) records dependencies and
+services whose terms remain separate. Adding a dependency requires checking
+its current upstream license and updating the notice before release.
+
+Release-owned binary/model assets live inside the package that consumes them,
+not inside a managed driver. Each asset requires:
+
+1. an exact path, byte size, SHA-256 checksum, source/provenance, license, and
+   owner authorization in `docs/validation`;
+2. a package-build test proving that the wheel contains it;
+3. a checksum test that fails if either the source or packaged copy changes;
+4. a new review and Raspberry Pi result before replacement.
+
+The approved Phase 8 wake-model record is
+`docs/validation/phase-8-wake-model.json`. Unattended service boot must never
+download or replace this model or its inference assets.
+
 1. **Read** the relevant phase in `NinjaRobotPi5V4_ImplementationPlan.md` and any related Architecture Decision Records (ADRs) in `docs/adr/`.
 2. **Review** the affected code using Serena or your preferred editor.
 3. **Present** your plan and obtain explicit approval before writing code.
@@ -306,6 +334,17 @@ The example at `config/ninjarobot_pi5.toml.example` is the authoritative referen
 - Fixed-focus OV5647 camera at 1280×720, retention disabled by default
 - USB PnP microphone at 16 kHz (actual rate may fall back to 44.1 kHz)
 - Phase 7 memory retention, retrieval bounds, and local face-data directory
+- Phase 8 opt-in voice, remote-access, QR onboarding, and deployment controls
+
+Existing Phase 7 configuration files remain valid. Missing `[voice_input]`,
+`[remote_access]`, `[onboarding]`, and `[deployment]` sections receive strict,
+disabled defaults. The serializer now round-trips all memory and Phase 8
+sections, so a configuration import no longer omits persistent-memory settings.
+
+Phase 8 bounds deliberately fix the ONNX runtime, local HTTPS upstream,
+owner-private ngrok config path, QR quiet zone/error correction, systemd unit,
+and power-off helper. Arbitrary executable paths, tunnel upstreams, inference
+formats, or command durations above 15 seconds are rejected.
 
 The `[memory]` section supplies first-run defaults only. After the database is
 initialized, confirmed changes made through `ninjarobot-agent memory
@@ -433,12 +472,180 @@ Invalid generated behavior arguments, oversized display text, policy rejections,
 `SecretStore` stores API keys and sensitive values in `~/.config/ninjarobot_pi5/secrets.env`:
 
 - Created with mode `0600` (owner-read/write only)
-- Written atomically using `tempfile` + `rename`
+- Written atomically using a unique `tempfile`, `fsync`, and `rename`
+- Rejects symbolic-link files/directories and non-regular targets
 - Reports presence of a key without revealing its value
-- Redacts known secret values from nested error diagnostics
+- Redacts known file-backed or resolved environment values from nested error diagnostics
 - `provider logout` removes only the selected provider's saved key
 
+Phase 8 reserves `NGROK_AUTHTOKEN`, `NINJAROBOT_PAIRING_SECRET`,
+`NINJAROBOT_SESSION_SECRET`, and `NINJAROBOT_REMOTE_HEADER_SECRET` in this
+same store. The TOML contains only these environment-variable names. It never
+contains a token, cookie, transport marker, or signing key.
+
+### Phase 8 Optional Dependencies and Status
+
+The normal `uv sync --frozen` software-only environment remains lightweight.
+On Raspberry Pi, the existing hardware extra now also resolves the release
+runtime dependencies:
+
+```bash
+uv sync --frozen --extra hardware
+```
+
+Pinned release packages are `openwakeword==0.6.0`,
+`onnxruntime==1.27.0`, `pyngrok==8.1.2`, and `qrcode[pil]==8.2`.
+ONNX Runtime 1.27.0 publishes a CPython 3.11 manylinux aarch64 wheel; the
+target-Pi import/model-load check remains a mandatory device validation.
+
+`ninjarobot-agent status` now includes `release.voice`,
+`release.remote_access`, `release.pairing`, `release.onboarding`, and
+`release.shutdown`. Each reports a stable `enabled`, `state`, safe detail code,
+and dependency-presence map. Status checks never start a microphone, tunnel,
+display action, or shutdown operation. New installations report `disabled`
+until an operator explicitly enables the relevant feature.
+
+### IDE-owned always-on voice
+
+`ninjarobot_pi5_ide.voice_input.VoiceInputController` is the only always-on
+listener. It owns one bounded raw PCM stream, resamples a USB microphone's
+supported native rate to the detector's 16 kHz input, and implements the
+disabled/listening/detected/recording/transcribing/dispatching/cooldown state
+machine. `MicrophoneDevice.manual_access()` pauses and releases that stream for
+manual capture or transcription, then restores it in a `finally` path.
+
+The IDE loads only the managed pi5mic device and openWakeWord detector modules;
+it never imports the historical pi5mic/OpenClaw voice loop. The packaged custom
+model plus explicit `melspectrogram.onnx`, `embedding_model.onnx`, and
+`silero_vad.onnx` paths make detector startup offline and deterministic. Their
+hashes and provenance are in `docs/validation/phase-8-wake-model.json` and
+`docs/validation/phase-8-openwakeword-assets.json`.
+
+The agent bridge sends each finalized transcript exactly once through
+`AgentRuntime.chat()` using the independent `voice-owner` session. This keeps
+terminal and browser user selection unchanged while reusing the default/owner
+profile, persistent memory, policy engine, tools, presentation, and events.
+The listener stores no continuous audio and deletes the temporary command WAV
+after local transcription. Phase 8.2 intentionally has no TTS.
+
+Voice enablement is an explicit persisted operator setting:
+
+```text
+/voice input on
+/voice input status
+/voice input off
+```
+
+The terminal `/arm` and web **Arm AI motion** paths grant both the issuing chat
+and voice session. Voice disablement, model replacement, emergency/system stop,
+service shutdown, and loss of the browser lease that issued the grant revoke
+voice motion. A voice request is never retried after an uncertain tool result.
+
 The web interface never accepts provider secrets. The terminal uses hidden, double-entry prompts.
+
+### Remote access and pairing boundary
+
+`ninjarobot_pi5_agent.remote_access.RemoteAccessService` owns one optional
+pyngrok endpoint and process. Activation first starts the existing local HTTPS
+server, verifies the already-installed ngrok executable, loads the authtoken
+from `SecretStore`, and verifies upstream TLS against the NinjaRobot local CA.
+The private ngrok config is mode `0600`; the token is written only for process
+startup and immediately removed again so it is not left in the process command
+line or ordinary configuration. Service boot never invokes the installer.
+
+The endpoint removes any client-supplied `x-ninjarobot-remote` header and adds
+a process-owned random marker. `PairingSessionManager` requires that marker,
+the exact active HTTPS Host, and exact browser Origin. This prevents a remote
+client from spoofing a private-LAN Host header to bypass pairing. Unknown public
+hosts receive `421`; unauthenticated remote assets/control receive `401`.
+
+The QR/operator URL uses `#pair=<random>` so the credential is not sent in the
+initial HTTP request, server access log, or Referer. A tiny no-store bootstrap
+page removes the fragment and exchanges it once. The resulting cookie is
+Secure, HttpOnly, SameSite=Strict, path-scoped, expiry-bounded, and tracked by a
+keyed hash. Rotation, tunnel replacement/loss, explicit deactivation, or
+service shutdown invalidates pending tokens and completed sessions. The normal
+controller lease remains exclusive after pairing.
+
+The supervisor validates an HTTPS public origin, uses exponential capped
+backoff, publishes only stable failure categories, and keeps local agent/web/
+hardware paths alive on executable, token, account, network, configuration, or
+tunnel failure. A healthy tunnel waits for a paired WebSocket indefinitely;
+lack of a browser is not treated as failure. The pyngrok design follows the
+[documented explicit config/process API](https://pyngrok.readthedocs.io/en/stable/)
+and ngrok's [agent configuration](https://ngrok.com/docs/agent/config/v3/).
+
+Local-owner commands are:
+
+```bash
+uv run --frozen --extra hardware ninjarobot-agent remote configure
+uv run --frozen --extra hardware ninjarobot-agent remote activate
+uv run --frozen ninjarobot-agent remote status
+uv run --frozen ninjarobot-agent remote pairing-url
+uv run --frozen ninjarobot-agent remote rotate-pairing
+uv run --frozen ninjarobot-agent remote deactivate
+uv run --frozen ninjarobot-agent remote remove-credentials --confirm
+```
+
+`remove-credentials` preserves the installed ngrok executable but deletes the
+three pairing/session/transport secrets, the authtoken, and private ngrok
+config. It never deletes profiles, memories, face data, behavior assets, or the
+main robot configuration.
+
+### QR onboarding and startup liveliness
+
+When `[onboarding].enabled = true`, service startup initializes the IDE and
+HTTPS server without playing Greeting. The IDE renders a plain black-on-white
+QR using `qrcode` error correction M, automatic minimum version, integer-sized
+square modules, and a four-module quiet border, centered without interpolation
+on the physical display. QR input is restricted to one bounded HTTPS origin
+plus one URL-fragment pairing token; arbitrary images never cross the agent/IDE
+boundary. This follows the Python qrcode project's
+[documented `QRCode` configuration](https://github.com/lincolnloop/python-qrcode).
+
+If remote access is enabled, the display shows **Connecting…** until ngrok is
+ready or fails. A ready tunnel displays its remote one-use QR indefinitely and
+refreshes it before token expiry. A real failure selects a local mDNS HTTPS QR
+while remote retry continues; recovery replaces and invalidates the local
+endpoint before any controller connects. With remote disabled, local QR is
+immediate.
+
+During onboarding, local and remote HTTP assets and WebSockets require the
+same Secure/HttpOnly paired-browser session. Health probes, crawlers, static
+requests, failed leases, and unpaired browsers cannot trigger startup. The
+first paired exclusive WebSocket lease enters a serialized once-per-process
+coordinator: it clears the QR, runs Greeting once through the IDE, then marks
+Idle ready. Reconnects never replay Greeting. QR/display/Greeting failure marks
+startup degraded, disarms voice and AI motion, attempts a servo stop, and
+leaves a stable Error presentation rather than falsely reporting Idle.
+
+### systemd deployment boundary
+
+`ninjarobot_pi5_agent.deployment` renders the versioned service template with
+the installed virtual-environment Python executable and absolute config,
+secret, state, socket, TLS, model, and working paths. Boot never calls `uv` or
+an interactive shell. One non-root service owns IDE hardware, web, voice, QR,
+pairing, and ngrok. The unit uses required device groups, strict filesystem and
+kernel hardening compatible with Pi access, private temporary storage,
+journald, bounded shutdown, restart throttling, and `Restart=on-failure` so a
+clean intentional stop remains stopped. This follows systemd's
+[recommended long-running service policy](https://github.com/systemd/systemd/blob/main/man/systemd.service.xml).
+
+Installation is explicitly confirmed and disabled by default. A separate
+install-time `systemd-analyze verify` and `visudo -cf` gate rejects malformed
+unit or privilege policy files before any root-owned target is replaced. The
+separate confirmed enable action turns on onboarding and web power-off in config and
+enables the unit for the next boot. The fixed root-owned helper contains only
+`/usr/bin/systemctl poweroff --no-wall`; sudoers permits the service user to
+execute only that argument-free helper. The web coordinator calls it as
+`/usr/bin/sudo -n /usr/libexec/ninjarobot-poweroff` after resource cleanup.
+No general passwordless sudo is installed.
+
+Deployment commands cover validate/install/upgrade, enable/disable,
+start/stop/restart, status/journal, private backup, verified overlay rollback,
+and uninstall. Upgrade preserves enablement. Disable/uninstall and rollback do
+not delete profiles, memory, face data, behaviors, secrets, configuration, or
+unarchived newer data.
 
 ### Prompt Composition Order
 
@@ -811,6 +1018,27 @@ OpenCV wheel variant in the environment.
 
 ### HTTPS Web Controller
 
+The Phase 8 dashboard loads key-identical JSON dictionaries for `en`, `ja`,
+`zh-TW`, and `zh-CN`. It chooses a supported browser locale on first use,
+stores an explicit choice in `localStorage`, updates the document language and
+accessibility labels together, and falls back to English. Tool names, slash
+commands, capability identifiers, and safety values remain unambiguous.
+
+The top-right hamburger opens a full-screen, safe-area-aware menu containing
+language, always-on voice, manual USB recording, connection/pairing status,
+and system power. Focus is contained while the menu or power confirmation is
+open; Escape and the menu backdrop close safely. Emergency Stop remains on the
+main controller surface.
+
+Web power-off is a deterministic service operation, never a model tool. Only a
+paired browser holding the exclusive controller lease receives access. The
+server issues a 30-second, one-use, lease-bound nonce; explicit confirmation
+consumes it before stopping hardware and voice. The service then closes the
+tunnel, web server, durable stores, IDE, and ownership lock before invoking the
+fixed `/usr/libexec/ninjarobot-poweroff` helper with fixed argv and no shell.
+Until Phase 8.6 installs that helper and its narrow policy, failure leaves the
+robot stopped and logs `sudo systemctl poweroff` as the local recovery action.
+
 - Started and stopped through IPC — cannot create a second IDE or hardware owner
 - Generated local CA + `.local` server certificate stored under `~/.config/ninjarobot_pi5/tls/`
 - One exclusive WebSocket controller lease — a second browser receives HTTP `423 Locked`
@@ -1087,6 +1315,14 @@ A configuration change that points to another host is rejected — preventing cr
 | Root camera health reports unavailable while `/usr/bin/python3` imports Picamera2 | Run `./scripts/bootstrap-rpi-camera-workspace.sh` and retry from the project root. Do not recreate `.venv` with `--system-site-packages` |
 | `pi5mic` reports PortAudio missing | Install `libportaudio2` and `portaudio19-dev`, then run `pi5mic devices`. Local transcription also requires a built `whisper-cli` and `ggml-base.bin` |
 | V4 microphone status reports 44.1 kHz instead of 16 kHz | Expected. The USB device rejected 16 kHz; the managed driver selected its supported native rate. Check both `requested_sample_rate_hz` and `actual_sample_rate_hz` in the status output |
+| Voice input reports `transcriber_unavailable` | Build/configure `whisper-cli` and its local model, then disable and re-enable voice input. Terminal and web text chat remain available |
+| Voice input reports `microphone_unavailable` or `audio_overflow` | Stop standalone audio programs, verify the USB device and PortAudio packages, use `/voice input off`, then re-enable after the device is free |
+| Voice input reports `detector_unavailable` | Run the packaged-asset checksum tests and the hardware-extra model-load check. The service never downloads a missing model during boot |
+| Remote access reports `executable_unavailable` | Run `ninjarobot-agent remote configure` locally. Unattended boot intentionally refuses to download ngrok |
+| Remote access reports `authtoken_unavailable` or `authentication_failed` | Replace the token through the local Remote Access menu; do not paste it into web chat, TOML, logs, or issue reports |
+| Remote access reports `account_rejected` | Inspect the ngrok dashboard for account/endpoint/plan limits. Local web and robot control remain available |
+| Pairing link is expired or already used | Run `ninjarobot-agent remote rotate-pairing`; this deliberately revokes existing remote browser sessions |
+| Remote request returns `401` or `421` | Use the exact current pairing URL through the ngrok endpoint. Do not override Host/Origin headers or expose port 8443 directly |
 | VL53L0X reference calibration retries once | This is the bounded recovery path on the live revision-`0x10` device. A second timeout is a hard initialization failure — do not bypass calibration |
 | Clean checkout reports `recovery_required` | Inspect `robot.safety.reason` and `robot.safety.fault_detail`, close any standalone `pi5*` programs, and use the confirmed recovery path. Never remove `safety.json` as a repair |
 
@@ -1108,6 +1344,11 @@ A configuration change that points to another host is rejected — preventing cr
 | Phase 5 | ✅ Complete | NinjaRobotAgent, Ollama, HTTPS web controller, MCP, Skills |
 | Phase 6 | ✅ Complete | OpenAI, Gemini, Anthropic cloud provider adapters |
 | Phase 7 | ✅ Software complete | Multi-user memory, face identity, capture, bounded retrieval, management |
+| Phase 8.2 | ✅ Software complete | IDE-owned always-on Hey Ninja voice input; Raspberry Pi microphone acceptance pending |
+| Phase 8.3 | ✅ Software complete | Optional ngrok lifecycle and passwordless pairing; live account acceptance pending |
+| Phase 8.4 | ✅ Software complete | Four-locale accessible dashboard and paired, nonce-confirmed orderly power-off; Pi power-risk acceptance pending Phase 8.6 |
+| Phase 8.5 | ✅ Software complete | IDE-owned QR onboarding, remote/local endpoint replacement, paired exactly-once Greeting; Pi display/motion acceptance pending |
+| Phase 8.6 | ✅ Software complete | Explicit systemd deployment, boot lifecycle, backup/rollback, and narrow power-off helper; Pi boot/power acceptance pending |
 | Pi Acceptance | 🔲 Pending | Full Raspberry Pi hardware validation by operator |
 
 The implementation plan `NinjaRobotPi5V4_ImplementationPlan.md` remains the authoritative source for all design decisions and phase requirements.

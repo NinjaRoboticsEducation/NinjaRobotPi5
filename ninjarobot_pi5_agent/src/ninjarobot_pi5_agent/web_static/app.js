@@ -1,5 +1,18 @@
-(() => {
+(async () => {
   "use strict";
+
+  const SUPPORTED_LOCALES = new Set(["en", "ja", "zh-TW", "zh-CN"]);
+  const SPEECH_LOCALES = { en: "en-US", ja: "ja-JP", "zh-TW": "zh-TW", "zh-CN": "zh-CN" };
+
+  function preferredLocale() {
+    const stored = localStorage.getItem("ninjarobotLocale");
+    if (SUPPORTED_LOCALES.has(stored)) return stored;
+    const requested = navigator.languages?.[0] || navigator.language || "en";
+    if (/^ja/i.test(requested)) return "ja";
+    if (/^zh-(tw|hk|mo|hant)/i.test(requested)) return "zh-TW";
+    if (/^zh/i.test(requested)) return "zh-CN";
+    return "en";
+  }
 
   function persistentBrowserChatId() {
     const stored = localStorage.getItem("ninjarobotBrowserChatId");
@@ -23,6 +36,7 @@
     pending: new Map(),
     activeAssistant: new Map(),
     usbRecording: false,
+    voiceEnabled: false,
     recognition: null,
     recognitionActive: false,
     previewTimer: null,
@@ -31,6 +45,14 @@
     drawerDragged: false,
     controllerStarted: false,
     certificateHelpLogged: false,
+    locale: preferredLocale(),
+    messages: {},
+    englishMessages: {},
+    poweroffEnabled: false,
+    poweroffAuthorized: false,
+    poweroffNonce: null,
+    remoteConnection: false,
+    previousFocus: null,
   };
 
   const elements = {
@@ -42,7 +64,8 @@
     chatInput: document.querySelector("#chatInput"),
     log: document.querySelector("#systemLog"),
     toast: document.querySelector("#toast"),
-    usbMic: document.querySelector("#usbMicButton"),
+    voiceInput: document.querySelector("#usbMicButton"),
+    usbRecord: document.querySelector("#usbRecordButton"),
     webMic: document.querySelector("#webMicButton"),
     language: document.querySelector("#languageSelect"),
     preview: document.querySelector("#cameraPreview"),
@@ -51,7 +74,73 @@
     activityToggle: document.querySelector("#activityToggle"),
     startOverlay: document.querySelector("#startOverlay"),
     startController: document.querySelector("#startControllerButton"),
+    menuButton: document.querySelector("#menuButton"),
+    menu: document.querySelector("#robotMenu"),
+    closeMenu: document.querySelector("#closeMenuButton"),
+    remoteStatus: document.querySelector("#remoteStatus"),
+    powerOff: document.querySelector("#powerOffButton"),
+    powerAvailability: document.querySelector("#powerOffAvailability"),
+    powerDialog: document.querySelector("#powerOffDialog"),
+    cancelPowerOff: document.querySelector("#cancelPowerOffButton"),
+    confirmPowerOff: document.querySelector("#confirmPowerOffButton"),
   };
+
+  function t(key, replacements = {}) {
+    const template = state.messages[key] || state.englishMessages[key] || key;
+    return Object.entries(replacements).reduce(
+      (value, [name, replacement]) => value.replaceAll(`{${name}}`, String(replacement)),
+      template,
+    );
+  }
+
+  function applyTranslations() {
+    document.documentElement.lang = state.locale;
+    document.querySelectorAll("[data-i18n]").forEach((node) => {
+      node.textContent = t(node.dataset.i18n);
+    });
+    document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
+      node.setAttribute("placeholder", t(node.dataset.i18nPlaceholder));
+    });
+    document.querySelectorAll("[data-i18n-aria]").forEach((node) => {
+      node.setAttribute("aria-label", t(node.dataset.i18nAria));
+    });
+    document.querySelectorAll("[data-i18n-alt]").forEach((node) => {
+      node.setAttribute("alt", t(node.dataset.i18nAlt));
+    });
+    updateAiMotion(elements.armAi.dataset.armed === "true");
+    updateAiCamera(elements.armAiCamera.dataset.granted === "true");
+    updateVoiceInput({ enabled: state.voiceEnabled, state: elements.voiceInput.dataset.state });
+    updateConnectionDetail();
+    updatePoweroffAvailability();
+  }
+
+  async function setLocale(locale) {
+    const selected = SUPPORTED_LOCALES.has(locale) ? locale : "en";
+    try {
+      if (Object.keys(state.englishMessages).length === 0) {
+        const english = await fetch("/assets/i18n/en.json", { cache: "no-store" });
+        if (!english.ok) throw new Error(`English dictionary HTTP ${english.status}`);
+        state.englishMessages = await english.json();
+      }
+      if (selected === "en") {
+        state.messages = state.englishMessages;
+      } else {
+        const response = await fetch(`/assets/i18n/${encodeURIComponent(selected)}.json`, {
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        state.messages = await response.json();
+      }
+      state.locale = selected;
+    } catch (error) {
+      console.error("NinjaRobot translation load failed", error);
+      state.locale = "en";
+      state.messages = state.englishMessages;
+    }
+    localStorage.setItem("ninjarobotLocale", state.locale);
+    elements.language.value = state.locale;
+    applyTranslations();
+  }
 
   function log(message, kind = "info") {
     const row = document.createElement("div");
@@ -90,7 +179,7 @@
 
   function send(type, payload = {}) {
     if (!state.socket || state.socket.readyState !== WebSocket.OPEN || !state.leaseId) {
-      toast("The robot controller is not connected.");
+      toast(t("error.controllerDisconnected"));
       return Promise.reject(new Error("controller is disconnected"));
     }
     const requestId = `web-${Date.now()}-${++state.requestCounter}`;
@@ -104,7 +193,9 @@
         if (pending) {
           state.pending.delete(requestId);
           reject(
-            new Error(`${type} did not answer within ${responseTimeout / 1000} seconds`),
+            new Error(
+              t("error.timeout", { type, seconds: responseTimeout / 1000 }),
+            ),
           );
         }
       }, responseTimeout);
@@ -120,15 +211,15 @@
     }
     const socket = new WebSocket(`${protocol}//${window.location.host}/ws?${query}`);
     state.socket = socket;
-    setConnection("Connecting", "badge-wait");
+    setConnection(t("connection.connecting"), "badge-wait");
 
-    socket.addEventListener("open", () => log("Secure controller connection opened."));
+    socket.addEventListener("open", () => log(t("connection.opened")));
     socket.addEventListener("message", (event) => {
       let message;
       try {
         message = JSON.parse(event.data);
       } catch {
-        log("The service returned malformed data.", "error");
+        log(t("error.badData"), "error");
         return;
       }
       handleMessage(message);
@@ -137,12 +228,17 @@
       window.clearInterval(state.heartbeatTimer);
       state.heartbeatTimer = null;
       state.leaseId = null;
+      state.poweroffAuthorized = false;
       updateAiCamera(false);
-      setConnection(event.code === 4423 ? "Controller locked" : "Disconnected", "badge-wait");
+      updatePoweroffAvailability();
+      setConnection(
+        event.code === 4423 ? t("connection.locked") : t("connection.disconnected"),
+        "badge-wait",
+      );
       log(
         event.code === 4423
-          ? "Another device currently controls NinjaRobot."
-          : "Controller connection closed.",
+          ? t("error.anotherController")
+          : t("connection.closed"),
         event.code === 4423 ? "error" : "info",
       );
       if (!state.released && event.code !== 4423) {
@@ -150,14 +246,14 @@
       }
     });
     socket.addEventListener("error", () => {
-      log("Could not establish the HTTPS WebSocket connection.", "error");
+      log(t("error.https"), "error");
       if (!state.certificateHelpLogged) {
         state.certificateHelpLogged = true;
         log(
-          "Chrome: accept the HTTPS warning for this exact address, then reload. Safari: install and trust the NinjaRobotPi5 Local CA. Run 'ninjarobot-agent web certificate-status' on the Pi for details.",
+          t("error.certificateHelp"),
           "error",
         );
-        toast("Secure connection failed. Open Live Activity for certificate help.");
+        toast(t("error.https"));
       }
     });
   }
@@ -167,9 +263,12 @@
       state.leaseId = message.lease_id;
       state.certificateHelpLogged = false;
       state.reconnectToken = message.reconnect_token;
+      state.remoteConnection = message.remote === true;
+      state.poweroffAuthorized = message.poweroff_authorized === true;
       sessionStorage.setItem("ninjarobotReconnectToken", state.reconnectToken);
-      setConnection("Controller active", "badge-ok");
-      log("This device owns the exclusive controller lease.");
+      setConnection(t("connection.active"), "badge-ok");
+      log(t("connection.owned"));
+      updateConnectionDetail();
       const interval = Math.max(1000, Number(message.heartbeat_seconds) * 1000);
       window.clearInterval(state.heartbeatTimer);
       state.heartbeatTimer = window.setInterval(() => {
@@ -185,9 +284,12 @@
       const provider = message.data?.provider;
       const providerText = provider
         ? `${provider.provider}: ${provider.status}`
-        : "provider status unavailable";
+        : t("status.providerUnavailable");
       const toolCount = Array.isArray(message.data?.tools) ? message.data.tools.length : 0;
-      log(`System ready · ${providerText} · ${toolCount} tools`);
+      log(t("status.ready", { provider: providerText, tools: toolCount }));
+      updateVoiceInput(message.data?.release?.voice);
+      state.poweroffEnabled = message.data?.release?.shutdown?.enabled === true;
+      updatePoweroffAvailability();
       return;
     }
     if (message.type === "conversation_history") {
@@ -199,7 +301,7 @@
         if (typeof content === "string" && content.trim()) addMessage(role, content);
       });
       if (history.length === 0) {
-        addMessage("assistant", "Hello. NinjaRobotAgent is ready.");
+        addMessage("assistant", t("chat.ready"));
       }
       return;
     }
@@ -213,7 +315,19 @@
         showCameraPreview(event.data.jpeg_base64);
         updateAiCamera(false);
       }
-      log(event.message || "Agent event", event.event_type === "error" ? "error" : "info");
+      if (event.event_type === "voice" && event.data?.kind === "voice_transcript") {
+        addMessage("user", t("voice.transcript", { text: event.data.transcript || "" }));
+      }
+      if (event.event_type === "voice" && event.data?.kind === "voice_reply") {
+        addMessage("assistant", event.data.text || t("chat.noResponse"));
+      }
+      if (event.event_type === "voice" && event.data?.kind === "voice_status") {
+        updateVoiceInput({
+          enabled: event.data.state !== "disabled",
+          state: event.data.state,
+        });
+      }
+      log(event.message || t("status.agentEvent"), event.event_type === "error" ? "error" : "info");
       return;
     }
     if (message.type === "chat_delta") {
@@ -230,16 +344,16 @@
       settle(message.request_id, true, message.data);
       const assistant = state.activeAssistant.get(message.request_id);
       if (assistant && !assistant.textContent.trim()) {
-        assistant.textContent = message.data?.text || "(No text response)";
+        assistant.textContent = message.data?.text || t("chat.noResponse");
       }
       state.activeAssistant.delete(message.request_id);
       return;
     }
     if (message.type === "error") {
-      settle(message.request_id, false, new Error(message.error || "Request failed"));
+      settle(message.request_id, false, new Error(message.error || t("error.requestFailed")));
       state.activeAssistant.delete(message.request_id);
-      log(message.error || "Request failed.", "error");
-      toast(message.error || "Request failed.");
+      log(message.error || t("error.requestFailed"), "error");
+      toast(message.error || t("error.requestFailed"));
     }
   }
 
@@ -303,27 +417,28 @@
       .then(() => {
         updateAiMotion(false);
         updateAiCamera(false);
-        toast("Emergency stop completed.");
+        toast(t("behavior.emergencyComplete"));
       })
       .catch(() => {});
   });
 
   function resumeRobot(showInChat = false) {
-    if (!window.confirm("Health-check and resume all robot modules after the emergency stop?")) {
-      if (showInChat) addMessage("assistant", "System resume was cancelled.");
+    if (!window.confirm(t("resume.confirm"))) {
+      if (showInChat) addMessage("assistant", t("resume.cancelled"));
       return Promise.resolve(false);
     }
     return send("resume", { confirmed: true })
       .then(() => {
         updateAiMotion(false);
-        const message =
-          "Robot modules resumed and Idle restored. AI motion remains disarmed; use Arm AI Motion before requesting servo movement.";
+        const message = t("resume.message");
         if (showInChat) addMessage("assistant", message);
-        toast("Robot modules resumed.");
+        toast(t("resume.toast"));
         return true;
       })
       .catch((error) => {
-        if (showInChat) addMessage("assistant", `Resume failed: ${error.message}`);
+        if (showInChat) {
+          addMessage("assistant", t("resume.failed", { error: error.message }));
+        }
         throw error;
       });
   }
@@ -349,9 +464,7 @@
       return;
     }
     if (
-      !window.confirm(
-        "Allow natural-language requests to move the robot for this browser session?",
-      )
+      !window.confirm(t("motion.armConfirm"))
     ) {
       return;
     }
@@ -363,7 +476,7 @@
   function updateAiMotion(armed) {
     const button = elements.armAi;
     button.dataset.armed = String(armed);
-    button.textContent = armed ? "Disarm AI motion" : "Arm AI motion";
+    button.textContent = armed ? t("motion.disarm") : t("motion.arm");
     button.setAttribute("aria-pressed", String(armed));
   }
 
@@ -376,16 +489,14 @@
       return;
     }
     if (
-      !window.confirm(
-        "Allow NinjaRobotAgent to take one temporary photo? The photo is not retained.",
-      )
+      !window.confirm(t("camera.armConfirm"))
     ) {
       return;
     }
     send("grant_chat_camera", { confirmed: true })
       .then((data) => {
         updateAiCamera(true);
-        toast(`AI camera grant #${data.grant_sequence} is ready for one photo.`);
+        toast(t("chat.cameraGranted", { sequence: data.grant_sequence }));
       })
       .catch(() => {});
   });
@@ -393,7 +504,7 @@
   function updateAiCamera(granted) {
     const button = elements.armAiCamera;
     button.dataset.granted = String(granted);
-    button.textContent = granted ? "AI camera ready" : "AI camera";
+    button.textContent = granted ? t("camera.armed") : t("camera.arm");
     button.setAttribute("aria-pressed", String(granted));
   }
 
@@ -420,15 +531,39 @@
 
   document.querySelector("#closePreviewButton").addEventListener("click", clearPreview);
 
-  elements.usbMic.addEventListener("click", () => {
+  function updateVoiceInput(status = {}) {
+    const enabled = status.enabled === true && status.state !== "disabled";
+    state.voiceEnabled = enabled;
+    elements.voiceInput.dataset.state =
+      typeof status.state === "string" ? status.state : "disabled";
+    elements.voiceInput.dataset.enabled = String(enabled);
+    elements.voiceInput.setAttribute("aria-pressed", String(enabled));
+    elements.voiceInput.classList.toggle("recording", enabled);
+    elements.voiceInput.querySelector("strong").textContent = enabled
+      ? t("voice.titleOn")
+      : t("voice.title");
+    const stateLabel = typeof status.state === "string" ? status.state : "disabled";
+    elements.voiceInput.querySelector("small").textContent = t("voice.status", {
+      state: stateLabel,
+    });
+  }
+
+  elements.voiceInput.addEventListener("click", () => {
+    const request = state.voiceEnabled ? "voice_disable" : "voice_enable";
+    send(request)
+      .then((data) => updateVoiceInput(data))
+      .catch(() => {});
+  });
+
+  elements.usbRecord.addEventListener("click", () => {
     if (state.usbRecording) {
       send("usb_microphone_stop").catch(() => {});
       return;
     }
     state.usbRecording = true;
-    elements.usbMic.classList.add("recording");
-    elements.usbMic.querySelector("strong").textContent = "STOP USB MICROPHONE";
-    const language = elements.language.value.startsWith("ja") ? "ja" : "en";
+    elements.usbRecord.classList.add("recording");
+    elements.usbRecord.querySelector("strong").textContent = t("record.stop");
+    const language = state.locale;
     send("usb_microphone", { duration_seconds: 5, language })
       .then((data) => {
         if (data.transcript) {
@@ -439,8 +574,8 @@
       .catch(() => {})
       .finally(() => {
         state.usbRecording = false;
-        elements.usbMic.classList.remove("recording");
-        elements.usbMic.querySelector("strong").textContent = "USB MICROPHONE";
+        elements.usbRecord.classList.remove("recording");
+        elements.usbRecord.querySelector("strong").textContent = t("record.title");
       });
   });
 
@@ -448,7 +583,7 @@
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       elements.webMic.disabled = true;
-      elements.webMic.querySelector("small").textContent = "Not supported by this browser";
+      elements.webMic.querySelector("small").textContent = t("speech.notSupported");
       return;
     }
     const recognition = new SpeechRecognition();
@@ -457,7 +592,7 @@
     recognition.onstart = () => {
       state.recognitionActive = true;
       elements.webMic.classList.add("recording");
-      elements.webMic.querySelector("strong").textContent = "STOP LISTENING";
+      elements.webMic.querySelector("strong").textContent = t("speech.stop");
     };
     recognition.onresult = (event) => {
       let transcript = "";
@@ -467,25 +602,26 @@
       elements.chatInput.value = transcript.trim();
       if (event.results[event.results.length - 1].isFinal && transcript.trim()) {
         elements.chatInput.focus();
-        toast("Speech added to the message box. Review it, then tap Send.");
+        toast(t("speech.added"));
       }
     };
     recognition.onerror = (event) => {
       const messages = {
-        "not-allowed": "Microphone permission was denied.",
-        "service-not-allowed": "Browser speech recognition is unavailable on this device.",
-        "audio-capture": "No working browser microphone was found.",
-        "no-speech": "No speech was detected. Tap Web Microphone and try again.",
-        network: "The browser speech service could not be reached.",
+        "not-allowed": t("error.permissionDenied"),
+        "service-not-allowed": t("error.speechUnavailable"),
+        "audio-capture": t("error.noBrowserMic"),
+        "no-speech": t("error.noSpeech"),
+        network: t("error.speechNetwork"),
       };
-      const message = messages[event.error] || `Browser microphone error: ${event.error}`;
+      const message =
+        messages[event.error] || t("error.browserMic", { error: event.error });
       log(message, "error");
       toast(message);
     };
     recognition.onend = () => {
       state.recognitionActive = false;
       elements.webMic.classList.remove("recording");
-      elements.webMic.querySelector("strong").textContent = "WEB MICROPHONE";
+      elements.webMic.querySelector("strong").textContent = t("browserMic.title");
     };
     state.recognition = recognition;
     elements.webMic.addEventListener("click", () => {
@@ -493,11 +629,11 @@
         recognition.stop();
         return;
       }
-      recognition.lang = elements.language.value;
+      recognition.lang = SPEECH_LOCALES[state.locale];
       try {
         recognition.start();
       } catch (error) {
-        const message = `Browser microphone could not start: ${error.message}`;
+        const message = t("error.browserMicStart", { error: error.message });
         log(message, "error");
         toast(message);
       }
@@ -524,8 +660,7 @@
           updateAiCamera(true);
           addMessage(
             "assistant",
-            `AI camera grant #${data.grant_sequence} is ready for one temporary photo. ` +
-              "Ask me to take a photo. You can use /camera again after it succeeds.",
+            t("chat.cameraGranted", { sequence: data.grant_sequence }),
           );
         })
         .catch(() => {});
@@ -546,6 +681,139 @@
   });
   document.querySelector("#clearLogButton").addEventListener("click", () => {
     elements.log.replaceChildren();
+  });
+
+  function updateConnectionDetail() {
+    elements.remoteStatus.textContent = state.remoteConnection
+      ? t("remote.connected")
+      : t("remote.local");
+  }
+
+  function updatePoweroffAvailability() {
+    elements.powerOff.disabled =
+      !state.poweroffEnabled || !state.poweroffAuthorized || !state.leaseId;
+    elements.powerAvailability.textContent =
+      state.poweroffEnabled && state.poweroffAuthorized
+      ? t("power.enabled")
+      : t("power.disabled");
+  }
+
+  function focusableElements(container) {
+    return Array.from(
+      container.querySelectorAll(
+        'button:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+      ),
+    ).filter((node) => !node.hidden);
+  }
+
+  function openMenu() {
+    state.previousFocus = document.activeElement;
+    elements.menu.classList.remove("hidden");
+    elements.menuButton.setAttribute("aria-expanded", "true");
+    document.body.classList.add("modal-open");
+    elements.closeMenu.focus();
+  }
+
+  function closeMenu({ restoreFocus = true } = {}) {
+    elements.menu.classList.add("hidden");
+    elements.menuButton.setAttribute("aria-expanded", "false");
+    if (elements.powerDialog.classList.contains("hidden")) {
+      document.body.classList.remove("modal-open");
+    }
+    if (restoreFocus && state.previousFocus instanceof HTMLElement) {
+      state.previousFocus.focus();
+    }
+  }
+
+  function showPowerDialog() {
+    closeMenu({ restoreFocus: false });
+    elements.powerDialog.classList.remove("hidden");
+    document.body.classList.add("modal-open");
+    elements.cancelPowerOff.focus();
+  }
+
+  function closePowerDialog() {
+    state.poweroffNonce = null;
+    elements.powerDialog.classList.add("hidden");
+    document.body.classList.remove("modal-open");
+    elements.powerOff.focus();
+  }
+
+  function trapDialogFocus(event, container) {
+    if (event.key !== "Tab") return;
+    const focusable = focusableElements(container);
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  elements.menuButton.addEventListener("click", openMenu);
+  elements.closeMenu.addEventListener("click", () => closeMenu());
+  elements.menu.addEventListener("click", (event) => {
+    if (event.target === elements.menu) closeMenu();
+  });
+  elements.language.addEventListener("change", () => {
+    setLocale(elements.language.value).catch((error) => {
+      log(String(error), "error");
+    });
+  });
+
+  elements.powerOff.addEventListener("click", () => {
+    if (!state.poweroffEnabled || !state.poweroffAuthorized) return;
+    elements.powerOff.disabled = true;
+    elements.powerAvailability.textContent = t("power.preparing");
+    send("poweroff_prepare")
+      .then((data) => {
+        state.poweroffNonce = data.nonce;
+        showPowerDialog();
+      })
+      .catch(() => {})
+      .finally(updatePoweroffAvailability);
+  });
+
+  elements.cancelPowerOff.addEventListener("click", closePowerDialog);
+  elements.confirmPowerOff.addEventListener("click", () => {
+    const nonce = state.poweroffNonce;
+    if (!nonce) {
+      closePowerDialog();
+      return;
+    }
+    elements.cancelPowerOff.disabled = true;
+    elements.confirmPowerOff.disabled = true;
+    send("poweroff_confirm", { confirmed: true, nonce })
+      .then(() => {
+        state.released = true;
+        elements.powerDialog.classList.add("hidden");
+        document.body.classList.remove("modal-open");
+        toast(t("power.shuttingDown"));
+        setConnection(t("power.shuttingDown"), "badge-wait");
+      })
+      .catch(() => {
+        closePowerDialog();
+      })
+      .finally(() => {
+        elements.cancelPowerOff.disabled = false;
+        elements.confirmPowerOff.disabled = false;
+      });
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (!elements.powerDialog.classList.contains("hidden")) {
+      if (event.key === "Escape") closePowerDialog();
+      else trapDialogFocus(event, elements.powerDialog);
+      return;
+    }
+    if (!elements.menu.classList.contains("hidden")) {
+      if (event.key === "Escape") closeMenu();
+      else trapDialogFocus(event, elements.menu);
+    }
   });
 
   function setActivityDrawer(open) {
@@ -609,7 +877,7 @@
     const requestFullscreen = root.requestFullscreen || root.webkitRequestFullscreen;
     if (!requestFullscreen) {
       log(
-        "This browser does not offer page fullscreen. Use Add to Home Screen for a full-screen controller.",
+        t("start.fullscreenHelp"),
       );
       return;
     }
@@ -619,7 +887,7 @@
         await window.screen.orientation.lock("portrait").catch(() => {});
       }
     } catch (error) {
-      log(`Full-screen mode was unavailable: ${error.message}`);
+      log(t("error.fullscreenUnavailable", { error: error.message }));
     }
   }
 
@@ -634,11 +902,12 @@
   elements.startController.addEventListener("click", () => {
     startController().catch((error) => {
       state.controllerStarted = false;
-      log(`Controller could not start: ${error.message}`, "error");
-      toast("Controller could not start.");
+      log(`${t("error.controllerStart")} ${error.message}`, "error");
+      toast(t("error.controllerStart"));
     });
   });
 
+  await setLocale(state.locale);
   syncViewportHeight();
   configureSpeechRecognition();
   if (standaloneDisplay()) {

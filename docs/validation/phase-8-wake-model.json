@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "asset": "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/assets/hey_Ninja.onnx",
+  "source_asset": "pi5mic/voiceinput/hey_Ninja.onnx",
+  "wake_phrase": "Hey Ninja",
+  "format": "onnx",
+  "size_bytes": 206276,
+  "sha256": "12c87f97ea41b08a356631dc1162af455aa30ac27ff6235963a31d0f5e39016a",
+  "license": "MIT",
+  "copyright": "Copyright (c) 2026 Chihkuang Chang",
+  "owner_approved_redistribution": true,
+  "approval_date": "2026-08-13",
+  "runtime_boot_download_allowed": false,
+  "pi_false_trigger_validation": "pending"
+}

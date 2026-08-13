@@ -25,6 +25,7 @@ from .face_renderer import render_emergency_stop
 from .hardware_ownership import HardwareOwnership
 from .microphone import MicrophoneBackendFactory, MicrophoneDevice
 from .models import ResourceHealth
+from .qr_display import render_pairing_qr
 from .safety import (
     MotionController,
     MotionSafetyError,
@@ -200,6 +201,38 @@ class RobotAssembly:
         self._liveliness_enabled = True
         self._idle_suppressed = False
         return await self.run_behavior("greeting")
+
+    async def show_onboarding_qr(self, url: str) -> dict[str, Any]:
+        """Render one trusted pairing QR without exposing arbitrary images."""
+        if self.system_safety.stopped:
+            raise RuntimeError("system is stopped; onboarding QR cannot replace safety state")
+        await self._stop_idle()
+        width, height = await self.display.dimensions()
+        image = render_pairing_qr(url, width=width, height=height)
+        return await self.display.show_image(image, source="phase-8-onboarding-qr")
+
+    async def show_onboarding_status(
+        self,
+        state: str,
+    ) -> dict[str, Any]:
+        """Show one bounded boot state while Greeting remains disabled."""
+        if state not in {"connecting", "error"}:
+            raise ValueError("onboarding state must be connecting or error")
+        if self.system_safety.stopped:
+            raise RuntimeError("system is stopped; onboarding cannot replace safety state")
+        await self._stop_idle()
+        text = "Connecting…" if state == "connecting" else "Error"
+        return await self.display.show_text(
+            text=text,
+            font_size=32 if state == "connecting" else 48,
+            foreground="#FFFFFF",
+            background="#00152E" if state == "connecting" else "#8B0018",
+        )
+
+    async def prepare_onboarding_greeting(self) -> dict[str, Any]:
+        """Clear the QR immediately before the one authorized Greeting attempt."""
+        await self._stop_idle()
+        return await self.display.clear(color="#000000")
 
     async def run_behavior(self, name: str) -> dict[str, Any]:
         """Load and run one validated expression behavior by safe name."""

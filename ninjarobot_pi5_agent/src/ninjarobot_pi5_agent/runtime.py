@@ -7,7 +7,7 @@ import re
 import unicodedata
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
-from typing import Any
+from typing import Any, Protocol
 
 from ninjarobot_pi5_ide import RiskLevel
 
@@ -34,6 +34,7 @@ from .models import (
 from .persistence import ConversationStore
 from .policy import CameraGrantManager, MotionArmManager, PolicyContext, PolicyEngine
 from .providers import LLMProvider
+from .release_foundations import ReleaseStatusRegistry
 from .skills import SkillRepository
 from .tools import CancellationToken, ToolRegistry
 
@@ -45,8 +46,22 @@ IdentityResetCommit = Callable[[str], Awaitable[bool]]
 IdentityResetRollback = Callable[[str], Awaitable[None]]
 
 
+class VoiceInputServiceProtocol(Protocol):
+    """Lifecycle boundary implemented by the agent voice coordinator."""
+
+    async def enable(self, *, persist: bool = True) -> dict[str, object]: ...
+
+    async def disable(self, *, persist: bool = True) -> dict[str, object]: ...
+
+    def status(self) -> dict[str, object]: ...
+
+    async def close(self) -> None: ...
+
+
 class AgentRuntime:
     """Own model, tools, transcript, motion arms, and shared events exactly once."""
+
+    VOICE_SESSION_ID = "voice-owner"
 
     def __init__(
         self,
@@ -69,6 +84,7 @@ class AgentRuntime:
         commit_identity_reset: IdentityResetCommit | None = None,
         rollback_identity_reset: IdentityResetRollback | None = None,
         initial_memory_settings: MemorySettings | None = None,
+        release_status: Callable[[], Mapping[str, Any]] | None = None,
     ) -> None:
         self.provider = provider
         self.tools = tools
@@ -91,6 +107,7 @@ class AgentRuntime:
         self._commit_identity_reset = commit_identity_reset
         self._rollback_identity_reset = rollback_identity_reset
         self._initial_memory_settings = initial_memory_settings
+        self._release_status = release_status or ReleaseStatusRegistry.disabled().status
         self._startup: dict[str, Any] = {
             "phase": "runtime_ready",
             "complete": True,
@@ -107,6 +124,7 @@ class AgentRuntime:
         self._identity_states: dict[str, str] = {}
         self._pending_confirmation_prompts: set[str] = set()
         self._automatic_memory_notices: dict[str, set[str]] = {}
+        self._voice_input: VoiceInputServiceProtocol | None = None
         self.loop.set_active_user_provider(self._active_users.get)
         self.loop.set_memory_context_provider(
             self._memory_context_for_session if memory is not None else None
@@ -283,6 +301,7 @@ class AgentRuntime:
                     "profile_count": len(profiles),
                     "owner_user_id": owner.user_id if owner is not None else None,
                 },
+                "release": dict(self._release_status()),
             }
         finally:
             self._end_operation()
@@ -300,13 +319,22 @@ class AgentRuntime:
         )
         startup_complete = self._startup["complete"] is True
         startup_failed = self._startup["liveliness"] == "failed"
+        release = self._release_status()
+        onboarding = release.get("onboarding")
+        onboarding_waiting = bool(
+            isinstance(onboarding, Mapping)
+            and onboarding.get("enabled") is True
+            and onboarding.get("state") in {"starting", "pairing", "connected"}
+        )
         ready = (
-            startup_complete
+            (startup_complete or onboarding_waiting)
             and not startup_failed
             and not system_latched
             and not liveliness_degraded
         )
-        if not startup_complete:
+        if onboarding_waiting and not startup_complete:
+            operational_state = "onboarding"
+        elif not startup_complete:
             operational_state = "starting"
         elif system_latched:
             operational_state = "recovery_required"
@@ -1209,6 +1237,7 @@ class AgentRuntime:
         *,
         confirmed: bool,
         lease_id: str | None = None,
+        include_voice: bool = False,
     ) -> None:
         """Arm physical motion for one bounded session."""
         self._ensure_started()
@@ -1217,6 +1246,12 @@ class AgentRuntime:
             confirmed=confirmed,
             lease_id=lease_id,
         )
+        if include_voice:
+            self.motion_arms.arm(
+                self.VOICE_SESSION_ID,
+                confirmed=confirmed,
+                lease_id=lease_id,
+            )
 
     def disarm_motion(self, session_id: str) -> None:
         """Revoke one session's consent and cancel its active motion tools."""
@@ -1224,6 +1259,42 @@ class AgentRuntime:
         self.loop.cancel_session(session_id)
         for token in self._motion_cancellations.pop(session_id, set()):
             token.cancel()
+
+    def disarm_voice_motion(self, *, lease_id: str | None = None) -> None:
+        """Revoke voice motion globally or only for its originating web lease."""
+        revoked = self.motion_arms.disarm(self.VOICE_SESSION_ID, lease_id=lease_id)
+        if revoked or lease_id is None:
+            self.loop.cancel_session(self.VOICE_SESSION_ID)
+        if (revoked or lease_id is None) and not self.motion_arms.has_arm(self.VOICE_SESSION_ID):
+            for token in self._motion_cancellations.pop(self.VOICE_SESSION_ID, set()):
+                token.cancel()
+
+    def set_voice_input_service(self, service: VoiceInputServiceProtocol) -> None:
+        """Attach the voice coordinator once after the runtime and IDE are built."""
+        if self._voice_input is not None:
+            raise RuntimeError("voice input service is already configured")
+        self._voice_input = service
+
+    async def enable_voice_input(self) -> dict[str, object]:
+        """Enable and persist always-on voice input deterministically."""
+        self._ensure_started()
+        if self._voice_input is None:
+            raise RuntimeError("voice input is not configured")
+        return await self._voice_input.enable()
+
+    async def disable_voice_input(self) -> dict[str, object]:
+        """Disable voice input and revoke its motion authorization."""
+        self._ensure_started()
+        if self._voice_input is None:
+            raise RuntimeError("voice input is not configured")
+        return await self._voice_input.disable()
+
+    def voice_input_status(self) -> dict[str, object]:
+        """Return voice state without probing microphone hardware."""
+        self._ensure_started()
+        if self._voice_input is None:
+            return {"enabled": False, "state": "unavailable"}
+        return self._voice_input.status()
 
     def grant_camera(
         self,
@@ -1265,9 +1336,12 @@ class AgentRuntime:
         *,
         lease_id: str | None = None,
         requested_by: str = "local-controller",
+        include_voice: bool = False,
     ) -> ToolExecutionResult:
         """Revoke consent, cancel motion work, and request an immediate servo stop."""
         self.disarm_motion(session_id)
+        if include_voice:
+            self.disarm_voice_motion()
         return await self.execute_tool(
             tool_name="robot.servo.stop",
             arguments={},
@@ -1419,6 +1493,8 @@ class AgentRuntime:
         if self._closed:
             return
         self._closed = True
+        if self._voice_input is not None:
+            await self._voice_input.close()
         self._disarm_all_motion()
         self.camera_grants.revoke_all()
         await self.tools.close()

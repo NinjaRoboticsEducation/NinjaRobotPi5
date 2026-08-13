@@ -17,11 +17,12 @@ import threading
 import types
 import uuid
 from collections.abc import Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.machinery import ModuleSpec
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any, AsyncIterator, Protocol, cast
 from urllib.parse import unquote, urlparse
 
 from .errors import IDEError
@@ -32,12 +33,13 @@ from .models import (
     RetrySafety,
     RiskLevel,
 )
+from .voice_input import WakeWordDetector
 
 MICROPHONE_RESOURCES = ("microphone",)
 MICROPHONE_FILENAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}\.wav$")
 MICROPHONE_CAPTURE_TIMEOUT_SECONDS = 35.0
 MICROPHONE_TRANSCRIPTION_TIMEOUT_SECONDS = 90.0
-MICROPHONE_ALLOWED_MODULES = frozenset(
+MICROPHONE_DEVICE_MODULES = frozenset(
     {
         "pi5mic",
         "pi5mic.core",
@@ -46,6 +48,15 @@ MICROPHONE_ALLOWED_MODULES = frozenset(
         "pi5mic.core.audio_backend",
         "pi5mic.core.devices",
         "pi5mic.core.recorder",
+    }
+)
+MICROPHONE_ALLOWED_MODULES = MICROPHONE_DEVICE_MODULES | frozenset(
+    {
+        "pi5mic.install",
+        "pi5mic.install.openwakeword",
+        "pi5mic.wakeword",
+        "pi5mic.wakeword.base",
+        "pi5mic.wakeword.openwakeword",
     }
 )
 _MICROPHONE_IMPORT_LOCK = threading.Lock()
@@ -105,6 +116,14 @@ class SpeechTranscriber(Protocol):
     def available(self) -> bool: ...
 
 
+class VoiceListenerCoordinator(Protocol):
+    """Pause/resume boundary used to serialize manual microphone operations."""
+
+    async def pause(self) -> None: ...
+
+    async def resume(self) -> None: ...
+
+
 class WhisperCppTranscriber:
     """Run a local ``whisper.cpp`` command without a shell or retained audio."""
 
@@ -131,8 +150,8 @@ class WhisperCppTranscriber:
         )
 
     async def transcribe(self, wav_path: Path, *, language: str) -> str:
-        if language not in {"auto", "en", "ja"}:
-            raise ValueError("language must be auto, en, or ja")
+        if language not in {"auto", "en", "ja", "zh", "zh-TW", "zh-CN"}:
+            raise ValueError("language must be auto, en, ja, zh, zh-TW, or zh-CN")
         if not self.available():
             raise RuntimeError("whisper.cpp is unavailable; verify the command and model paths")
         resolved_wav = wav_path.expanduser().resolve()
@@ -149,7 +168,7 @@ class WhisperCppTranscriber:
                 "-f",
                 str(resolved_wav),
                 "-l",
-                language,
+                "zh" if language in {"zh-TW", "zh-CN"} else language,
                 "-t",
                 str(self._threads),
                 "-otxt",
@@ -220,6 +239,18 @@ class _Pi5MicBindings:
     ]
     recorder_settings: Callable[..., Any]
     record_wav: Callable[[Path, Any], MicrophoneClip]
+
+
+@dataclass(slots=True)
+class _Pi5MicVoiceBindings:
+    """Approved raw-stream and wake-detector callables; no historical loop."""
+
+    resolve_supported_input_settings: Callable[
+        ...,
+        tuple[int | None, int, MicrophoneDeviceInfo | None, str | None],
+    ]
+    load_sounddevice: Callable[..., Any]
+    detector: Callable[..., WakeWordDetector]
 
 
 class _ManagedPi5MicBackend:
@@ -414,6 +445,146 @@ def _load_pi5mic_bindings() -> _Pi5MicBindings:
         )
 
 
+def _load_pi5mic_voice_bindings() -> _Pi5MicVoiceBindings:
+    """Load only the managed raw-audio and openWakeWord detector modules."""
+    base = _load_pi5mic_bindings()
+    del base
+    with _MICROPHONE_IMPORT_LOCK:
+        package_directory = _managed_pi5mic_package_directory()
+        install_directory = package_directory / "install"
+        wakeword_directory = package_directory / "wakeword"
+        if "pi5mic.install" not in sys.modules:
+            sys.modules["pi5mic.install"] = _namespace_package(
+                "pi5mic.install",
+                install_directory,
+            )
+        if "pi5mic.wakeword" not in sys.modules:
+            sys.modules["pi5mic.wakeword"] = _namespace_package(
+                "pi5mic.wakeword",
+                wakeword_directory,
+            )
+        _load_module(
+            "pi5mic.install.openwakeword",
+            install_directory / "openwakeword.py",
+        )
+        _load_module(
+            "pi5mic.wakeword.base",
+            wakeword_directory / "base.py",
+        )
+        detector_module = _load_module(
+            "pi5mic.wakeword.openwakeword",
+            wakeword_directory / "openwakeword.py",
+        )
+        audio_module = sys.modules["pi5mic.core.audio_backend"]
+        devices_module = sys.modules["pi5mic.core.devices"]
+        unexpected = _unexpected_pi5mic_modules()
+        if unexpected:
+            raise ImportError(f"voice loading imported unapproved pi5mic modules: {unexpected}")
+        return _Pi5MicVoiceBindings(
+            resolve_supported_input_settings=cast(
+                Callable[
+                    ...,
+                    tuple[int | None, int, MicrophoneDeviceInfo | None, str | None],
+                ],
+                devices_module.resolve_supported_input_settings,
+            ),
+            load_sounddevice=cast(Callable[..., Any], audio_module.load_sounddevice),
+            detector=cast(Callable[..., WakeWordDetector], detector_module.OpenWakeWordDetector),
+        )
+
+
+class ManagedVoiceAudioSource:
+    """Exclusive async wrapper over the approved pi5mic/sounddevice raw stream."""
+
+    def __init__(
+        self,
+        *,
+        selector: str,
+        requested_sample_rate: int,
+        channels: int,
+        block_frames: int = 1280,
+    ) -> None:
+        self._selector = selector
+        self._requested_sample_rate = requested_sample_rate
+        self._channels = channels
+        self._block_frames = block_frames
+        self._sample_rate = requested_sample_rate
+        self._stream: Any | None = None
+
+    @property
+    def sample_rate(self) -> int:
+        return self._sample_rate
+
+    async def start(self) -> None:
+        if self._stream is not None:
+            return
+        bindings = await asyncio.to_thread(_load_pi5mic_voice_bindings)
+        device, actual_rate, _info, _warning = await asyncio.to_thread(
+            bindings.resolve_supported_input_settings,
+            selector=self._selector,
+            sample_rate=self._requested_sample_rate,
+            channels=self._channels,
+        )
+        sounddevice = await asyncio.to_thread(
+            bindings.load_sounddevice,
+            purpose="NinjaRobot always-on voice input",
+            error_factory=RuntimeError,
+        )
+        stream = sounddevice.RawInputStream(
+            samplerate=actual_rate,
+            blocksize=self._block_frames,
+            device=device,
+            channels=self._channels,
+            dtype="int16",
+            latency="high",
+        )
+        await asyncio.to_thread(stream.start)
+        self._sample_rate = actual_rate
+        self._stream = stream
+
+    async def read(self) -> tuple[bytes, bool]:
+        stream = self._stream
+        if stream is None:
+            raise RuntimeError("voice audio source is not started")
+        data, overflowed = await asyncio.to_thread(stream.read, self._block_frames)
+        return bytes(data), bool(overflowed)
+
+    async def close(self) -> None:
+        stream = self._stream
+        self._stream = None
+        if stream is None:
+            return
+        try:
+            await asyncio.to_thread(stream.stop)
+        finally:
+            await asyncio.to_thread(stream.close)
+
+
+def build_managed_wake_detector(
+    *,
+    model_path: str | Path,
+    threshold: float,
+    vad_threshold: float,
+    enable_noise_suppression: bool,
+    inference_framework: str,
+    runtime_asset_directory: str | Path,
+) -> WakeWordDetector:
+    """Build the approved detector without importing pi5mic's legacy voice loop."""
+    bindings = _load_pi5mic_voice_bindings()
+    assets = Path(runtime_asset_directory).resolve()
+    return bindings.detector(
+        keyword="Hey Ninja",
+        model_path=model_path,
+        threshold=threshold,
+        vad_threshold=vad_threshold,
+        enable_noise_suppression=enable_noise_suppression,
+        inference_framework=inference_framework,
+        melspec_model_path=assets / "melspectrogram.onnx",
+        embedding_model_path=assets / "embedding_model.onnx",
+        vad_model_path=assets / "silero_vad.onnx",
+    )
+
+
 def _load_microphone_backend() -> MicrophoneBackend:
     return _ManagedPi5MicBackend(_load_pi5mic_bindings())
 
@@ -458,11 +629,28 @@ class MicrophoneDevice:
         self._start_attempted = False
         self._closed = False
         self._lock = asyncio.Lock()
+        self._voice_coordinator: VoiceListenerCoordinator | None = None
 
     @property
     def simulated(self) -> bool:
         """Return whether the service uses deterministic synthetic audio."""
         return self._simulated
+
+    def set_voice_coordinator(self, coordinator: VoiceListenerCoordinator | None) -> None:
+        """Attach the single listener that must yield to manual capture."""
+        self._voice_coordinator = coordinator
+
+    @asynccontextmanager
+    async def manual_access(self) -> AsyncIterator[None]:
+        """Pause always-on listening across one complete manual operation."""
+        coordinator = self._voice_coordinator
+        if coordinator is not None:
+            await coordinator.pause()
+        try:
+            yield
+        finally:
+            if coordinator is not None:
+                await coordinator.resume()
 
     async def start(self) -> None:
         """Check device and PortAudio readiness without recording audio."""
@@ -532,6 +720,20 @@ class MicrophoneDevice:
         filename: str | None,
     ) -> dict[str, Any]:
         """Record one bounded clip and wait for worker cleanup on cancellation."""
+        async with self.manual_access():
+            return await self._capture_uncoordinated(
+                duration_seconds=duration_seconds,
+                retain=retain,
+                filename=filename,
+            )
+
+    async def _capture_uncoordinated(
+        self,
+        *,
+        duration_seconds: float,
+        retain: bool,
+        filename: str | None,
+    ) -> dict[str, Any]:
         async with self._lock:
             backend = self._require_backend()
             if not 0.25 <= duration_seconds <= self._max_capture_seconds:
@@ -926,7 +1128,7 @@ class MicrophoneTranscribeAdapter:
                 },
                 "language": {
                     "type": "string",
-                    "enum": ["auto", "en", "ja"],
+                    "enum": ["auto", "en", "ja", "zh-TW", "zh-CN"],
                     "default": "auto",
                 },
             },
@@ -936,7 +1138,10 @@ class MicrophoneTranscribeAdapter:
             "type": "object",
             "properties": {
                 "transcript": {"type": "string", "minLength": 1},
-                "language": {"type": "string", "enum": ["auto", "en", "ja"]},
+                "language": {
+                    "type": "string",
+                    "enum": ["auto", "en", "ja", "zh-TW", "zh-CN"],
+                },
                 "duration_seconds": {"type": "number"},
                 "audio_retained": {"type": "boolean", "const": False},
                 "simulated": {"type": "boolean"},
@@ -983,33 +1188,34 @@ class MicrophoneTranscribeAdapter:
                 "duration_seconds must be a number",
                 capability="microphone.transcribe",
             )
-        if language not in {"auto", "en", "ja"}:
+        if language not in {"auto", "en", "ja", "zh-TW", "zh-CN"}:
             raise _invalid_arguments(
-                "language must be auto, en, or ja",
+                "language must be auto, en, ja, zh-TW, or zh-CN",
                 capability="microphone.transcribe",
             )
         filename = f"transcribe-{uuid.uuid4().hex}.wav"
         capture: dict[str, Any] | None = None
         try:
-            capture = await self._device.capture(
-                duration_seconds=float(duration),
-                retain=True,
-                filename=filename,
-            )
-            raw_path = capture.get("path")
-            if not isinstance(raw_path, str):
-                raise RuntimeError("temporary microphone capture returned no path")
-            transcript = await self._transcriber.transcribe(
-                Path(raw_path),
-                language=language,
-            )
-            return {
-                "transcript": transcript,
-                "language": language,
-                "duration_seconds": float(capture["duration_seconds"]),
-                "audio_retained": False,
-                "simulated": self._device.simulated,
-            }
+            async with self._device.manual_access():
+                capture = await self._device._capture_uncoordinated(
+                    duration_seconds=float(duration),
+                    retain=True,
+                    filename=filename,
+                )
+                raw_path = capture.get("path")
+                if not isinstance(raw_path, str):
+                    raise RuntimeError("temporary microphone capture returned no path")
+                transcript = await self._transcriber.transcribe(
+                    Path(raw_path),
+                    language=language,
+                )
+                return {
+                    "transcript": transcript,
+                    "language": language,
+                    "duration_seconds": float(capture["duration_seconds"]),
+                    "audio_retained": False,
+                    "simulated": self._device.simulated,
+                }
         except IDEError:
             raise
         except asyncio.CancelledError:

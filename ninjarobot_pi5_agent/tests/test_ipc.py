@@ -85,6 +85,37 @@ class _EchoProvider:
         return None
 
 
+class _FakeRemoteAccess:
+    def __init__(self) -> None:
+        self.active = False
+        self.rotations = 0
+        self.closed = False
+
+    async def activate(self) -> dict[str, object]:
+        self.active = True
+        return self.status()
+
+    async def deactivate(self) -> dict[str, object]:
+        self.active = False
+        return self.status()
+
+    def status(self) -> dict[str, object]:
+        return {
+            "enabled": self.active,
+            "state": "waiting_for_connection" if self.active else "disabled",
+        }
+
+    def pairing_url(self) -> str:
+        return "https://robot.example/#pair=local-owner-only"
+
+    async def rotate_pairing(self) -> dict[str, object]:
+        self.rotations += 1
+        return {"pairing_url": self.pairing_url(), "sessions_revoked": True}
+
+    async def close(self) -> None:
+        self.closed = True
+
+
 def build_runtime(
     tmp_path,
     *,
@@ -165,6 +196,7 @@ def test_runtime_status_exposes_startup_safety_and_recovery(tmp_path) -> None:
         await runtime.start()
 
         starting = await runtime.status()
+        assert starting["release"]["voice"]["state"] == "disabled"
         assert starting["ready"] is False
         assert starting["operational_state"] == "starting"
         assert starting["startup"]["complete"] is False
@@ -431,6 +463,41 @@ def test_ipc_allows_reconnect_stream_history_clear_arm_and_stop(tmp_path) -> Non
         await serve_task
         await server.close()
         assert not socket_path.exists()
+
+    asyncio.run(exercise())
+
+
+def test_ipc_remote_management_is_local_owner_only_and_lifecycle_bounded(tmp_path) -> None:
+    async def exercise() -> None:
+        socket_path = tmp_path / "remote-agent.sock"
+        runtime = build_runtime(tmp_path)
+        remote = _FakeRemoteAccess()
+        server = AgentIPCServer(
+            runtime=runtime,
+            socket_path=socket_path,
+            ownership=ServiceOwnership(tmp_path / "remote-agent.lock"),
+            remote_access=remote,  # type: ignore[arg-type]
+        )
+        await server.start()
+        serve_task = asyncio.create_task(server.serve())
+        client = AgentIPCClient(socket_path)
+
+        activated = await client.request({"command": "remote_activate"})
+        assert activated["data"]["enabled"] is True
+        status = await client.request({"command": "remote_status"})
+        assert status["data"]["state"] == "waiting_for_connection"
+        pairing = await client.request({"command": "remote_pairing_url"})
+        assert pairing["data"]["pairing_url"].startswith("https://")
+        rotated = await client.request({"command": "remote_rotate_pairing"})
+        assert rotated["data"]["sessions_revoked"] is True
+        assert remote.rotations == 1
+        deactivated = await client.request({"command": "remote_deactivate"})
+        assert deactivated["data"]["enabled"] is False
+
+        await client.request({"command": "stop"})
+        await serve_task
+        await server.close()
+        assert remote.closed is True
 
     asyncio.run(exercise())
 

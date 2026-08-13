@@ -1,0 +1,35 @@
+[Unit]
+Description=NinjaRobotPi5 Agent and Web Controller
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+[Service]
+Type=exec
+User=@USER@
+SupplementaryGroups=audio video gpio i2c spi
+WorkingDirectory=@WORKING_DIRECTORY@
+Environment=PYTHONUNBUFFERED=1
+ExecStart=@EXEC_START@
+StandardOutput=journal
+StandardError=journal
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+UMask=0077
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=@READ_WRITE_PATHS@
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

@@ -69,6 +69,19 @@ def test_confirmed_motion_arm_survives_slow_local_model_reasoning() -> None:
     assert decision.reason == "Motion is armed for this active session."
 
 
+def test_voice_motion_lease_can_be_revoked_without_touching_other_grants() -> None:
+    arms = MotionArmManager()
+    arms.arm("voice-owner", confirmed=True, lease_id="browser-lease")
+    arms.arm("terminal", confirmed=True)
+
+    assert arms.has_arm("voice-owner")
+    assert not arms.disarm("voice-owner", lease_id="wrong-lease")
+    assert arms.has_arm("voice-owner")
+    assert arms.disarm("voice-owner", lease_id="browser-lease")
+    assert not arms.has_arm("voice-owner")
+    assert arms.has_arm("terminal")
+
+
 def test_emergency_is_allowed_and_sensitive_work_requires_confirmation() -> None:
     policy = PolicyEngine(MotionArmManager())
     context = PolicyContext(session_id="session-1")

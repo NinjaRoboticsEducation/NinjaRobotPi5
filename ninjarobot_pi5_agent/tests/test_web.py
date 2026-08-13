@@ -17,8 +17,11 @@ from ninjarobot_pi5_agent.models import (
     ToolExecutionResult,
     ToolExecutionStatus,
 )
+from ninjarobot_pi5_agent.pairing import PairingSessionManager
 from ninjarobot_pi5_agent.runtime import AgentRuntime
+from ninjarobot_pi5_agent.shutdown import PoweroffCoordinator
 from ninjarobot_pi5_agent.web_app import (
+    _dispatch_web_message,
     create_web_app,
     ensure_self_signed_certificate,
     local_ca_paths,
@@ -75,6 +78,20 @@ class _FakeController:
         self.revoked.append((lease_id, reason))
 
 
+class _FakePoweroff:
+    def __init__(self) -> None:
+        self.prepared: list[str] = []
+        self.confirmed: list[tuple[str, str]] = []
+
+    async def issue_nonce(self, lease_id: str) -> dict[str, object]:
+        self.prepared.append(lease_id)
+        return {"nonce": "nonce-for-active-controller", "expires_in_seconds": 30}
+
+    async def confirm(self, lease_id: str, nonce: str) -> dict[str, object]:
+        self.confirmed.append((lease_id, nonce))
+        return {"shutdown_accepted": True}
+
+
 class _RacingRuntime:
     def __init__(self) -> None:
         self.first_servo_stop_started = asyncio.Event()
@@ -116,6 +133,9 @@ class _ResumeRuntime:
 
     def disarm_motion(self, session_id: str) -> None:
         self.disarmed.append(session_id)
+
+    def disarm_voice_motion(self, *, lease_id: str | None = None) -> None:
+        self.disarmed.append(f"voice:{lease_id}")
 
     def arm_motion(
         self,
@@ -165,7 +185,7 @@ def test_web_resume_disarms_ai_and_reactivates_direct_control_only_after_success
         result = await controller.resume("lease-test")
 
         assert result["status"] == "succeeded"
-        assert runtime.disarmed == ["web-chat-test"]
+        assert runtime.disarmed == ["web-chat-test", "voice:lease-test"]
         assert runtime.resume_calls == [
             {
                 "session_id": "web-control-test",
@@ -187,7 +207,7 @@ def test_failed_web_resume_keeps_direct_control_inactive() -> None:
         with pytest.raises(RuntimeError, match="camera health check failed"):
             await controller.resume("lease-test")
 
-        assert runtime.disarmed == ["web-chat-test"]
+        assert runtime.disarmed == ["web-chat-test", "voice:lease-test"]
         assert runtime.armed == []
 
     asyncio.run(exercise())
@@ -304,6 +324,245 @@ def test_second_websocket_receives_http_423_locked() -> None:
             }
 
 
+def test_web_poweroff_requires_pairing_second_confirmation_and_active_lease_nonce() -> None:
+    runtime = _FakeRuntime()
+    controller = _FakeController()
+    poweroff = _FakePoweroff()
+    leases = ControllerLeaseManager(on_revoke=controller.lease_revoked)
+    static = Path(__file__).resolve().parents[1] / "src" / "ninjarobot_pi5_agent" / "web_static"
+    app = create_web_app(
+        runtime=cast(AgentRuntime, runtime),
+        controller=cast(WebRobotController, controller),
+        leases=leases,
+        static_directory=static,
+        poweroff=cast(PoweroffCoordinator, poweroff),
+    )
+
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws?browser_chat_id=poweroff-browser") as websocket:
+            lease = websocket.receive_json()
+            assert websocket.receive_json()["type"] == "system_status"
+            assert websocket.receive_json()["type"] == "conversation_history"
+            websocket.send_json(
+                {
+                    "type": "poweroff_prepare",
+                    "request_id": "prepare-1",
+                    "lease_id": lease["lease_id"],
+                }
+            )
+            prepared = websocket.receive_json()
+            assert prepared["type"] == "error"
+            assert "paired controller" in prepared["error"]
+
+    async def exercise_paired_dispatch() -> None:
+        async def send(_payload: dict[str, Any]) -> None:
+            return
+
+        nonce = await _dispatch_web_message(
+            cast(WebRobotController, controller),
+            lease["lease_id"],
+            {"type": "poweroff_prepare"},
+            send,
+            poweroff=cast(PoweroffCoordinator, poweroff),
+            poweroff_authorized=True,
+        )
+        with pytest.raises(PermissionError, match="explicit confirmation"):
+            await _dispatch_web_message(
+                cast(WebRobotController, controller),
+                lease["lease_id"],
+                {"type": "poweroff_confirm", "nonce": nonce["nonce"]},
+                send,
+                poweroff=cast(PoweroffCoordinator, poweroff),
+                poweroff_authorized=True,
+            )
+        confirmed = await _dispatch_web_message(
+            cast(WebRobotController, controller),
+            lease["lease_id"],
+            {
+                "type": "poweroff_confirm",
+                "nonce": nonce["nonce"],
+                "confirmed": True,
+            },
+            send,
+            poweroff=cast(PoweroffCoordinator, poweroff),
+            poweroff_authorized=True,
+        )
+        assert confirmed == {"shutdown_accepted": True}
+
+    asyncio.run(exercise_paired_dispatch())
+    assert poweroff.prepared == [lease["lease_id"]]
+    assert poweroff.confirmed == [(lease["lease_id"], "nonce-for-active-controller")]
+
+
+def test_remote_http_and_websocket_require_one_use_pairing_cookie() -> None:
+    runtime = _FakeRuntime()
+    controller = _FakeController()
+    leases = ControllerLeaseManager(on_revoke=controller.lease_revoked)
+    pairing = PairingSessionManager(
+        pairing_secret=b"p" * 32,
+        session_secret=b"s" * 32,
+        remote_header_secret="r" * 43,
+        pairing_lifetime_seconds=60,
+        session_lifetime_seconds=300,
+    )
+    pairing.set_remote_url("https://robot.example")
+    token = pairing.pairing_url().split("#pair=", maxsplit=1)[1]
+    static = Path(__file__).resolve().parents[1] / "src" / "ninjarobot_pi5_agent" / "web_static"
+    app = create_web_app(
+        runtime=cast(AgentRuntime, runtime),
+        controller=cast(WebRobotController, controller),
+        leases=leases,
+        static_directory=static,
+        pairing=pairing,
+    )
+
+    remote_headers = {"x-ninjarobot-remote": "r" * 43}
+    with TestClient(app, base_url="https://robot.example") as client:
+        bootstrap = client.get("/", headers=remote_headers)
+        assert bootstrap.status_code == 200
+        assert "NinjaRobot Pairing" in bootstrap.text
+        assert client.get("/assets/app.js", headers=remote_headers).status_code == 401
+        with pytest.raises(WebSocketDenialResponse) as denial:
+            with client.websocket_connect(
+                "/ws",
+                headers={"origin": "https://robot.example", **remote_headers},
+            ):
+                pass
+        assert denial.value.status_code == 401
+        wrong_origin = client.post(
+            "/pair",
+            json={"token": token},
+            headers={"origin": "https://attacker.example", **remote_headers},
+        )
+        assert wrong_origin.status_code == 401
+        exchanged = client.post(
+            "/pair",
+            json={"token": token},
+            headers={"origin": "https://robot.example", **remote_headers},
+        )
+        assert exchanged.status_code == 200
+        cookie = exchanged.headers["set-cookie"]
+        assert "Secure" in cookie
+        assert "HttpOnly" in cookie
+        assert "SameSite=strict" in cookie
+        assert "Path=/" in cookie
+        assert "NINJA ROBOT PI5" in client.get("/", headers=remote_headers).text
+
+        with client.websocket_connect(
+            "/ws?browser_chat_id=paired-browser",
+            headers={
+                "origin": "https://robot.example",
+                "host": "robot.example",
+                "cookie": f"ninjarobot_session={client.cookies['ninjarobot_session']}",
+                **remote_headers,
+            },
+        ) as websocket:
+            assert websocket.receive_json()["type"] == "lease"
+
+    with TestClient(app, base_url="https://robot.example") as replay_client:
+        replay = replay_client.post(
+            "/pair",
+            json={"token": token},
+            headers={"origin": "https://robot.example", **remote_headers},
+        )
+        assert replay.status_code == 401
+
+
+def test_remote_pairing_gate_denies_unknown_public_host_and_preserves_lan() -> None:
+    runtime = _FakeRuntime()
+    controller = _FakeController()
+    leases = ControllerLeaseManager(on_revoke=controller.lease_revoked)
+    pairing = PairingSessionManager(
+        pairing_secret=b"p" * 32,
+        session_secret=b"s" * 32,
+        remote_header_secret="r" * 43,
+        pairing_lifetime_seconds=60,
+        session_lifetime_seconds=300,
+    )
+    pairing.set_remote_url("https://robot.example")
+    static = Path(__file__).resolve().parents[1] / "src" / "ninjarobot_pi5_agent" / "web_static"
+    app = create_web_app(
+        runtime=cast(AgentRuntime, runtime),
+        controller=cast(WebRobotController, controller),
+        leases=leases,
+        static_directory=static,
+        pairing=pairing,
+    )
+
+    with TestClient(app, base_url="https://attacker.example") as unknown:
+        assert (
+            unknown.get(
+                "/",
+                headers={"x-ninjarobot-remote": "r" * 43},
+            ).status_code
+            == 421
+        )
+    with TestClient(app, base_url="https://192.168.1.20:8443") as local:
+        assert local.get("/").status_code == 200
+        assert local.get("/assets/app.js").status_code == 200
+
+
+def test_onboarding_requires_local_pairing_before_websocket_acceptance() -> None:
+    runtime = _FakeRuntime()
+    controller = _FakeController()
+    leases = ControllerLeaseManager(on_revoke=controller.lease_revoked)
+    pairing = PairingSessionManager(
+        pairing_secret=b"p" * 32,
+        session_secret=b"s" * 32,
+        remote_header_secret="r" * 43,
+        pairing_lifetime_seconds=60,
+        session_lifetime_seconds=300,
+    )
+    pairing.set_local_url("https://127.0.0.1:8443")
+    token = pairing.pairing_url().split("#pair=", maxsplit=1)[1]
+    connected: list[tuple[bool, bool]] = []
+
+    async def authenticated(remote: bool, paired: bool) -> None:
+        connected.append((remote, paired))
+
+    static = Path(__file__).resolve().parents[1] / "src" / "ninjarobot_pi5_agent" / "web_static"
+    app = create_web_app(
+        runtime=cast(AgentRuntime, runtime),
+        controller=cast(WebRobotController, controller),
+        leases=leases,
+        static_directory=static,
+        pairing=pairing,
+        require_local_pairing=True,
+        on_authenticated_controller=authenticated,
+    )
+
+    with TestClient(app, base_url="https://127.0.0.1:8443") as client:
+        assert "NinjaRobot Pairing" in client.get("/").text
+        assert client.get("/assets/app.js").status_code == 401
+        with pytest.raises(WebSocketDenialResponse) as denial:
+            with client.websocket_connect(
+                "/ws",
+                headers={"origin": "https://127.0.0.1:8443"},
+            ):
+                pass
+        assert denial.value.status_code == 401
+        exchanged = client.post(
+            "/pair",
+            json={"token": token},
+            headers={"origin": "https://127.0.0.1:8443"},
+        )
+        assert exchanged.status_code == 200
+        assert "NINJA ROBOT PI5" in client.get("/").text
+        with client.websocket_connect(
+            "/ws?browser_chat_id=paired-local-browser",
+            headers={
+                "origin": "https://127.0.0.1:8443",
+                "host": "127.0.0.1:8443",
+                "cookie": f"ninjarobot_session={client.cookies['ninjarobot_session']}",
+            },
+        ) as websocket:
+            lease = websocket.receive_json()
+            assert lease["poweroff_authorized"] is True
+            assert lease["remote"] is False
+
+    assert connected == [(False, True)]
+
+
 def test_local_ca_certificate_is_reused_named_and_private(tmp_path: Path) -> None:
     certificate = tmp_path / "tls" / "cert.pem"
     key = tmp_path / "tls" / "key.pem"
@@ -326,9 +585,16 @@ def test_local_ca_certificate_is_reused_named_and_private(tmp_path: Path) -> Non
             x509.SubjectAlternativeName
         ).value.get_values_for_type(x509.DNSName)
     )
+    addresses = {
+        str(address)
+        for address in server.extensions.get_extension_for_class(
+            x509.SubjectAlternativeName
+        ).value.get_values_for_type(x509.IPAddress)
+    }
     hostname = socket.gethostname().rstrip(".")
     assert server.issuer == authority.subject
     assert {hostname, f"{hostname}.local", "localhost"} <= names
+    assert {"127.0.0.1", "::1"} <= addresses
     assert authority.extensions.get_extension_for_class(x509.BasicConstraints).value.ca is True
     assert os.stat(ca_key).st_mode & 0o777 == 0o600
 
@@ -354,6 +620,7 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     html = (static / "index.html").read_text(encoding="utf-8")
     css = (static / "styles.css").read_text(encoding="utf-8")
     javascript = (static / "app.js").read_text(encoding="utf-8")
+    english = (static / "i18n" / "en.json").read_text(encoding="utf-8")
     recognition_handler = javascript.split("recognition.onresult =", maxsplit=1)[1].split(
         "recognition.onerror =",
         maxsplit=1,
@@ -388,18 +655,30 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert "requestFullscreen" in javascript
     assert "webkitRequestFullscreen" in javascript
     assert 'window.matchMedia("(display-mode: standalone)")' in javascript
+    assert 'id="usbMicButton"' in html
+    assert '"voice_enable"' in javascript
+    assert '"voice_disable"' in javascript
+    assert 'event.data?.kind === "voice_transcript"' in javascript
+    assert 'event.data?.kind === "voice_reply"' in javascript
     assert "startController()" in javascript
     assert "motionBadge" not in javascript
-    assert "certificate-status" in javascript
+    assert "certificate-status" in english
     assert 'if (text === "/resume")' in javascript
     assert 'send("resume", { confirmed: true })' in javascript
     assert 'id="armAiCameraButton"' in html
     assert 'if (text === "/camera")' in javascript
     assert 'send("grant_chat_camera", { confirmed: true })' in javascript
     assert "data.grant_sequence" in javascript
-    assert "use /camera again after it succeeds" in javascript
+    assert "use /camera again after it succeeds" in english
     assert 'event.event_type === "media"' in javascript
     assert "showCameraPreview(event.data.jpeg_base64)" in javascript
-    assert "AI motion remains disarmed" in javascript
+    assert "AI motion remains disarmed" in english
     assert "updateAiMotion(false)" in javascript
+    assert 'id="menuButton"' in html
+    assert 'id="robotMenu"' in html
+    assert 'role="alertdialog"' in html
+    assert 'send("poweroff_prepare")' in javascript
+    assert 'send("poweroff_confirm", { confirmed: true, nonce })' in javascript
+    assert "trapDialogFocus" in javascript
+    assert 'localStorage.setItem("ninjarobotLocale"' in javascript
     assert (static / "manifest.webmanifest").is_file()

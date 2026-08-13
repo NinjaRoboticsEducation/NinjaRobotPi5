@@ -1,0 +1,10 @@
+The melspectrogram.onnx, embedding_model.onnx, and silero_vad.onnx files were
+downloaded from the openWakeWord v0.5.1 GitHub release for offline runtime use.
+
+Source:
+https://github.com/dscripka/openWakeWord/releases/tag/v0.5.1
+
+openWakeWord and its feature-model release assets are distributed under the
+Apache License 2.0. The Silero VAD model is distributed under the MIT License.
+See the upstream repository and NinjaRobotPi5 THIRD_PARTY_NOTICES.md for the
+complete attribution and license references.

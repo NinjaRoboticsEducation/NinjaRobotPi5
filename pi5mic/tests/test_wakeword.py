@@ -103,3 +103,52 @@ def test_openwakeword_process_and_close(monkeypatch, tmp_path) -> None:
 
     detector.close()
     assert model.reset_called is True
+
+
+def test_openwakeword_uses_explicit_offline_runtime_assets(monkeypatch, tmp_path) -> None:
+    wake_model = tmp_path / "ninja.onnx"
+    melspec_model = tmp_path / "melspectrogram.onnx"
+    embedding_model = tmp_path / "embedding_model.onnx"
+    vad_model = tmp_path / "silero_vad.onnx"
+    for path in (wake_model, melspec_model, embedding_model, vad_model):
+        path.write_bytes(b"fake-model")
+
+    captured: dict[str, object] = {}
+    model = _FakeModel()
+    fake_package = types.ModuleType("openwakeword")
+    fake_model_module = types.ModuleType("openwakeword.model")
+    fake_vad_module = types.ModuleType("openwakeword.vad")
+
+    def _fake_model_factory(**kwargs):
+        captured.update(kwargs)
+        return model
+
+    class _FakeVAD:
+        def __init__(self, *, model_path: str) -> None:
+            self.model_path = model_path
+
+    fake_model_module.Model = _fake_model_factory
+    fake_vad_module.VAD = _FakeVAD
+    fake_package.model = fake_model_module
+    fake_package.vad = fake_vad_module
+    monkeypatch.setitem(sys.modules, "openwakeword", fake_package)
+    monkeypatch.setitem(sys.modules, "openwakeword.model", fake_model_module)
+    monkeypatch.setitem(sys.modules, "openwakeword.vad", fake_vad_module)
+
+    detector = OpenWakeWordDetector(
+        keyword="ninja",
+        model_path=wake_model,
+        threshold=0.5,
+        vad_threshold=0.2,
+        inference_framework="onnx",
+        melspec_model_path=melspec_model,
+        embedding_model_path=embedding_model,
+        vad_model_path=vad_model,
+    )
+
+    assert captured["vad_threshold"] == 0.0
+    assert captured["melspec_model_path"] == str(melspec_model)
+    assert captured["embedding_model_path"] == str(embedding_model)
+    assert model.vad.model_path == str(vad_model)
+    assert model.vad_threshold == 0.2
+    detector.close()
