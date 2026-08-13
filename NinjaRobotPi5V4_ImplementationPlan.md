@@ -203,6 +203,46 @@ open design options:
   GPIO12/GPIO13 breakouts and therefore native Raspberry Pi hardware PWM, not
   the HAT's dedicated I2C PWM0/PWM1 sockets
 
+### 3.2 Confirmed Phase 8 public-release decisions
+
+The following final-release decisions were confirmed on 2026-08-13:
+
+- Phase 8 replaces the former separate Phase 8 and Phase 9 roadmap entries and
+  is the final implementation phase for the first public `v1.0.0` release.
+- A multi-agent hierarchy remains outside the first public release.
+- Always-on voice input uses the existing
+  `pi5mic/voiceinput/hey_Ninja.onnx` openWakeWord model and the spoken wake
+  phrase **“Hey Ninja.”** The canonical source asset has SHA-256
+  `12c87f97ea41b08a356631dc1162af455aa30ac27ff6235963a31d0f5e39016a`.
+- A voice request records for no more than 15 seconds and completes early after
+  validated speech-ending silence. Continuous wake audio and temporary command
+  audio are not retained.
+- Version 1.0.0 is voice-input-only. It does not synthesize spoken replies;
+  replies remain available through web text, bounded display presentation, and
+  the existing robot faces, buzzer, and behavior system. The existing manual
+  USB “record once” and browser-microphone paths remain available.
+- The owner/default user is the independent voice-session identity. Voice
+  activity does not silently switch a terminal or browser profile.
+- The existing terminal `/arm` flow and web **Arm AI motion** button also grant
+  voice motion. `/disarm`, web disarm, voice disablement, controller-lease loss
+  when the browser supplied the grant, model replacement, emergency/system
+  stop, and service restart revoke the voice grant.
+- The web interface supports English, Japanese, Traditional Chinese, and
+  Simplified Chinese. The wake phrase remains “Hey Ninja” for every locale.
+- ngrok remote access is optional and never uses the ngrok authtoken as a
+  visitor credential. A high-entropy, short-lived QR pairing token establishes
+  a secure browser session without asking the user to type a second login.
+- A healthy ngrok URL remains displayed until a browser connects. Local mDNS
+  fallback is used only after an actual tunnel/configuration/network failure;
+  background recovery may replace the local QR before the first connection.
+- systemd auto-start is installed disabled and becomes active only through an
+  explicit command or confirmed NinjaRobotAgent Interactive Tool action.
+- Web power-off requires the paired controller, a modal with **Power Off** and
+  **Cancel**, and a short-lived server confirmation nonce before orderly robot
+  and operating-system shutdown.
+- The public project uses a top-level MIT license aligned with the managed
+  drivers, subject to a final third-party/model redistribution notice audit.
+
 ## 4. Current project: what exists today
 
 At Phase 0 entry, the new `NinjaRobotPi5V4` root contained the implementation
@@ -1283,16 +1323,20 @@ The deployment baseline is:
   the optional FastAPI web server
 - locally generated or administrator-supplied HTTPS certificate for LAN access
 - exclusive browser controller lease with heartbeat and reconnect-token expiry
-- no router port forwarding or public-internet exposure
+- optional authenticated ngrok HTTPS access with passwordless QR pairing; no
+  router port forwarding or anonymous public controller
+- an optional IDE-owned “Hey Ninja” listener that routes transcripts through
+  the same agent runtime, policy engine, and IDE as text input
 - writable application data on the NVMe drive
 - explicit device permissions
 - shutdown hooks that cancel work and close adapters
 
-The application starts manually by default. An optional systemd service may be
-provided and enabled manually, but installation must not silently enable
+The application starts manually by default. Phase 8 provides a systemd service
+that is installed disabled and enabled only by an explicit operator command or
+confirmed Interactive Tool action; installation never silently enables
 auto-start. The CLI can reconnect to an already-running service, stop only the
-web interface, or request an orderly stop of the complete agent service. Quitting
-one CLI client does not stop the service.
+web interface, or request an orderly stop of the complete agent service.
+Quitting one CLI client does not stop the service.
 
 ## 18. Clean-build and reference strategy
 
@@ -2684,70 +2728,575 @@ the durable action ledger.
 - Switching model providers retains project-owned memory.
 - Users can inspect and delete stored information.
 
-### Phase 8: Voice and multimodal interaction
+### Phase 8: Final public-release implementation (`v1.0.0`)
 
 **Objective**
 
-Add microphone, camera, and optional speech output to the agent without
-bypassing the IDE or privacy policy.
+Complete the last-mile voice, remote-access, web, boot, deployment, security,
+and release work required to make NinjaRobotPi5V4 a polished, self-contained,
+user-friendly Raspberry Pi 5 robot platform. Phase 8 consolidates the former
+voice/multimodal and deployment/release phases; there is no Phase 9 in the
+first-release roadmap.
 
-**Deliverables**
+**Research and compatibility basis**
 
-- Voice session state and cancellation.
-- A V4-owned transcription/provider boundary that uses only approved
-  device-facing `pi5mic` APIs.
-- Explicit camera/audio consent and retention controls.
-- Backpressure so media processing cannot starve robot control.
-- Text fallback when media services fail.
-- Proof that no `pi5mic.integration.openclaw_*`,
-  `pi5mic.transport.openclaw_*`, or other OpenClaw path is imported.
+- `pyngrok` provides explicit config paths, authtoken configuration, tunnel
+  creation, `public_url` discovery, disconnect, and managed-process teardown:
+  <https://pyngrok.readthedocs.io/en/stable/>.
+- An ngrok authtoken authenticates the Pi agent, not a visiting browser. The
+  application therefore supplies its own passwordless, short-lived pairing
+  session rather than exposing an anonymous controller:
+  <https://ngrok.com/docs/agent>.
+- Free ngrok accounts have endpoint/request/data limits and may show a
+  provider-controlled browser interstitial; setup and troubleshooting must not
+  promise that every account has an interstitial-free or cost-free experience:
+  <https://ngrok.com/docs/pricing-limits/free-plan-limits>.
+- `python-qrcode` supports automatic QR sizing, explicit error correction,
+  square modules, the standard four-module quiet border, and in-memory PIL
+  output suitable for the 240×320 display:
+  <https://github.com/lincolnloop/python-qrcode>.
+- openWakeWord processes local 16 kHz, 16-bit PCM frames. The approved custom
+  ONNX model and its shared feature-model assets must be loadable without a
+  runtime download during service boot:
+  <https://github.com/dscripka/openWakeWord>.
+- The agent must react to network availability changes instead of indefinitely
+  blocking the complete robot boot on `network-online.target`; ngrok recovery
+  belongs in its own bounded lifecycle task.
 
-**Pi validation**
-
-- Recorded fixtures only.
-- Privacy, cancellation, buffering, and fallback tests.
-- No implicit local camera or microphone access in the default suite.
-- Wake/listen/stop behavior.
-- Microphone contention and release.
-- Camera access indication and cleanup.
-- Text fallback after media failure.
-
-**Exit criteria**
-
-- Voice is an input/output mode, not a second control path.
-
-### Phase 9: Deployment hardening and release
+#### Phase 8.0: Release contract, licensing, and threat-model freeze
 
 **Objective**
 
-Make NinjaRobotPi5V4 a self-contained supported runtime.
+Turn the approved product decisions into testable release contracts before
+adding runtime behavior.
+
+**Likely files and modules**
+
+- `NinjaRobotPi5V4_ImplementationPlan.md`
+- root `LICENSE` and `THIRD_PARTY_NOTICES.md`
+- architecture decision records and release validation documents under `docs/`
+- package metadata in the root, IDE, and agent `pyproject.toml` files
 
 **Deliverables**
 
-- Final parity report.
-- Installation and rollback guide.
-- Raspberry Pi service files and permissions.
-- Startup, restart, update, backup, and recovery documentation.
-- Optional systemd unit that is installed disabled and enabled only by an
-  explicit operator command.
-- Release checklist and versioning policy.
+- Record Raspberry Pi OS, Python 3.11, Pi 5, display, USB microphone, and
+  network support boundaries for `v1.0.0`.
+- Add the root MIT license and audit licenses/provenance for pyngrok, ngrok,
+  qrcode, openWakeWord, ONNX Runtime, shared inference assets, and
+  `hey_Ninja.onnx` before redistribution.
+- Copy the approved wake model into a V4-owned packaged asset location without
+  changing the managed `pi5mic` copy. Preserve and verify its approved SHA-256.
+- Define threats and controls for QR possession, stolen/replayed tokens,
+  remote direct controls, microphone privacy, privileged power-off, service
+  credentials, logs, and tunnel failure.
+- Define upgrade, backup, rollback, uninstall, semantic-versioning, and release
+  acceptance policies.
+- Confirm that the installed release performs no dependency/model/ngrok binary
+  download during unattended service boot.
 
-**Pi validation**
+**Lint/test/validation gate**
 
-- Clean install in a fresh environment.
-- Documentation command verification.
-- Full quality gates.
-- Full installation from documented steps.
-- Reboot/startup and safe shutdown.
-- Local Ollama and any intentionally configured cloud provider.
-- All devices independently, then integrated.
-- Cancellation, network loss, provider failure, database restart, and rollback.
+- dependency and license manifest checks
+- model checksum and package-data tests
+- immutable-driver verification before and after the subphase
+- compileall, Ruff lint/format, strict MyPy, pytest, and `git diff --check`
+
+**Hardware risk**
+
+None. No microphone, display, GPIO, actuator, or operating-system power action
+is allowed in this subphase.
+
+**Documentation**
+
+Record the release contract, licenses, supported platform, known account costs,
+privacy boundary, and rollback policy.
+
+#### Phase 8.1: Strict configuration and lifecycle foundations
+
+**Objective**
+
+Add bounded configuration, status, events, and dependency handling before
+enabling voice, tunneling, QR onboarding, or auto-start.
+
+**Likely files and modules**
+
+- `ninjarobot_pi5_ide/config.py` and configuration import/example paths
+- agent configuration, secret store, runtime status, event broker, IPC, and CLI
+- root/agent/IDE package metadata and `uv.lock`
+
+**Deliverables**
+
+- Add strict voice configuration: enabled state, packaged model path,
+  `onnx` inference framework, threshold, VAD/noise options, 15-second maximum,
+  silence stop, cooldown, language, and resource bounds.
+- Add strict remote-access configuration: enabled state, private config path,
+  local HTTPS upstream, retry/backoff limits, health state, pairing lifetime,
+  and no secret values.
+- Add strict onboarding/systemd configuration without accepting arbitrary
+  executable commands, unbounded URLs, or untrusted paths.
+- Save `NGROK_AUTHTOKEN` and pairing/session secrets through the existing
+  owner-only atomic `SecretStore`. Never print, serialize to ordinary config,
+  place in the QR, or write the authtoken to Git/logs/database.
+- Add normalized voice, tunnel, pairing, onboarding, and shutdown states to
+  runtime status and events.
+- Pin qrcode, pyngrok, openWakeWord, ONNX Runtime, and required inference assets.
+  Explicitly prove that the selected Python 3.11/aarch64 ONNX Runtime loads on
+  Raspberry Pi 5; do not silently switch model formats.
+- Load existing Phase 7 configuration unchanged with new features disabled
+  unless the operator explicitly configures them.
+
+**Lint/test/validation gate**
+
+- strict schema bounds and unknown-field rejection
+- old-config migration and current-config round-trip tests
+- secret permissions/redaction and hostile-path tests
+- optional dependency unavailable/degraded tests
+- full mandatory repository gate and immutable-driver verification
+
+**Hardware risk**
+
+Low. Tests use configuration and deterministic fakes only.
+
+**Documentation**
+
+Update configuration, dependency installation, secret locations, status
+values, and troubleshooting references without claiming later subphases are
+implemented.
+
+#### Phase 8.2: IDE-owned always-on voice input
+
+**Objective**
+
+Make “Hey Ninja” a hands-free input mode while retaining one IDE-owned
+microphone path and the existing agent/policy/tool execution boundary.
+
+**Required flow**
+
+```text
+USB microphone
+  → IDE-owned single audio stream
+  → packaged hey_Ninja.onnx detector
+  → at most 15 seconds of command audio, ending early after silence
+  → local transcription
+  → owner/default voice session in AgentRuntime.chat()
+  → existing policy, tools, IDE, presentation, memory, and event paths
+```
+
+**Likely files and modules**
+
+- new V4 voice controller/state module in `ninjarobot_pi5_ide`
+- existing IDE microphone adapter, integrated client, scheduler, and tests
+- agent runtime, service assembly, policy/arming, IPC, CLI, web controller,
+  frontend event handling, and presentation
+- packaged wake model and immutable asset manifest
+
+**Deliverables**
+
+- Reuse only approved device-facing `pi5mic` detector/listener APIs. Prove that
+  no `pi5mic.integration.openclaw_*`, `pi5mic.transport.openclaw_*`, complete
+  historical OpenClaw voice loop, or other OpenClaw path is imported.
+- Maintain one microphone owner and one state machine:
+  disabled → listening → detected → recording → transcribing → dispatching →
+  cooldown/listening, plus cancellable error and shutdown states.
+- Keep wake frames in bounded memory, retain no continuous audio, delete every
+  temporary command clip, and record only the transcript under normal Phase 7
+  retention rules.
+- Pause and deterministically restore the listener around manual USB capture,
+  transcription, service suspension, and device recovery. A busy microphone
+  returns a clear state instead of starting a competing process.
+- Add `/voice input on`, `/voice input off`, and `/voice input status` to the
+  terminal chat. Persist enablement only through an explicit operator action.
+- Convert the main web USB microphone control into the always-on toggle/status
+  while preserving “record once” in the robot menu. Preserve browser speech
+  recognition as a separate input.
+- Use the owner/default profile and an independent durable voice conversation
+  session; never silently alter terminal/browser active users.
+- Extend transcription locale mapping for `en`, `ja`, `zh-TW`, and `zh-CN`.
+  Local Whisper may use the common `zh` language code with the selected script
+  as a prompt/locale hint when supported; the web recognizer uses the explicit
+  browser locale.
+- Publish transcript, response, progress, and error events to connected web
+  clients. Show a bounded physical display reply/status, then restore Idle.
+  Version 1.0.0 does not add text-to-speech or require speaker hardware.
+- Extend existing authorization rather than creating an automatic voice arm:
+  confirmed terminal `/arm` or web **Arm AI motion** arms the issuing chat and
+  voice channel. The existing disarm paths, lease loss for a browser-sourced
+  grant, voice disablement, model replacement, emergency/system stop, and
+  service restart revoke voice motion.
+- Never retry a voice request after an uncertain physical result.
+
+**Lint/test/validation gate**
+
+- recorded 16 kHz PCM positive, negative, silence, noise, debounce, cooldown,
+  multilingual, and false-trigger fixtures
+- model checksum/load, bounded buffering, cancellation, state transition,
+  temporary-file deletion, and microphone contention tests
+- exactly-once transcript dispatch and text/manual-input fallback tests
+- voice identity/memory isolation and cross-interface event tests
+- voice-motion arm/revoke policy table tests
+- service close/recovery and no-OpenClaw-import tests
+- a long fake-stream resource/CPU leak test plus the full repository gate
+
+**Hardware risk**
+
+Medium for microphone privacy and resource ownership. Actuator-moving voice
+tests are high risk and remain deferred until explicit Pi validation with
+motion armed and wheels raised.
+
+**Documentation**
+
+Document the visible listening indicator, privacy/retention rules, wake model,
+four languages, no-TTS limitation, manual input fallbacks, arm semantics, and
+microphone troubleshooting.
+
+#### Phase 8.3: Passwordless ngrok remote access
+
+**Objective**
+
+Provide optional remote access without exposing an anonymous robot controller
+or asking the user to type a second browser username/password.
+
+**Likely files and modules**
+
+- new agent-owned remote-access and pairing-session modules
+- agent service assembly, runtime, IPC, Interactive Tool, web app/middleware,
+  web status/events, and tests
+- private ngrok config template outside the checkout
+
+**Deliverables**
+
+- Extend the NinjaRobotAgent Interactive Tool with configure/replace token,
+  activate, deactivate, status/URL, regenerate pairing, and remove credentials.
+- Install and verify the pinned ngrok executable during explicit setup. Never
+  download or update it during unattended boot.
+- Start ngrok only after the local HTTPS server is ready. Preserve upstream TLS
+  and trust the NinjaRobot local CA rather than disabling certificate checks.
+- Use pyngrok's explicit private config and process lifecycle. Disconnect the
+  exact public URL and terminate the owned process on orderly shutdown.
+- Generate a cryptographically random, short-lived pairing token. Put the
+  pairing token—but never the ngrok authtoken—in the QR URL fragment; exchange
+  it through a bounded pairing request for a `Secure`, `HttpOnly`, appropriately
+  scoped browser-session cookie, then invalidate it.
+- Reject missing, expired, replayed, malformed, or wrong-origin pairing. Apply
+  pairing to dashboard assets, WebSocket control, camera/microphone operations,
+  motion arming, and power-off. Preserve the existing exclusive controller
+  lease after authentication.
+- Treat anyone who can scan the physical QR as temporarily possessing a
+  pairing credential. Allow an owner to invalidate sessions and generate a new
+  pairing code from the Interactive Tool.
+- Keep a healthy ngrok QR active indefinitely until an authenticated WebSocket
+  controller connects; lack of a user connection is not a tunnel failure.
+- Show local mDNS only after an actual executable/configuration/token/account/
+  tunnel/network failure. Continue bounded background recovery and replace the
+  local QR with remote pairing if ngrok recovers before the first connection.
+- Keep local web/agent/hardware operation alive through ngrok failure. A tunnel
+  drop cannot revoke an already completed physical result or trigger Greeting
+  again.
+- Redact tokens, cookies, public pairing fragments, private paths, and ngrok
+  response bodies from logs/status/events. Do not expose ngrok's inspection API.
+- Explain the free-tier browser interstitial, limits, account requirements, and
+  possible charges without trying to bypass provider controls.
+
+**Lint/test/validation gate**
+
+- fake pyngrok process/tunnel lifecycle and sanitized failure taxonomy
+- exact URL/scheme/host bounds and hostile URL tests
+- pairing entropy, expiry, replay, rotation, cookie, origin, and WebSocket tests
+- unauthenticated HTTP/assets/control/power-off rejection
+- tunnel loss/recovery and local fallback state-machine tests
+- no-secret logging/database/QR tests and the full repository gate
+
+**Hardware risk**
+
+No direct hardware risk. Public-network security risk is high; this subphase
+cannot pass while an anonymous remote direct-control path exists.
+
+**Documentation**
+
+Document ngrok account setup, token secrecy, passwordless pairing, adding or
+revoking browsers, free-tier constraints, status, logs, recovery, and removal.
+
+#### Phase 8.4: Multilingual responsive web interface and safe power-off
+
+**Objective**
+
+Finish the mobile dashboard while preserving every current control and making
+all new remote/destructive actions explicit and accessible.
+
+**Likely files and modules**
+
+- `web_static/index.html`, `styles.css`, `app.js`, manifest, and four JSON
+  locale dictionaries
+- web app/controller dispatch, runtime shutdown coordinator, IPC, system helper
+  boundary, and web/static tests
+
+**Deliverables**
+
+- Provide complete `en`, `ja`, `zh-TW`, and `zh-CN` dictionaries for visible
+  text, dynamic messages, dialogs, toasts, errors, placeholders, status, and
+  accessibility labels. English is the safe fallback for a missing key.
+- Choose an initial supported browser locale, persist an explicit selection in
+  local storage, update `<html lang>`, and never translate capability names,
+  tool names, commands, or safety values ambiguously.
+- Place **NINJA ROBOT PI5** on the left and an accessible hamburger button on
+  the right. Add a full-screen overlay with focus containment, keyboard/Escape
+  and backdrop close, correct ARIA state, safe-area support, and portrait/mobile
+  responsiveness.
+- Include language, voice status/toggle, manual USB record-once, remote/pairing
+  status, and power-off in the overlay. Keep emergency stop immediately visible
+  outside the menu.
+- Preserve direct movement pointer cancellation, Greeting, Celebrate, camera,
+  browser microphone, chat, motion/camera authorization, resume, activity log,
+  and reconnect behavior.
+- Power-off is available only to a paired active controller. The menu action
+  opens a modal with **Power Off** and **Cancel**; confirming obtains/consumes a
+  short-lived server nonce, stops/disarms motion, closes voice/tunnel/web work,
+  flushes SQLite state, closes IDE resources, and requests OS power-off through
+  one narrowly authorized systemd/logind helper.
+- Never give the web or agent process unrestricted passwordless `sudo`. A
+  failed OS request leaves hardware stopped, reports the error, and provides a
+  local recovery command.
+
+**Lint/test/validation gate**
+
+- JSON schema and exact key-parity tests for all four dictionaries
+- no untranslated user-visible/static/dynamic string audit
+- JavaScript syntax, DOM behavior, focus/ARIA, locale persistence, and safe
+  responsive-layout checks
+- preserved-control regression tests
+- power-off authentication, nonce expiry/replay, cancellation, cleanup order,
+  privilege denial, and failure-recovery tests
+- full mandatory repository gate
+
+**Hardware risk**
+
+Direct controls retain their existing risk. Operating-system power-off is
+critical and remains fake-only until the dedicated Pi power-risk checklist.
+
+**Documentation**
+
+Document language selection, menu layout, pairing requirements, all preserved
+controls, power-off confirmation, privilege setup, and recovery.
+
+#### Phase 8.5: QR boot onboarding and connection-triggered Greeting
+
+**Objective**
+
+Implement a deterministic boot-to-browser experience without playing Greeting
+before a real authenticated user connects.
+
+**Required flow**
+
+```text
+system boot
+  → agent and IDE initialize without Greeting
+  → HTTPS web server becomes ready
+  → configured ngrok tunnel is established or fails explicitly
+  → remote pairing QR, or failure-triggered local pairing QR, is displayed
+  → first paired WebSocket controller lease is accepted
+  → Greeting runs exactly once
+  → Idle and the interactive dashboard remain active
+```
+
+**Likely files and modules**
+
+- IDE display/QR renderer, integrated client, and deterministic display tests
+- agent startup-liveliness coordinator, service assembly, runtime status/events,
+  web connection callback, presentation, and tests
+
+**Deliverables**
+
+- Generate an in-memory, plain black-on-white PIL QR with automatic minimum
+  version, medium error correction, square modules, and a four-module quiet
+  border. Compute an integer module size and center it without interpolation on
+  the physical 240×320 frame.
+- Keep QR rendering and display writes inside the IDE; it is a trusted service
+  presentation operation, not an LLM-callable arbitrary image tool.
+- Reject unbounded, malformed, non-HTTPS remote, or nonlocal fallback URLs.
+  Prove that a decoded QR equals the exact approved pairing URL.
+- Display a remote-connection progress state while ngrok is establishing. A
+  healthy remote QR waits indefinitely; only a real failure selects local mDNS.
+- Replace the displayed local QR if remote access recovers before the first
+  paired WebSocket connection.
+- Define “connected” as a paired and accepted WebSocket controller lease, not
+  an HTTP health probe, crawler, ngrok check, static request, or failed lease.
+- Use a serialized once-per-service coordinator so concurrent/reconnecting
+  clients cannot run Greeting twice. A reconnect or tunnel recovery never
+  replays Greeting.
+- If QR rendering, display write, or Greeting fails, publish a redaction-safe
+  error, leave motion disarmed, stop uncertain presentation work, and show a
+  stable Error state when the display remains usable. Do not falsely report
+  Idle or Greeting success.
+- Restore Idle only after successful Greeting completion. Preserve explicit
+  resume/recovery paths.
+
+**Lint/test/validation gate**
+
+- QR round-trip decode, dimensions, quiet-zone, long-URL, invalid-URL, and
+  deterministic image fixture tests
+- web readiness, remote/local selection, delayed recovery, simultaneous first
+  connections, reconnect, and exactly-once Greeting tests
+- display/Greeting failure injection and Idle truthfulness tests
+- full mandatory repository gate
+
+**Hardware risk**
+
+Medium for SPI/display ownership. Greeting can move servos and is high risk;
+its real validation requires raised wheels, cleared space, verified power, and
+an accessible power cutoff.
+
+**Documentation**
+
+Document every boot screen/state, QR scanning/pairing, free-tier interstitial,
+local fallback, first connection, Greeting, Idle, and recovery outcome.
+
+#### Phase 8.6: Explicit systemd installation and reliable boot lifecycle
+
+**Objective**
+
+Run one real-hardware NinjaRobot service reliably at boot without depending on
+an interactive shell, duplicate daemon, checkout-relative environment, or root
+agent process.
+
+**Likely files and modules**
+
+- versioned systemd unit template and narrowly scoped power-off helper/policy
+- agent install/enable/disable/start/stop/status/logs/uninstall CLI and
+  Interactive Tool menus
+- installation scripts, service ownership/lifecycle, and deployment tests
+
+**Deliverables**
+
+- Generate a unit with explicit absolute executable, config, secrets, working,
+  state, and log paths. Use the installed virtual-environment executable
+  directly, never `uv run` at boot.
+- Run as the installing non-root robot user with only required audio, video,
+  GPIO, I2C, and SPI group/device access. Apply compatible systemd hardening,
+  bounded startup/shutdown, restart throttling, `Restart=on-failure`, and
+  journald logging without blocking required hardware/config/state paths.
+- Start exactly one agent service in real-hardware mode. It owns IDE hardware,
+  web, voice, QR, pairing, and pyngrok lifecycle; do not add separate microphone
+  or ngrok services that compete for resources.
+- Do not indefinitely block the complete robot on internet availability. Local
+  web/hardware becomes recoverable while the remote manager handles network
+  changes and ngrok retries.
+- Install the unit disabled. Enable it only after a typed/confirmed command or
+  explicit Interactive Tool action that reports the exact user, paths, mode,
+  and next boot behavior. Disable/uninstall preserves user data by default.
+- Distinguish intentional stop/power-off from crash so systemd does not restart
+  the agent during shutdown.
+- Provide status, journal, config check, backup, update, rollback, disable, and
+  uninstall commands. Never delete profiles, memories, behavior assets, face
+  data, secrets, or configuration without a separate explicit destructive
+  action.
+
+**Lint/test/validation gate**
+
+- rendered-unit parsing and exact absolute-path/user/group tests
+- `systemd-analyze verify` where systemd is available
+- installer idempotency, disabled-by-default, enable/disable, upgrade,
+  rollback, uninstall, and data-preservation tests
+- crash/restart, intentional stop, signal cleanup, stale PID/socket, duplicate
+  ownership, no-network, and ngrok/microphone unavailable simulations
+- full mandatory repository gate
+
+**Hardware risk**
+
+High because boot owns real hardware. The initial automated test must disable
+motion or raise wheels until first-connection Greeting is explicitly approved.
+
+**Documentation**
+
+Add copy-paste-ready clean install, explicit enablement, first boot, status,
+logs, update, backup/restore, rollback, disable, uninstall, and recovery steps.
+
+#### Phase 8.7: Public-release hardening and acceptance
+
+**Objective**
+
+Produce and sign off the complete, reproducible NinjaRobotPi5 `v1.0.0`
+release after software, privacy, security, deployment, and physical validation.
+
+**Likely files and modules**
+
+- root and package versions, changelog/development log, release manifest,
+  validation records, README, installation/development guides, and all modules
+  changed by Phase 8
+
+**Deliverables**
+
+- Complete dependency/license/model provenance and build/package-data audits.
+- Verify a clean Raspberry Pi OS installation from public documentation with no
+  hidden development checkout or shell state.
+- Verify upgrade from Phase 7 with profiles, face data, preferences,
+  conversations, behavior memories, model selection, behavior catalog,
+  calibration, and safety state preserved.
+- Verify backup/restore, storage pressure, database recovery, update rollback,
+  service disable/uninstall, and secrets removal as separate explicit flows.
+- Produce final architecture/parity, privacy, remote-threat, and residual-risk
+  reports plus a complete known-limitations/support matrix.
+- Update every required document and mark only physically tested features as
+  validated. Create the `v1.0.0` release only after the final report has no
+  unresolved safety-critical or anonymous-remote-access issue.
+
+**Mandatory software validation**
+
+After every Phase 8 subphase, and once more for the release candidate:
+
+```bash
+uv run python scripts/verify_immutable_drivers.py
+uv run python -m compileall -q .
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy .
+uv run pytest -q
+git diff --check
+```
+
+Frontend/deployment subphases also run JavaScript syntax/DOM/i18n checks,
+`systemd-analyze verify` where available, package build/install tests, and
+documented-command verification. No subphase proceeds until its gate passes.
+
+**Mandatory Raspberry Pi validation**
+
+1. **Safe smoke tests:** simulation, immutable drivers, dependency/model load,
+   config/secrets, i18n, QR decoding, pairing rejection, mocked ngrok, systemd
+   verification, backup, and rollback; expected result is no hardware access.
+2. **Device communication tests:** display QR/Error/Idle frames, microphone
+   stream/listen/cancel/release, wake detection in four transcription locales,
+   web/pairing/lease, tunnel loss/recovery, and long-run thermal/resource soak;
+   expected result is truthful state and complete cleanup without actuator use.
+3. **Actuator-moving tests:** with wheels raised, stable power, cleared space,
+   and an accessible cutoff, verify first-connection Greeting exactly once and
+   a voice movement only after existing motion authorization; expected result
+   is bounded movement, no duplicate action, and Idle restoration.
+4. **Power-risk tests:** backup first, then verify enabled boot, crash restart,
+   orderly stop, browser-confirmed power-off, database/filesystem integrity,
+   disabled-service rollback, and physical reboot; expected result is no
+   restart loop, corruption, unsafe pulse, or orphan device/tunnel process.
+
+Rollback stops/disables the unit, disconnects ngrok, revokes pairing and motion,
+restores the Phase 7 config/database backup and previous locked environment,
+verifies driver provenance, and returns to documented manual startup.
 
 **Exit criteria**
 
-- Complete Pi pass/fail report.
-- No unresolved safety-critical issue.
-- User approves NinjaRobotPi5V4 for release.
+- “Hey Ninja” voice input runs for the long-duration Pi soak without microphone
+  loss, unbounded resource growth, retained raw audio, or a second control path.
+- `/arm` and the web motion button authorize voice exactly as approved, and all
+  revocation paths fail closed.
+- Local and ngrok browsers require valid passwordless pairing; anonymous HTTP,
+  WebSocket, direct control, and power-off attempts fail.
+- Four web locales are complete, accessible, responsive, and preserve all
+  Phase 5–7 controls.
+- Boot displays the correct QR, waits for a paired WebSocket, runs Greeting once,
+  and transitions truthfully to Idle or Error.
+- systemd installation remains disabled until explicit activation and survives
+  reboot, failure, update, rollback, and uninstall tests without data loss.
+- The complete software gate, clean-install test, and signed Pi pass/fail report
+  pass with no unresolved safety-critical issue.
+- Documentation, licenses, notices, release artifacts, and version identifiers
+  are complete and the user approves `v1.0.0` publication.
 
 ## 23. Documentation deliverables
 
@@ -2755,6 +3304,7 @@ Documentation is part of every phase, not a final cleanup task.
 
 Required living documents:
 
+- top-level MIT license and third-party/model redistribution notices
 - V4 architecture overview
 - capability and tool authoring guide
 - provider adapter guide
@@ -2764,6 +3314,7 @@ Required living documents:
 - installation and service guide for Raspberry Pi 5
 - per-adapter and full-hardware Pi validation checklists
 - installation and rollback guide
+- public release manifest, supported-platform matrix, and signed Pi report
 - ADRs for significant decisions
 
 `README.md`, `DevelopmentGuide.md`, and `InstallationGuide.md` must be updated
@@ -2794,10 +3345,25 @@ NinjaRobotPi5V4 is complete when:
 - Raspberry Pi 5 validation passes with a signed-off report
 - installation, development, migration, privacy, and recovery documentation is
   accurate
+- the packaged “Hey Ninja” model has recorded provenance, license, checksum,
+  Python 3.11/aarch64 load proof, and Raspberry Pi false-trigger results
+- always-on voice input retains no raw audio and remains an input to the existing
+  agent/policy/IDE path rather than a separate robot-control path
+- local and ngrok web access require passwordless pairing, and anonymous HTTP,
+  WebSocket, robot-control, and power-off attempts are rejected
+- the web interface has complete English, Japanese, Traditional Chinese, and
+  Simplified Chinese dictionaries and accessibility validation
+- the boot workflow displays the correct remote or failure-triggered local QR,
+  runs Greeting exactly once after a paired WebSocket connection, and reports
+  Idle/Error truthfully
+- systemd installation is disabled by default, enabled only explicitly, and
+  passes reboot, shutdown, update, rollback, and uninstall validation
 - the default two-servo power path is recorded, with the missing physical
   cutoff documented as an accepted residual risk
 - no V4 runtime path imports OpenClaw
-- the user approves the release
+- a top-level MIT license, third-party notices, release manifest, and signed Pi
+  pass/fail report are complete
+- the user approves the public `v1.0.0` release
 
 ## 25. Important non-goals for the first V4 release
 
@@ -2805,7 +3371,7 @@ The first release will not attempt:
 
 - unrestricted autonomous operation
 - a multi-agent hierarchy
-- a remote public robot-control service
+- anonymous remote robot control or direct router port forwarding
 - a third-party app marketplace
 - a mandatory vector database
 - silent learning from every conversation
@@ -2814,9 +3380,9 @@ The first release will not attempt:
 - full robot simulation before deterministic fakes provide sufficient coverage
 - modifying any copied `pi5*` library or its documentation
 - a separate IDE process
-- a public-internet robot-control service or router port forwarding
-- browser pairing authentication in Phase 5
-- spoken robot responses in Phase 5
+- a second ngrok, voice-input, or hardware-owner service process
+- reusable browser passwords embedded in QR codes or URLs
+- synthesized spoken/text-to-speech robot replies in `v1.0.0`
 - enabling Tavily extract, crawl, or map tools by default
 - executable-code agent skills
 - automatic startup immediately after installation
@@ -2836,7 +3402,10 @@ Approval is requested at these points:
 5. Approve Pi hardware execution when the deferred checklists are ready.
 6. Review the Phase 4 servo power record and residual-risk statement before
    powered servo tests.
-7. Approve optional systemd auto-start separately after manual startup is
-   stable.
+7. Phase 8 systemd installation remains disabled until the operator explicitly
+   enables it through the approved command or Interactive Tool confirmation.
+8. Review and approve the finalized Phase 8 plan before implementation, then
+   approve the signed Raspberry Pi release report before publishing `v1.0.0`.
 
-Until checkpoint 1 is approved, this plan is the only V4 project change.
+Phase 8 implementation begins only after checkpoint 8 plan approval. Public
+release begins only after the final software and Raspberry Pi reports pass.

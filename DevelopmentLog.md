@@ -1,5 +1,47 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-13 — Phase 8 final public-release roadmap
+
+### Scope and decisions
+
+- replaced the former separate Phase 8 voice/multimodal and Phase 9 deployment
+  entries with one final Phase 8 targeting the first public `v1.0.0` release
+- recorded the approved “Hey Ninja” ONNX wake model and checksum, 15-second
+  silence-bounded command capture, voice-input-only response flow, owner voice
+  identity, shared existing motion-arming controls, and four interface locales
+- designed optional ngrok access around short-lived passwordless QR pairing
+  rather than anonymous access, reusable credentials in a URL, or misuse of the
+  robot's ngrok authtoken as a browser credential
+- specified remote/local QR failure behavior, first-paired-browser Greeting,
+  truthful Idle/Error transitions, accessible hamburger navigation, confirmed
+  power-off, and explicitly enabled systemd startup
+- retained multi-agent hierarchy, text-to-speech, router port forwarding,
+  anonymous remote control, and silent installation-time auto-start as
+  `v1.0.0` non-goals
+
+### Plan structure and validation
+
+- divided Phase 8 into contract/licensing, lifecycle/configuration, voice,
+  remote access, web/i18n/power-off, QR onboarding, systemd, and final release
+  subphases; each records likely files, deliverables, validation, hardware risk,
+  documentation, rollback, and exit criteria
+- reviewed `README.md`, `DevelopmentGuide.md`, and `InstallationGuide.md`; they
+  remain unchanged because Phase 8 behavior is planned but not implemented and
+  must not be documented as currently available
+- immutable-driver verification passed with 222 tracked files and 26 authorized
+  repairs; compileall, Ruff lint/format, strict MyPy, and the full suite passed
+  with 422 tests and the one existing Starlette test-client deprecation warning
+- no runtime, dependency, configuration, managed driver, GPIO, microphone,
+  display, actuator, network service, or operating-system power behavior changed
+
+### Raspberry Pi status and next step
+
+No Raspberry Pi hardware or ngrok account was accessed for this planning-only
+change. Phase 8 implementation begins only after explicit implementation
+approval and proceeds through the documented subphase gates; physical tests are
+deferred to the safe-smoke, device-communication, raised-wheel actuator, and
+power-risk checklists in the finalized plan.
+
 ## 2026-08-13 — Gemini 3 tool-continuation and quota-retry correction
 
 ### Root cause and correction
