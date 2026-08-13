@@ -64,6 +64,10 @@ chat and run:
 ```
 
 Expected: state progresses to `listening`; the web **VOICE INPUT** status agrees.
+The enable operation itself must not return a successful `starting` state. If
+the stream cannot become ready within 10 seconds, expected behavior is a
+bounded failure, a closed partial stream, and `enabled: false` rather than a
+stuck background task.
 Say “Hey Ninja”, then a harmless question. Expected: one transcript and one
 reply appear on the web interface, the reply is presented normally, and the
 listener returns to `listening` after cooldown.
@@ -113,6 +117,7 @@ This section can energize servos. Raise the wheels first.
 - [ ] Immutable-driver and focused software checks pass.
 - [ ] Offline ONNX model load prints `16000 1280`.
 - [ ] Voice reaches `listening` without a network download.
+- [ ] Busy/missing/stalled microphone fails within the startup bound and can be re-enabled after correction.
 - [ ] Positive wake, negative speech, silence, and noise trials are recorded.
 - [ ] All four transcription locales produce acceptable text.
 - [ ] Manual recording never competes with the listener.

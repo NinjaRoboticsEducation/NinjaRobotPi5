@@ -50,6 +50,8 @@ def test_robot_latches_only_for_a_real_driver_failure() -> None:
         recorder = SafetyRecorder()
         robot.system_safety = recorder
         robot._idle_suppressed = False
+        robot._idle_lock = asyncio.Lock()
+        robot._idle_task = None
 
         await robot._driver_failure(ide_error("INVALID_CAPABILITY_ARGUMENTS"))
         assert recorder.calls == []

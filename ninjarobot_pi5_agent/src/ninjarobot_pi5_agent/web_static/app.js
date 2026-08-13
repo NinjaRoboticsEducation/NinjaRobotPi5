@@ -53,6 +53,8 @@
     poweroffNonce: null,
     remoteConnection: false,
     previousFocus: null,
+    connectionKey: "connection.offline",
+    connectionClass: "badge-wait",
   };
 
   const elements = {
@@ -110,6 +112,7 @@
     updateAiMotion(elements.armAi.dataset.armed === "true");
     updateAiCamera(elements.armAiCamera.dataset.granted === "true");
     updateVoiceInput({ enabled: state.voiceEnabled, state: elements.voiceInput.dataset.state });
+    renderConnection();
     updateConnectionDetail();
     updatePoweroffAvailability();
   }
@@ -163,9 +166,15 @@
     window.setTimeout(() => elements.toast.classList.add("hidden"), 3200);
   }
 
-  function setConnection(label, className) {
-    elements.badge.textContent = label;
-    elements.badge.className = `badge ${className}`;
+  function renderConnection() {
+    elements.badge.textContent = t(state.connectionKey);
+    elements.badge.className = `badge ${state.connectionClass}`;
+  }
+
+  function setConnection(key, className) {
+    state.connectionKey = key;
+    state.connectionClass = className;
+    renderConnection();
   }
 
   function addMessage(role, text = "") {
@@ -211,7 +220,7 @@
     }
     const socket = new WebSocket(`${protocol}//${window.location.host}/ws?${query}`);
     state.socket = socket;
-    setConnection(t("connection.connecting"), "badge-wait");
+    setConnection("connection.connecting", "badge-wait");
 
     socket.addEventListener("open", () => log(t("connection.opened")));
     socket.addEventListener("message", (event) => {
@@ -232,7 +241,7 @@
       updateAiCamera(false);
       updatePoweroffAvailability();
       setConnection(
-        event.code === 4423 ? t("connection.locked") : t("connection.disconnected"),
+        event.code === 4423 ? "connection.locked" : "connection.disconnected",
         "badge-wait",
       );
       log(
@@ -266,7 +275,7 @@
       state.remoteConnection = message.remote === true;
       state.poweroffAuthorized = message.poweroff_authorized === true;
       sessionStorage.setItem("ninjarobotReconnectToken", state.reconnectToken);
-      setConnection(t("connection.active"), "badge-ok");
+      setConnection("connection.active", "badge-ok");
       log(t("connection.owned"));
       updateConnectionDetail();
       const interval = Math.max(1000, Number(message.heartbeat_seconds) * 1000);
@@ -793,7 +802,7 @@
         elements.powerDialog.classList.add("hidden");
         document.body.classList.remove("modal-open");
         toast(t("power.shuttingDown"));
-        setConnection(t("power.shuttingDown"), "badge-wait");
+        setConnection("power.shuttingDown", "badge-wait");
       })
       .catch(() => {
         closePowerDialog();

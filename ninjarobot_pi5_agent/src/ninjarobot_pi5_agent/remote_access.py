@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import stat
+import subprocess
 import tempfile
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -25,6 +26,17 @@ from .secrets import SecretStore
 
 PersistRemoteSetting = Callable[[bool], Awaitable[None]]
 StartWebServer = Callable[[], Awaitable[dict[str, object]]]
+PERMANENT_REMOTE_ERRORS = frozenset(
+    {
+        "account_rejected",
+        "authentication_failed",
+        "authtoken_unavailable",
+        "config_path_unsafe",
+        "configuration_invalid",
+        "executable_unavailable",
+        "local_ca_unavailable",
+    }
+)
 
 
 class RemoteAccessError(RuntimeError):
@@ -99,8 +111,7 @@ class PyngrokTunnelBackend:
                 bind_tls=True,
                 upstream_tls_verify=True,
                 upstream_tls_verify_cas=str(self._ca_certificate),
-                request_header_remove=[REMOTE_MARKER_HEADER],
-                request_header_add=[f"{REMOTE_MARKER_HEADER}:{self._remote_header_secret}"],
+                traffic_policy=_remote_marker_traffic_policy(self._remote_header_secret),
                 pyngrok_config=pyngrok_config,
             )
             public_url = validate_public_https_origin(str(tunnel.public_url))
@@ -353,7 +364,7 @@ class RemoteAccessService:
                     failures += 1
                     state = (
                         ReleaseFeatureState.FAILED
-                        if failures > self._config.retry_limit
+                        if code in PERMANENT_REMOTE_ERRORS or failures > self._config.retry_limit
                         else ReleaseFeatureState.DEGRADED
                     )
                     self._release_status.update("remote_access", state, detail=code)
@@ -363,12 +374,12 @@ class RemoteAccessService:
                         "Remote access is unavailable; local agent and web control remain ready.",
                         data={"kind": "remote_error", "code": code},
                     )
+                    if code in PERMANENT_REMOTE_ERRORS:
+                        return
                     delay = min(
                         self._config.retry_initial_seconds * (2 ** min(failures - 1, 16)),
                         self._config.retry_max_seconds,
                     )
-                    if failures > self._config.retry_limit:
-                        failures = 0
                     try:
                         await asyncio.wait_for(self._stop.wait(), timeout=delay)
                     except TimeoutError:
@@ -389,20 +400,73 @@ def _persist_remote_access_enabled(config_path: str | Path, enabled: bool) -> No
 
 
 def install_ngrok_binary(path: str | Path) -> Path:
-    """Explicit setup-only download; the unattended service never calls this."""
+    """Reuse or atomically install ngrok v3 without overwriting a live inode."""
     try:
         destination = _private_path(path)
     except RemoteAccessError as exc:
         raise ValueError("ngrok executable path must not use symbolic links") from exc
     destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(destination.parent, 0o700)
-    from pyngrok import installer
+    if _valid_ngrok_v3_binary(destination):
+        os.chmod(destination, 0o700)
+        return destination
+    try:
+        from pyngrok import installer
 
-    installer.install_ngrok(str(destination), ngrok_version="3")
-    if not destination.is_file():
-        raise RuntimeError("ngrok installation did not produce an executable")
-    os.chmod(destination, 0o700)
+        with tempfile.TemporaryDirectory(
+            prefix=".ngrok-install-",
+            dir=destination.parent,
+        ) as directory:
+            temporary = Path(directory) / "ngrok"
+            installer.install_ngrok(str(temporary), ngrok_version="3")
+            if not _valid_ngrok_v3_binary(temporary):
+                raise RemoteAccessError("ngrok_install_invalid")
+            os.chmod(temporary, 0o700)
+            os.replace(temporary, destination)
+    except RemoteAccessError:
+        raise
+    except Exception as exc:
+        raise RemoteAccessError("ngrok_install_failed") from exc
+    if not _valid_ngrok_v3_binary(destination):
+        raise RemoteAccessError("ngrok_install_invalid")
     return destination
+
+
+def _valid_ngrok_v3_binary(path: Path) -> bool:
+    if path.is_symlink() or not path.is_file() or not os.access(path, os.X_OK):
+        return False
+    try:
+        result = subprocess.run(
+            [str(path), "version"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5.0,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    output = f"{result.stdout}\n{result.stderr}".casefold()
+    return result.returncode == 0 and "ngrok version 3" in output
+
+
+def _remote_marker_traffic_policy(secret: str) -> dict[str, object]:
+    """Remove any client marker before adding the trusted tunnel marker."""
+    return {
+        "on_http_request": [
+            {
+                "actions": [
+                    {
+                        "type": "remove-headers",
+                        "config": {"headers": [REMOTE_MARKER_HEADER]},
+                    },
+                    {
+                        "type": "add-headers",
+                        "config": {"headers": {REMOTE_MARKER_HEADER: secret}},
+                    },
+                ]
+            }
+        ]
+    }
 
 
 def _ensure_private_ngrok_config(path: Path) -> None:

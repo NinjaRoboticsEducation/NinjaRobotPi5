@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .models import MemoryKind
+from .pairing import PairingError
 from .remote_access import RemoteAccessService
 from .runtime import AgentRuntime
 from .service import ServiceOwnership
@@ -362,11 +363,33 @@ class AgentIPCServer:
         if command == "remote_pairing_url":
             if self._remote_access is None:
                 raise AgentIPCError("remote access is not configured")
+            try:
+                pairing_url = self._remote_access.pairing_url()
+            except PairingError:
+                await _write_message(
+                    writer,
+                    {
+                        "type": "result",
+                        "data": {
+                            "pairing_url": None,
+                            "pairing_available": False,
+                            "detail": "tunnel_not_ready",
+                            "next_step": (
+                                "Check Remote Access status and activate a healthy tunnel first."
+                            ),
+                        },
+                    },
+                )
+                return
             await _write_message(
                 writer,
                 {
                     "type": "result",
-                    "data": {"pairing_url": self._remote_access.pairing_url()},
+                    "data": {
+                        "pairing_url": pairing_url,
+                        "pairing_available": True,
+                        "detail": None,
+                    },
                 },
             )
             return

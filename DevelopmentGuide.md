@@ -152,7 +152,7 @@ NinjaRobotPi5/
 ### First-Time Setup (Simulation — No Hardware)
 
 ```bash
-git clone --branch alpha02 --single-branch \
+git clone --branch public_v01 --single-branch \
   https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
 cd NinjaRobotPi5
 
@@ -514,6 +514,13 @@ disabled/listening/detected/recording/transcribing/dispatching/cooldown state
 machine. `MicrophoneDevice.manual_access()` pauses and releases that stream for
 manual capture or transcription, then restores it in a `finally` path.
 
+`start()` is readiness-gated: it returns only after the stream publishes
+`listening`, or raises a stable failure after the configured bounded startup
+timeout. Raw stream construction runs outside the asyncio loop, partial
+PortAudio ownership is published early enough for cancellation cleanup, and an
+explicit enable is persisted only after readiness. A failed enable rolls the
+switch back to disabled.
+
 The IDE loads only the managed pi5mic device and openWakeWord detector modules;
 it never imports the historical pi5mic/OpenClaw voice loop. The packaged custom
 model plus explicit `melspectrogram.onnx`, `embedding_model.onnx`, and
@@ -554,7 +561,8 @@ startup and immediately removed again so it is not left in the process command
 line or ordinary configuration. Service boot never invokes the installer.
 
 The endpoint removes any client-supplied `x-ninjarobot-remote` header and adds
-a process-owned random marker. `PairingSessionManager` requires that marker,
+a process-owned random marker using ngrok Traffic Policy `remove-headers` then
+`add-headers` actions. `PairingSessionManager` requires that marker,
 the exact active HTTPS Host, and exact browser Origin. This prevents a remote
 client from spoofing a private-LAN Host header to bypass pairing. Unknown public
 hosts receive `421`; unauthenticated remote assets/control receive `401`.
@@ -568,12 +576,17 @@ service shutdown invalidates pending tokens and completed sessions. The normal
 controller lease remains exclusive after pairing.
 
 The supervisor validates an HTTPS public origin, uses exponential capped
-backoff, publishes only stable failure categories, and keeps local agent/web/
+backoff for transient failures, stops retrying permanent configuration,
+credential, executable, and account failures, publishes only stable failure
+categories, and keeps local agent/web/
 hardware paths alive on executable, token, account, network, configuration, or
 tunnel failure. A healthy tunnel waits for a paired WebSocket indefinitely;
 lack of a browser is not treated as failure. The pyngrok design follows the
 [documented explicit config/process API](https://pyngrok.readthedocs.io/en/stable/)
-and ngrok's [agent configuration](https://ngrok.com/docs/agent/config/v3/).
+and ngrok's still-supported [v2 tunnel Traffic Policy fields](https://ngrok.com/docs/agent/config/v2/).
+The installed executable is ngrok v3; pyngrok uses its v2 tunnel API here
+because that schema exposes the required custom upstream-CA verification. The
+removed direct header-module fields are not used.
 
 Local-owner commands are:
 
@@ -1025,10 +1038,13 @@ accessibility labels together, and falls back to English. Tool names, slash
 commands, capability identifiers, and safety values remain unambiguous.
 
 The top-right hamburger opens a full-screen, safe-area-aware menu containing
-language, always-on voice, manual USB recording, connection/pairing status,
-and system power. Focus is contained while the menu or power confirmation is
-open; Escape and the menu backdrop close safely. Emergency Stop remains on the
-main controller surface.
+language, connection/pairing status, and system power. Always-on voice and
+manual USB recording are main-surface controls below Camera and Web
+Microphone. The connection badge stores a semantic connection key rather than
+translated display text, so locale changes cannot reset a live connection to
+“offline.” Focus is contained while the menu or power confirmation is open;
+Escape and the menu backdrop close safely. Emergency Stop remains on the main
+controller surface.
 
 Web power-off is a deterministic service operation, never a model tool. Only a
 paired browser holding the exclusive controller lease receives access. The
@@ -1317,10 +1333,14 @@ A configuration change that points to another host is rejected — preventing cr
 | V4 microphone status reports 44.1 kHz instead of 16 kHz | Expected. The USB device rejected 16 kHz; the managed driver selected its supported native rate. Check both `requested_sample_rate_hz` and `actual_sample_rate_hz` in the status output |
 | Voice input reports `transcriber_unavailable` | Build/configure `whisper-cli` and its local model, then disable and re-enable voice input. Terminal and web text chat remain available |
 | Voice input reports `microphone_unavailable` or `audio_overflow` | Stop standalone audio programs, verify the USB device and PortAudio packages, use `/voice input off`, then re-enable after the device is free |
+| Voice input reports `microphone_busy`, `microphone_permission_denied`, or `microphone_format_unsupported` | Close other recording programs, verify group/device permissions, or select a supported USB format in the standalone `pi5mic` setup; then re-enable voice |
+| Voice input reports `listener_start_timeout` | The model loaded but the USB stream did not become ready within the bounded startup window. Disconnect/reconnect the microphone, close competing ALSA/PortAudio clients, and enable voice again |
 | Voice input reports `detector_unavailable` | Run the packaged-asset checksum tests and the hardware-extra model-load check. The service never downloads a missing model during boot |
 | Remote access reports `executable_unavailable` | Run `ninjarobot-agent remote configure` locally. Unattended boot intentionally refuses to download ngrok |
 | Remote access reports `authtoken_unavailable` or `authentication_failed` | Replace the token through the local Remote Access menu; do not paste it into web chat, TOML, logs, or issue reports |
 | Remote access reports `account_rejected` | Inspect the ngrok dashboard for account/endpoint/plan limits. Local web and robot control remain available |
+| Remote access reports `configuration_invalid` | Correct/reconfigure ngrok locally. Permanent configuration failures deliberately stop retrying so a broken endpoint cannot leave a process continuously restarting |
+| Pairing URL reports `tunnel_not_ready` | Use Remote Access Status, correct the reported tunnel failure, and activate again. A pairing fragment exists only after a public HTTPS endpoint is ready |
 | Pairing link is expired or already used | Run `ninjarobot-agent remote rotate-pairing`; this deliberately revokes existing remote browser sessions |
 | Remote request returns `401` or `421` | Use the exact current pairing URL through the ngrok endpoint. Do not override Host/Origin headers or expose port 8443 directly |
 | VL53L0X reference calibration retries once | This is the bounded recovery path on the live revision-`0x10` device. A second timeout is a hard initialization failure — do not bypass calibration |

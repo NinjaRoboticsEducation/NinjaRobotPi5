@@ -526,6 +526,10 @@ def test_service_start_waits_for_liveliness_result_before_reporting(
     assert output["started"] is True
     assert output["ready"] is False
     assert output["status"] == detailed
+    log_text = (tmp_path / "agent.log").read_text(encoding="utf-8")
+    assert "=== NinjaRobotAgent start " in log_text
+    assert "source=" in log_text
+    assert "mode=real" in log_text
 
 
 def test_service_start_reports_onboarding_without_waiting_for_greeting(
@@ -588,3 +592,24 @@ def test_service_start_reports_onboarding_without_waiting_for_greeting(
     assert result == 0
     assert json.loads(capsys.readouterr().out)["status"] == onboarding
     process.terminate.assert_not_called()
+
+
+def test_service_log_is_private_rotated_and_rejects_symlinks(tmp_path) -> None:
+    log = tmp_path / "private" / "agent-service.log"
+    log.parent.mkdir()
+    log.write_bytes(b"old-log-data")
+
+    prepared = agent_cli._prepare_service_log(log, max_bytes=4)  # noqa: SLF001
+
+    assert prepared == log
+    assert not log.exists()
+    backup = log.with_name("agent-service.log.1")
+    assert backup.read_bytes() == b"old-log-data"
+    assert backup.stat().st_mode & 0o777 == 0o600
+
+    target = tmp_path / "target.log"
+    target.write_text("do not touch", encoding="utf-8")
+    log.symlink_to(target)
+    with pytest.raises(ValueError, match="symbolic links"):
+        agent_cli._prepare_service_log(log)  # noqa: SLF001
+    assert target.read_text(encoding="utf-8") == "do not touch"

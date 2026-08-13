@@ -492,28 +492,36 @@ class SystemSafetyController:
                 snapshot = self._state.latch_system(reason, fault_detail=fault_detail)
             else:
                 snapshot = self._state.read()
+            # Close the presentation gate before cleanup starts.  Without this,
+            # an idle/face task can win the display race after the stop request.
+            self._locally_stopped = True
             results = await asyncio.gather(
                 self._motion.stop_motion(reason, latch=False),
                 self._silence_buzzer(),
                 *(sensor.suspend() for sensor in self._sensors),
                 return_exceptions=True,
             )
+            cleanup_errors = [
+                f"{type(result).__name__}: {result}"
+                for result in results
+                if isinstance(result, BaseException)
+            ]
             try:
-                await self._show_stopped()
+                display_result = await self._show_stopped()
+                if isinstance(display_result, Mapping):
+                    warning = display_result.get("emergency_icon_error")
+                    if warning:
+                        cleanup_errors.append(f"display: {warning}")
+            except Exception as exc:
+                cleanup_errors.append(f"display: {type(exc).__name__}: {exc}")
+            if self._display_hold_seconds > 0:
                 await asyncio.sleep(self._display_hold_seconds)
-            except Exception:
-                pass
-            self._locally_stopped = True
             return {
                 "level": 2,
                 "reason": reason,
                 "latched": latch,
                 "persistent_state": asdict(snapshot),
-                "cleanup_errors": [
-                    f"{type(result).__name__}: {result}"
-                    for result in results
-                    if isinstance(result, BaseException)
-                ],
+                "cleanup_errors": cleanup_errors,
             }
 
     async def resume_system(
@@ -525,6 +533,15 @@ class SystemSafetyController:
         """Clear a driver-failure latch only after explicit healthy probes."""
         if not confirmed:
             raise ValueError("system resume requires explicit confirmation")
+
+        async with self._stop_lock:
+            return await self._resume_after_health_checks(health_checks)
+
+    async def _resume_after_health_checks(
+        self,
+        health_checks: Mapping[str, Callable[[], Coroutine[Any, Any, bool]]],
+    ) -> SafetySnapshot:
+        """Probe and resume while the Level 2 transaction lock is held."""
 
         async def probe(
             name: str,

@@ -138,7 +138,7 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 
 ```bash
 # 1. Clone the repository
-git clone --branch alpha02 --single-branch \
+git clone --branch public_v01 --single-branch \
   https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
 cd NinjaRobotPi5
 
@@ -209,6 +209,7 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 | [Phase 8.5 Onboarding Validation](docs/validation/phase-8-5-onboarding-pi-checklist.md) | QR decoding, remote/local fallback, pairing gate, exactly-once Greeting, and error recovery |
 | [Phase 8.6 systemd Validation](docs/validation/phase-8-6-systemd-pi-checklist.md) | Disabled-by-default install, boot/restart, hardware groups, power-off privilege, upgrade/rollback, and uninstall |
 | [v1.0.0 Release-Candidate Report](docs/validation/v1.0.0-release-candidate-report.md) | Final software, packaging, architecture, privacy/security, residual-risk, and publication status |
+| [Phase 8 Final Interactive Validation](docs/validation/phase-8-final-interactive-pi-validation-2026-08-14.md) | Existing checkout, clean clone, normal-user tools, hardware, remote, boot, power, and soak acceptance |
 | [v1.0.0 Support Matrix](docs/architecture/v1.0.0-support-matrix.md) | Supported platforms/features, compatibility guarantees, known limitations, and open Pi acceptance |
 
 ---
@@ -292,6 +293,11 @@ motion** also authorizes the independent voice session; voice disablement,
 model replacement, emergency stop, disconnect of the granting browser, and
 service restart revoke that voice motion grant.
 
+Enablement succeeds only after the USB stream reaches `listening`. A busy,
+missing, unsupported, permission-denied, or stalled microphone returns a
+bounded error and leaves voice disabled instead of remaining indefinitely in
+`starting`.
+
 ### Optional remote access
 
 Remote access is disabled by default. Start the agent service, then use the
@@ -304,8 +310,10 @@ uv run --frozen ninjarobot-agent remote pairing-url
 ```
 
 `remote configure` is the only operation allowed to download/install the ngrok
-agent. It uses hidden double-entry for the authtoken and stores credentials in
-the owner-only secret store. Service boot never downloads or updates ngrok.
+agent. It reuses a valid ngrok v3 binary and installs replacements atomically,
+so a running binary is never overwritten in place. It uses hidden double-entry
+for the authtoken and stores credentials in the owner-only secret store.
+Service boot never downloads or updates ngrok.
 Open the returned pairing URL on the controlling browser. The URL fragment is
 exchanged once for a Secure/HttpOnly cookie, so there is no second username or
 password prompt. Use `remote rotate-pairing` to revoke browsers and issue a new
@@ -316,6 +324,9 @@ The project therefore enforces its own short-lived pairing, exact Origin/Host
 checks, and an ngrok-injected transport marker before exposing assets or the
 WebSocket controller. ngrok accounts, free-plan interstitials/limits, and
 possible charges remain governed by [ngrok's current limits](https://ngrok.com/docs/pricing-limits/free-plan-limits).
+
+The complete normal-user Raspberry Pi acceptance workflow is in the
+[Phase 8 interactive validation guide](docs/validation/phase-8-final-interactive-pi-validation-2026-08-14.md).
 
 ---
 

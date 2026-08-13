@@ -1,5 +1,55 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-14 — Phase 8 Raspberry Pi test hardening and interactive acceptance guide
+
+### Implemented
+
+- fixed web connection-state translation so changing `en`, `ja`, `zh-TW`, or
+  `zh-CN` re-renders the live semantic state rather than the initial offline
+  label
+- moved Voice Input and Record Once to the main media-control grid below Camera
+  and Web Microphone
+- made Level 2 stop close the presentation gate immediately, report display
+  cleanup errors, keep the emergency frame last/persistent, and attempt a red
+  text fallback if icon rendering fails
+- made voice enablement wait for real `listening` readiness, added a bounded
+  startup timeout and stable microphone failure categories, moved raw stream
+  construction off the event loop, cleaned partial PortAudio ownership, and
+  persisted enablement only after success
+- replaced rejected ngrok legacy request-header options with Traffic Policy
+  remove/add header actions; permanent configuration/credential/account errors
+  now stop retrying while transient loss retains capped recovery
+- made ngrok installation reuse a valid v3 binary or perform validated atomic
+  replacement, preventing in-place `Text file busy` failures
+- made unavailable pairing URLs return `tunnel_not_ready` guidance rather than
+  an argparse traceback
+- added owner-private, symlink-safe, 5 MB service-log rotation and a checkout/
+  mode/interpreter/timestamp marker at every manual service start
+- corrected public branch references and added the consolidated Phase 8
+  existing-checkout/clean-clone normal-user validation workflow
+
+### Validation
+
+- managed-driver verification: 222 tracked files plus 28 authorized repairs,
+  pass before and after every implementation phase
+- Ruff lint and format: pass
+- MyPy: pass for 81 source files
+- Python compileall: pass
+- pytest: 522 passed; one upstream Starlette/httpx test-client deprecation
+  warning remains, with no production runtime failure
+- agent and IDE `1.0.0` wheels/source distributions: build pass; repaired web,
+  voice, remote, safety, locale, wake-model, and offline runtime assets present
+- `git diff --check`: pass before the documentation phase
+- no managed `pi5*` driver or nested `NinjaClawBot/` content changed
+
+### Raspberry Pi follow-up
+
+Run and sign
+`docs/validation/phase-8-final-interactive-pi-validation-2026-08-14.md` on the
+existing checkout and a clean `public_v01` clone. The checklist separates safe
+smoke, device communication, actuator-moving, network, boot, power-risk, soak,
+and rollback steps and uses the normal Interactive Tools for feature tests.
+
 ## 2026-08-13 — Phase 8.7 v1.0.0 release candidate
 
 ### Implementation

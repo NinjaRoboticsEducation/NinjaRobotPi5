@@ -786,6 +786,7 @@ def build_robot_ide_client(
         silence_rms_threshold=voice_config.silence_rms_threshold,
         language=voice_config.language,
         retry_limit=voice_config.retry_limit,
+        startup_timeout_seconds=voice_config.startup_timeout_seconds,
     )
     robot.microphone.set_voice_coordinator(voice_input)
     return RobotIDEClient(robot, engine, identity, voice_input)

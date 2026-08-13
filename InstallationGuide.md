@@ -2,6 +2,7 @@
 
 > [!WARNING]
 > **v1.0.0 release candidate.** The software gate is complete. Finish every applicable Phase 8 Raspberry Pi checklist before public tagging or allowing free floor movement.
+> For the consolidated normal-user run, use the [Phase 8 Final Interactive Raspberry Pi Validation](docs/validation/phase-8-final-interactive-pi-validation-2026-08-14.md).
 
 This guide takes you from a blank Raspberry Pi to a fully calibrated, running robot. Follow the numbered steps in order. The testing, troubleshooting, and extension sections at the end are available whenever you need them.
 
@@ -193,7 +194,7 @@ Expected result: a `uv` version number is printed. The installer also adds `uv` 
 **Clone the project:**
 
 ```bash
-git clone -b alpha02 https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
+git clone -b public_v01 https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
 cd NinjaRobotPi5
 ```
 
@@ -1236,6 +1237,14 @@ Physical movement still requires the existing `/arm` confirmation or web
 switching models, emergency stop, or losing the browser lease that granted the
 arm revokes voice motion permission.
 
+`/voice input on` now waits for the USB stream to reach `listening`; it no
+longer reports a successful enable while the microphone is still opening. A
+startup that exceeds `startup_timeout_seconds` (10 seconds by default) closes
+partial PortAudio ownership, leaves voice disabled, and reports a stable error
+such as `microphone_busy`, `microphone_permission_denied`,
+`microphone_format_unsupported`, `microphone_unavailable`, or
+`listener_start_timeout`.
+
 #### 🌐 Configure Optional ngrok Remote Access
 
 Remote access is opt-in and requires an ngrok account/authtoken. Free accounts
@@ -1243,7 +1252,11 @@ may show an ngrok-controlled interstitial and have endpoint, request, and data
 limits; review [ngrok's current limits](https://ngrok.com/docs/pricing-limits/free-plan-limits)
 before relying on the service.
 
-Start the agent service first. Then run:
+Start the agent service, launch `uv run --frozen --extra hardware
+ninjarobot-agent`, select **11. Remote Access**, then select **1. Configure
+token, install ngrok, and activate**. The same menu provides Status, current
+pairing URL, rotation, deactivation, and credential removal. Scriptable
+equivalents are:
 
 ```bash
 uv run --frozen --extra hardware ninjarobot-agent remote configure
@@ -1252,10 +1265,25 @@ uv run --frozen ninjarobot-agent remote pairing-url
 ```
 
 The first command prompts twice for the ngrok authtoken and explicitly installs
-the ngrok agent. The token is never printed. The service will not download or
-update ngrok on startup. Open the pairing URL on the controlling browser. No
+the ngrok agent. A valid v3 binary is reused; a replacement is downloaded to a
+private temporary directory, version-checked, and atomically installed. This
+prevents `Text file busy` when an older process still references the previous
+inode. The token is never printed. The service will not download or update
+ngrok on startup. Open the pairing URL on the controlling browser. No
 browser username or password is required: the one-use URL fragment becomes a
 short-lived Secure/HttpOnly session cookie.
+
+The tunnel removes any client-supplied transport marker and adds the trusted
+marker through ngrok Traffic Policy `remove-headers` and `add-headers` actions.
+This follows ngrok's current
+[Traffic Policy header actions](https://ngrok.com/docs/traffic-policy/examples/add-and-remove-headers)
+while retaining verified TLS to the robot's private local CA.
+Permanent authentication/account/configuration failures stop retrying until
+the operator corrects them; transient network/tunnel loss continues with
+capped backoff. If **Show current pairing URL** reports
+`detail: tunnel_not_ready`, first use **Status** and correct/activate the tunnel.
+The “pairing code” is the short-lived URL fragment generated only after a
+healthy public HTTPS endpoint exists; it is not a separate number.
 
 Useful management commands:
 
@@ -1278,9 +1306,17 @@ to port 8443 as an alternative.
 Open the top-right hamburger menu to select English, Japanese, Traditional
 Chinese, or Simplified Chinese. The selection controls interface labels and
 the recognition locale for manual USB recording and browser speech, and it
-persists in that browser. The menu also contains always-on voice, record-once,
-connection status, and system power. Press Escape, the close button, or the
-menu backdrop to close it; Emergency Stop remains on the main dashboard.
+persists in that browser. The live connection badge retains its actual state
+when the language changes. **VOICE INPUT** and **RECORD ONCE** are on the main
+controller below **CAMERA** and **WEB MICROPHONE**; the hamburger contains the
+language selector, connection information, and system power. Press Escape, the
+close button, or the menu backdrop to close it; Emergency Stop remains on the
+main dashboard.
+
+An Emergency Stop cancels foreground/idle presentation and leaves a persistent
+red stop icon until confirmed Resume. If icon rendering fails, the display
+attempts a red `EMERGENCY STOP / RESUME REQUIRED` text fallback and records the
+display error instead of silently leaving the previous face frozen.
 
 Power-off is disabled unless deployment power control is enabled and the
 active browser has completed pairing. Selecting **Power off NinjaRobot**
@@ -1547,6 +1583,11 @@ Expected result: the answer includes source links. If internet access or quota i
 | `pi5camera` | `~/.config/pi5camera/camera.json` | Width, height, warm-up time, autofocus mode |
 | `pi5mic` | `~/.config/pi5mic/mic.json` | Input device, sample rate, channel count |
 
+The integrated Agent reads the imported microphone settings from
+`~/.config/ninjarobot_pi5/config.toml`. A checkout-root `mic.json` is not an
+Agent configuration file and a machine-specific absolute model path there
+should not be committed as portable project configuration.
+
 Always run each library from the root NinjaRobotPi5 environment:
 
 ```bash
@@ -1588,3 +1629,7 @@ uv run --frozen pytest -q
 ```
 
 `git pull --ff-only` refuses to combine unexpected local source changes with the downloaded update. Your personal configuration under `~/.config` and retained media under `~/.local` remain outside the Git checkout and are never affected by updates.
+
+For a complete existing-checkout and clean-clone acceptance run using the two
+normal interactive tools, follow
+[Phase 8 Final Interactive Raspberry Pi Validation](docs/validation/phase-8-final-interactive-pi-validation-2026-08-14.md).

@@ -33,7 +33,7 @@ from .models import (
     RetrySafety,
     RiskLevel,
 )
-from .voice_input import WakeWordDetector
+from .voice_input import VoiceInputError, WakeWordDetector
 
 MICROPHONE_RESOURCES = ("microphone",)
 MICROPHONE_FILENAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}\.wav$")
@@ -530,17 +530,27 @@ class ManagedVoiceAudioSource:
             purpose="NinjaRobot always-on voice input",
             error_factory=RuntimeError,
         )
-        stream = sounddevice.RawInputStream(
-            samplerate=actual_rate,
-            blocksize=self._block_frames,
-            device=device,
-            channels=self._channels,
-            dtype="int16",
-            latency="high",
-        )
-        await asyncio.to_thread(stream.start)
+        try:
+            stream = await asyncio.to_thread(
+                sounddevice.RawInputStream,
+                samplerate=actual_rate,
+                blocksize=self._block_frames,
+                device=device,
+                channels=self._channels,
+                dtype="int16",
+                latency="high",
+            )
+            # Publish the partially opened stream before start so cancellation
+            # can close it instead of leaving PortAudio ownership behind.
+            self._stream = stream
+            await asyncio.to_thread(stream.start)
+        except asyncio.CancelledError:
+            await self.close()
+            raise
+        except Exception as exc:
+            await self.close()
+            raise VoiceInputError(_voice_microphone_error_code(exc)) from exc
         self._sample_rate = actual_rate
-        self._stream = stream
 
     async def read(self) -> tuple[bytes, bool]:
         stream = self._stream
@@ -555,9 +565,30 @@ class ManagedVoiceAudioSource:
         if stream is None:
             return
         try:
-            await asyncio.to_thread(stream.stop)
+            try:
+                await asyncio.to_thread(stream.abort)
+            except (AttributeError, RuntimeError, OSError):
+                try:
+                    await asyncio.to_thread(stream.stop)
+                except (RuntimeError, OSError):
+                    pass
         finally:
             await asyncio.to_thread(stream.close)
+
+
+def _voice_microphone_error_code(error: Exception) -> str:
+    """Map PortAudio/device startup failures to stable, non-sensitive codes."""
+    message = str(error).casefold()
+    if isinstance(error, PermissionError) or "permission denied" in message:
+        return "microphone_permission_denied"
+    if "busy" in message or "in use" in message:
+        return "microphone_busy"
+    if any(
+        marker in message
+        for marker in ("invalid sample rate", "invalid number of channels", "unsupported format")
+    ):
+        return "microphone_format_unsupported"
+    return "microphone_unavailable"
 
 
 def build_managed_wake_detector(

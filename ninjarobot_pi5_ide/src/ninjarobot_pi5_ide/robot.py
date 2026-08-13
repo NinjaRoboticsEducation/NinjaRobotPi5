@@ -390,6 +390,7 @@ class RobotAssembly:
             exc_info=(type(error), error, error.__traceback__),
         )
         self._idle_suppressed = True
+        await self._stop_idle()
         stopped = await self.system_safety.full_stop(
             "driver_failure",
             latch=True,
@@ -497,12 +498,37 @@ class RobotAssembly:
         )
 
     async def _show_system_stopped(self) -> dict[str, Any]:
-        width, height = await self.display.dimensions()
-        image = render_emergency_stop(width=width, height=height)
-        return await self.display.show_image(
-            image,
-            source="safety:emergency-stop",
-        )
+        try:
+            width, height = await self.display.dimensions()
+            image = render_emergency_stop(width=width, height=height)
+            return await self.display.show_image(
+                image,
+                source="safety:emergency-stop",
+            )
+        except Exception as icon_error:
+            detail = f"{type(icon_error).__name__}: {icon_error}"
+            LOGGER.error(
+                "Emergency-stop icon failed; attempting the text fallback: %s",
+                detail,
+                exc_info=(type(icon_error), icon_error, icon_error.__traceback__),
+            )
+            try:
+                result = await self.display.show_text(
+                    text="EMERGENCY STOP\nRESUME REQUIRED",
+                    font_size=28,
+                    foreground="#FFFFFF",
+                    background="#8B0018",
+                )
+            except Exception as fallback_error:
+                fallback_detail = f"{type(fallback_error).__name__}: {fallback_error}"
+                raise RuntimeError(
+                    f"emergency-stop display failed: icon={detail}; text_fallback={fallback_detail}"
+                ) from fallback_error
+            return {
+                **result,
+                "fallback": "text",
+                "emergency_icon_error": detail,
+            }
 
     async def _show_motion_warning(self, warning: str) -> dict[str, Any]:
         if warning.startswith("distance reading unavailable"):

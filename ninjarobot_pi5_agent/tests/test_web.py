@@ -656,6 +656,11 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert "webkitRequestFullscreen" in javascript
     assert 'window.matchMedia("(display-mode: standalone)")' in javascript
     assert 'id="usbMicButton"' in html
+    assert html.index('id="usbMicButton"') < html.index('id="robotMenu"')
+    assert html.index('id="usbRecordButton"') < html.index('id="robotMenu"')
+    assert 'id="connectionBadge" class="badge badge-wait" data-i18n=' not in html
+    assert 'connectionKey: "connection.offline"' in javascript
+    assert "renderConnection();" in javascript
     assert '"voice_enable"' in javascript
     assert '"voice_disable"' in javascript
     assert 'event.data?.kind === "voice_transcript"' in javascript

@@ -6,8 +6,10 @@ import asyncio
 from array import array
 from pathlib import Path
 
+import pytest
 from ninjarobot_pi5_ide.voice_input import (
     VoiceInputController,
+    VoiceInputError,
     VoiceInputState,
     VoiceInputStatus,
     _PCMFrameAssembler,
@@ -65,6 +67,22 @@ class FakeSource:
         self.closed = True
 
 
+class HangingSource(FakeSource):
+    def __init__(self) -> None:
+        super().__init__([pcm_frame(0)])
+        self._forever = asyncio.Event()
+
+    async def start(self) -> None:
+        self.started = True
+        await self._forever.wait()
+
+
+class FailingSource(FakeSource):
+    async def start(self) -> None:
+        self.started = True
+        raise OSError("USB microphone unavailable")
+
+
 class FakeTranscriber:
     def __init__(self, text: str = "move forward") -> None:
         self.text = text
@@ -97,6 +115,7 @@ def build_controller(
     vad_enabled: bool = True,
     retry_limit: int = 2,
     language: str = "en",
+    startup_timeout_seconds: float = 10.0,
 ) -> VoiceInputController:
     source_iter = iter(sources)
 
@@ -118,6 +137,7 @@ def build_controller(
         silence_rms_threshold=200,
         language=language,
         retry_limit=retry_limit,
+        startup_timeout_seconds=startup_timeout_seconds,
     )
     controller.bind_handlers(
         transcript_handler=handle_transcript,
@@ -197,6 +217,77 @@ def test_negative_frames_never_dispatch_and_stop_is_prompt() -> None:
     asyncio.run(scenario())
 
 
+def test_start_waits_for_listening_readiness() -> None:
+    async def scenario() -> None:
+        detector = FakeDetector([False])
+        source = FakeSource([pcm_frame(0)])
+        controller = build_controller(
+            detector,
+            [source],
+            FakeTranscriber(),
+            [],
+            asyncio.Event(),
+            [],
+        )
+
+        status = await controller.start()
+
+        assert status["state"] == "listening"
+        assert status["listening_indicator"] is True
+        await controller.stop()
+
+    asyncio.run(scenario())
+
+
+def test_hanging_microphone_start_times_out_and_cleans_up() -> None:
+    async def scenario() -> None:
+        source = HangingSource()
+        controller = build_controller(
+            FakeDetector([False]),
+            [source],
+            FakeTranscriber(),
+            [],
+            asyncio.Event(),
+            [],
+            startup_timeout_seconds=0.05,
+        )
+
+        with pytest.raises(VoiceInputError, match="listener_start_timeout"):
+            await controller.start()
+
+        assert source.started is True
+        assert source.closed is True
+        assert controller.status()["enabled"] is False
+        assert controller.status()["state"] == "failed"
+        assert controller.status()["last_error_code"] == "listener_start_timeout"
+
+    asyncio.run(scenario())
+
+
+def test_microphone_start_failure_is_returned_instead_of_staying_starting() -> None:
+    async def scenario() -> None:
+        source = FailingSource([pcm_frame(0)])
+        controller = build_controller(
+            FakeDetector([False]),
+            [source],
+            FakeTranscriber(),
+            [],
+            asyncio.Event(),
+            [],
+            retry_limit=0,
+        )
+
+        with pytest.raises(VoiceInputError, match="microphone_unavailable"):
+            await controller.start()
+
+        assert source.closed is True
+        assert controller.status()["enabled"] is False
+        assert controller.status()["state"] == "failed"
+        assert controller.status()["last_error_code"] == "microphone_unavailable"
+
+    asyncio.run(scenario())
+
+
 def test_vad_disabled_uses_bounded_maximum_capture() -> None:
     async def scenario() -> None:
         detector = FakeDetector([True])
@@ -267,7 +358,10 @@ def test_audio_overflow_retries_then_reports_failed_without_dispatch() -> None:
             retry_limit=1,
         )
 
-        await controller.start()
+        try:
+            await controller.start()
+        except VoiceInputError as exc:
+            assert exc.code == "audio_overflow"
         for _ in range(100):
             if controller.status()["state"] == "failed":
                 break

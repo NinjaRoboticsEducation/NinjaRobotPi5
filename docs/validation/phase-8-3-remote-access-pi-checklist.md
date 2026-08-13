@@ -51,6 +51,13 @@ fragment but no authtoken. Open it from a device outside the LAN. Complete any
 provider interstitial, then expect one automatic pairing exchange and the
 normal dashboard without a username/password prompt.
 
+Repeat configuration while the installed v3 binary is valid. Expected: it is
+reused without download. For an update/replacement, expected: download and
+version validation occur in a private temporary directory followed by atomic
+replacement; no `Text file busy` traceback occurs. Confirm the endpoint uses
+Traffic Policy remove/add header actions and does not use rejected legacy
+`request_header_remove` or `request_header_add` fields.
+
 Confirm a second anonymous browser receives a pairing page/401 rather than
 assets or a WebSocket. Reusing the consumed URL must fail. A wrong Origin,
 modified Host, copied cookie on another origin, expired link, or client-supplied
@@ -89,6 +96,8 @@ action and immediate revocation when the controller lease is lost.
 
 - [ ] Explicit install/configuration succeeds with mode-0600 private files.
 - [ ] No unattended install/download occurs.
+- [ ] Valid binary reuse and atomic replacement avoid in-place executable overwrite.
+- [ ] Transport marker uses Traffic Policy remove-headers then add-headers actions.
 - [ ] Public origin is HTTPS and upstream CA verification succeeds.
 - [ ] First pairing succeeds without browser login credentials.
 - [ ] Replay, expiry, wrong-origin, Host spoof, and anonymous WebSocket fail.

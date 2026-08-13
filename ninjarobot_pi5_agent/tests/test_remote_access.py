@@ -17,6 +17,7 @@ from ninjarobot_pi5_agent.remote_access import (
     RemoteAccessError,
     RemoteAccessService,
     _ensure_private_ngrok_config,
+    install_ngrok_binary,
     persist_remote_access_enabled,
 )
 from ninjarobot_pi5_agent.secrets import SecretStore
@@ -246,11 +247,82 @@ def test_pyngrok_backend_requires_installed_binary_and_preserves_upstream_tls(
     assert connect_arguments["bind_tls"] is True
     assert connect_arguments["upstream_tls_verify"] is True
     assert connect_arguments["upstream_tls_verify_cas"] == str(ca)
-    assert connect_arguments["request_header_remove"] == ["x-ninjarobot-remote"]
-    assert connect_arguments["request_header_add"] == [f"x-ninjarobot-remote:{REMOTE_MARKER}"]
+    assert "request_header_remove" not in connect_arguments
+    assert "request_header_add" not in connect_arguments
+    assert connect_arguments["traffic_policy"] == {
+        "on_http_request": [
+            {
+                "actions": [
+                    {
+                        "type": "remove-headers",
+                        "config": {"headers": ["x-ninjarobot-remote"]},
+                    },
+                    {
+                        "type": "add-headers",
+                        "config": {"headers": {"x-ninjarobot-remote": REMOTE_MARKER}},
+                    },
+                ]
+            }
+        ]
+    }
     assert token not in private_config.read_text(encoding="utf-8")
     assert captured["disconnect"][0] == "https://robot.example"
     assert "pyngrok_config" in captured["kill"]
+
+
+def test_permanent_configuration_failure_does_not_retry_forever() -> None:
+    async def scenario() -> None:
+        backend = FakeBackend([RemoteAccessError("configuration_invalid")])
+        service, _events, _release, _persisted, _web_starts = build_service(backend)
+
+        status = await service.activate()
+        await asyncio.sleep(0.05)
+
+        assert status["state"] == "failed"
+        assert status["detail"] == "configuration_invalid"
+        assert backend.connect_calls == 1
+        await service.deactivate()
+
+    asyncio.run(scenario())
+
+
+def test_ngrok_installer_reuses_valid_v3_binary(tmp_path: Path, monkeypatch) -> None:
+    destination = tmp_path / "bin" / "ngrok"
+    destination.parent.mkdir()
+    destination.write_text("#!/bin/sh\necho 'ngrok version 3.39.11'\n", encoding="utf-8")
+    destination.chmod(0o700)
+
+    def unexpected_install(*_args, **_kwargs) -> None:
+        raise AssertionError("a valid installed ngrok binary was replaced")
+
+    from pyngrok import installer
+
+    monkeypatch.setattr(installer, "install_ngrok", unexpected_install)
+
+    assert install_ngrok_binary(destination) == destination
+
+
+def test_ngrok_installer_replaces_invalid_binary_atomically(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    destination = tmp_path / "bin" / "ngrok"
+    destination.parent.mkdir()
+    destination.write_text("invalid", encoding="utf-8")
+    destination.chmod(0o700)
+
+    def install(path: str, *, ngrok_version: str) -> None:
+        assert ngrok_version == "3"
+        installed = Path(path)
+        installed.write_text("#!/bin/sh\necho 'ngrok version 3.40.0'\n", encoding="utf-8")
+        installed.chmod(0o700)
+
+    from pyngrok import installer
+
+    monkeypatch.setattr(installer, "install_ngrok", install)
+
+    assert install_ngrok_binary(destination) == destination
+    assert "3.40.0" in destination.read_text(encoding="utf-8")
 
 
 def test_remote_enable_persistence_changes_only_validated_switch(tmp_path: Path) -> None:

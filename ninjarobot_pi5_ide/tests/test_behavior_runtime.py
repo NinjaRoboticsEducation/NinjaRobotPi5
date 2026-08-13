@@ -8,7 +8,8 @@ from typing import Any
 
 import pytest
 from ninjarobot_pi5_ide.config import BehaviorConfig
-from ninjarobot_pi5_ide.face_renderer import render_face
+from ninjarobot_pi5_ide.face_renderer import render_emergency_stop, render_face
+from PIL import ImageChops
 
 from ninjarobot_pi5_ide import (
     BehaviorDefinition,
@@ -440,6 +441,8 @@ def test_robot_liveliness_runs_greeting_then_supervises_silent_idle(
 
         await robot.stop()
         frame_count = len(display.frames)
+        expected_stop = render_emergency_stop(width=display.width, height=display.height)
+        assert ImageChops.difference(display.frames[-1], expected_stop).getbbox() is None
         await asyncio.sleep(0.12)
         assert len(display.frames) == frame_count
 

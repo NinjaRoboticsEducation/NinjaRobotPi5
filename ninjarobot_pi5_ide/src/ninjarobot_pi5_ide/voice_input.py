@@ -129,6 +129,7 @@ class VoiceInputController:
         silence_rms_threshold: int,
         language: str,
         retry_limit: int,
+        startup_timeout_seconds: float = 10.0,
         transcript_handler: TranscriptHandler | None = None,
         status_handler: VoiceStatusHandler | None = None,
     ) -> None:
@@ -144,6 +145,8 @@ class VoiceInputController:
             raise ValueError("voice language is unsupported")
         if not 0 <= retry_limit <= 5:
             raise ValueError("voice retry limit must be from 0 through 5")
+        if not 0.05 <= startup_timeout_seconds <= 30.0:
+            raise ValueError("voice startup timeout must be from 0.05 through 30 seconds")
         self._detector_factory = detector_factory
         self._audio_source_factory = audio_source_factory
         self._transcriber = transcriber
@@ -154,6 +157,7 @@ class VoiceInputController:
         self._silence_rms_threshold = silence_rms_threshold
         self._language = language
         self._retry_limit = retry_limit
+        self._startup_timeout_seconds = startup_timeout_seconds
         self._transcript_handler = transcript_handler
         self._status_handler = status_handler
         self._status = VoiceInputStatus(
@@ -165,6 +169,7 @@ class VoiceInputController:
         self._stop_event = asyncio.Event()
         self._resume_event = asyncio.Event()
         self._paused_event = asyncio.Event()
+        self._startup_event = asyncio.Event()
         self._manual_pause_count = 0
         self._lifecycle_lock = asyncio.Lock()
 
@@ -185,30 +190,65 @@ class VoiceInputController:
         return self._status.model_dump(mode="json")
 
     async def start(self) -> dict[str, object]:
-        """Start listening only after callbacks and local transcription are ready."""
+        """Start and return only after the wake stream is confirmed listening."""
         async with self._lifecycle_lock:
             if self._task is not None and not self._task.done():
-                return self.status()
-            if self._transcript_handler is None or self._status_handler is None:
-                raise VoiceInputError("listener_not_bound")
-            if not self._transcriber.available():
+                if self._status.state is not VoiceInputState.STARTING:
+                    return self.status()
+            else:
+                if self._transcript_handler is None or self._status_handler is None:
+                    raise VoiceInputError("listener_not_bound")
+                if not self._transcriber.available():
+                    await self._set_status(
+                        enabled=False,
+                        state=VoiceInputState.FAILED,
+                        last_error_code="transcriber_unavailable",
+                    )
+                    raise VoiceInputError("transcriber_unavailable")
+                self._stop_event.clear()
+                self._resume_event.set()
+                self._paused_event.clear()
+                self._startup_event.clear()
                 await self._set_status(
                     enabled=True,
-                    state=VoiceInputState.FAILED,
-                    last_error_code="transcriber_unavailable",
+                    state=VoiceInputState.STARTING,
+                    last_error_code=None,
                 )
-                raise VoiceInputError("transcriber_unavailable")
-            self._stop_event.clear()
-            self._resume_event.set()
-            self._paused_event.clear()
-            await self._set_status(
-                enabled=True,
-                state=VoiceInputState.STARTING,
-                last_error_code=None,
+                self._task = asyncio.create_task(self._run(), name="ninjarobot-voice-input")
+        try:
+            await asyncio.wait_for(
+                self._startup_event.wait(),
+                timeout=self._startup_timeout_seconds,
             )
-            self._task = asyncio.create_task(self._run(), name="ninjarobot-voice-input")
-        await asyncio.sleep(0)
-        return self.status()
+        except TimeoutError as exc:
+            await self.stop()
+            await self._set_status(
+                enabled=False,
+                state=VoiceInputState.FAILED,
+                model_loaded=False,
+                listening_indicator=False,
+                last_error_code="listener_start_timeout",
+            )
+            raise VoiceInputError("listener_start_timeout") from exc
+
+        status = self._status
+        if status.state is VoiceInputState.LISTENING:
+            return self.status()
+        task = self._task
+        if task is not None:
+            await asyncio.gather(task, return_exceptions=True)
+        async with self._lifecycle_lock:
+            if self._task is task:
+                self._task = None
+        code = status.last_error_code or "listener_start_cancelled"
+        await self._set_status(
+            enabled=False,
+            state=VoiceInputState.FAILED,
+            model_loaded=False,
+            listening_indicator=False,
+            last_error_code=code,
+        )
+        raise VoiceInputError(code)
 
     async def stop(self) -> dict[str, object]:
         """Stop the stream, discard partial audio, and release detector resources."""
@@ -230,6 +270,7 @@ class VoiceInputController:
             )
             self._stop_event.set()
             self._resume_event.set()
+            self._startup_event.set()
         try:
             await asyncio.wait_for(asyncio.shield(task), timeout=3.0)
         except TimeoutError:
@@ -383,6 +424,7 @@ class VoiceInputController:
                 listening_indicator=True,
                 last_error_code=None,
             )
+            self._startup_event.set()
             while self._resume_event.is_set() and not self._stop_event.is_set():
                 pcm, overflowed = await source.read()
                 if overflowed:
@@ -461,6 +503,8 @@ class VoiceInputController:
     async def _set_status(self, **updates: object) -> None:
         payload = {**self._status.model_dump(mode="python"), **updates}
         self._status = VoiceInputStatus.model_validate(payload)
+        if self._status.state is VoiceInputState.FAILED:
+            self._startup_event.set()
         handler = self._status_handler
         if handler is not None:
             try:

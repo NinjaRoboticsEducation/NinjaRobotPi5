@@ -422,6 +422,82 @@ def test_full_stop_suspends_sensors_and_driver_failure_latches_system(
     asyncio.run(exercise())
 
 
+def test_full_stop_closes_gate_before_display_and_reports_display_failure(
+    tmp_path: Path,
+) -> None:
+    async def exercise() -> None:
+        motion, _servo, distance, state = controller(tmp_path, readings=[200])
+        holder: dict[str, SystemSafetyController] = {}
+
+        async def show() -> None:
+            assert holder["system"].stopped is True
+            raise RuntimeError("simulated display failure")
+
+        async def silence() -> None:
+            return None
+
+        system = SystemSafetyController(
+            motion=motion,
+            state=state,
+            silence_buzzer=silence,
+            show_stopped=show,
+            sensors=(distance,),
+            display_hold_seconds=0,
+        )
+        holder["system"] = system
+
+        result = await system.full_stop("operator_stop", latch=False)
+
+        assert system.stopped is True
+        assert result["cleanup_errors"] == ["display: RuntimeError: simulated display failure"]
+
+    asyncio.run(exercise())
+
+
+def test_resume_waits_for_full_stop_cleanup_transaction(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        motion, _servo, distance, state = controller(tmp_path, readings=[200])
+        cleanup_started = asyncio.Event()
+        cleanup_release = asyncio.Event()
+        health_called = asyncio.Event()
+
+        async def silence() -> None:
+            cleanup_started.set()
+            await cleanup_release.wait()
+
+        async def show() -> None:
+            return None
+
+        async def health() -> bool:
+            health_called.set()
+            return True
+
+        system = SystemSafetyController(
+            motion=motion,
+            state=state,
+            silence_buzzer=silence,
+            show_stopped=show,
+            sensors=(distance,),
+            display_hold_seconds=0,
+        )
+        stop_task = asyncio.create_task(system.full_stop("operator_stop", latch=False))
+        await cleanup_started.wait()
+        resume_task = asyncio.create_task(
+            system.resume_system(confirmed=True, health_checks={"test": health})
+        )
+        await asyncio.sleep(0)
+
+        assert health_called.is_set() is False
+        assert resume_task.done() is False
+        cleanup_release.set()
+        await stop_task
+        await resume_task
+        assert health_called.is_set() is True
+        assert system.stopped is False
+
+    asyncio.run(exercise())
+
+
 async def _health(value: bool) -> bool:
     return value
 

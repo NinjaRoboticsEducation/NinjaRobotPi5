@@ -22,7 +22,13 @@ policy.
    close with Escape, and close through the backdrop.
 3. Confirm camera, browser microphone, chat, activity, Greeting, Celebrate,
    Resume, AI camera, voice, and manual recording controls remain present.
+   Voice Input and Record Once must appear on the main surface below Camera and
+   Web Microphone, not inside the hamburger.
 4. Select **Power off NinjaRobot**, then select **Cancel**.
+
+While the controller badge is connected, switch through all four languages.
+Expected: its translated label remains connected and never resets to the
+offline translation.
 
 Expected: language persists; labels and accessibility text change together;
 focus stays inside open dialogs; cancellation changes no service or hardware;
@@ -55,7 +61,7 @@ terminal interface if the browser is unavailable.
 3. Run Greeting and Celebrate, press Emergency Stop, then use confirmed Resume.
 
 Expected: movement stops on every release/cancel path; Emergency Stop remains
-visible outside the menu; Resume restores Idle but leaves AI chat motion
+visible as the final persistent red display frame outside the menu; Resume restores Idle but leaves AI chat motion
 disarmed.
 
 Rollback: press Emergency Stop, use the physical disconnect if software does

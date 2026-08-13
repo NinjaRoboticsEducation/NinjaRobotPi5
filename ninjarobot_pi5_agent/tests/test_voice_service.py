@@ -6,6 +6,7 @@ import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from ninjarobot_pi5_agent.events import EventBroker
 from ninjarobot_pi5_agent.release_foundations import ReleaseStatusRegistry
 from ninjarobot_pi5_agent.voice_service import (
@@ -27,6 +28,7 @@ class FakeIDE:
         self.status_handler = None
         self.started = False
         self.stopped = False
+        self.start_error: Exception | None = None
 
     def bind_voice_handlers(self, *, transcript_handler, status_handler) -> None:
         self.transcript_handler = transcript_handler
@@ -34,7 +36,9 @@ class FakeIDE:
 
     async def start_voice_input(self) -> dict[str, object]:
         self.started = True
-        return {"enabled": True, "state": "starting"}
+        if self.start_error is not None:
+            raise self.start_error
+        return {"enabled": True, "state": "listening"}
 
     async def stop_voice_input(self) -> dict[str, object]:
         self.stopped = True
@@ -122,6 +126,25 @@ def test_start_configured_does_not_persist_again() -> None:
 
         assert ide.started is True
         assert persisted == []
+
+    asyncio.run(scenario())
+
+
+def test_failed_explicit_enable_rolls_back_persistence_and_motion() -> None:
+    async def scenario() -> None:
+        service, ide, runtime, events, release, persisted = build_service()
+        ide.start_error = RuntimeError("microphone unavailable")
+
+        with pytest.raises(RuntimeError, match="microphone unavailable"):
+            await service.enable()
+
+        assert ide.stopped is True
+        assert persisted == [False]
+        assert runtime.disarms == [None]
+        voice_status = release.status()["voice"]
+        assert voice_status["enabled"] is False
+        assert voice_status["state"] == "disabled"
+        assert (await events.history())[-1].data["code"] == "listener_start_failed"
 
     asyncio.run(scenario())
 

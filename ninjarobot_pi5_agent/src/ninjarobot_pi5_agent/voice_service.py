@@ -76,16 +76,22 @@ class VoiceInputService:
         if self._closed:
             raise RuntimeError("voice input service is closed")
         self._release_status.set_enabled("voice", True)
-        if persist:
-            await self._persist_enabled(True)
         try:
             status = await self._ide.start_voice_input()
+            if status.get("state") != VoiceInputState.LISTENING.value:
+                raise RuntimeError("voice listener did not report ready")
         except Exception:
-            self._release_status.update(
-                "voice",
-                ReleaseFeatureState.FAILED,
-                detail="listener_start_failed",
-            )
+            try:
+                await self._ide.stop_voice_input()
+            except Exception:
+                pass
+            self._runtime.disarm_voice_motion()
+            self._release_status.set_enabled("voice", False)
+            if persist:
+                try:
+                    await self._persist_enabled(False)
+                except Exception:
+                    pass
             await self._events.publish(
                 AgentEventType.ERROR,
                 "Voice input could not start. Check the USB microphone, wake model, "
@@ -94,6 +100,8 @@ class VoiceInputService:
                 data={"kind": "voice_error", "code": "listener_start_failed"},
             )
             raise
+        if persist:
+            await self._persist_enabled(True)
         await self._events.publish(
             AgentEventType.VOICE,
             "Always-on voice input was enabled; say Hey Ninja before a command.",

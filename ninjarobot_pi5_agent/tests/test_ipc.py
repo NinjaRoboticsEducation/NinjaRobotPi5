@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from ninjarobot_pi5_agent.models import ToolExecutionResult, ToolExecutionStatus
+from ninjarobot_pi5_agent.pairing import PairingError
 
 from ninjarobot_pi5_agent import (
     AgentIPCClient,
@@ -498,6 +499,39 @@ def test_ipc_remote_management_is_local_owner_only_and_lifecycle_bounded(tmp_pat
         await serve_task
         await server.close()
         assert remote.closed is True
+
+    asyncio.run(exercise())
+
+
+def test_ipc_pairing_url_explains_that_the_tunnel_is_not_ready(tmp_path) -> None:
+    class UnavailablePairingRemote(_FakeRemoteAccess):
+        def pairing_url(self) -> str:
+            raise PairingError("no current pairing code is available")
+
+    async def exercise() -> None:
+        socket_path = tmp_path / "remote-unavailable.sock"
+        runtime = build_runtime(tmp_path)
+        server = AgentIPCServer(
+            runtime=runtime,
+            socket_path=socket_path,
+            ownership=ServiceOwnership(tmp_path / "remote-unavailable.lock"),
+            remote_access=UnavailablePairingRemote(),  # type: ignore[arg-type]
+        )
+        await server.start()
+        serve_task = asyncio.create_task(server.serve())
+        client = AgentIPCClient(socket_path)
+
+        result = await client.request({"command": "remote_pairing_url"})
+
+        assert result["data"] == {
+            "pairing_url": None,
+            "pairing_available": False,
+            "detail": "tunnel_not_ready",
+            "next_step": "Check Remote Access status and activate a healthy tunnel first.",
+        }
+        await client.request({"command": "stop"})
+        await serve_task
+        await server.close()
 
     asyncio.run(exercise())
 

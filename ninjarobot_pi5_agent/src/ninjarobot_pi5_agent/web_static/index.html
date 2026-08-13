@@ -23,7 +23,7 @@
       <main class="dashboard">
         <section class="panel controls-panel" aria-label="Direct robot controls" data-i18n-aria="controls.direct">
           <div class="control-status">
-            <span id="connectionBadge" class="badge badge-wait" data-i18n="connection.offline">Not connected</span>
+            <span id="connectionBadge" class="badge badge-wait">Not connected</span>
             <div class="ai-permissions">
               <button id="armAiButton" class="small-button motion-arm" aria-pressed="false" data-i18n="motion.arm">Arm AI motion</button>
               <button id="armAiCameraButton" class="small-button camera-arm" aria-pressed="false" data-i18n="camera.arm">AI camera</button>
@@ -44,6 +44,12 @@
             </button>
             <button id="webMicButton" class="media-button">
               <strong data-i18n="browserMic.title">WEB MICROPHONE</strong><small data-i18n="browserMic.detail">Fill the message box</small>
+            </button>
+            <button id="usbMicButton" class="media-button" aria-pressed="false">
+              <strong data-i18n="voice.title">VOICE INPUT</strong><small data-i18n="voice.off">Always-on Ninja: Off</small>
+            </button>
+            <button id="usbRecordButton" class="media-button">
+              <strong data-i18n="record.title">RECORD ONCE</strong><small data-i18n="record.detail">Record 5 seconds locally</small>
             </button>
           </div>
 
@@ -135,17 +141,6 @@
         <section class="menu-section" aria-labelledby="connectionTitle">
           <h3 id="connectionTitle" data-i18n="menu.connection">Connection</h3>
           <p id="remoteStatus" class="menu-status" data-i18n="remote.local">Local secure controller</p>
-        </section>
-        <section class="menu-section" aria-labelledby="voiceTitle">
-          <h3 id="voiceTitle" data-i18n="menu.voice">Voice input</h3>
-          <div class="menu-tools">
-            <button id="usbMicButton" class="media-button" aria-pressed="false">
-              <strong data-i18n="voice.title">VOICE INPUT</strong><small data-i18n="voice.off">Always-on Ninja: Off</small>
-            </button>
-            <button id="usbRecordButton" class="media-button">
-              <strong data-i18n="record.title">RECORD ONCE</strong><small data-i18n="record.detail">Record 5 seconds locally</small>
-            </button>
-          </div>
         </section>
         <section class="menu-section danger-section" aria-labelledby="powerTitle">
           <h3 id="powerTitle" data-i18n="power.title">System power</h3>

@@ -3305,6 +3305,36 @@ verifies driver provenance, and returns to documented manual startup.
 - Documentation, licenses, notices, release artifacts, and version identifiers
   are complete and the user approves `v1.0.0` publication.
 
+#### Phase 8.8: Post-hardware-test release hardening
+
+**Status:** implemented in software on 2026-08-14; consolidated Raspberry Pi
+acceptance remains pending.
+
+The first operator run exposed last-mile state and lifecycle defects. The
+approved repair keeps all Phase 5–8 architecture boundaries while:
+
+- preserving semantic WebSocket connection state across locale changes and
+  returning Voice Input/Record Once to the main media surface;
+- making Level 2 stop close the presentation gate immediately, retain the
+  emergency frame until Resume, and report/use a text fallback on display
+  failure;
+- readiness-gating voice enablement with bounded microphone startup, cleanup,
+  stable failure codes, and persistence only after `listening`;
+- replacing rejected ngrok legacy header fields with Traffic Policy actions,
+  distinguishing permanent from transient recovery, reusing or atomically
+  replacing the ngrok v3 executable, and returning actionable unavailable-
+  pairing status;
+- bounding and source-marking manual service logs; and
+- providing one normal-user Interactive Tool checklist for both the existing
+  checkout and a clean public-branch clone.
+
+The Phase 8.8 software gate passes 522 tests, Ruff, formatting, MyPy for 81
+source files, compileall, whitespace checks, and the 222-file/28-authorized-
+repair managed-driver verification. The upstream Starlette test-client
+deprecation warning is recorded but does not affect the deployed ASGI runtime.
+Physical release acceptance follows
+`docs/validation/phase-8-final-interactive-pi-validation-2026-08-14.md`.
+
 ## 23. Documentation deliverables
 
 Documentation is part of every phase, not a final cleanup task.

@@ -276,6 +276,7 @@ class VoiceInputConfig(ConfigModel):
     max_command_seconds: Annotated[float, Field(ge=1.0, le=15.0)] = 15.0
     silence_stop_seconds: Annotated[float, Field(ge=0.25, le=5.0)] = 1.25
     cooldown_seconds: Annotated[float, Field(ge=0.25, le=10.0)] = 1.0
+    startup_timeout_seconds: Annotated[float, Field(ge=2.0, le=30.0)] = 10.0
     frame_milliseconds: Literal[80] = 80
     language: Literal["en", "ja", "zh-TW", "zh-CN"] = "en"
     retry_limit: Annotated[int, Field(ge=0, le=5)] = 2

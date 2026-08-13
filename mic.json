@@ -13,11 +13,11 @@
     "enabled": false,
     "backend": "openwakeword",
     "keyword": "ninja",
-    "model_path": null,
+    "model_path": "/home/rogerchang/NinjaRobotPi5/pi5mic/voiceinput/hey_Ninja.onnx",
     "threshold": 0.5,
     "vad_threshold": 0.0,
     "enable_noise_suppression": false,
-    "inference_framework": "auto"
+    "inference_framework": "onnx"
   },
   "voiceinput": {
     "enabled": false,

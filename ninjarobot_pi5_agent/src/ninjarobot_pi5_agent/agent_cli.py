@@ -6,9 +6,12 @@ import argparse
 import asyncio
 import getpass
 import json
+import os
 import secrets as secure_random
+import stat
 import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -74,6 +77,7 @@ DEFAULT_WHISPER_MODEL = Path("~/whisper.cpp/models/ggml-base.bin")
 DEFAULT_WEB_CERTIFICATE = Path("~/.config/ninjarobot_pi5/tls/agent-cert.pem")
 DEFAULT_WEB_KEY = Path("~/.config/ninjarobot_pi5/tls/agent-key.pem")
 DEFAULT_WEB_CA_EXPORT = Path("~/ninjarobotpi5-local-ca.pem")
+MAX_SERVICE_LOG_BYTES = 5_000_000
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -976,9 +980,19 @@ async def _spawn_service(arguments: argparse.Namespace) -> int:
         command.extend(("--base-url", namespace.base_url))
     if namespace.real:
         command.append("--real")
-    log_path = DEFAULT_SERVICE_LOG.expanduser()
-    log_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    with log_path.open("ab") as log_handle:
+    log_path = _prepare_service_log(DEFAULT_SERVICE_LOG)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(log_path, flags, 0o600)
+    with os.fdopen(descriptor, "ab") as log_handle:
+        source = Path(__file__).resolve().parents[3]
+        started_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        marker = (
+            f"\n=== NinjaRobotAgent start {started_at} "
+            f"source={source} mode={'real' if namespace.real else 'simulated'} "
+            f"python={sys.executable} ===\n"
+        )
+        log_handle.write(marker.encode("utf-8"))
+        log_handle.flush()
         process = subprocess.Popen(
             command,
             stdin=subprocess.DEVNULL,
@@ -1021,6 +1035,37 @@ async def _spawn_service(arguments: argparse.Namespace) -> int:
         return 0
     process.terminate()
     raise AgentIPCError(f"agent service did not become ready; inspect {log_path}")
+
+
+def _prepare_service_log(
+    path: str | Path,
+    *,
+    max_bytes: int = MAX_SERVICE_LOG_BYTES,
+) -> Path:
+    """Create one owner-private bounded log path without following symlinks."""
+    if max_bytes < 1:
+        raise ValueError("service log size limit must be positive")
+    candidate = Path(os.path.abspath(Path(path).expanduser()))
+    current = candidate
+    while current.parent != current:
+        if current.is_symlink():
+            raise ValueError("service log path must not contain symbolic links")
+        current = current.parent
+    candidate.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chmod(candidate.parent, 0o700)
+    if candidate.exists():
+        mode = candidate.stat().st_mode
+        if not stat.S_ISREG(mode):
+            raise ValueError("service log path must be a regular file")
+        if candidate.stat().st_size > max_bytes:
+            backup = candidate.with_name(f"{candidate.name}.1")
+            if backup.exists() and not stat.S_ISREG(backup.lstat().st_mode):
+                raise ValueError("service log backup path must be a regular file")
+            os.replace(candidate, backup)
+            os.chmod(backup, 0o600)
+        else:
+            os.chmod(candidate, 0o600)
+    return candidate
 
 
 def _service_namespace(arguments: argparse.Namespace) -> argparse.Namespace:

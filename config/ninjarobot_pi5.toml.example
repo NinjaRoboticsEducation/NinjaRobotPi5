@@ -96,6 +96,7 @@ noise_suppression_enabled = false
 max_command_seconds = 15.0
 silence_stop_seconds = 1.25
 cooldown_seconds = 1.0
+startup_timeout_seconds = 10.0
 frame_milliseconds = 80
 language = "en"
 retry_limit = 2
