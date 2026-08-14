@@ -144,23 +144,24 @@ cd NinjaRobotPi5
 
 # 2. Install dependencies
 uv sync --frozen
+source .venv/bin/activate
 
-# 3. Verify the environment
-uv run --frozen ninjarobot_pi5_cli --version
-uv run --frozen ninjarobot_pi5_cli capabilities
+# 3. Create and inspect the default private configuration
+ninjarobot-ide-tool config import --apply
+ninjarobot-ide-tool hardware status
 
 # 4. Start the agent in simulation (no hardware opened)
-uv run --frozen ninjarobot-agent service start
-uv run --frozen ninjarobot-agent chat
+ninjarobot-agent service start
+ninjarobot-agent chat
 # The first chat asks for your name and creates the owner profile.
 
 # 5. Open the web controller (simulation, no hardware)
-uv run --frozen ninjarobot-agent web start
+ninjarobot-agent web start
 # Open the printed URL in your browser
 
 # 6. Stop everything when done
-uv run --frozen ninjarobot-agent web stop
-uv run --frozen ninjarobot-agent service stop
+ninjarobot-agent web stop
+ninjarobot-agent service stop
 ```
 
 For full Raspberry Pi hardware setup, follow the [Installation Guide](InstallationGuide.md).
@@ -304,9 +305,9 @@ Remote access is disabled by default. Start the agent service, then use the
 Interactive Tool's **Remote Access** menu, or the scriptable commands:
 
 ```bash
-uv run --frozen --extra hardware ninjarobot-agent remote configure
-uv run --frozen --extra hardware ninjarobot-agent remote activate
-uv run --frozen ninjarobot-agent remote pairing-url
+ninjarobot-agent remote configure
+ninjarobot-agent remote activate
+ninjarobot-agent remote pairing-url
 ```
 
 `remote configure` is the only operation allowed to download/install the ngrok
@@ -314,6 +315,10 @@ agent. It reuses a valid ngrok v3 binary and installs replacements atomically,
 so a running binary is never overwritten in place. It uses hidden double-entry
 for the authtoken and stores credentials in the owner-only secret store.
 Service boot never downloads or updates ngrok.
+Remote activation also enables QR-first onboarding. The first authenticated
+browser or owner-only terminal chat runs Greeting exactly once and then enters
+silent Idle; model changes and additional interfaces do not create a second
+hardware owner.
 Open the returned pairing URL on the controlling browser. The URL fragment is
 exchanged once for a Secure/HttpOnly cookie, so there is no second username or
 password prompt. Use `remote rotate-pairing` to revoke browsers and issue a new

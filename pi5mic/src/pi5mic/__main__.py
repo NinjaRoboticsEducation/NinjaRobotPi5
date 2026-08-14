@@ -28,7 +28,7 @@ from pi5mic.errors import ConfigError, DeviceError, RecordingError, STTError
     "-C",
     type=click.Path(path_type=Path),
     default=None,
-    help="Path to mic config file (default: ./mic.json).",
+    help="Path to mic config file (default: ~/.config/pi5mic/mic.json).",
 )
 @click.pass_context
 def cli(ctx: click.Context, config_file: Path | None) -> None:

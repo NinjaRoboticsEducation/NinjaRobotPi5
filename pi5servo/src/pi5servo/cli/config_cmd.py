@@ -7,7 +7,7 @@ from pathlib import Path
 
 import click
 
-from ..config import BACKEND_CONFIG_KEY, ConfigManager
+from ..config import BACKEND_CONFIG_KEY, ConfigManager, get_default_config_path
 from ..core import ServoCalibration, parse_servo_endpoint
 
 
@@ -21,7 +21,7 @@ def config_cmd() -> None:
     "-c",
     "--config",
     "config_path",
-    default="servo.json",
+    default=str(get_default_config_path()),
     help="Path to calibration config file.",
 )
 @click.option(
@@ -89,7 +89,7 @@ def show_config(config_path: str, pin: int | None, endpoint: str | None) -> None
     "-c",
     "--config",
     "config_path",
-    default="servo.json",
+    default=str(get_default_config_path()),
     help="Source config file.",
 )
 def export_config(output_path: str, config_path: str) -> None:
@@ -110,7 +110,7 @@ def export_config(output_path: str, config_path: str) -> None:
     "-c",
     "--config",
     "config_path",
-    default="servo.json",
+    default=str(get_default_config_path()),
     help="Target config file.",
 )
 @click.option(

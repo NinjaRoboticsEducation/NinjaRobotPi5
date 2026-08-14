@@ -6,7 +6,7 @@ import sys
 
 import click
 
-from ..config import ConfigManager
+from ..config import ConfigManager, get_default_config_path
 from ..core import Servo, ServoCalibration
 from ._common import (
     backend_options,
@@ -265,7 +265,7 @@ Misc:
     "-c",
     "--config",
     type=click.Path(),
-    default="servo.json",
+    default=str(get_default_config_path()),
     help="Path to configuration file.",
 )
 @click.option(

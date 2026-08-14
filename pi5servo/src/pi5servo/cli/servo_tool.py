@@ -8,7 +8,7 @@ from collections.abc import Callable
 
 import click
 
-from ..config import ConfigManager
+from ..config import ConfigManager, get_default_config_path
 from ..core import Servo, ServoCalibration, ServoGroup
 from ._common import (
     LEGACY_BACKENDS,
@@ -36,7 +36,7 @@ except ImportError:
     "-c",
     "--config",
     "config_path",
-    default="servo.json",
+    default=str(get_default_config_path()),
     help="Path to calibration config file.",
 )
 @backend_options

@@ -5,7 +5,16 @@ import os
 
 import pytest
 
-from pi5buzzer.config.config_manager import DEFAULT_CONFIG, BuzzerConfigManager
+from pi5buzzer.config.config_manager import (
+    DEFAULT_CONFIG,
+    BuzzerConfigManager,
+    get_default_config_filepath,
+)
+
+
+def test_default_config_path_uses_xdg_config_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    assert get_default_config_filepath() == str(tmp_path / "pi5buzzer" / "buzzer.json")
 
 
 class TestConfigManagerLoad:

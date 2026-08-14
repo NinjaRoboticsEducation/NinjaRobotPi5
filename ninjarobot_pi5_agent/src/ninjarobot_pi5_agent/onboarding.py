@@ -120,7 +120,7 @@ class OnboardingCoordinator:
             await self._show_local_pairing()
 
     async def controller_connected(self, *, paired: bool) -> None:
-        """Attempt Greeting once for the first paired, accepted controller lease."""
+        """Attempt Greeting once for the first authenticated controller."""
         if not self._enabled or not paired or self._terminal_failure:
             return
         async with self._greeting_lock:
@@ -139,7 +139,8 @@ class OnboardingCoordinator:
             self._release_status.update("onboarding", ReleaseFeatureState.READY)
             await self._events.publish(
                 AgentEventType.ONBOARDING,
-                "The first paired controller connected; Greeting completed and Idle is active.",
+                "The first authenticated controller connected; Greeting completed "
+                "and Idle is active.",
                 data={"kind": "onboarding_complete"},
             )
 

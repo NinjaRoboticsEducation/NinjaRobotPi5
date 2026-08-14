@@ -167,6 +167,38 @@ def import_pi5_configs(
                 if "channels" in audio:
                     payload["hardware"]["microphone"]["channels"] = audio["channels"]
                 imported.append(f"pi5mic audio profile from {item.path}")
+            wakeword = data.get("wakeword")
+            if isinstance(wakeword, dict):
+                wake_mapping = {
+                    "threshold": "wake_threshold",
+                    "vad_threshold": "wake_vad_threshold",
+                    "enable_noise_suppression": "noise_suppression_enabled",
+                }
+                for source, target in wake_mapping.items():
+                    if source in wakeword:
+                        payload["voice_input"][target] = wakeword[source]
+                # The integrated release asset is ONNX. Standalone "auto" is
+                # therefore resolved deterministically rather than copied.
+                payload["voice_input"]["inference_framework"] = "onnx"
+                imported.append(
+                    "pi5mic wake profile from "
+                    f"{item.path}; Ninja model uses the equivalent bundled package asset"
+                )
+            voiceinput = data.get("voiceinput")
+            if isinstance(voiceinput, dict):
+                voice_mapping = {
+                    "max_capture_seconds": "max_command_seconds",
+                    "silence_timeout_seconds": "silence_stop_seconds",
+                    "cooldown_seconds": "cooldown_seconds",
+                    "vad_rms_threshold": "silence_rms_threshold",
+                }
+                for source, target in voice_mapping.items():
+                    if source in voiceinput:
+                        value = voiceinput[source]
+                        if target == "silence_rms_threshold" and isinstance(value, float):
+                            value = int(value)
+                        payload["voice_input"][target] = value
+                imported.append(f"pi5mic command-capture profile from {item.path}")
         elif item.library == "pi5vl53l0x":
             imported.append(
                 f"pi5vl53l0x found at {item.path}; its calibration remains driver-owned"

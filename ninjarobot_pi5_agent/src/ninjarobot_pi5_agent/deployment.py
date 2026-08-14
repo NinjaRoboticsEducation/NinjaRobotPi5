@@ -156,6 +156,7 @@ class DeploymentManager:
     def install(self, *, confirmed: bool, upgrade: bool = False) -> dict[str, Any]:
         if not confirmed:
             raise ValueError("deployment installation requires --confirm")
+        self._prepare_optional_user_files()
         self.spec.validate()
         if UNIT_PATH.exists() and not upgrade:
             raise ValueError("deployment already exists; use deployment upgrade --confirm")
@@ -220,8 +221,20 @@ class DeploymentManager:
     def enable(self, *, confirmed: bool) -> dict[str, Any]:
         if not confirmed:
             raise ValueError("auto-start enablement requires --confirm")
-        self._persist_auto_start(True)
+        artifacts = self.artifact_status()
+        if not all(artifacts.values()):
+            missing = ", ".join(name for name, ready in artifacts.items() if not ready)
+            raise RuntimeError(
+                f"deployment is incomplete ({missing}); install or repair it before enabling"
+            )
         self._checked([str(SUDO), str(SYSTEMCTL), "enable", UNIT_NAME])
+        try:
+            self._persist_auto_start(True)
+        except Exception:
+            # Do not leave a boot-enabled unit whose configuration still says
+            # deployment/onboarding is disabled.
+            self._checked([str(SUDO), str(SYSTEMCTL), "disable", UNIT_NAME])
+            raise
         return {
             "enabled": True,
             "onboarding_enabled": True,
@@ -251,7 +264,8 @@ class DeploymentManager:
             ]
         )
         return {
-            "installed": UNIT_PATH.is_file(),
+            "installed": all(self.artifact_status().values()),
+            "artifacts": self.artifact_status(),
             "enabled": self.is_enabled(),
             "systemd": result.stdout.strip() if result.returncode == 0 else "unavailable",
             "spec": _public_spec(self.spec),
@@ -259,7 +273,31 @@ class DeploymentManager:
 
     def validate(self) -> dict[str, Any]:
         self.spec.validate()
-        return {"valid": True, "spec": _public_spec(self.spec)}
+        artifacts = self.artifact_status()
+        return {
+            "valid": all(artifacts.values()),
+            "artifacts": artifacts,
+            "spec": _public_spec(self.spec),
+        }
+
+    def install_and_enable(self, *, confirmed: bool, repair: bool = False) -> dict[str, Any]:
+        """Install all privileged artifacts, then transactionally enable boot."""
+        if not confirmed:
+            raise ValueError("deployment setup requires --confirm")
+        existing = self.artifact_status()
+        upgrade = repair or any(existing.values())
+        installed = self.install(confirmed=True, upgrade=upgrade)
+        enabled = self.enable(confirmed=True)
+        return {"installed": installed["installed"], **enabled}
+
+    @staticmethod
+    def artifact_status() -> dict[str, bool]:
+        """Report every privileged artifact required by boot and web power-off."""
+        return {
+            "systemd_unit": UNIT_PATH.is_file(),
+            "poweroff_helper": HELPER_PATH.is_file(),
+            "sudoers_rule": SUDOERS_PATH.is_file(),
+        }
 
     def logs(self, *, lines: int = 100) -> subprocess.CompletedProcess[str]:
         if not 1 <= lines <= 1000:
@@ -292,6 +330,23 @@ class DeploymentManager:
             payload["deployment"]["web_poweroff_enabled"] = True
             payload["onboarding"]["enabled"] = True
         save_robot_config(type(config).model_validate(payload), self.spec.config, overwrite=True)
+
+    def _prepare_optional_user_files(self) -> None:
+        """Materialize optional empty files required by the hardened unit sandbox."""
+        for directory in (self.spec.skill_dir, self.spec.benchmark_dir):
+            directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+            directory.chmod(0o700)
+        for path, initial in (
+            (self.spec.mcp_config, "schema_version = 1\nservers = []\n"),
+            (self.spec.secret_file, ""),
+        ):
+            if path.is_symlink():
+                raise ValueError(f"deployment user file must not be a symbolic link: {path}")
+            path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            path.parent.chmod(0o700)
+            if not path.exists():
+                path.write_text(initial, encoding="utf-8")
+            path.chmod(0o600)
 
 
 def create_backup(spec: DeploymentSpec, output: Path) -> Path:

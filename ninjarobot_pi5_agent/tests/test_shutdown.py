@@ -63,6 +63,7 @@ def test_poweroff_nonce_is_lease_bound_one_use_and_requests_orderly_stop() -> No
             release_status=status,
             request_service_stop=stopped.set,
             clock=lambda: now[0],
+            helper_probe=lambda _path: (True, None),
         )
 
         issued = await coordinator.issue_nonce("lease-owner")
@@ -95,6 +96,7 @@ def test_poweroff_nonce_expires_and_disabled_coordinator_rejects_requests() -> N
             release_status=_release_status(enabled=False),
             request_service_stop=lambda: None,
             clock=lambda: now[0],
+            helper_probe=lambda _path: (True, None),
         )
         with pytest.raises(PermissionError, match="disabled"):
             await disabled.issue_nonce("lease-owner")
@@ -108,6 +110,7 @@ def test_poweroff_nonce_expires_and_disabled_coordinator_rejects_requests() -> N
             release_status=_release_status(),
             request_service_stop=lambda: None,
             clock=lambda: now[0],
+            helper_probe=lambda _path: (True, None),
         )
         issued = await enabled.issue_nonce("lease-owner")
         now[0] += 31.0
@@ -129,6 +132,7 @@ def test_poweroff_continues_after_bounded_module_cleanup_failures() -> None:
             events=events,
             release_status=_release_status(),
             request_service_stop=stopped.set,
+            helper_probe=lambda _path: (True, None),
         )
         issued = await coordinator.issue_nonce("lease-owner")
 
@@ -166,6 +170,7 @@ def test_poweroff_helper_uses_only_fixed_argv_after_cleanup(
             events=EventBroker(),
             release_status=_release_status(),
             request_service_stop=lambda: None,
+            helper_probe=lambda _path: (True, None),
         )
         issued = await coordinator.issue_nonce("lease-owner")
         await coordinator.confirm("lease-owner", str(issued["nonce"]))
@@ -184,6 +189,29 @@ def test_poweroff_helper_uses_only_fixed_argv_after_cleanup(
         ]
 
     approved = "/usr/libexec/ninjarobot-poweroff"
+    asyncio.run(exercise())
+
+
+def test_poweroff_rejects_before_nonce_when_privileged_installation_is_missing() -> None:
+    async def exercise() -> None:
+        stopped = asyncio.Event()
+        coordinator = PoweroffCoordinator(
+            enabled=True,
+            helper_path="/usr/libexec/ninjarobot-poweroff",
+            runtime=_Runtime(),
+            controller=_Controller(),
+            events=EventBroker(),
+            release_status=_release_status(),
+            request_service_stop=stopped.set,
+            helper_probe=lambda _path: (False, "power-off helper file is missing"),
+        )
+
+        with pytest.raises(PermissionError, match="install or repair"):
+            await coordinator.issue_nonce("lease-owner")
+
+        assert coordinator.requested is False
+        assert stopped.is_set() is False
+
     asyncio.run(exercise())
 
 

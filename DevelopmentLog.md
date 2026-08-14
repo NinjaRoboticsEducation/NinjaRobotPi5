@@ -1,5 +1,56 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-14 — Fresh-install, hardware recovery, onboarding, and deployment repair
+
+### Root causes and implementation
+
+- standardized every standalone managed driver on its canonical per-user XDG
+  configuration path so routine tools no longer write calibration state into a
+  clone or package source directory
+- added a bounded standalone `pi5camera` system-Python bridge for apt-managed
+  Picamera2/libcamera while retaining the locked project environment for the
+  CLI and face recognition
+- changed new integrated configurations to expose calibrated real motion by
+  default while preserving calibration validation, stop latches, obstacle/
+  watchdog controls, and the Agent's independent per-session `/arm` gate
+- represented the wake model as a package resource and imported compatible
+  pi5mic wake/VAD/capture tuning; the packaged ONNX asset remains byte-equivalent
+  to the managed pi5mic model
+- fixed both Level 2 resume entry points to start replacement driver instances
+  before health probing, then restore the Idle presentation
+- made Web status return ready, local/loopback URLs, certificate information,
+  and recovery guidance; rejected WebSocket activation failures are now closed
+  cleanly instead of escaping the handler
+- changed the Interactive Tool's MCP view to report loaded built-in tools and
+  provider health separately from optional external `mcp.toml` servers
+- made ngrok or boot enablement activate QR onboarding automatically; the first
+  paired browser or owner-only terminal chat triggers Greeting once, then Idle
+- added transactional deployment setup and per-artifact status, plus a
+  power-off helper/sudo preflight that rejects an incomplete installation
+  before a nonce is issued or the Agent stops
+- restructured `InstallationGuide.md` around blank-OS setup, detailed managed
+  module dependencies/calibration, short activated-environment commands,
+  direct interactive hardware/Agent tests, remote access, boot, and recovery
+
+### Validation
+
+- managed-driver verifier passed with 222 tracked files and 47 explicitly
+  authorized repairs after standalone-driver changes
+- managed driver suites passed independently: buzzer 67, camera 27, microphone
+  91, servo 134, and distance sensor 71 tests
+- NinjaRobot IDE passed 256 tests; NinjaRobotAgent passed 257 tests with one
+  upstream Starlette/httpx test-client deprecation warning
+- the root suite passed 526 tests; Ruff lint/format, compileall, MyPy for 81
+  source files, both v1.0.0 source/wheel builds, `git diff --check`, and final
+  driver verification passed
+
+### Hardware validation status
+
+No actuator, camera, microphone, power-off, or reboot action was executed by
+this software audit. The Installation Guide and final Pi checklist require
+raised-wheel direct testing, consent before capture, QR/browser acceptance,
+boot verification, and the explicitly separated power-risk test.
+
 ## 2026-08-14 — Phase 8 Raspberry Pi test hardening and interactive acceptance guide
 
 ### Implemented

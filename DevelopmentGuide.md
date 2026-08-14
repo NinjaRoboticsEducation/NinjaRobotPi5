@@ -158,16 +158,16 @@ cd NinjaRobotPi5
 
 # Install all Python dependencies (hardware packages excluded)
 uv sync --frozen
+source .venv/bin/activate
 
-# Verify the environment
-uv run --frozen ninjarobot_pi5_cli --version
-uv run --frozen ninjarobot_pi5_cli capabilities
-uv run --frozen ninjarobot_pi5_cli dry-run \
-  --capability system.echo \
-  --json '{"message":"hello"}'
+# Create and inspect a simulation-safe private configuration
+ninjarobot-ide-tool config import --apply
+ninjarobot-ide-tool hardware status
+ninjarobot-ide-tool behavior simulate greeting
 ```
 
-`dry-run` never opens GPIO, I2C, SPI, camera, or audio. The result must include `"simulated": true`.
+`behavior simulate` never opens GPIO, I2C, SPI, camera, or audio. The result
+must include `"simulated": true`.
 
 ### First-Time Setup (With Hardware — Raspberry Pi Only)
 
@@ -353,8 +353,7 @@ set-retention` persist across restart and are not overwritten by the TOML file.
 Validate any configuration file:
 
 ```bash
-uv run --frozen ninjarobot_pi5_cli config validate \
-  --config config/ninjarobot_pi5.toml.example
+ninjarobot-ide-tool --config config/ninjarobot_pi5.toml.example hardware status
 ```
 
 ### How Configuration Flows Between Layers
@@ -382,40 +381,26 @@ The import is **one-way**. The standalone JSON files never change when you run `
 | `pi5servo` | `~/.config/pi5servo/servo.json` |
 | `pi5vl53l0x` | `~/.config/pi5vl53l0x/vl53l0x.json` |
 
-> [!IMPORTANT]
-> Always pass the explicit canonical path when using a library for integrated NinjaRobotPi5. Some tools create their JSON in the current directory if you omit the path. `pi5disp` uses the `PI5DISP_CONFIG` environment variable.
+All six managed tools select these XDG paths by default. An explicit path is
+needed only for tests, migration, or a deliberately separate profile. This
+keeps fresh-clone calibration state out of the Git worktree.
 
 ### IDE Configuration Import and Synchronization
 
 First import (new file):
 
 ```bash
-export NINJAROBOT_CONFIG="$HOME/.config/ninjarobot_pi5/config.toml"
-
-uv run --frozen ninjarobot-ide-tool config discover
-uv run --frozen ninjarobot-ide-tool config import \
-  --destination "$NINJAROBOT_CONFIG"          # preview — nothing written
-uv run --frozen ninjarobot-ide-tool config import \
-  --destination "$NINJAROBOT_CONFIG" \
-  --apply                                     # write the file
-chmod 600 "$NINJAROBOT_CONFIG"
+ninjarobot-ide-tool config discover
+ninjarobot-ide-tool config import            # preview — nothing written
+ninjarobot-ide-tool config import --apply    # write the private file
 ```
 
 After changing a standalone configuration, synchronize with `--overwrite`:
 
 ```bash
-uv run --frozen ninjarobot-ide-tool \
-  --config "$NINJAROBOT_CONFIG" \
-  config import \
-  --destination "$NINJAROBOT_CONFIG"            # preview first
-uv run --frozen ninjarobot-ide-tool \
-  --config "$NINJAROBOT_CONFIG" \
-  config import \
-  --destination "$NINJAROBOT_CONFIG" \
-  --apply \
-  --overwrite                                  # write
-uv run --frozen ninjarobot_pi5_cli config validate \
-  --config "$NINJAROBOT_CONFIG"
+ninjarobot-ide-tool config import                    # preview first
+ninjarobot-ide-tool config import --apply --overwrite
+ninjarobot-ide-tool hardware status
 ```
 
 The preview returns `"applied": false` by design — it is not a failure.
@@ -591,13 +576,13 @@ removed direct header-module fields are not used.
 Local-owner commands are:
 
 ```bash
-uv run --frozen --extra hardware ninjarobot-agent remote configure
-uv run --frozen --extra hardware ninjarobot-agent remote activate
-uv run --frozen ninjarobot-agent remote status
-uv run --frozen ninjarobot-agent remote pairing-url
-uv run --frozen ninjarobot-agent remote rotate-pairing
-uv run --frozen ninjarobot-agent remote deactivate
-uv run --frozen ninjarobot-agent remote remove-credentials --confirm
+ninjarobot-agent remote configure
+ninjarobot-agent remote activate
+ninjarobot-agent remote status
+ninjarobot-agent remote pairing-url
+ninjarobot-agent remote rotate-pairing
+ninjarobot-agent remote deactivate
+ninjarobot-agent remote remove-credentials --confirm
 ```
 
 `remove-credentials` preserves the installed ngrok executable but deletes the
@@ -607,7 +592,8 @@ main robot configuration.
 
 ### QR onboarding and startup liveliness
 
-When `[onboarding].enabled = true`, service startup initializes the IDE and
+When onboarding is explicitly enabled, remote access is enabled, or boot
+deployment is enabled, service startup initializes the IDE and
 HTTPS server without playing Greeting. The IDE renders a plain black-on-white
 QR using `qrcode` error correction M, automatic minimum version, integer-sized
 square modules, and a four-module quiet border, centered without interpolation
@@ -626,9 +612,10 @@ immediate.
 During onboarding, local and remote HTTP assets and WebSockets require the
 same Secure/HttpOnly paired-browser session. Health probes, crawlers, static
 requests, failed leases, and unpaired browsers cannot trigger startup. The
-first paired exclusive WebSocket lease enters a serialized once-per-process
-coordinator: it clears the QR, runs Greeting once through the IDE, then marks
-Idle ready. Reconnects never replay Greeting. QR/display/Greeting failure marks
+first paired exclusive WebSocket lease or authenticated owner-only terminal
+chat enters a serialized once-per-process coordinator: it clears the QR, runs
+Greeting once through the IDE, then marks Idle ready. Reconnects never replay
+Greeting. QR/display/Greeting failure marks
 startup degraded, disarms voice and AI motion, attempts a servo stop, and
 leaves a stable Error presentation rather than falsely reporting Idle.
 
@@ -644,17 +631,19 @@ journald, bounded shutdown, restart throttling, and `Restart=on-failure` so a
 clean intentional stop remains stopped. This follows systemd's
 [recommended long-running service policy](https://github.com/systemd/systemd/blob/main/man/systemd.service.xml).
 
-Installation is explicitly confirmed and disabled by default. A separate
-install-time `systemd-analyze verify` and `visudo -cf` gate rejects malformed
-unit or privilege policy files before any root-owned target is replaced. The
-separate confirmed enable action turns on onboarding and web power-off in config and
-enables the unit for the next boot. The fixed root-owned helper contains only
+Installation is explicitly confirmed and disabled by default at package
+installation time. The normal-user **deployment setup** transaction runs
+`systemd-analyze verify` and `visudo -cf`, installs all three privileged
+artifacts, enables the unit, and only then persists onboarding/web-power
+settings. Partial installation or configuration persistence failure leaves the
+unit disabled. The fixed root-owned helper contains only
 `/usr/bin/systemctl poweroff --no-wall`; sudoers permits the service user to
 execute only that argument-free helper. The web coordinator calls it as
 `/usr/bin/sudo -n /usr/libexec/ninjarobot-poweroff` after resource cleanup.
 No general passwordless sudo is installed.
 
-Deployment commands cover validate/install/upgrade, enable/disable,
+Deployment commands cover transactional setup, validate/install/upgrade,
+enable/disable,
 start/stop/restart, status/journal, private backup, verified overlay rollback,
 and uninstall. Upgrade preserves enablement. Disable/uninstall and rollback do
 not delete profiles, memory, face data, behaviors, secrets, configuration, or
@@ -789,7 +778,12 @@ the safe failure reason for each attempted provider rather than an ambiguous
 
 ### MCP Client Configuration
 
-MCP servers are configured in `~/.config/ninjarobot_pi5/mcp.toml`. The format for a remote (Streamable HTTP) server:
+The IDE provider, trusted robot-control MCP façade, and read-only memory MCP
+provider are built in and load independently of this file. The Agent
+Interactive Tool reports their live health and loaded tools under **MCP Tools
+(Built-in and External)**. `~/.config/ninjarobot_pi5/mcp.toml` contains only
+optional external servers and may validly be absent/empty. The format for a
+remote (Streamable HTTP) server:
 
 ```toml
 [[servers]]
@@ -1029,7 +1023,21 @@ If the command reports an incompatible `cv2`, run
 `uv sync --frozen --extra hardware` and restart the service. Install only one
 OpenCV wheel variant in the environment.
 
+Raspberry Pi OS owns Picamera2/libcamera through apt. Both the standalone
+`pi5camera` backend and integrated IDE first try an in-process import; an
+isolated root `uv` environment falls back to a bounded `/usr/bin/python3 -s`
+subprocess with the managed `pi5camera/src` path. Only capture parameters and
+the explicit output path cross that boundary. This avoids unsupported
+`--system-site-packages` environments while keeping face recognition in the
+locked project OpenCV environment.
+
 ### HTTPS Web Controller
+
+`web start` is an IPC request to the already-running Agent service; it never
+creates another runtime or hardware owner. Its response contains `ready`, the
+LAN/mDNS URL, a loopback diagnostic URL, certificate/CA paths, and the next
+trust step. WebSocket activation permission/runtime failures release the lease
+and close with a bounded controller error rather than escaping the ASGI task.
 
 The Phase 8 dashboard loads key-identical JSON dictionaries for `en`, `ja`,
 `zh-TW`, and `zh-CN`. It chooses a supported browser locale on first use,
@@ -1048,12 +1056,14 @@ controller surface.
 
 Web power-off is a deterministic service operation, never a model tool. Only a
 paired browser holding the exclusive controller lease receives access. The
-server issues a 30-second, one-use, lease-bound nonce; explicit confirmation
+server first verifies the fixed helper and its narrow passwordless sudo rule;
+an incomplete deployment is rejected before the Agent stops. It then issues a
+30-second, one-use, lease-bound nonce; explicit confirmation
 consumes it before stopping hardware and voice. The service then closes the
 tunnel, web server, durable stores, IDE, and ownership lock before invoking the
-fixed `/usr/libexec/ninjarobot-poweroff` helper with fixed argv and no shell.
-Until Phase 8.6 installs that helper and its narrow policy, failure leaves the
-robot stopped and logs `sudo systemctl poweroff` as the local recovery action.
+fixed `/usr/libexec/ninjarobot-poweroff` helper with fixed argv and no shell. A
+rare helper failure after cleanup leaves the robot stopped and logs
+`sudo systemctl poweroff` as the local recovery action.
 
 - Started and stopped through IPC — cannot create a second IDE or hardware owner
 - Generated local CA + `.local` server certificate stored under `~/.config/ninjarobot_pi5/tls/`
@@ -1321,14 +1331,14 @@ A configuration change that points to another host is rejected — preventing cr
 | Real command reports `DEVICE_UNAVAILABLE` | Install with `uv sync --frozen --extra hardware`, confirm I2C is enabled, and confirm address `0x29` appears on bus 1 |
 | A repeated action does not re-read the sensor | Intentional when the same action ID or idempotency key is reused. Generate new IDs for a new physical reading |
 | Real servo health is unavailable | Verify the `pwm-2chan` overlay in `/boot/firmware/config.txt`, confirm I2C address `0x10`, install the hardware extra, confirm the user can access `/sys/class/pwm` and `/dev/i2c-1` |
-| Real move returns `SERVO_MOTION_DISABLED` | The checked-in configuration intentionally blocks movement. Use a private configuration only after the electrical record is approved |
+| Real move returns `SERVO_MOTION_DISABLED` | Regenerate/synchronize the private config or confirm `motion_enabled` and `group_motion_enabled` are true. Agent movement still separately requires `/arm` |
 | Real move returns `SERVO_NOT_CALIBRATED` | Calibrate that endpoint with the standalone `pi5servo` tool. Do not substitute another servo's calibration |
-| Display shows `simulated: true` | Safe default. Add `--real` only on a correctly wired Pi |
+| Display shows `simulated: true` | A scriptable simulation command was selected. The interactive IDE tool runs physical hardware directly after installation |
 | Screen goes dark when a command exits | Intentional cleanup. Add `--hold 5` to a real manual test to keep the backlight active for inspection |
 | Text is sideways on the display | Authoritative V4 rotation is 90°. Confirm `--config` points to the correct TOML file |
 | Hardware already owned by another process | Use the existing agent interface, or run `uv run --frozen ninjarobot-agent service stop`, then retry. Also stop both integrated tools before opening a standalone `pi5*` tool |
 | A repaired `pi5*` source file is present but Python runs an older copy | Run `uv sync --frozen --extra hardware`, then `scripts/verify_workspace_driver_sources.py`. Editable dependencies must resolve into this checkout |
-| Root camera health reports unavailable while `/usr/bin/python3` imports Picamera2 | Run `./scripts/bootstrap-rpi-camera-workspace.sh` and retry from the project root. Do not recreate `.venv` with `--system-site-packages` |
+| Camera reports unavailable while `/usr/bin/python3` imports Picamera2 | Run `./scripts/bootstrap-rpi-camera-workspace.sh`; both standalone and integrated capture should then use the bounded system-Python bridge. Do not recreate `.venv` with `--system-site-packages` |
 | `pi5mic` reports PortAudio missing | Install `libportaudio2` and `portaudio19-dev`, then run `pi5mic devices`. Local transcription also requires a built `whisper-cli` and `ggml-base.bin` |
 | V4 microphone status reports 44.1 kHz instead of 16 kHz | Expected. The USB device rejected 16 kHz; the managed driver selected its supported native rate. Check both `requested_sample_rate_hz` and `actual_sample_rate_hz` in the status output |
 | Voice input reports `transcriber_unavailable` | Build/configure `whisper-cli` and its local model, then disable and re-enable voice input. Terminal and web text chat remain available |

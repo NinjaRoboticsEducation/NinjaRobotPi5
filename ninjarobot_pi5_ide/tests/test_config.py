@@ -17,8 +17,8 @@ def test_example_configuration_matches_confirmed_wiring() -> None:
     assert config.hardware.buzzer.gpio == 27
     assert config.hardware.servos.endpoints == ("gpio12", "gpio13")
     assert config.hardware.servos.calibration_file == "~/.config/pi5servo/servo.json"
-    assert config.hardware.servos.motion_enabled is False
-    assert config.hardware.servos.group_motion_enabled is False
+    assert config.hardware.servos.motion_enabled is True
+    assert config.hardware.servos.group_motion_enabled is True
     assert config.hardware.display.dc_gpio == 4
     assert config.hardware.display.reset_gpio == 5
     assert config.hardware.display.backlight_gpio == 6

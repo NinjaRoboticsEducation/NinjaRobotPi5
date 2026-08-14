@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -84,8 +85,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
 
 
 def get_default_config_filepath() -> Path:
-    """Return the default `mic.json` path."""
-    return Path.cwd() / CONFIG_FILE_NAME
+    """Return the per-user config path, independent of the current directory."""
+    config_home = os.environ.get("XDG_CONFIG_HOME")
+    base_dir = Path(config_home).expanduser() if config_home else Path.home() / ".config"
+    return base_dir / "pi5mic" / CONFIG_FILE_NAME
 
 
 def _merge_config(

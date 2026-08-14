@@ -31,6 +31,32 @@
       },
       "reason": "Pin and explicitly configure Ruff, and add a lockfile so fresh pi5buzzer development environments reproduce the validated lint toolchain."
     },
+    "pi5buzzer/src/pi5buzzer/__main__.py": {
+      "approved": {
+        "sha256": "47fb5e55239b4b036854324418296bdde1621938d53eaedc09742be2c7fa32ce",
+        "size": 6235
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "b6da04c43a116627e68a4c96bd29831de8ab6d8b1af376980fa38d3404189387",
+        "size": 6215
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
+    "pi5buzzer/src/pi5buzzer/config/config_manager.py": {
+      "approved": {
+        "sha256": "d3874148967c0e6c612e1f2457b3cc0ee063112b33705b14bfbfef13c2ea7e37",
+        "size": 5049
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "7b67e253d2123d528089b4254cb6dfe5e64e18d3543c6ba26b39100b90dfeb90",
+        "size": 4857
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
     "pi5buzzer/src/pi5buzzer/core/driver.py": {
       "approved": {
         "sha256": "d60cf9624ea28784f72206f28b7928e041f60249d90494b91fe5969077d910a0",
@@ -46,16 +72,16 @@
     },
     "pi5buzzer/tests/test_config.py": {
       "approved": {
-        "sha256": "28273ede8fd3af6f7b35865e224838863a913833d8c847a1acf8434da741afd8",
-        "size": 6635
+        "sha256": "a890f1cb8bfd4b5372b4f2937b97597c65a72972169a436b69eb52e4d3f99fcd",
+        "size": 6902
       },
       "authorized_by": "project owner",
-      "authorized_on": "2026-07-25",
+      "authorized_on": "2026-08-14",
       "baseline": {
         "sha256": "95cba9d0fb998afa05969b65dbd4b972d581170dac5e4bf3a4c8b8da91675881",
         "size": 6635
       },
-      "reason": "Sort the config-test import so the package passes its now-explicit Ruff import-order rule."
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
     },
     "pi5buzzer/tests/test_driver.py": {
       "approved": {
@@ -119,6 +145,19 @@
       },
       "reason": "Normalize camera CLI failures at the CameraError boundary, add backend-unavailable regression coverage, and make the supported system-site Picamera2 environment reproducible with frozen dependencies."
     },
+    "pi5camera/src/pi5camera/__main__.py": {
+      "approved": {
+        "sha256": "cc9e97e1f2cce8b019b9789d8df973da8540905ef71d16690edeb5e3b993b7aa",
+        "size": 2941
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "7ec96f19f82aae64ee07369d4ee81bd57599ed98cb4b3826eec3a27490ee47ef",
+        "size": 2923
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
     "pi5camera/src/pi5camera/cli/capture_cmd.py": {
       "approved": {
         "sha256": "07ffd9eb99f5ef24f84551fd377762319110ee9e7320f9681136ef319acfe0a5",
@@ -158,18 +197,57 @@
       },
       "reason": "Normalize camera CLI failures at the CameraError boundary, add backend-unavailable regression coverage, and make the supported system-site Picamera2 environment reproducible with frozen dependencies."
     },
-    "pi5camera/tests/test_camera_backend.py": {
+    "pi5camera/src/pi5camera/config/config_manager.py": {
       "approved": {
-        "sha256": "783d5496030b6f6810e49ee109ce6a1abca32eabf55ac4b326f7d5a73224e754",
-        "size": 2368
+        "sha256": "048fbddb0e6a2f246d7f3254aa397740fae8fc63ea588e6399fbf5a485928031",
+        "size": 7339
       },
       "authorized_by": "project owner",
-      "authorized_on": "2026-07-25",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "9b8103f95f3da65ec8a840d722b1d255ba038d93460b25c648bdf9f69b23ccd8",
+        "size": 7161
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
+    "pi5camera/src/pi5camera/core/camera_backend.py": {
+      "approved": {
+        "sha256": "749bfbfd9c6bebb02e6cc67c0676fb15a8cd41cbb809a5976ab57949ab0aafb4",
+        "size": 11645
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "3bf34e48b9b33d73915d54de6f4d89a875d54a8c2360b51407b5e4e723ed82aa",
+        "size": 6030
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
+    "pi5camera/tests/test_camera_backend.py": {
+      "approved": {
+        "sha256": "2fda5c32471617d47975787430522d8403224e0c082395bdf8f843c2c2328330",
+        "size": 4410
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
       "baseline": {
         "sha256": "4b7d2d86d10a05cc4e1fb551eb1f6fcd0a45779aad4fc647d126c1998c7d7e03",
         "size": 1482
       },
-      "reason": "Normalize camera CLI failures at the CameraError boundary, add backend-unavailable regression coverage, and make the supported system-site Picamera2 environment reproducible with frozen dependencies."
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
+    "pi5camera/tests/test_config_manager.py": {
+      "approved": {
+        "sha256": "63f8c6461d9b065f1ebb9a65fadbd0a35fadc02671dd08c2285997fac8433d09",
+        "size": 3078
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "6ffad2cab79a5d6832a54e06d933a86e97eb4b44c3809fa00bf0f28ef4b3e291",
+        "size": 2819
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
     },
     "pi5disp/README.md": {
       "approved": {
@@ -223,6 +301,32 @@
       },
       "reason": "Standalone installation, dependency, and CLI validation documentation"
     },
+    "pi5mic/src/pi5mic/__main__.py": {
+      "approved": {
+        "sha256": "863443732b991dc21c4e1ec51d1f662ad0895e3dfec2b87b13587f8b86adfc9e",
+        "size": 5225
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "0a00b7295a4d552cd0c8c658a4f945aea036ab603059a8ca6dd09d65629ff99c",
+        "size": 5210
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
+    "pi5mic/src/pi5mic/config/config_manager.py": {
+      "approved": {
+        "sha256": "e0203687a0bdd01d40bf79c55bb4b6c2e7cf9d66920123d0a1fc576b8b4b2140",
+        "size": 8140
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "8d4657506d2f88262291f0bed0d125b6b70157b8d1f586a6cb462498e50691d9",
+        "size": 7944
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
     "pi5mic/src/pi5mic/wakeword/openwakeword.py": {
       "approved": {
         "sha256": "d6d5c6fbeacc45ad2f067acd72db9d674b2f3771048e0255919e4175242418c4",
@@ -235,6 +339,19 @@
         "size": 4284
       },
       "reason": "Offline explicit openWakeWord feature and VAD asset paths for deterministic Phase 8 voice startup"
+    },
+    "pi5mic/tests/test_config.py": {
+      "approved": {
+        "sha256": "281bd9020d17e4f1428b7608702abbb9e477298e8b2f41e48d9905831c63c495",
+        "size": 4181
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "f363fcba53ae004d88f37f5c2383701248ead115be0ae51231e86bf17446e74e",
+        "size": 4133
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
     },
     "pi5mic/tests/test_wakeword.py": {
       "approved": {
@@ -262,6 +379,97 @@
       },
       "reason": "Correct native PWM alternate-pin routing and two-channel setup guidance"
     },
+    "pi5servo/src/pi5servo/cli/calib.py": {
+      "approved": {
+        "sha256": "b67f67502bac2cf6c4a4df8b14dc25a8ece3c98562516095d494ae9399635eac",
+        "size": 11851
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "fb36a8ad2501e8ef497a11e713bc45328faaad265f3837d37f9033146d130179",
+        "size": 11808
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
+    "pi5servo/src/pi5servo/cli/cmd.py": {
+      "approved": {
+        "sha256": "d063e056cffc676059cfc1c66b3be4a16f18dfdd960708f3ec3ea2130d83b320",
+        "size": 2448
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "7a5faa5edc5d35109eb315490f54c3093f20879386a32ce3db566711722d8a08",
+        "size": 2385
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
+    "pi5servo/src/pi5servo/cli/config_cmd.py": {
+      "approved": {
+        "sha256": "81481e359e9b93d2d39c4680bdbb9a139904f918f70dc5face68033b89c8de7e",
+        "size": 4835
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "972617917f4facd5b79b4d63edde75b0bc4afcc38b943ac993835724aa3ef31f",
+        "size": 4756
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
+    "pi5servo/src/pi5servo/cli/move.py": {
+      "approved": {
+        "sha256": "364cc9b6402480d7c9ec1abe98ae3cf25e779a617af9980ba52a803b9fba65c1",
+        "size": 2945
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "c86db12116352fd826a0766c2f00b574b9339e5d86cd7aa1f769c9052f118981",
+        "size": 2882
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
+    "pi5servo/src/pi5servo/cli/servo_tool.py": {
+      "approved": {
+        "sha256": "f71aa6009a149e86cc9dad2c8e87d33f745e60f10ef89b5b68e1cc3f96678431",
+        "size": 18934
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "4b27b6529af9893dc4320e394a73617acf9edc333dba0cc8ba6cd572637fbf9f",
+        "size": 18891
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
+    "pi5servo/src/pi5servo/cli/status.py": {
+      "approved": {
+        "sha256": "6fa0a4409566d6ed2c4ea5e05b17bd44cfd7a181dcdc063513556ddac7299d13",
+        "size": 3679
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "9c4921dff9b07c50f4da6f9351f48edbb3e766008c9c15a96932ae3a8fe1f75c",
+        "size": 3616
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
+    "pi5servo/src/pi5servo/config/config_manager.py": {
+      "approved": {
+        "sha256": "c8f3acd5442512afe2a31cac3c4f1c375b0357621ebd7b507703149fe9808b97",
+        "size": 8688
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "8e44a2dea4bd4c1d75ef6e8bfd47f3aa2c2b35e094ac5d6109bcee49e94c61b8",
+        "size": 8664
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
     "pi5servo/src/pi5servo/core/backends/hardware_pwm.py": {
       "approved": {
         "sha256": "b0f1d0844fcc1bc39322e390ea5fbc45c222d14aa01594ade331677b116af48d",
@@ -288,6 +496,19 @@
       },
       "reason": "Regression coverage for native PWM alternate-pin routing"
     },
+    "pi5servo/tests/test_config.py": {
+      "approved": {
+        "sha256": "abe539dbd6fa174279b750e6a8f69aef97e876fa975d0b57b97a3d263813f559",
+        "size": 7586
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "2ec27c9d9af0d4806d37ad9a97423ba94c033570de5596a984bde4d5e76e0723",
+        "size": 7517
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
     "pi5vl53l0x/README.md": {
       "approved": {
         "sha256": "dabecb58e6aaa6d92f40046189c4f473dfeb6574ccda9af554d2492108e447fe",
@@ -303,16 +524,29 @@
     },
     "pi5vl53l0x/src/pi5vl53l0x/cli/sensor_tool.py": {
       "approved": {
-        "sha256": "4d4cb6d1b408be29084ce9c903b1aca9a811270c5abafda78812c4a67afbf931",
-        "size": 23998
+        "sha256": "36cbde335cb7f781f722db35942c4e70e68620cd60d16e5afabceb06df9693b8",
+        "size": 24040
       },
       "authorized_by": "project owner",
-      "authorized_on": "2026-07-25",
+      "authorized_on": "2026-08-14",
       "baseline": {
         "sha256": "b9359a5406d061d110f962505627e6f59e06017a3ee6c728fd84715a47869c41",
         "size": 22860
       },
-      "reason": "VL53L0X timing, bounded calibration recovery, invalid-reading safeguards, tests, and documentation"
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
+    "pi5vl53l0x/src/pi5vl53l0x/config/config_manager.py": {
+      "approved": {
+        "sha256": "6d9a8ba0f6473d4f33d70ed76f2acc7e13414920dc738a959fc3a35e2eeae901",
+        "size": 3463
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "414e293cfd90b937385974a7ca5e6d8d411860fdd1213014d84ddf44dab19fb2",
+        "size": 3306
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
     },
     "pi5vl53l0x/src/pi5vl53l0x/core/sensor.py": {
       "approved": {
@@ -352,6 +586,19 @@
         "size": 818
       },
       "reason": "VL53L0X timing, bounded calibration recovery, invalid-reading safeguards, tests, and documentation"
+    },
+    "pi5vl53l0x/tests/test_config.py": {
+      "approved": {
+        "sha256": "58cd85c4686bd2400ac9da807c4580ac18a0bf2a49c8f436f953516c7625fdcb",
+        "size": 5419
+      },
+      "authorized_by": "project owner",
+      "authorized_on": "2026-08-14",
+      "baseline": {
+        "sha256": "f4f88ad4b47f6b5013cfe70dd6db3518566c5a4dc05b90c908d0a9a4003905bd",
+        "size": 5343
+      },
+      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
     },
     "pi5vl53l0x/tests/test_sensor.py": {
       "approved": {

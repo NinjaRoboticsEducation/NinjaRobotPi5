@@ -419,6 +419,7 @@ def system_resume(tool: ToolContext, confirm: bool) -> None:
 
     async def resume_and_close() -> Any:
         try:
+            await robot.start()
             return await robot.resume_system(confirmed=True)
         finally:
             await robot.close()

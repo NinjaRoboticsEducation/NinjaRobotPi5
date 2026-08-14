@@ -465,9 +465,9 @@ def create_web_app(
         await websocket.accept()
         try:
             controller.activate(lease.lease_id, browser_chat_id=browser_chat_id)
-        except ValueError as error:
+        except (ValueError, PermissionError, RuntimeError) as error:
             await leases.release(lease.lease_id)
-            await websocket.close(code=4400, reason=str(error))
+            await websocket.close(code=4403, reason=str(error)[:120])
             return
         if on_authenticated_controller is not None:
             await on_authenticated_controller(remote_connection, paired_connection)
@@ -776,14 +776,24 @@ class WebServerManager:
         running = self._task is not None and not self._task.done()
         display_host = mdns_hostname() if self._host in {"0.0.0.0", "::"} else self._host
         ca_certificate, _ca_key = local_ca_paths(self._certificate_path)
+        url = f"https://{display_host}:{self._port}/" if running else None
         return {
             "running": running,
+            "ready": running and bool(self._server and self._server.started),
             "host": self._host,
             "port": self._port,
-            "url": f"https://{display_host}:{self._port}/" if running else None,
+            "url": url,
+            "loopback_url": f"https://127.0.0.1:{self._port}/" if running else None,
             "certificate": str(self._certificate_path),
             "local_ca_certificate": (str(ca_certificate) if ca_certificate.is_file() else None),
             "browser_trust_required": ca_certificate.is_file(),
+            "next_step": (
+                "Open the URL in a browser. If the browser warns about the local "
+                "certificate, export and trust the NinjaRobot local CA from the "
+                "Interactive Tool. Use Remote Access when mDNS is unavailable."
+                if running
+                else "Start the web interface from the Interactive Tool."
+            ),
         }
 
     async def close(self) -> None:

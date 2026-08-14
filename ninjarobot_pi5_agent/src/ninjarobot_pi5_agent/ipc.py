@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
@@ -35,12 +35,14 @@ class AgentIPCServer:
         ownership: ServiceOwnership,
         web: WebServerManager | None = None,
         remote_access: RemoteAccessService | None = None,
+        on_local_controller: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         self._runtime = runtime
         self._socket_path = Path(socket_path).expanduser()
         self._ownership = ownership
         self._web = web
         self._remote_access = remote_access
+        self._on_local_controller = on_local_controller
         self._server: asyncio.AbstractServer | None = None
         self._stop = asyncio.Event()
 
@@ -134,6 +136,14 @@ class AgentIPCServer:
         cancellation: CancellationToken,
     ) -> None:
         command = payload.get("command")
+        if command == "controller_connected":
+            if self._on_local_controller is not None:
+                await self._on_local_controller()
+            await _write_message(
+                writer,
+                {"type": "result", "data": {"controller_connected": True}},
+            )
+            return
         if command == "chat":
 
             async def send_delta(text: str) -> None:

@@ -21,11 +21,11 @@ class TestConfigManager:
         """Create a ConfigManager with temp path."""
         return ConfigManager(temp_config)
 
-    def test_default_path(self):
-        """Default path is relative to package."""
+    def test_default_path(self, tmp_path, monkeypatch):
+        """Default path is writable per-user configuration."""
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
         path = get_default_config_path()
-        assert path.name == "servo.json"
-        assert path.parent.name == "pi5servo"
+        assert path == tmp_path / "pi5servo" / "servo.json"
 
     def test_init_with_path(self, temp_config):
         """ConfigManager accepts custom path."""

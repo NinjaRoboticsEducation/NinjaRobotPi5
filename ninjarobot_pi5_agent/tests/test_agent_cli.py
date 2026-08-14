@@ -46,7 +46,12 @@ def test_chat_resume_requires_confirmation_and_bypasses_the_model(
     )
 
     assert result == 0
-    service_request.assert_awaited_once_with(
+    service_request.assert_any_await(
+        SimpleNamespace(),
+        {"command": "controller_connected", "interface": "terminal"},
+        print_result=False,
+    )
+    service_request.assert_any_await(
         SimpleNamespace(),
         {
             "command": "resume_system",
@@ -74,7 +79,11 @@ def test_chat_resume_cancellation_sends_no_service_request(monkeypatch, capsys) 
     )
 
     assert result == 0
-    service_request.assert_not_awaited()
+    service_request.assert_awaited_once_with(
+        SimpleNamespace(),
+        {"command": "controller_connected", "interface": "terminal"},
+        print_result=False,
+    )
     assert "System resume was cancelled." in capsys.readouterr().out
 
 
@@ -92,7 +101,12 @@ def test_chat_camera_grants_one_temporary_capture(monkeypatch, capsys) -> None:
     )
 
     assert result == 0
-    service_request.assert_awaited_once_with(
+    service_request.assert_any_await(
+        SimpleNamespace(),
+        {"command": "controller_connected", "interface": "terminal"},
+        print_result=False,
+    )
+    service_request.assert_any_await(
         SimpleNamespace(),
         {
             "command": "grant_camera",
@@ -131,6 +145,7 @@ def test_chat_voice_commands_bypass_the_model_and_use_exact_service_commands(
 
     assert result == 0
     assert [call.args[1] for call in service_request.await_args_list] == [
+        {"command": "controller_connected", "interface": "terminal"},
         {"command": "voice_status"},
         {"command": "voice_enable"},
         {"command": "voice_disable"},

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -7,6 +8,8 @@ from click.testing import CliRunner
 from ninjarobot_pi5_ide.cli import main
 from ninjarobot_pi5_ide.config import BehaviorConfig, RobotConfig, load_robot_config
 from ninjarobot_pi5_ide.config_import import save_robot_config
+from ninjarobot_pi5_ide.interactive_tool import InteractiveRobotSession
+from ninjarobot_pi5_ide.safety import SafetySnapshot, SafetyStateStore
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = ROOT / "config" / "ninjarobot_pi5.toml.example"
@@ -254,6 +257,80 @@ def test_motion_resume_requires_confirmation_and_clears_level_one(
 
     assert refused.exit_code == 2
     assert json.loads(resumed.output)["motion_latched"] is False
+
+
+def test_system_resume_initializes_replacement_hardware_before_probe(
+    tmp_path: Path, monkeypatch
+) -> None:
+    events: list[str] = []
+
+    class FakeRobot:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        async def start(self) -> None:
+            events.append("start")
+
+        async def resume_system(self, *, confirmed: bool) -> SafetySnapshot:
+            assert confirmed is True
+            events.append("resume")
+            return SafetySnapshot()
+
+        async def close(self) -> None:
+            events.append("close")
+
+    monkeypatch.setattr("ninjarobot_pi5_ide.cli.RobotAssembly", FakeRobot)
+
+    result = invoke(
+        CliRunner(),
+        private_config(tmp_path),
+        "system",
+        "resume",
+        "--confirm",
+    )
+
+    assert result.exit_code == 0
+    assert events == ["start", "resume", "close"]
+
+
+def test_interactive_level_two_resume_starts_hardware_then_returns_to_idle(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = load_robot_config(private_config(tmp_path))
+    SafetyStateStore(config.behaviors.safety_state_file).latch_system("operator_stop")
+    events: list[str] = []
+
+    class FakeRobot:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        async def start(self) -> None:
+            events.append("start")
+
+        async def resume_system(self, *, confirmed: bool) -> SafetySnapshot:
+            assert confirmed is True
+            events.append("resume")
+            SafetyStateStore(config.behaviors.safety_state_file).clear_system()
+            return SafetySnapshot()
+
+        async def close(self) -> None:
+            events.append("close")
+
+    async def exercise() -> None:
+        session = InteractiveRobotSession(config)
+        session.system_stopped = True
+
+        async def idle(_definition, *, loop_face: bool) -> None:
+            assert loop_face is True
+            events.append("idle")
+
+        monkeypatch.setattr("ninjarobot_pi5_ide.interactive_tool.RobotAssembly", FakeRobot)
+        monkeypatch.setattr(session, "start_background", idle)
+        result = await session.resume()
+        assert result["level"] == 2
+
+    asyncio.run(exercise())
+    assert events == ["start", "resume", "idle"]
 
 
 def test_private_config_written_by_cli_serializer_round_trips(tmp_path: Path) -> None:

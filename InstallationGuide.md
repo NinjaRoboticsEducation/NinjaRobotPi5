@@ -6,6 +6,14 @@
 
 This guide takes you from a blank Raspberry Pi to a fully calibrated, running robot. Follow the numbered steps in order. The testing, troubleshooting, and extension sections at the end are available whenever you need them.
 
+NinjaRobotPi5 combines six Raspberry Pi hardware drivers with a deterministic
+robot IDE, a persistent multi-user AI agent, local/cloud model providers,
+always-on “Hey Ninja” input, a multilingual HTTPS controller, optional ngrok
+access, and opt-in boot startup. This document is the beginner-facing source of
+truth for installing all of those parts. Commands marked **one-time setup** are
+run once; daily use happens through `ninjarobot-ide-tool` and
+`ninjarobot-agent` after activating the project environment.
+
 ---
 
 ## 📋 Before You Begin
@@ -127,14 +135,23 @@ sudo apt full-upgrade -y
 
 ```bash
 sudo apt install -y \
+  ca-certificates \
   build-essential \
   cmake \
+  pkg-config \
+  python3-dev \
+  swig \
   git \
   curl \
   i2c-tools \
   alsa-utils \
   libportaudio2 \
-  portaudio19-dev
+  portaudio19-dev \
+  python3-picamera2 \
+  python3-libcamera \
+  rpicam-apps \
+  avahi-daemon \
+  libnss-mdns
 ```
 
 **Enable I2C and SPI:**
@@ -204,7 +221,18 @@ cd NinjaRobotPi5
 uv sync --frozen --extra hardware
 ```
 
-`uv` creates the `.venv` virtual environment automatically. You never need to run `source .venv/bin/activate` — all commands in this guide use `uv run`.
+`--frozen` makes the one-time installation match the checked-in lock file;
+`--extra hardware` installs Raspberry Pi backends. Neither flag is a daily
+runtime option. Activate the installed environment now and again after every
+new SSH login:
+
+```bash
+source .venv/bin/activate
+```
+
+Your prompt normally begins with `(NinjaRobotPi5)`. All remaining beginner
+commands assume this environment is active. If a command is not found, return
+to the project directory and activate it again.
 
 **Set up the camera bridge:**
 
@@ -212,7 +240,10 @@ uv sync --frozen --extra hardware
 ./scripts/bootstrap-rpi-camera-workspace.sh
 ```
 
-This installs the Raspberry Pi OS camera packages (Picamera2 and libcamera), keeps your normal project environment separate, and verifies the bridge without taking a photograph.
+This verifies the Raspberry Pi OS Picamera2/libcamera installation and the
+bounded system-Python bridge without taking a photograph. Both standalone
+`pi5camera` and the integrated IDE now use this bridge when the isolated
+project environment cannot import apt-managed Picamera2 directly.
 
 > [!NOTE]
 > It is normal for `python -c "import picamera2"` inside the project `.venv` to fail. NinjaRobotPi5 routes real camera calls through `/usr/bin/python3` on purpose. The required check is `/usr/bin/python3 -s -c "import libcamera, picamera2"`.
@@ -251,10 +282,8 @@ cd "$HOME/NinjaRobotPi5"
 **Verify the driver sources:**
 
 ```bash
-uv run --frozen --extra hardware python \
-  scripts/verify_workspace_driver_sources.py
-
-uv run --frozen python scripts/verify_immutable_drivers.py
+python scripts/verify_workspace_driver_sources.py
+python scripts/verify_immutable_drivers.py
 ```
 
 Expected result: all six `pi5*` packages resolve into this checkout and all driver file checksums match their approved records.
@@ -264,7 +293,9 @@ Expected result: all six `pi5*` packages resolve into this checkout and all driv
 ### Step 4 — Initialize and Calibrate Each Hardware Module
 
 > [!IMPORTANT]
-> This step creates configuration files in `~/.config`. Always include the configuration path options shown below — some tools create their files in the current directory if you omit them.
+> This step creates configuration files in `~/.config/pi5*`. The standalone
+> tools now choose those paths automatically, so routine commands do not need
+> `--config` or `-C` arguments and never dirty the Git checkout.
 
 **Create configuration folders:**
 
@@ -279,6 +310,23 @@ mkdir -p \
   "$HOME/.config/ninjarobot_pi5"
 ```
 
+The root `uv sync --extra hardware` installation supplies the Python packages
+for every managed library. The OS packages and interfaces each module also
+needs are:
+
+| Module | Extra requirement | Why |
+|---|---|---|
+| `pi5buzzer` | GPIO access; `swig` and `python3-dev` are build fallbacks | Passive PWM tone on GPIO27 |
+| `pi5disp` | SPI enabled | ST7789V display on SPI0 |
+| `pi5vl53l0x` | I2C enabled; `i2c-tools` | VL53L0X at address `0x29` |
+| `pi5servo` | PWM overlay, external servo power, common ground | Continuous servos on GPIO12/13 |
+| `pi5camera` | `python3-picamera2`, `python3-libcamera` | CSI capture through Raspberry Pi OS bindings |
+| `pi5mic` | ALSA, PortAudio, whisper.cpp | USB capture, local transcription, wake-word listener |
+
+Do not install a second PyPI `picamera2` or `libcamera` into `.venv`. Do not
+install multiple OpenCV wheel variants: the project lock supplies the supported
+OpenCV 4 face-recognition API.
+
 > [!CAUTION]
 > Raise both wheels off the work surface before any step that may activate the servos. Keep hair, hands, cables, and loose objects clear.
 
@@ -287,11 +335,8 @@ mkdir -p \
 #### 4.1 — Buzzer (GPIO27)
 
 ```bash
-uv run --frozen --extra hardware pi5buzzer \
-  -C "$HOME/.config/pi5buzzer/buzzer.json" init 27
-
-uv run --frozen --extra hardware pi5buzzer \
-  -C "$HOME/.config/pi5buzzer/buzzer.json" buzzer-tool
+pi5buzzer init 27
+pi5buzzer buzzer-tool
 ```
 
 Use the menu to play a short tone or melody. Exit after confirming the buzzer sounds and becomes silent.
@@ -301,8 +346,7 @@ Use the menu to play a short tone or melody. Exit after confirming the buzzer so
 #### 4.2 — Display (ST7789V)
 
 ```bash
-PI5DISP_CONFIG="$HOME/.config/pi5disp/display.json" \
-  uv run --frozen --extra hardware pi5disp display-tool
+pi5disp display-tool
 ```
 
 Choose **Init** and enter the following values:
@@ -325,8 +369,7 @@ Then choose **Show Text**, **Brightness**, and **Clear** to confirm the screen w
 #### 4.3 — Distance Sensor (VL53L0X)
 
 ```bash
-uv run --frozen --extra hardware pi5vl53l0x sensor-tool \
-  -c "$HOME/.config/pi5vl53l0x/vl53l0x.json"
+pi5vl53l0x sensor-tool
 ```
 
 Use the menu to check status and take several readings. Place a flat object in front of the sensor to verify distance accuracy.
@@ -344,8 +387,7 @@ Calibrate only after ordinary readings work. Place a flat target at a known dist
 > Servo calibration moves the motors. Raise both wheels, keep all body parts and loose objects clear, and be ready to remove robot power. This robot has no accessible physical servo cutoff — software stop reduces risk but cannot remove all electrical risk.
 
 ```bash
-uv run --frozen --extra hardware pi5servo servo-tool \
-  -c "$HOME/.config/pi5servo/servo.json"
+pi5servo servo-tool
 ```
 
 In the menu:
@@ -363,8 +405,7 @@ For these MG90D continuous-rotation servos, the calibrated center is the stop po
 **Verify the saved calibrations without moving:**
 
 ```bash
-uv run --frozen --extra hardware pi5servo calib --show \
-  --config "$HOME/.config/pi5servo/servo.json"
+pi5servo calib --show
 ```
 
 Expected result: both `gpio12` and `gpio13` are listed. If the result says `No calibrations stored`, see [Servo calibration saved to wrong file](#-servo-calibration-saved-to-the-wrong-file).
@@ -377,8 +418,7 @@ Expected result: both `gpio12` and `gpio13` are listed. If the result says `No c
 > Tell everyone nearby before taking or retaining a photograph. Obtain their consent first.
 
 ```bash
-uv run --frozen --extra hardware pi5camera \
-  -C "$HOME/.config/pi5camera/camera.json" camera-tool
+pi5camera camera-tool
 ```
 
 Choose **Run setup wizard**. For the current OV5647 camera, enter:
@@ -406,8 +446,7 @@ Expected result: your USB microphone is listed as a capture device.
 **Open the microphone tool:**
 
 ```bash
-uv run --frozen --extra hardware pi5mic \
-  -C "$HOME/.config/pi5mic/mic.json" mic-tool
+pi5mic mic-tool
 ```
 
 Choose **Run setup wizard**, select your USB microphone, and accept a supported sample rate. Then choose **Run doctor** and **Show status**. Recording and speech-to-text tests are in [Microphone test](#-microphone-test) because they require consent.
@@ -424,16 +463,10 @@ The NinjaRobotPi5 IDE reads its own unified configuration file, separate from th
 > [!IMPORTANT]
 > The import is one-way and read-only. The IDE never rewrites the standalone `pi5*` JSON files, and the standalone tools never rewrite the integrated `config.toml`.
 
-**Set a short variable for the integrated configuration path:**
-
-```bash
-export NINJAROBOT_CONFIG="$HOME/.config/ninjarobot_pi5/config.toml"
-```
-
 **Check which standalone files the IDE finds:**
 
 ```bash
-uv run --frozen ninjarobot-ide-tool config discover
+ninjarobot-ide-tool config discover
 ```
 
 Expected result: all six entries show the canonical files created in Step 4.
@@ -441,8 +474,7 @@ Expected result: all six entries show the canonical files created in Step 4.
 **Preview the import (nothing is written yet):**
 
 ```bash
-uv run --frozen ninjarobot-ide-tool config import \
-  --destination "$NINJAROBOT_CONFIG"
+ninjarobot-ide-tool config import
 ```
 
 The preview intentionally shows `"applied": false`. This is not an error — it means the file has not been written yet. Confirm the preview shows:
@@ -456,29 +488,20 @@ The preview intentionally shows `"applied": false`. This is not an error — it 
 **Apply the reviewed settings:**
 
 ```bash
-uv run --frozen ninjarobot-ide-tool config import \
-  --destination "$NINJAROBOT_CONFIG" \
-  --apply
-
-chmod 600 "$NINJAROBOT_CONFIG"
+ninjarobot-ide-tool config import --apply
 ```
 
 > [!NOTE]
 > The first import does not overwrite an existing file. If the destination already exists, use the synchronization procedure in the [Appendix](#-synchronize-changed-module-settings-with-the-ide).
 
-**Enable integrated wheel movement:**
-
-```bash
-nano "$NINJAROBOT_CONFIG"
-```
-
-Confirm these sections contain the following values (add or edit as needed):
+The generated configuration enables calibrated direct movement by default and
+stores the expanded servo calibration path, for example:
 
 ```toml
 [hardware.servos]
 enabled = true
 endpoints = ["gpio12", "gpio13"]
-calibration_file = "~/.config/pi5servo/servo.json"
+calibration_file = "/home/YOUR_USERNAME/.config/pi5servo/servo.json"
 motion_enabled = true
 group_motion_enabled = true
 
@@ -493,16 +516,16 @@ left_motor = "gpio12"
 right_motor = "gpio13"
 ```
 
-Save with `Ctrl+O`, Enter, then `Ctrl+X`.
+The absolute calibration path is correct: it is the exact file discovered at
+import time. The wake-word field is also expected to read
+`package://ninjarobot_pi5_ide/assets/hey_Ninja.onnx`. This is the packaged copy
+of the same approved Ninja model used by `pi5mic`; it is not a missing project
+root file and must not be copied into `ninjarobot_pi5_ide/assets/`.
 
 **Validate the merged configuration:**
 
 ```bash
-uv run --frozen ninjarobot_pi5_cli config validate \
-  --config "$NINJAROBOT_CONFIG"
-
-uv run --frozen ninjarobot-ide-tool \
-  --config "$NINJAROBOT_CONFIG" hardware status
+ninjarobot-ide-tool hardware status
 ```
 
 Expected result: validation succeeds, both servo endpoints are listed, and the calibration file exists.
@@ -511,56 +534,34 @@ Expected result: validation succeeds, both servo endpoints are listed, and the c
 
 ### Step 6 — Test the Installed Robot
 
-**Start with simulation — no hardware is opened:**
-
-```bash
-uv run --frozen ninjarobot-ide-tool \
-  --config "$NINJAROBOT_CONFIG" behavior list
-
-uv run --frozen ninjarobot-ide-tool \
-  --config "$NINJAROBOT_CONFIG" behavior health
-
-uv run --frozen ninjarobot-ide-tool \
-  --config "$NINJAROBOT_CONFIG" behavior simulate greeting
-
-uv run --frozen ninjarobot-ide-tool \
-  --config "$NINJAROBOT_CONFIG" behavior simulate move_forward \
-  --duration 2
-```
-
-Expected result: all commands finish without opening physical devices. The simulation output describes the face, tone, and motion that would run.
-
-**Run non-moving hardware health checks:**
-
-```bash
-uv run --frozen --extra hardware ninjarobot-ide-tool \
-  --config "$NINJAROBOT_CONFIG" hardware status --real
-```
-
 **Open the interactive robot tool:**
 
 ```bash
-uv run --frozen --extra hardware ninjarobot-ide-tool \
-  --config "$NINJAROBOT_CONFIG"
+ninjarobot-ide-tool
 ```
 
-Normal behavior selections in this menu execute real hardware. Choose **Simulation** for a hardware-free preview. Test in this order:
+No flags are required because the environment already contains hardware
+dependencies and the tool automatically loads
+`~/.config/ninjarobot_pi5/config.toml`. Normal selections run physical
+hardware; **Simulation** remains available as an optional diagnostic. Keep both
+wheels raised and test in this order:
 
 1. **Hardware Configurations** — verify the connected profile
-2. **Simulation** — preview any behavior without hardware
-3. A face expression — confirm the display updates
-4. **Greeting** — confirm the full greeting sequence
-5. **Emergency Stop** — confirm the emergency stop sign appears
-6. **Resume Robot Movement** — confirm the robot returns to Idle
-7. A wheel movement — with **both wheels raised**
+2. A face expression — confirm the display updates
+3. **Greeting** — confirm the face and sound sequence
+4. A short wheel movement — confirm both raised wheels respond and stop
+5. **Emergency Stop** — confirm outputs stop and the red stop icon remains
+6. **Resume Robot Movement** — confirm devices are reinitialized and Idle returns
+
+If you want a no-hardware preview, choose **Simulation** in this same tool; a
+separate long command is not necessary.
 
 > [!CAUTION]
 > Before any wheel movement test, prepare an emergency stop in a second SSH terminal. Navigate there and run:
 > ```bash
 > cd "$HOME/NinjaRobotPi5"
-> export NINJAROBOT_CONFIG="$HOME/.config/ninjarobot_pi5/config.toml"
-> uv run --frozen --extra hardware ninjarobot-ide-tool \
->   --config "$NINJAROBOT_CONFIG" behavior stop
+> source .venv/bin/activate
+> ninjarobot-ide-tool behavior stop
 > ```
 > Do not press Enter yet. Start the movement in the first terminal, then press Enter in the second terminal if you need to stop it.
 
@@ -583,7 +584,7 @@ Before using a model for physical robot control, run the benchmark to confirm it
 ```bash
 cd "$HOME/NinjaRobotPi5"
 
-uv run --frozen ninjarobot-agent benchmark ollama \
+ninjarobot-agent benchmark ollama \
   --model qwen3:4b \
   --output "$HOME/.local/share/ninjarobot_pi5/benchmarks/qwen3-4b-latest.json"
 ```
@@ -602,40 +603,29 @@ The benchmark is CPU-, memory-, and heat-intensive but never executes a robot to
 
 If the result is `"accepted": false`, keep using simulation and review the report before selecting another model.
 
-**Select the model:**
+**Open the normal-user Agent tool:**
 
 ```bash
-uv run --frozen ninjarobot-agent \
-  --config "$NINJAROBOT_CONFIG" model list
-
-uv run --frozen ninjarobot-agent \
-  --config "$NINJAROBOT_CONFIG" model select qwen3:4b
-
-uv run --frozen ninjarobot-agent \
-  --config "$NINJAROBOT_CONFIG" model current
+ninjarobot-agent
 ```
 
-**Start the agent in simulation:**
+Use the menus in this order:
 
-```bash
-uv run --frozen ninjarobot-agent \
-  --config "$NINJAROBOT_CONFIG" \
-  service start
+1. **Change Agent Model** — select Ollama and `qwen3:4b` (or a configured cloud model).
+2. **Start Agent Service** — choose **real hardware**. Only one service owns hardware.
+3. **Agent Status** — confirm `started`, the selected provider, built-in tool providers, and robot tools are ready.
+4. **MCP Tools (Built-in and External)** — confirm IDE, robot-control, and read-only memory tools appear even when `external_servers` is empty.
+5. **Chat with NinjaRobot** — create the first owner profile and complete face enrollment.
 
-uv run --frozen ninjarobot-agent status
-uv run --frozen ninjarobot-agent chat
-```
-
-The first chat asks for your name. Enter it to create the robot owner/default
-profile. In simulation, face enrollment can remain pending because no real
-camera is available; chat must continue normally. Then enter a short greeting
-request to verify the model.
+The first chat asks for your name, displays a photo countdown, and creates the
+owner/default profile. If the camera is unavailable, chat continues with a
+clear pending-enrollment message and the display returns to Idle.
 
 Before real-hardware face enrollment, verify the installed OpenCV API without
 capturing a photo:
 
 ```bash
-uv run --frozen python scripts/validate_face_recognition_backend.py
+python scripts/validate_face_recognition_backend.py
 ```
 
 Expected: `PASS` with OpenCV 4.x and the Haar cascade path. If it fails, run
@@ -646,21 +636,21 @@ same `cv2` namespace.
 Run the non-hardware memory benchmark:
 
 ```bash
-uv run --frozen python scripts/benchmark_agent_memory.py \
+python scripts/benchmark_agent_memory.py \
   --entries 1000 --queries 50
 ```
 
 Expected result: `"passed": true`. The benchmark uses a temporary database and
 does not open GPIO, SPI, I2C, PWM, camera, microphone, or the robot action ledger.
 
-**Start the HTTPS web interface:**
+**Start the HTTPS web interface:** return to the main Agent menu, select
+**Start Web Interface**, and use the exact `url` printed by the tool. The Agent
+service must already be running; the web command controls the server owned by
+that service and does not start a second Agent.
 
-```bash
-uv run --frozen ninjarobot-agent web certificate-status
-uv run --frozen ninjarobot-agent web export-ca \
-  --output "$HOME/ninjarobotpi5-local-ca.pem"
-uv run --frozen ninjarobot-agent web start
-```
+Select **Export Browser Trust Certificate** to write
+`~/ninjarobotpi5-local-ca.pem` for phones or computers that require trusted
+local HTTPS.
 
 Verify the certificate contains two entries (server certificate + local CA):
 
@@ -680,40 +670,79 @@ Open the printed URL from a browser on the same local network. If the hostname d
 >
 > **Add to Home Screen (iPhone/iPad):** For the most reliable fullscreen controller experience, choose **Share → Add to Home Screen** in Safari, then launch the saved icon.
 
-**Test the web controller in simulation:**
+**Test the web controller:**
 
 1. ✅ Chat sends a message and streams a response
 2. ✅ Live Activity tab shows service and tool events
-3. ✅ D-pad buttons simulate movement and stop when released
-4. ✅ **X** performs simulated Emergency Stop
+3. ✅ With wheels raised, D-pad movement stops when released
+4. ✅ **X** performs Emergency Stop and leaves the red stop icon visible
 5. ✅ **Y** asks for confirmation before Resume
 6. ✅ **A** runs Greeting, **B** runs Celebrate
 7. ✅ Camera button shows a simulated preview
 8. ✅ USB Microphone returns simulated recognized text
 9. ✅ Web Microphone fills the message box with recognized text (sent only when you press **Send**)
 
-**Stop the services:**
-
-```bash
-uv run --frozen ninjarobot-agent web stop
-uv run --frozen ninjarobot-agent service stop
-```
-
-**Start with real hardware (after all Phase 4 physical tests pass):**
-
-```bash
-uv run --frozen --extra hardware ninjarobot-agent \
-  --config "$NINJAROBOT_CONFIG" \
-  service start --real
-
-uv run --frozen ninjarobot-agent web start
-```
-
-In real mode, startup runs the **Greeting** behavior once, then loops a silent **Idle** face between interactions. The normal conversation flow is:
+Use **Stop Web Interface** or **Stop Agent Service** from the same tool when
+needed. With ordinary startup (onboarding disabled), real mode runs Greeting
+once and then silent Idle. After remote access or automatic startup is enabled,
+startup instead shows the current pairing QR; the first authenticated browser
+or terminal chat runs Greeting once and then enters Idle. The normal flow is:
 
 ```text
 Idle → Thinking → Speaking (or emotion) → robot action → Idle
 ```
+
+### Step 8 — Configure and Test Remote Access (Optional)
+
+1. Open `ninjarobot-agent` and select **Remote Access**.
+2. Select **Configure token, install ngrok, and activate**.
+3. Paste your ngrok authtoken twice when the hidden prompts request it.
+4. Select **Status** and wait for a non-empty `public_url`.
+5. Select **Show current pairing URL** and open that exact URL in the browser.
+
+The configuration operation downloads/replaces ngrok atomically, preventing
+the former `Text file busy` overwrite. The authtoken identifies the local ngrok
+agent but is not a browser password. Browser authentication uses the short-lived
+pairing fragment in the URL, then a Secure/HttpOnly cookie; the QR contains no
+secret that remains in browser history after pairing.
+
+After remote access is enabled, the next Agent start follows this sequence:
+
+```text
+Agent/web start → ngrok QR on robot display → authenticated browser or terminal
+chat connects → Greeting face and sound → silent Idle
+```
+
+While ngrok is healthy the robot keeps waiting on its remote QR. A confirmed
+tunnel/configuration/network failure switches the display to a fresh local
+pairing QR while remote recovery continues. Never expose port 8443 through
+router port forwarding.
+
+### Step 9 — Enable and Test Automatic Startup (Optional)
+
+Keep both wheels raised. Open `ninjarobot-agent`, select **Auto-Start &
+Deployment**, then select **Install/repair and enable automatic startup**. Type
+`ENABLE` only after reading the prompt. This single transaction installs and
+validates all three privileged artifacts—the systemd unit, fixed power-off
+helper, and narrow sudoers rule—before persisting boot enablement.
+
+Select **Show deployment status**. Pass criteria are:
+
+- `installed: true` and `enabled: true`
+- all `artifacts` values are `true`
+- the unit references the current checkout and `.venv` Python
+
+Reboot with `sudo reboot`. After reconnecting by SSH, open `ninjarobot-agent`
+and check **Agent Status** and **Auto-Start & Deployment → Show deployment
+status**. The display should show the current remote pairing QR, or a local QR
+only when remote service is unavailable. Scan/open it and confirm Greeting then
+Idle.
+
+Finally, test **Power off NinjaRobot** in the paired web hamburger menu. Choose
+**Cancel** once, then repeat and choose **Power off**. If the deployment helper
+or sudo rule is missing, the request is rejected before the Agent stops and the
+web error tells you to run the deployment repair. A successful confirmation
+stops robot modules and then powers off Raspberry Pi OS.
 
 ---
 
@@ -724,7 +753,7 @@ Idle → Thinking → Speaking (or emotion) → robot action → Idle
 Once the service is running, open a chat session:
 
 ```bash
-uv run --frozen ninjarobot-agent
+ninjarobot-agent
 ```
 
 Useful slash commands inside chat:
@@ -739,7 +768,7 @@ Useful slash commands inside chat:
 | `/resume` | Recover from Emergency Stop |
 | `/confirm <request>` | Approve a sensitive one-off action |
 | `/new user` | Register another local profile and attempt face enrollment |
-| `/switch user` | Select an existing profile for this chat session |
+| `/switch user` | Name a profile, then switch only after its registered face matches |
 | `/identify` | Take one countdown photo and switch only on one unique known face |
 | `/update profile` | Show the active name/face status and start a profile update |
 | `/clear` | Clear the current conversation history |
@@ -772,7 +801,7 @@ user; transcript-only replies are never treated as persistent preferences.
 Open the interactive tool and choose **Manage Memory**:
 
 ```bash
-uv run --frozen ninjarobot-agent
+ninjarobot-agent
 ```
 
 The menu can list profiles, transfer the owner role, delete an inactive member
@@ -782,17 +811,17 @@ deletion and full reset are intentionally unavailable in terminal/web chat.
 The same deterministic operations are scriptable:
 
 ```bash
-uv run --frozen ninjarobot-agent memory profiles
-uv run --frozen ninjarobot-agent memory settings
-uv run --frozen ninjarobot-agent memory list local-user \
+ninjarobot-agent memory profiles
+ninjarobot-agent memory settings
+ninjarobot-agent memory list local-user \
   --kind successful_behavior
-uv run --frozen ninjarobot-agent memory set-retention \
+ninjarobot-agent memory set-retention \
   --conversations 7 --failed 180 --failed-cap 1000
-uv run --frozen ninjarobot-agent memory delete USER_ID MEMORY_ID --confirm
-uv run --frozen ninjarobot-agent memory transfer-owner USER_ID --confirm
-uv run --frozen ninjarobot-agent memory delete-profile USER_ID --confirm
-uv run --frozen ninjarobot-agent memory register-face USER_ID --confirm
-uv run --frozen ninjarobot-agent memory reset-all --confirm
+ninjarobot-agent memory delete USER_ID MEMORY_ID --confirm
+ninjarobot-agent memory transfer-owner USER_ID --confirm
+ninjarobot-agent memory delete-profile USER_ID --confirm
+ninjarobot-agent memory register-face USER_ID --confirm
+ninjarobot-agent memory reset-all --confirm
 ```
 
 The service must be running. An active profile cannot be deleted. The current
@@ -904,8 +933,8 @@ Never change wiring while the robot is powered.
 
 ```bash
 cd "$HOME/NinjaRobotPi5"
-uv run --frozen python scripts/verify_immutable_drivers.py
-uv run --frozen pytest -q
+python scripts/verify_immutable_drivers.py
+pytest -q
 ```
 
 Expected result: driver verification passes and all tests pass. These tests use simulation only.
@@ -913,8 +942,7 @@ Expected result: driver verification passes and all tests pass. These tests use 
 ### 🔊 Buzzer Test
 
 ```bash
-uv run --frozen --extra hardware pi5buzzer \
-  -C "$HOME/.config/pi5buzzer/buzzer.json" buzzer-tool
+pi5buzzer buzzer-tool
 ```
 
 Expected result: a short tone or melody plays through GPIO27 and the buzzer is silent afterward.
@@ -923,8 +951,7 @@ Full checklist: [Phase 3.1 buzzer validation](docs/validation/phase-3-1-buzzer-v
 ### 🖥️ Display Test
 
 ```bash
-PI5DISP_CONFIG="$HOME/.config/pi5disp/display.json" \
-  uv run --frozen --extra hardware pi5disp display-tool
+pi5disp display-tool
 ```
 
 Expected result: text and colors are correctly oriented at 320×240 after the 90° rotation, and brightness changes take effect.
@@ -933,8 +960,7 @@ Full checklist: [Phase 3.2 display validation](docs/validation/phase-3-2-display
 ### 📡 Distance Sensor Test
 
 ```bash
-uv run --frozen --extra hardware pi5vl53l0x sensor-tool \
-  -c "$HOME/.config/pi5vl53l0x/vl53l0x.json"
+pi5vl53l0x sensor-tool
 ```
 
 Expected result: a target within range produces changing millimetre readings. Open space may produce the raw value `8191`, which means no target is measurable.
@@ -946,8 +972,7 @@ Full checklist: [Phase 2 distance validation](docs/validation/phase-2-validation
 > Raise the wheels and keep an operator ready to remove power.
 
 ```bash
-uv run --frozen --extra hardware pi5servo servo-tool \
-  -c "$HOME/.config/pi5servo/servo.json"
+pi5servo servo-tool
 ```
 
 Expected result: each motor turns in both directions and stops at its calibrated center. Recalibrate if a motor creeps at center.
@@ -964,8 +989,7 @@ Full checklist: [Phase 3.3 servo validation](docs/validation/phase-3-3-servo-val
 
 rpicam-hello --list-cameras
 
-uv run --frozen --extra hardware pi5camera \
-  -C "$HOME/.config/pi5camera/camera.json" camera-tool
+pi5camera camera-tool
 ```
 
 Full checklist: [Phase 3.4 camera validation](docs/validation/phase-3-4-camera-validation-2026-07-26.md)
@@ -978,8 +1002,7 @@ Full checklist: [Phase 3.4 camera validation](docs/validation/phase-3-4-camera-v
 ```bash
 arecord -l
 
-uv run --frozen --extra hardware pi5mic \
-  -C "$HOME/.config/pi5mic/mic.json" mic-tool
+pi5mic mic-tool
 ```
 
 Choose **Run one capture cycle**. If the sample rate falls back to 44.1 kHz, that is normal when the device reports ready.
@@ -988,11 +1011,11 @@ Full checklist: [Phase 3.5 microphone validation](docs/validation/phase-3-5-micr
 ### 🤖 Integrated Behavior Test
 
 ```bash
-uv run --frozen --extra hardware ninjarobot-ide-tool \
-  --config "$HOME/.config/ninjarobot_pi5/config.toml"
+ninjarobot-ide-tool
 ```
 
-Use **Simulation** first. During real wheel movement, note:
+Use **Simulation** only when you want a hardware-free diagnostic. During the
+raised-wheel real movement test, note:
 
 - Movement starts without waiting for clear sensor readings
 - The value `8191` means clear (no target in range), not an error
@@ -1051,7 +1074,7 @@ Always use `-c "$HOME/.config/pi5servo/servo.json"` for future `servo-tool` call
 That is the expected **preview**. Nothing is wrong. Apply it with:
 
 ```bash
-uv run --frozen ninjarobot-ide-tool config import \
+ninjarobot-ide-tool config import \
   --destination "$HOME/.config/ninjarobot_pi5/config.toml" \
   --apply
 ```
@@ -1117,11 +1140,10 @@ Expected addresses: `29` for the VL53L0X, `10` for the DFR0566.
 Check calibration and safety state:
 
 ```bash
-uv run --frozen --extra hardware pi5servo calib --show \
+pi5servo calib --show \
   --config "$HOME/.config/pi5servo/servo.json"
 
-uv run --frozen --extra hardware ninjarobot-ide-tool \
-  --config "$HOME/.config/ninjarobot_pi5/config.toml" hardware status --real
+ninjarobot-ide-tool hardware status --real
 ```
 
 Both calibrations must exist, both motion flags must be `true`, and no safety latch must be active.
@@ -1129,23 +1151,21 @@ Both calibrations must exist, both motion flags must be `true`, and no safety la
 If a Level 1 motion latch is active:
 
 ```bash
-uv run --frozen --extra hardware ninjarobot-ide-tool \
-  --config "$HOME/.config/ninjarobot_pi5/config.toml" \
+ninjarobot-ide-tool \
   motion resume --confirm
 ```
 
 If a driver-failure Level 2 latch is active:
 
 ```bash
-uv run --frozen --extra hardware ninjarobot-ide-tool \
-  --config "$HOME/.config/ninjarobot_pi5/config.toml" \
+ninjarobot-ide-tool \
   system resume --confirm
 ```
 
 If the IDE says the hardware is already owned by the agent service, use the agent instead:
 
 ```bash
-uv run --frozen ninjarobot-agent
+ninjarobot-agent
 # Then type: /resume
 # Then type: RESUME
 ```
@@ -1157,7 +1177,7 @@ uv run --frozen ninjarobot-agent
 ```bash
 systemctl status ollama --no-pager
 ollama list
-uv run --frozen ninjarobot-agent service status
+ninjarobot-agent service status
 tail -n 100 "$HOME/.local/state/ninjarobot_pi5/agent-service.log"
 ```
 
@@ -1168,8 +1188,8 @@ tail -n 100 "$HOME/.local/state/ninjarobot_pi5/agent-service.log"
 Another browser holds the one controller lease. Close that browser and wait about 10 seconds, or restart the web interface:
 
 ```bash
-uv run --frozen ninjarobot-agent web stop
-uv run --frozen ninjarobot-agent web start
+ninjarobot-agent web stop
+ninjarobot-agent web start
 ```
 
 ---
@@ -1179,8 +1199,8 @@ uv run --frozen ninjarobot-agent web start
 Restart the web interface to upgrade older certificates:
 
 ```bash
-uv run --frozen ninjarobot-agent web stop
-uv run --frozen ninjarobot-agent web start
+ninjarobot-agent web stop
+ninjarobot-agent web start
 grep -c 'BEGIN CERTIFICATE' \
   "$HOME/.config/ninjarobot_pi5/tls/agent-cert.pem"
 ```
@@ -1188,7 +1208,7 @@ grep -c 'BEGIN CERTIFICATE' \
 The count should be `2`. If Chrome offers **Advanced → Proceed**, accept it and reload. For Safari and reliable browser microphone access, install the public CA:
 
 ```bash
-uv run --frozen ninjarobot-agent web export-ca \
+ninjarobot-agent web export-ca \
   --output "$HOME/ninjarobotpi5-local-ca.pem"
 ```
 
@@ -1206,8 +1226,7 @@ test -f "$HOME/whisper.cpp/models/ggml-base.bin"
 If whisper.cpp is installed in a different location, pass the paths explicitly:
 
 ```bash
-uv run --frozen --extra hardware ninjarobot-agent \
-  --config "$NINJAROBOT_CONFIG" \
+ninjarobot-agent \
   --whisper-command /absolute/path/to/whisper-cli \
   --whisper-model /absolute/path/to/ggml-model.bin \
   service start --real
@@ -1252,16 +1271,16 @@ may show an ngrok-controlled interstitial and have endpoint, request, and data
 limits; review [ngrok's current limits](https://ngrok.com/docs/pricing-limits/free-plan-limits)
 before relying on the service.
 
-Start the agent service, launch `uv run --frozen --extra hardware
-ninjarobot-agent`, select **11. Remote Access**, then select **1. Configure
-token, install ngrok, and activate**. The same menu provides Status, current
+Start the agent service, launch `ninjarobot-agent`, select **11. Remote
+Access**, then select **1. Configure token, install ngrok, and activate**. The
+same menu provides Status, current
 pairing URL, rotation, deactivation, and credential removal. Scriptable
 equivalents are:
 
 ```bash
-uv run --frozen --extra hardware ninjarobot-agent remote configure
-uv run --frozen --extra hardware ninjarobot-agent remote activate
-uv run --frozen ninjarobot-agent remote pairing-url
+ninjarobot-agent remote configure
+ninjarobot-agent remote activate
+ninjarobot-agent remote pairing-url
 ```
 
 The first command prompts twice for the ngrok authtoken and explicitly installs
@@ -1288,10 +1307,10 @@ healthy public HTTPS endpoint exists; it is not a separate number.
 Useful management commands:
 
 ```bash
-uv run --frozen ninjarobot-agent remote status
-uv run --frozen ninjarobot-agent remote rotate-pairing
-uv run --frozen ninjarobot-agent remote deactivate
-uv run --frozen ninjarobot-agent remote remove-credentials --confirm
+ninjarobot-agent remote status
+ninjarobot-agent remote rotate-pairing
+ninjarobot-agent remote deactivate
+ninjarobot-agent remote remove-credentials --confirm
 ```
 
 Rotation revokes all existing remote browser sessions. Deactivation stops the
@@ -1324,7 +1343,9 @@ obtains a short-lived confirmation and then shows separate **Power off** and
 **Cancel** actions. Cancel changes nothing. Confirmation first stops hardware
 and voice and closes agent resources. Phase 8.6 installs the narrow helper for
 the final OS shutdown; the agent never receives general passwordless sudo. If
-that OS request is denied, the robot remains stopped and the local recovery is:
+the helper or sudo rule is missing, preflight rejects the request before the
+Agent stops. A rare failure after confirmed cleanup leaves the robot safely
+stopped; the local recovery is:
 
 ```bash
 sudo systemctl poweroff
@@ -1332,11 +1353,12 @@ sudo systemctl poweroff
 
 #### 📱 Enable QR Onboarding
 
-Set `[onboarding].enabled = true` in the robot configuration before starting
-the service. Startup initializes the robot and web server without moving, then
+Remote activation and automatic-start setup enable onboarding automatically;
+beginners should not edit TOML. Startup initializes the robot and web server
+without moving, then
 shows **Connecting…** while configured ngrok access starts. A healthy remote
 endpoint displays its pairing QR and waits; an actual tunnel/configuration/
-network failure displays the local `https://ninjarobot-pi5.local:8443` pairing
+network failure displays the local `https://ninjarobotpi5.local:8443` pairing
 QR while remote retries. If remote access is disabled, the local QR appears
 immediately.
 
@@ -1356,13 +1378,14 @@ installed environment. First validate and back up:
 ```bash
 ninjarobot-agent deployment validate
 ninjarobot-agent deployment backup --output ~/ninjarobot-backup.tar.gz
-ninjarobot-agent deployment install --confirm
+ninjarobot-agent deployment setup --confirm
 ninjarobot-agent deployment status
 ```
 
-Installation uses sudo only to place the root-owned unit, fixed power-off
-helper, and narrow sudoers rule. It leaves auto-start disabled and does not
-start hardware. Test safely with raised wheels:
+Setup uses sudo only to place the root-owned unit, fixed power-off helper, and
+narrow sudoers rule. It checks that all three files exist, enables the next-boot
+service, and only then persists onboarding and web power-off settings. A partial
+or failed installation remains disabled. Test safely with raised wheels:
 
 ```bash
 ninjarobot-agent deployment start
@@ -1370,14 +1393,13 @@ ninjarobot-agent deployment logs --lines 200
 ninjarobot-agent deployment stop
 ```
 
-Enable the next-boot real-hardware workflow only after the test succeeds:
+Reboot only after the raised-wheel test succeeds:
 
 ```bash
-ninjarobot-agent deployment enable --confirm
 sudo reboot
 ```
 
-Enablement also turns on QR onboarding and paired web power-off. Useful
+Setup also turns on QR onboarding and paired web power-off. Useful
 maintenance and recovery commands are:
 
 ```bash
@@ -1414,42 +1436,33 @@ All three providers use API keys only. Browser logins, Google OAuth, and Anthrop
 **OpenAI:**
 
 ```bash
-uv run --frozen ninjarobot-agent \
-  --config "$NINJAROBOT_CONFIG" provider set-api-key openai
+ninjarobot-agent provider set-api-key openai
 
-uv run --frozen ninjarobot-agent \
-  --config "$NINJAROBOT_CONFIG" provider health openai
+ninjarobot-agent provider health openai
 
-uv run --frozen ninjarobot-agent \
-  --config "$NINJAROBOT_CONFIG" model list --provider openai
+ninjarobot-agent model list --provider openai
 ```
 
 **Google Gemini:**
 
 ```bash
-uv run --frozen ninjarobot-agent \
-  --config "$NINJAROBOT_CONFIG" provider set-api-key gemini
+ninjarobot-agent provider set-api-key gemini
 
-uv run --frozen ninjarobot-agent \
-  --config "$NINJAROBOT_CONFIG" provider health gemini
+ninjarobot-agent provider health gemini
 ```
 
 **Anthropic:**
 
 ```bash
-uv run --frozen ninjarobot-agent \
-  --config "$NINJAROBOT_CONFIG" provider set-api-key anthropic
+ninjarobot-agent provider set-api-key anthropic
 
-uv run --frozen ninjarobot-agent \
-  --config "$NINJAROBOT_CONFIG" provider health anthropic
+ninjarobot-agent provider health anthropic
 ```
 
 Select a model once you see the available list:
 
 ```bash
-uv run --frozen ninjarobot-agent \
-  --config "$NINJAROBOT_CONFIG" \
-  model select MODEL_ID --provider PROVIDER_ID
+ninjarobot-agent model select MODEL_ID --provider PROVIDER_ID
 ```
 
 Do not copy a model name from an old guide — provider catalogs change over time.
@@ -1472,26 +1485,23 @@ Use this procedure after changing buzzer, display, camera, or microphone setting
 
 1. Exit any running `ninjarobot-ide-tool` process.
 2. Save the new settings using the standalone tool with its canonical path.
-3. Set the integrated path:
+3. Return to the project environment:
 
 ```bash
 cd "$HOME/NinjaRobotPi5"
-export NINJAROBOT_CONFIG="$HOME/.config/ninjarobot_pi5/config.toml"
+source .venv/bin/activate
 ```
 
 4. Confirm discovery finds the updated files:
 
 ```bash
-uv run --frozen ninjarobot-ide-tool config discover
+ninjarobot-ide-tool config discover
 ```
 
 5. Preview the update (uses the current integrated file as base):
 
 ```bash
-uv run --frozen ninjarobot-ide-tool \
-  --config "$NINJAROBOT_CONFIG" \
-  config import \
-  --destination "$NINJAROBOT_CONFIG"
+ninjarobot-ide-tool config import
 ```
 
 6. Review the preview carefully — confirm safety values, servo roles, and AI settings are still correct.
@@ -1499,24 +1509,13 @@ uv run --frozen ninjarobot-ide-tool \
 7. Apply:
 
 ```bash
-uv run --frozen ninjarobot-ide-tool \
-  --config "$NINJAROBOT_CONFIG" \
-  config import \
-  --destination "$NINJAROBOT_CONFIG" \
-  --apply \
-  --overwrite
-
-chmod 600 "$NINJAROBOT_CONFIG"
+ninjarobot-ide-tool config import --apply --overwrite
 ```
 
 8. Validate and verify hardware:
 
 ```bash
-uv run --frozen ninjarobot_pi5_cli config validate \
-  --config "$NINJAROBOT_CONFIG"
-
-uv run --frozen --extra hardware ninjarobot-ide-tool \
-  --config "$NINJAROBOT_CONFIG" hardware status --real
+ninjarobot-ide-tool hardware status
 ```
 
 `--overwrite` is required because the destination already exists. It does not overwrite any standalone `pi5*` JSON file.
@@ -1536,20 +1535,20 @@ Tavily lets the AI search the internet for current information. It is optional �
 
 ```bash
 cd "$HOME/NinjaRobotPi5"
-uv run --frozen ninjarobot-agent secret set TAVILY_API_KEY
+ninjarobot-agent secret set TAVILY_API_KEY
 ```
 
 3. Install the bundled Tavily preset:
 
 ```bash
-uv run --frozen ninjarobot-agent mcp add --preset tavily --id tavily
+ninjarobot-agent mcp add --preset tavily --id tavily
 ```
 
 4. Verify the connection:
 
 ```bash
-uv run --frozen ninjarobot-agent mcp health tavily
-uv run --frozen ninjarobot-agent mcp tools tavily
+ninjarobot-agent mcp health tavily
+ninjarobot-agent mcp tools tavily
 ```
 
 Expected result: the server is healthy and the API key shows as redacted (not visible).
@@ -1557,7 +1556,7 @@ Expected result: the server is healthy and the API key shows as redacted (not vi
 5. Run a test search:
 
 ```bash
-uv run --frozen ninjarobot-agent \
+ninjarobot-agent \
   mcp test tavily --tool tavily-search \
   --arguments '{"query":"Raspberry Pi official news","max_results":3}'
 ```
@@ -1613,8 +1612,8 @@ Stop the agent and integrated IDE before opening any standalone hardware tool.
 Stop all tools and services before updating:
 
 ```bash
-uv run --frozen ninjarobot-agent web stop
-uv run --frozen ninjarobot-agent service stop
+ninjarobot-agent web stop
+ninjarobot-agent service stop
 
 cd "$HOME/NinjaRobotPi5"
 git status --short
@@ -1622,10 +1621,10 @@ git pull --ff-only
 uv sync --frozen --extra hardware
 ./scripts/bootstrap-rpi-camera-workspace.sh --skip-apt
 
-uv run --frozen --extra hardware python \
+python \
   scripts/verify_workspace_driver_sources.py
-uv run --frozen python scripts/verify_immutable_drivers.py
-uv run --frozen pytest -q
+python scripts/verify_immutable_drivers.py
+pytest -q
 ```
 
 `git pull --ff-only` refuses to combine unexpected local source changes with the downloaded update. Your personal configuration under `~/.config` and retained media under `~/.local` remain outside the Git checkout and are never affected by updates.

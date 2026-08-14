@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, cast
 
@@ -17,8 +18,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
 
 
 def get_default_config_filepath() -> Path:
-    """Get the default config file path."""
-    return Path(__file__).parent / CONFIG_FILE_NAME
+    """Get the per-user configuration path."""
+    config_home = os.environ.get("XDG_CONFIG_HOME")
+    base_dir = Path(config_home).expanduser() if config_home else Path.home() / ".config"
+    return base_dir / "pi5vl53l0x" / CONFIG_FILE_NAME
 
 
 def load_config(filepath: Path | str | None = None) -> dict[str, Any]:

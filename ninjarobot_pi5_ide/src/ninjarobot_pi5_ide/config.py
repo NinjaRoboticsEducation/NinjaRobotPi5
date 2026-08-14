@@ -52,8 +52,10 @@ class ServoConfig(ConfigModel):
     enabled: bool = True
     endpoints: tuple[str, ...] = DEFAULT_SERVO_ENDPOINTS
     calibration_file: NonEmptyText = "~/.config/pi5servo/servo.json"
-    motion_enabled: bool = False
-    group_motion_enabled: bool = False
+    # Physical motion is available after calibration on the Pi. Agent-directed
+    # motion still requires the separate per-session /arm authorization.
+    motion_enabled: bool = True
+    group_motion_enabled: bool = True
 
     @field_validator("endpoints", mode="before")
     @classmethod
@@ -264,8 +266,8 @@ class VoiceInputConfig(ConfigModel):
     """Bounded Phase 8 wake-word and command-capture configuration."""
 
     enabled: bool = False
-    model_resource: Literal["ninjarobot_pi5_ide/assets/hey_Ninja.onnx"] = (
-        "ninjarobot_pi5_ide/assets/hey_Ninja.onnx"
+    model_resource: Literal["package://ninjarobot_pi5_ide/assets/hey_Ninja.onnx"] = (
+        "package://ninjarobot_pi5_ide/assets/hey_Ninja.onnx"
     )
     inference_framework: Literal["onnx"] = "onnx"
     wake_threshold: Annotated[float, Field(ge=0.1, le=0.95)] = 0.5
@@ -280,6 +282,17 @@ class VoiceInputConfig(ConfigModel):
     frame_milliseconds: Literal[80] = 80
     language: Literal["en", "ja", "zh-TW", "zh-CN"] = "en"
     retry_limit: Annotated[int, Field(ge=0, le=5)] = 2
+
+    @field_validator("model_resource", mode="before")
+    @classmethod
+    def migrate_legacy_model_resource(cls, value: object) -> object:
+        """Normalize historical checkout-looking paths to the bundled asset URI."""
+        if value in {
+            "ninjarobot_pi5_ide/assets/hey_Ninja.onnx",
+            "pi5mic/voiceinput/hey_Ninja.onnx",
+        }:
+            return "package://ninjarobot_pi5_ide/assets/hey_Ninja.onnx"
+        return value
 
 
 class RemoteAccessConfig(ConfigModel):

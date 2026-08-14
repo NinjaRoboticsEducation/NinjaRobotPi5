@@ -308,6 +308,11 @@ async def run_service(arguments: argparse.Namespace) -> None:
     )
     remote_holder: dict[str, RemoteAccessService] = {}
     onboarding_holder: dict[str, OnboardingCoordinator] = {}
+    onboarding_enabled = (
+        config.onboarding.enabled
+        or config.remote_access.enabled
+        or config.deployment.auto_start_enabled
+    )
 
     async def authenticated_controller(remote: bool, paired: bool) -> None:
         service = remote_holder.get("service")
@@ -316,6 +321,12 @@ async def run_service(arguments: argparse.Namespace) -> None:
         coordinator = onboarding_holder.get("coordinator")
         if coordinator is not None:
             await coordinator.controller_connected(paired=paired)
+
+    async def local_controller_connected() -> None:
+        """The owner-only Unix socket is an authenticated local controller."""
+        coordinator = onboarding_holder.get("coordinator")
+        if coordinator is not None:
+            await coordinator.controller_connected(paired=True)
 
     server_holder: dict[str, AgentIPCServer] = {}
 
@@ -340,7 +351,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
         static_directory=Path(__file__).with_name("web_static"),
         pairing=pairing,
         poweroff=poweroff,
-        require_local_pairing=config.onboarding.enabled,
+        require_local_pairing=onboarding_enabled,
         on_authenticated_controller=authenticated_controller,
     )
     web = WebServerManager(
@@ -371,7 +382,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
     )
     remote_holder["service"] = remote_access
     onboarding = OnboardingCoordinator(
-        enabled=config.onboarding.enabled,
+        enabled=onboarding_enabled,
         local_origin=f"https://{mdns_hostname()}:{arguments.web_port}",
         ide=ide,
         runtime=runtime,
@@ -387,13 +398,14 @@ async def run_service(arguments: argparse.Namespace) -> None:
         ownership=ServiceOwnership(arguments.lock),
         web=web,
         remote_access=remote_access,
+        on_local_controller=local_controller_connected,
     )
     server_holder["server"] = server
     loop_object = asyncio.get_running_loop()
     for signal_number in (signal.SIGINT, signal.SIGTERM):
         loop_object.add_signal_handler(signal_number, server.request_stop)
     await server.start()
-    if config.onboarding.enabled:
+    if onboarding_enabled:
         await web.start()
         await onboarding.start(remote_enabled=config.remote_access.enabled)
     else:

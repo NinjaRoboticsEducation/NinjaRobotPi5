@@ -44,7 +44,7 @@ def _create_buzzer(pi, config_path=None):
     "-C",
     type=str,
     default=None,
-    help="Path to config file (default: buzzer.json).",
+    help="Path to config file (default: ~/.config/pi5buzzer/buzzer.json).",
 )
 def cli(ctx, config_file):
     """pi5buzzer CLI tool."""

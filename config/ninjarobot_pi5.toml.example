@@ -8,8 +8,8 @@ gpio = 27
 enabled = true
 endpoints = ["gpio12", "gpio13"]
 calibration_file = "~/.config/pi5servo/servo.json"
-motion_enabled = false
-group_motion_enabled = false
+motion_enabled = true
+group_motion_enabled = true
 
 [hardware.display]
 enabled = true
@@ -86,7 +86,7 @@ face_data_directory = "~/.local/share/ninjarobot_pi5/faces"
 # Phase 8 release features remain opt-in. Enabling voice does not arm motion.
 [voice_input]
 enabled = false
-model_resource = "ninjarobot_pi5_ide/assets/hey_Ninja.onnx"
+model_resource = "package://ninjarobot_pi5_ide/assets/hey_Ninja.onnx"
 inference_framework = "onnx"
 wake_threshold = 0.5
 vad_enabled = true

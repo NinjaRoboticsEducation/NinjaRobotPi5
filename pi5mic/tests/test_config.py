@@ -14,9 +14,9 @@ from pi5mic.config.config_manager import (
 from pi5mic.errors import ConfigError
 
 
-def test_default_config_path_uses_cwd(tmp_path, monkeypatch) -> None:
-    monkeypatch.chdir(tmp_path)
-    assert get_default_config_filepath() == tmp_path / "mic.json"
+def test_default_config_path_uses_xdg_config_home(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    assert get_default_config_filepath() == tmp_path / "pi5mic" / "mic.json"
 
 
 def test_load_returns_defaults_when_file_is_missing(tmp_path) -> None:

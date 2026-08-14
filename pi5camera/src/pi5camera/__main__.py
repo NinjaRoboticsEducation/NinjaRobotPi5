@@ -75,7 +75,7 @@ class LazyGroup(click.Group):
     "-C",
     type=click.Path(path_type=Path),
     default=None,
-    help="Path to camera config file (default: ./camera.json).",
+    help="Path to camera config file (default: ~/.config/pi5camera/camera.json).",
 )
 @click.pass_context
 def cli(ctx: click.Context, config_file: Path | None) -> None:

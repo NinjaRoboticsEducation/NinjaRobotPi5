@@ -303,12 +303,22 @@ def test_robot_assembly_shares_expression_devices_and_blocks_unsafe_motion_start
         config = load_robot_config(EXAMPLE)
         config = config.model_copy(
             update={
+                "hardware": config.hardware.model_copy(
+                    update={
+                        "servos": config.hardware.servos.model_copy(
+                            update={
+                                "motion_enabled": False,
+                                "group_motion_enabled": False,
+                            }
+                        )
+                    }
+                ),
                 "behaviors": BehaviorConfig(
                     user_directory=str(tmp_path / "behaviors"),
                     safety_state_file=str(tmp_path / "safety.json"),
                     clear_reading_timeout_seconds=1.0,
                     system_stopped_display_seconds=0.0,
-                )
+                ),
             }
         )
         robot = RobotAssembly(

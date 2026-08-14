@@ -16,6 +16,7 @@ from .release_foundations import ReleaseFeatureState, ReleaseStatusRegistry
 
 NONCE_LIFETIME_SECONDS = 30.0
 LOGGER = logging.getLogger(__name__)
+HelperProbe = Callable[[Path], tuple[bool, str | None]]
 
 
 class ShutdownRuntime(Protocol):
@@ -40,6 +41,7 @@ class PoweroffCoordinator:
         release_status: ReleaseStatusRegistry,
         request_service_stop: Callable[[], None],
         clock: Callable[[], float] = time.monotonic,
+        helper_probe: HelperProbe | None = None,
     ) -> None:
         self._enabled = enabled
         self._helper_path = Path(helper_path)
@@ -49,6 +51,7 @@ class PoweroffCoordinator:
         self._release_status = release_status
         self._request_service_stop = request_service_stop
         self._clock = clock
+        self._helper_probe = helper_probe or _probe_poweroff_helper
         self._nonces: dict[str, tuple[str, float]] = {}
         self._requested = False
         self._lock = asyncio.Lock()
@@ -61,6 +64,7 @@ class PoweroffCoordinator:
         """Issue one nonce only to an already validated active controller lease."""
         if not self._enabled:
             raise PermissionError("web power-off is disabled")
+        await self._require_helper_ready()
         nonce = secrets.token_urlsafe(32)
         async with self._lock:
             self._prune()
@@ -74,6 +78,7 @@ class PoweroffCoordinator:
         """Consume the nonce before cleanup so replay cannot re-enter shutdown."""
         if not self._enabled:
             raise PermissionError("web power-off is disabled")
+        await self._require_helper_ready()
         if not nonce or len(nonce) > 128:
             raise PermissionError("power-off confirmation nonce is invalid")
         async with self._lock:
@@ -125,13 +130,8 @@ class PoweroffCoordinator:
         """Run only after web, tunnel, SQLite, IDE, and agent cleanup completed."""
         if not self._requested:
             return
+        await self._require_helper_ready(runtime_error=True)
         helper = self._helper_path
-        if not helper.is_absolute() or helper != Path("/usr/libexec/ninjarobot-poweroff"):
-            raise RuntimeError("power-off helper path is not approved")
-        if not helper.is_file() or helper.is_symlink():
-            raise RuntimeError(
-                "power-off helper is unavailable; run `sudo systemctl poweroff` locally"
-            )
         try:
             completed = await asyncio.to_thread(
                 subprocess.run,
@@ -155,3 +155,38 @@ class PoweroffCoordinator:
     def _prune(self) -> None:
         now = self._clock()
         self._nonces = {lease: record for lease, record in self._nonces.items() if record[1] > now}
+
+    async def _require_helper_ready(self, *, runtime_error: bool = False) -> None:
+        ready, detail = await asyncio.to_thread(self._helper_probe, self._helper_path)
+        if ready:
+            return
+        message = (
+            "web power-off is unavailable: "
+            + (detail or "deployment helper is not ready")
+            + "; use Auto-Start & Deployment to install or repair it"
+        )
+        if runtime_error:
+            raise RuntimeError(message)
+        raise PermissionError(message)
+
+
+def _probe_poweroff_helper(helper: Path) -> tuple[bool, str | None]:
+    """Verify the fixed helper and passwordless narrow sudo rule without mutating state."""
+    approved = Path("/usr/libexec/ninjarobot-poweroff")
+    if not helper.is_absolute() or helper != approved:
+        return False, "power-off helper path is not approved"
+    if not helper.is_file() or helper.is_symlink():
+        return False, "power-off helper file is missing"
+    try:
+        completed = subprocess.run(
+            ["/usr/bin/sudo", "-n", "-l", str(helper)],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5.0,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False, "power-off sudo authorization could not be checked"
+    if completed.returncode != 0:
+        return False, "passwordless power-off sudo authorization is missing"
+    return True, None

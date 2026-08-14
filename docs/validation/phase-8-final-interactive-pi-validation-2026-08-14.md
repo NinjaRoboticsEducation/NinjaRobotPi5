@@ -46,6 +46,7 @@ cd "$HOME/NinjaRobotPi5"
 git status --short
 uv sync --frozen --extra hardware
 ./scripts/bootstrap-rpi-camera-workspace.sh --skip-apt
+source .venv/bin/activate
 ```
 
 Expected: dependency synchronization completes, and any pre-existing local
@@ -57,7 +58,7 @@ changes merely to run validation.
 Ensure the agent service is stopped, then launch:
 
 ```bash
-uv run --frozen --extra hardware ninjarobot-ide-tool
+ninjarobot-ide-tool
 ```
 
 Use these menu workflows:
@@ -65,9 +66,8 @@ Use these menu workflows:
 1. **Hardware Configurations → Show Current Configuration**. Confirm display,
    buzzer, I2C, camera, microphone, servo endpoints, servo roles, calibration,
    and safety paths point to the intended user configuration.
-2. **Simulation**. Run Greeting, Celebrate, Emergency Stop, and Resume without
-   physical hardware. Expected: all finish without a traceback.
-3. Return to the main menu and use **Run Robot Behaviors** on real hardware.
+2. Optionally use **Simulation** for one hardware-free preview.
+3. Use **Run Robot Behaviors** directly on real hardware.
    Run Greeting first. Expected: face/display and buzzer operate and Idle
    returns.
 4. Run **Emergency Stop**. Expected: active sound/motion/presentation stops and
@@ -89,12 +89,15 @@ check.
 Launch:
 
 ```bash
-uv run --frozen --extra hardware ninjarobot-agent
+ninjarobot-agent
 ```
 
 1. Select **4. Start Agent Service**.
 2. Select **2. real hardware**.
 3. Select **2. Agent Status**.
+4. Select **12. MCP Tools (Built-in and External)**. Expected: IDE,
+   robot-control, and memory providers/tools are listed even when the external
+   server list is empty.
 
 Expected: one real-hardware service is running, the IDE and trusted tool
 providers are ready, and the status names the expected model/configuration.
@@ -193,6 +196,7 @@ In the Agent Interactive Tool choose **11. Remote Access**.
    endpoint/process.
 9. Select **5. Deactivate**. Expected: public URL clears and remote sessions are
    revoked while local service/memory/hardware remain available.
+10. Activate remote access again before the boot-onboarding test.
 
 If Status reports a permanent authentication/account/configuration error,
 correct it and explicitly activate again. The supervisor should not continuously
@@ -205,15 +209,17 @@ usage traceback.
 In the Agent Interactive Tool select **15. Auto-Start & Deployment**.
 
 1. Select **1. Show deployment status** and record the result.
-2. Select **9. Back up configuration and user data** and provide a private
+2. Select **7. Back up configuration and user data** and provide a private
    archive path.
-3. Select **2. Install service (disabled)** and type `INSTALL`. Expected: the
-   unit/helper/policy install, but boot startup remains disabled.
-4. Select **6. Start installed service now** with wheels raised.
-5. Select **8. Show recent service logs**. Expected: one service owns IDE, web,
+3. Select **2. Install/repair and enable automatic startup** and type `ENABLE`.
+   Expected: `systemd_unit`, `poweroff_helper`, and `sudoers_rule` are all true,
+   and boot enablement is persisted only after all three install successfully.
+4. Select **4. Start installed service now** with wheels raised.
+5. Select **6. Show recent service logs**. Expected: one service owns IDE, web,
    voice, onboarding, and remote lifecycle; the source path matches this clone.
-6. Select **7. Stop installed service**. Expected: all hardware releases.
-7. Select **4. Enable automatic real-hardware startup** and type `ENABLE`.
+6. Select **5. Stop installed service**. Expected: all hardware releases.
+7. Select **1. Show deployment status** again; installed and enabled must both
+   be true and every artifact must remain present.
 8. Reboot the Pi normally.
 9. Expected after boot: QR onboarding appears without Greeting or motion. If a
    configured ngrok endpoint is healthy, its remote QR remains while waiting.
@@ -236,22 +242,26 @@ From the paired active browser, open the hamburger and choose Power Off.
 4. After power is fully off, inspect the filesystem/log/database on the next
    boot. Expected: no corruption and no restart loop.
 
-This is a power-risk test. If the helper is denied and Linux remains running,
-the robot must remain stopped; use the documented local orderly shutdown. Use
-the physical disconnect immediately if any actuator remains unsafe.
+This is a power-risk test. If deployment is incomplete, the browser must reject
+the request before the Agent or hardware is stopped and direct the operator to
+repair deployment. A rare helper failure after confirmed cleanup leaves the
+robot stopped; use the documented local orderly shutdown. Use the physical
+disconnect immediately if any actuator remains unsafe.
 
 ## 3. Clean-clone acceptance
 
 Use a new empty directory; do not delete or overwrite the existing checkout.
 
 ```bash
-cd "$HOME"
+mkdir -p "$HOME/NinjaRobotPi5_test"
+cd "$HOME/NinjaRobotPi5_test"
 git clone --branch public_v01 --single-branch \
   https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git \
-  NinjaRobotPi5_test
-cd "$HOME/NinjaRobotPi5_test"
+  NinjaRobotPi5
+cd "$HOME/NinjaRobotPi5_test/NinjaRobotPi5"
 uv sync --frozen --extra hardware
 ./scripts/bootstrap-rpi-camera-workspace.sh
+source .venv/bin/activate
 ```
 
 Follow Installation Guide Steps 4 and 5 to create the six standalone hardware
@@ -264,7 +274,10 @@ Then repeat Sections 2.2 through 2.9 from inside `NinjaRobotPi5_test`. The
 service-start marker and deployment logs must show the test checkout—not the
 old checkout. Pay particular attention to these clean-install conditions:
 
-- the bundled `hey_Ninja.onnx` and openWakeWord assets load offline;
+- `pi5camera camera-tool` captures through the apt-managed system-Python bridge
+  without adding system site packages to `.venv`;
+- all six standalone tools use `~/.config/pi5*/` without explicit path flags;
+- the bundled `hey_Ninja.onnx` package resource and openWakeWord assets load offline;
 - the integrated agent reads `~/.config/ninjarobot_pi5/config.toml`, not a
   checkout-root `mic.json`;
 - ngrok reuses or atomically replaces its owner-private installed binary;
@@ -272,8 +285,8 @@ old checkout. Pay particular attention to these clean-install conditions:
   after model changes and interface changes;
 - exactly one process owns display, buzzer, servo, camera, distance sensor, and
   microphone resources;
-- auto-start points to the clean clone only after an explicit deployment
-  install/upgrade and enable confirmation.
+- auto-start points to the clean clone only after the explicit transactional
+  setup confirmation.
 
 If the clean clone fails while the existing checkout passes, stop the service
 through the Interactive Tool, compare the startup source marker and private

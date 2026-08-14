@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import click
 
+from ..config import get_default_config_path
 from ..core import parse_servo_endpoint
 from ._common import (
     LEGACY_BACKENDS,
@@ -20,7 +21,7 @@ from ._common import (
     "-c",
     "--config",
     type=click.Path(),
-    default="servo.json",
+    default=str(get_default_config_path()),
     help="Path to configuration file.",
 )
 @click.option(

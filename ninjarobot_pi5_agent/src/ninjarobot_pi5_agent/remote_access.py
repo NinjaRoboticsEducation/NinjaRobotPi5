@@ -396,6 +396,9 @@ def _persist_remote_access_enabled(config_path: str | Path, enabled: bool) -> No
     config = load_robot_config(config_path)
     payload = config.model_dump(mode="python")
     payload["remote_access"]["enabled"] = enabled
+    # Remote activation opts into the QR-first release startup flow. Turning
+    # remote access off preserves that flow only when boot deployment needs it.
+    payload["onboarding"]["enabled"] = enabled or payload["deployment"]["auto_start_enabled"]
     save_robot_config(type(config).model_validate(payload), config_path, overwrite=True)
 
 

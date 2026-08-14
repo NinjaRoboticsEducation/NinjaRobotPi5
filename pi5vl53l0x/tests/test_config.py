@@ -82,11 +82,11 @@ class TestLoadSave:
 class TestDefaultPath:
     """Tests for default path resolution."""
 
-    def test_default_path_is_project_relative(self) -> None:
-        """Default config path should be relative to the module."""
+    def test_default_path_uses_xdg_config_home(self, tmp_path, monkeypatch) -> None:
+        """Default config path should be writable and independent of checkout."""
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
         path = get_default_config_filepath()
-        assert path.name == "vl53l0x.json"
-        assert "config" in str(path.parent)
+        assert path == tmp_path / "pi5vl53l0x" / "vl53l0x.json"
 
 
 class TestConfigManager:

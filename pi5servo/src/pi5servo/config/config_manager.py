@@ -1,6 +1,7 @@
 """Configuration manager for servo calibration data and backend settings."""
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -17,14 +18,14 @@ DEFAULT_BACKEND_CONFIG = {
 
 
 def get_default_config_path() -> Path:
-    """Get the default config file path (relative to this package).
+    """Get the per-user configuration path.
 
     Returns:
         Path to default servo.json location
     """
-    # Look for config in the package's parent (library root) first
-    package_dir = Path(__file__).parent.parent
-    return package_dir / DEFAULT_CONFIG_FILE
+    config_home = os.environ.get("XDG_CONFIG_HOME")
+    base_dir = Path(config_home).expanduser() if config_home else Path.home() / ".config"
+    return base_dir / "pi5servo" / DEFAULT_CONFIG_FILE
 
 
 class ConfigManager:

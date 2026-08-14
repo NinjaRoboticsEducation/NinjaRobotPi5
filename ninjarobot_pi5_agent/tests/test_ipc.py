@@ -386,15 +386,25 @@ def test_runtime_resume_failure_stays_disarmed_and_reports_health_error(tmp_path
 def test_ipc_allows_reconnect_stream_history_clear_arm_and_stop(tmp_path) -> None:
     async def exercise() -> None:
         socket_path = tmp_path / "agent.sock"
+        connected = 0
+
+        async def local_controller_connected() -> None:
+            nonlocal connected
+            connected += 1
+
         server = AgentIPCServer(
             runtime=build_runtime(tmp_path),
             socket_path=socket_path,
             ownership=ServiceOwnership(tmp_path / "agent.lock"),
+            on_local_controller=local_controller_connected,
         )
         await server.start()
         serve_task = asyncio.create_task(server.serve())
 
         first_client = AgentIPCClient(socket_path)
+        acknowledged = await first_client.request({"command": "controller_connected"})
+        assert acknowledged["data"] == {"controller_connected": True}
+        assert connected == 1
         streamed = [
             message
             async for message in first_client.stream(

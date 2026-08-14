@@ -113,6 +113,7 @@ def test_installer_is_disabled_by_default_idempotent_and_uses_fixed_targets(
 
 def test_enable_and_disable_persist_boot_onboarding_without_deleting_data(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     spec = _spec(tmp_path)
     calls: list[list[str]] = []
@@ -123,6 +124,15 @@ def test_enable_and_disable_persist_boot_onboarding_without_deleting_data(
         return subprocess.CompletedProcess(rendered, 0, "enabled\n", "")
 
     manager = DeploymentManager(spec, runner=runner)
+    monkeypatch.setattr(
+        manager,
+        "artifact_status",
+        lambda: {
+            "systemd_unit": True,
+            "poweroff_helper": True,
+            "sudoers_rule": True,
+        },
+    )
     enabled = manager.enable(confirmed=True)
     config = load_robot_config(spec.config)
     assert enabled["next_boot"] == "real_hardware_agent_starts"
@@ -134,6 +144,25 @@ def test_enable_and_disable_persist_boot_onboarding_without_deleting_data(
     assert load_robot_config(spec.config).deployment.auto_start_enabled is False
     assert spec.secret_file.is_file()
     assert ["/usr/bin/sudo", "/usr/bin/systemctl", "disable", "--now", UNIT_NAME] in calls
+
+
+def test_enable_rejects_partial_privileged_install_before_changing_config(tmp_path: Path) -> None:
+    spec = _spec(tmp_path)
+    before = spec.config.read_bytes()
+    manager = DeploymentManager(
+        spec,
+        runner=lambda command: subprocess.CompletedProcess(list(command), 0, "", ""),
+    )
+    manager.artifact_status = lambda: {  # type: ignore[method-assign]
+        "systemd_unit": True,
+        "poweroff_helper": False,
+        "sudoers_rule": False,
+    }
+
+    with pytest.raises(RuntimeError, match="deployment is incomplete"):
+        manager.enable(confirmed=True)
+
+    assert spec.config.read_bytes() == before
 
 
 def test_backup_is_private_and_contains_only_user_data(tmp_path: Path) -> None:

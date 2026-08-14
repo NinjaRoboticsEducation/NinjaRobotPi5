@@ -7,9 +7,14 @@ from pathlib import Path
 
 import pytest
 
-from pi5camera.config.config_manager import CameraConfigManager
+from pi5camera.config.config_manager import CameraConfigManager, get_default_config_filepath
 from pi5camera.core.capture import build_output_path
 from pi5camera.errors import ConfigError
+
+
+def test_default_config_path_uses_xdg_config_home(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    assert get_default_config_filepath() == tmp_path / "pi5camera" / "camera.json"
 
 
 def test_config_defaults_are_root_aware(tmp_path: Path) -> None:

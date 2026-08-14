@@ -212,7 +212,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     deployment = commands.add_parser("deployment", help="Manage opt-in systemd auto-start.")
     deployment_commands = deployment.add_subparsers(dest="deployment_command", required=True)
-    for deployment_command in ("install", "upgrade", "enable", "uninstall"):
+    for deployment_command in ("setup", "install", "upgrade", "enable", "uninstall"):
         item = deployment_commands.add_parser(deployment_command)
         item.add_argument("--confirm", action="store_true")
     for deployment_command in (
@@ -727,6 +727,11 @@ async def _stream_chat(
 
 
 async def _chat_repl(arguments: argparse.Namespace, *, session_id: str) -> int:
+    await _service_request(
+        arguments,
+        {"command": "controller_connected", "interface": "terminal"},
+        print_result=False,
+    )
     print("NinjaRobot chat. Type /help for commands.")
     while True:
         try:
@@ -890,7 +895,9 @@ def _run_deployment_command(arguments: argparse.Namespace) -> int:
     spec = current_spec(arguments)
     manager = DeploymentManager(spec)
     command = arguments.deployment_command
-    if command in {"install", "upgrade"}:
+    if command == "setup":
+        _print_json(manager.install_and_enable(confirmed=arguments.confirm))
+    elif command in {"install", "upgrade"}:
         _print_json(
             manager.install(
                 confirmed=arguments.confirm,
@@ -1438,9 +1445,12 @@ def _configured_provider(arguments: argparse.Namespace) -> tuple[str, Any]:
 async def _service_request(
     arguments: argparse.Namespace,
     payload: dict[str, Any],
+    *,
+    print_result: bool = True,
 ) -> int:
     result = await AgentIPCClient(arguments.service_socket).request(payload)
-    _print_json(result["data"])
+    if print_result:
+        _print_json(result["data"])
     return 0
 
 
@@ -1643,7 +1653,7 @@ async def _interactive(arguments: argparse.Namespace) -> int:
             "9. Stop Web Interface\n"
             "10. Export Browser Trust Certificate\n"
             "11. Remote Access\n"
-            "12. MCP Tools\n"
+            "12. MCP Tools (Built-in and External)\n"
             "13. Agent Skills\n"
             "14. Stop Agent Service\n"
             "15. Auto-Start & Deployment\n"
@@ -1698,8 +1708,23 @@ async def _interactive(arguments: argparse.Namespace) -> int:
                 await _interactive_remote_access(arguments)
             elif choice == "12":
                 configuration = load_mcp_configuration(arguments.mcp_config)
+                service_status = await AgentIPCClient(arguments.service_socket).request(
+                    {"command": "status"}
+                )
+                status_data = service_status.get("data", {})
                 _print_json(
-                    {"servers": [server.redacted_dict() for server in configuration.servers]}
+                    {
+                        "loaded_tools": status_data.get("tools", []),
+                        "loaded_tool_providers": status_data.get("tool_providers", []),
+                        "external_servers": [
+                            server.redacted_dict() for server in configuration.servers
+                        ],
+                        "note": (
+                            "Robot, IDE, and memory providers are built in and load "
+                            "without mcp.toml. external_servers contains only optional "
+                            "third-party MCP servers."
+                        ),
+                    }
                 )
             elif choice == "13":
                 _print_json(
@@ -1740,46 +1765,42 @@ async def _interactive_deployment(arguments: argparse.Namespace) -> None:
         print(
             "\nAuto-Start & Deployment\n"
             "1. Show deployment status\n"
-            "2. Install service (disabled)\n"
-            "3. Upgrade installed service\n"
-            "4. Enable automatic real-hardware startup\n"
-            "5. Disable and stop automatic startup\n"
-            "6. Start installed service now\n"
-            "7. Stop installed service\n"
-            "8. Show recent service logs\n"
-            "9. Back up configuration and user data\n"
-            "10. Roll back from a backup\n"
-            "11. Uninstall service (preserve all user data)\n"
-            "12. Back\n"
+            "2. Install/repair and enable automatic startup\n"
+            "3. Disable and stop automatic startup\n"
+            "4. Start installed service now\n"
+            "5. Stop installed service\n"
+            "6. Show recent service logs\n"
+            "7. Back up configuration and user data\n"
+            "8. Roll back from a backup\n"
+            "9. Uninstall service (preserve all user data)\n"
+            "10. Back\n"
         )
         choice = (await asyncio.to_thread(input, "Select an option: ")).strip()
-        if choice == "12":
+        if choice == "10":
             return
         command = {
             "1": "status",
-            "2": "install",
-            "3": "upgrade",
-            "4": "enable",
-            "5": "disable",
-            "6": "start",
-            "7": "stop",
-            "8": "logs",
-            "9": "backup",
-            "10": "rollback",
-            "11": "uninstall",
+            "2": "setup",
+            "3": "disable",
+            "4": "start",
+            "5": "stop",
+            "6": "logs",
+            "7": "backup",
+            "8": "rollback",
+            "9": "uninstall",
         }.get(choice)
         if command is None:
-            print("Please choose a number from 1 through 12.")
+            print("Please choose a number from 1 through 10.")
             continue
         confirmed = False
-        if command in {"install", "upgrade", "enable", "rollback", "uninstall"}:
+        if command in {"setup", "rollback", "uninstall"}:
             prompt = (
                 "Type ENABLE to install boot startup and enable real-hardware onboarding: "
-                if command == "enable"
+                if command == "setup"
                 else f"Type {command.upper()} to confirm {command}: "
             )
             answer = (await asyncio.to_thread(input, prompt)).strip()
-            expected = "ENABLE" if command == "enable" else command.upper()
+            expected = "ENABLE" if command == "setup" else command.upper()
             if answer != expected:
                 print("Deployment action cancelled.")
                 continue

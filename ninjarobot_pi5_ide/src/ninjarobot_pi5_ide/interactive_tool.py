@@ -226,6 +226,10 @@ class InteractiveRobotSession:
         candidate = RobotAssembly(config=self.config, simulated=False)
         self.robot = candidate
         try:
+            # A replacement assembly has no live driver instances until start()
+            # completes.  Probing it first incorrectly reports every configured
+            # device as unavailable and leaves the emergency-stop face frozen.
+            await candidate.start()
             resumed = await candidate.resume_system(confirmed=True)
         except Exception:
             try:

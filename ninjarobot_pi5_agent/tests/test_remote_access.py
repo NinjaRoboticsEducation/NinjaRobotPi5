@@ -336,6 +336,8 @@ def test_remote_enable_persistence_changes_only_validated_switch(tmp_path: Path)
     disabled = load_robot_config(config_path)
 
     assert enabled.remote_access.enabled is True
+    assert enabled.onboarding.enabled is True
     assert disabled.remote_access.enabled is False
+    assert disabled.onboarding.enabled is False
     assert enabled.hardware == before.hardware
     assert enabled.providers == before.providers

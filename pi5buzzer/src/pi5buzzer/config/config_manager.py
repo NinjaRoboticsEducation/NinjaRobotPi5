@@ -28,8 +28,10 @@ _MAX_VOLUME = 255
 
 
 def get_default_config_filepath() -> str:
-    """Return the default config file path."""
-    return os.path.join(os.getcwd(), "buzzer.json")
+    """Return the per-user config path, independent of the current directory."""
+    config_home = os.environ.get("XDG_CONFIG_HOME")
+    base_dir = config_home if config_home else os.path.join(os.path.expanduser("~"), ".config")
+    return os.path.join(base_dir, "pi5buzzer", "buzzer.json")
 
 
 class BuzzerConfigManager:

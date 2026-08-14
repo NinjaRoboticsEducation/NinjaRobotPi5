@@ -6,6 +6,7 @@ import sys
 
 import click
 
+from ..config import get_default_config_path
 from ._common import (
     backend_options,
     close_runtime_handle,
@@ -27,7 +28,7 @@ from ._common import (
     "-c",
     "--config",
     type=click.Path(),
-    default="servo.json",
+    default=str(get_default_config_path()),
     help="Path to servo configuration file.",
 )
 @click.option(

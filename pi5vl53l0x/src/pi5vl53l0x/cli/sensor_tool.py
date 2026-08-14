@@ -70,7 +70,7 @@ def _create_sensor(
     "-C",
     type=str,
     default=None,
-    help="Path to config file (default: vl53l0x.json).",
+    help="Path to config file (default: ~/.config/pi5vl53l0x/vl53l0x.json).",
 )
 @click.option("--debug", "-d", is_flag=True, help="Enable debug mode.")
 def cli(ctx: click.Context, debug: bool, config_file: str | None) -> None:
@@ -310,7 +310,7 @@ def config_import(ctx: click.Context, path: str) -> None:
     "--config",
     "config_path",
     default=None,
-    help="Path to sensor config file (default: vl53l0x.json).",
+    help="Path to sensor config file (default: ~/.config/pi5vl53l0x/vl53l0x.json).",
 )
 def sensor_tool(config_path: str | None) -> None:
     """Interactive VL53L0X distance sensor tool (TUI)."""

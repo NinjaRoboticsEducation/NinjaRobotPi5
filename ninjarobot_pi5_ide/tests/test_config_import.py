@@ -54,7 +54,22 @@ def test_import_reads_supported_fields_and_never_rewrites_sources(tmp_path: Path
     write_json(camera, {"camera": {"width": 640, "height": 480}})
     write_json(
         microphone,
-        {"audio": {"input_device": "USB PnP Sound Device", "sample_rate": 44_100}},
+        {
+            "audio": {"input_device": "USB PnP Sound Device", "sample_rate": 44_100},
+            "wakeword": {
+                "model_path": "pi5mic/voiceinput/hey_Ninja.onnx",
+                "threshold": 0.62,
+                "vad_threshold": 0.25,
+                "enable_noise_suppression": True,
+                "inference_framework": "onnx",
+            },
+            "voiceinput": {
+                "max_capture_seconds": 12.0,
+                "silence_timeout_seconds": 1.5,
+                "cooldown_seconds": 2.0,
+                "vad_rms_threshold": 240,
+            },
+        },
     )
     write_json(distance, {"offset_mm": 2})
     discovered = [
@@ -74,7 +89,15 @@ def test_import_reads_supported_fields_and_never_rewrites_sources(tmp_path: Path
     assert imported.hardware.servos.calibration_file == str(servo)
     assert imported.hardware.camera.width == 640
     assert imported.hardware.microphone.sample_rate_hz == 44_100
-    assert len(report) == 6
+    assert imported.voice_input.model_resource.startswith("package://")
+    assert imported.voice_input.wake_threshold == 0.62
+    assert imported.voice_input.wake_vad_threshold == 0.25
+    assert imported.voice_input.noise_suppression_enabled is True
+    assert imported.voice_input.max_command_seconds == 12.0
+    assert imported.voice_input.silence_stop_seconds == 1.5
+    assert imported.voice_input.cooldown_seconds == 2.0
+    assert imported.voice_input.silence_rms_threshold == 240
+    assert len(report) == 8
     assert {item.path: item.path.read_bytes() for item in discovered} == before
 
 
