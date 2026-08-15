@@ -30,6 +30,34 @@ def test_tavily_preset_is_search_only_https_and_round_trips(tmp_path) -> None:
     assert preset.default_parameters["include_raw_content"] is False
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
     assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+    assert path.read_text(encoding="utf-8").startswith("schema_version = 1\n")
+
+
+def test_empty_versioned_configuration_round_trips(tmp_path) -> None:
+    path = tmp_path / "mcp.toml"
+
+    save_mcp_configuration(MCPConfiguration(), path)
+
+    assert path.read_text(encoding="utf-8") == "schema_version = 1\n"
+    assert load_mcp_configuration(path) == MCPConfiguration()
+
+
+def test_legacy_configuration_without_schema_version_defaults_to_version_one(tmp_path) -> None:
+    path = tmp_path / "mcp.toml"
+    path.write_text("servers = []\n", encoding="utf-8")
+
+    configuration = load_mcp_configuration(path)
+
+    assert configuration.schema_version == 1
+    assert configuration.servers == ()
+
+
+def test_unsupported_mcp_schema_version_is_rejected(tmp_path) -> None:
+    path = tmp_path / "mcp.toml"
+    path.write_text("schema_version = 2\nservers = []\n", encoding="utf-8")
+
+    with pytest.raises(ValidationError, match="schema_version"):
+        load_mcp_configuration(path)
 
 
 def test_legacy_tavily_raw_tool_name_is_migrated_without_rewriting(tmp_path) -> None:

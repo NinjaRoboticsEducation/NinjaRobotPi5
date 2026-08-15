@@ -1,20 +1,23 @@
 # Phase 8.6 systemd and Boot Lifecycle Raspberry Pi Checklist
 
-The deployment tests validate rendering, `systemd-analyze verify`, fixed
-privilege targets, disabled-by-default installation, backup/rollback, and data
+The deployment tests validate rendering, strict robot/versioned-MCP preflight,
+`systemd-analyze verify`, fixed privilege targets, disabled-by-default
+installation, start-limit recovery, IPC readiness, backup/rollback, and data
 preservation. The following real Pi tests remain mandatory.
 
 ## Safe installation and smoke tests
 
-1. Back up user data:
-   `ninjarobot-agent deployment backup --output ~/ninjarobot-pre-boot.tar.gz`.
-2. Run `ninjarobot-agent deployment validate` and correct every missing path.
-3. Run `ninjarobot-agent deployment install --confirm`.
-4. Confirm `deployment status` reports installed but disabled and no service
-   started. Inspect `/etc/systemd/system/ninjarobot-agent.service`,
-   `/usr/libexec/ninjarobot-poweroff`, and
-   `/etc/sudoers.d/ninjarobot-poweroff` ownership/modes.
-5. Run `deployment start`, inspect QR onboarding, then `deployment stop`.
+1. Raise both wheels, open `ninjarobot-agent`, and select **12. Startup Agent
+   Deployment**.
+2. Select **3. Show startup Agent status**. Record installed, enabled, running,
+   ready, and the structured systemd result/restart/exit fields.
+3. Select **1. Install and deploy automatic startup Agent**, type `ENABLE`, and
+   wait for the bounded readiness result.
+4. Confirm all three artifacts are true and the result reports
+   `running_now: true` and `ready: true`. Inspect the installed paths only with
+   appropriate administrator access if advanced evidence is required.
+5. Select **3. Show startup Agent status** and confirm installed, enabled,
+   running, and ready remain true.
 
 Expected: the service runs as the non-root robot user with one real-hardware
 agent process, journald receives output, and clean stop is not restarted.
@@ -24,8 +27,8 @@ Rollback: `ninjarobot-agent deployment disable`; if necessary run
 
 ## Boot, device, and no-network tests
 
-1. Raise the wheels, keep the physical cutoff reachable, and run
-   `ninjarobot-agent deployment enable --confirm`.
+1. Keep the wheels raised and physical cutoff reachable after the confirmed
+   Interactive Tool deployment.
 2. Reboot with network available, then without network/ngrok, and inspect
    `deployment status` and `deployment logs --lines 200`.
 3. Verify display, SPI, I2C, GPIO, camera/video, microphone/audio, state,

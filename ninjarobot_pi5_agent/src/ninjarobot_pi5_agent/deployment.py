@@ -6,10 +6,12 @@ import getpass
 import json
 import pwd
 import shlex
+import socket
 import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -17,6 +19,8 @@ from pathlib import Path
 from typing import Any
 
 from ninjarobot_pi5_ide import load_robot_config, save_robot_config
+
+from .mcp_config import MCPConfiguration, load_mcp_configuration, save_mcp_configuration
 
 UNIT_NAME = "ninjarobot-agent.service"
 UNIT_PATH = Path("/etc/systemd/system/ninjarobot-agent.service")
@@ -30,6 +34,7 @@ SYSTEMD_ANALYZE = Path("/usr/bin/systemd-analyze")
 VISUDO = Path("/usr/sbin/visudo")
 
 CommandRunner = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
+ReadinessProbe = Callable[[Path], bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +88,7 @@ class DeploymentSpec:
         if not self.secret_file.is_file():
             raise ValueError("agent secret file is unavailable")
         load_robot_config(self.config)
+        load_mcp_configuration(self.mcp_config)
 
 
 def render_unit(spec: DeploymentSpec) -> str:
@@ -149,9 +155,20 @@ def render_unit(spec: DeploymentSpec) -> str:
 class DeploymentManager:
     """Install or operate only the fixed NinjaRobot systemd artifacts."""
 
-    def __init__(self, spec: DeploymentSpec, *, runner: CommandRunner | None = None) -> None:
+    def __init__(
+        self,
+        spec: DeploymentSpec,
+        *,
+        runner: CommandRunner | None = None,
+        readiness_probe: ReadinessProbe | None = None,
+        readiness_timeout_seconds: float = 30.0,
+    ) -> None:
+        if readiness_timeout_seconds < 0:
+            raise ValueError("deployment readiness timeout must not be negative")
         self.spec = spec
         self._runner = runner or _run
+        self._readiness_probe = readiness_probe or _agent_ipc_ready
+        self._readiness_timeout_seconds = readiness_timeout_seconds
 
     def install(self, *, confirmed: bool, upgrade: bool = False) -> dict[str, Any]:
         if not confirmed:
@@ -254,21 +271,17 @@ class DeploymentManager:
         return {"action": action, "accepted": True}
 
     def status(self) -> dict[str, Any]:
-        result = self._runner(
-            [
-                str(SYSTEMCTL),
-                "show",
-                UNIT_NAME,
-                "--property=ActiveState,SubState,UnitFileState",
-                "--no-pager",
-            ]
-        )
+        systemd = self._systemd_status()
         artifacts = self.artifact_status()
+        active = systemd.get("ActiveState") == "active"
+        ipc_ready = active and self._readiness_probe(self.spec.socket)
         return {
             "installed": all(artifacts.values()),
             "artifacts": artifacts,
             "enabled": self.is_enabled(),
-            "systemd": result.stdout.strip() if result.returncode == 0 else "unavailable",
+            "running": active,
+            "ready": ipc_ready,
+            "systemd": systemd,
             "spec": _public_spec(self.spec),
         }
 
@@ -290,7 +303,9 @@ class DeploymentManager:
         installed = self.install(confirmed=True, upgrade=upgrade)
         enabled = self.enable(confirmed=True)
         try:
+            self._checked([str(SUDO), str(SYSTEMCTL), "reset-failed", UNIT_NAME])
             started = self.action("start")
+            readiness = self._wait_for_readiness()
         except Exception:
             # A failed first start must not leave a broken unit enabled for the
             # next boot. User data and installed artifacts remain available for
@@ -304,8 +319,43 @@ class DeploymentManager:
             "installed": installed["installed"],
             **enabled,
             "started": started["accepted"],
-            "running_now": True,
+            "running_now": readiness["running"],
+            "ready": readiness["ready"],
+            "systemd": readiness["systemd"],
         }
+
+    def _wait_for_readiness(self) -> dict[str, Any]:
+        """Wait until systemd is active and the owner IPC endpoint responds."""
+        deadline = time.monotonic() + self._readiness_timeout_seconds
+        last_state: dict[str, str] = {}
+        while True:
+            last_state = self._systemd_status()
+            active_state = last_state.get("ActiveState")
+            if active_state == "failed":
+                raise RuntimeError(_deployment_failure_message(last_state))
+            if active_state == "active" and self._readiness_probe(self.spec.socket):
+                return {"running": True, "ready": True, "systemd": last_state}
+            if time.monotonic() >= deadline:
+                raise RuntimeError(
+                    "automatic startup did not become Agent-ready within "
+                    f"{self._readiness_timeout_seconds:g} seconds; "
+                    f"systemd state: {last_state or 'unavailable'}"
+                )
+            time.sleep(0.25)
+
+    def _systemd_status(self) -> dict[str, str]:
+        result = self._runner(
+            [
+                str(SYSTEMCTL),
+                "show",
+                UNIT_NAME,
+                "--property=ActiveState,SubState,UnitFileState,Result,NRestarts,ExecMainStatus",
+                "--no-pager",
+            ]
+        )
+        if result.returncode != 0:
+            return {"status": "unavailable"}
+        return _parse_systemd_properties(result.stdout)
 
     def artifact_status(self) -> dict[str, bool]:
         """Report privileged artifacts without directly traversing protected sudoers."""
@@ -357,17 +407,17 @@ class DeploymentManager:
         for directory in (self.spec.skill_dir, self.spec.benchmark_dir):
             directory.mkdir(mode=0o700, parents=True, exist_ok=True)
             directory.chmod(0o700)
-        for path, initial in (
-            (self.spec.mcp_config, "schema_version = 1\nservers = []\n"),
-            (self.spec.secret_file, ""),
-        ):
+        for path in (self.spec.mcp_config, self.spec.secret_file):
             if path.is_symlink():
                 raise ValueError(f"deployment user file must not be a symbolic link: {path}")
             path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
             path.parent.chmod(0o700)
-            if not path.exists():
-                path.write_text(initial, encoding="utf-8")
-            path.chmod(0o600)
+        if not self.spec.mcp_config.exists():
+            save_mcp_configuration(MCPConfiguration(), self.spec.mcp_config)
+        if not self.spec.secret_file.exists():
+            self.spec.secret_file.write_text("", encoding="utf-8")
+        self.spec.mcp_config.chmod(0o600)
+        self.spec.secret_file.chmod(0o600)
 
 
 def create_backup(spec: DeploymentSpec, output: Path) -> Path:
@@ -495,6 +545,48 @@ def _public_spec(spec: DeploymentSpec) -> dict[str, str]:
         key: "configured-private-file" if key in hidden else str(value)
         for key, value in asdict(spec).items()
     }
+
+
+def _agent_ipc_ready(socket_path: Path) -> bool:
+    """Probe the owner-only Agent IPC endpoint without mutating robot state."""
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+            connection.settimeout(1.0)
+            connection.connect(str(socket_path))
+            connection.sendall(b'{"command":"startup_status"}\n')
+            payload = b""
+            while b"\n" not in payload and len(payload) <= 65_536:
+                chunk = connection.recv(4096)
+                if not chunk:
+                    break
+                payload += chunk
+    except OSError:
+        return False
+    try:
+        message = json.loads(payload.partition(b"\n")[0])
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return False
+    return isinstance(message, dict) and message.get("type") == "result"
+
+
+def _parse_systemd_properties(output: str) -> dict[str, str]:
+    properties: dict[str, str] = {}
+    for line in output.splitlines():
+        key, separator, value = line.partition("=")
+        if separator and key:
+            properties[key] = value
+    return properties
+
+
+def _deployment_failure_message(state: dict[str, str]) -> str:
+    result = state.get("Result", "unknown")
+    exit_status = state.get("ExecMainStatus", "unknown")
+    restarts = state.get("NRestarts", "unknown")
+    return (
+        "automatic startup Agent exited before becoming ready "
+        f"(result={result}, exit_status={exit_status}, restarts={restarts}); "
+        "inspect `journalctl -u ninjarobot-agent.service` and the Agent service log"
+    )
 
 
 def _run(command: Sequence[str]) -> subprocess.CompletedProcess[str]:

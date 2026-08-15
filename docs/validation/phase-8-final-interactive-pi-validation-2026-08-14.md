@@ -92,10 +92,10 @@ Launch:
 ninjarobot-agent
 ```
 
-1. Select **4. Start Agent Service**.
+1. Select **2. Start Agent Service**.
 2. Select **2. real hardware**.
-3. Select **2. Agent Status**.
-4. Select **12. MCP Tools (Built-in and External)**. Expected: IDE,
+3. Select **3. Agent Service Status**.
+4. Select **9. MCP Tools (Built-in and External)**. Expected: IDE,
    robot-control, and memory providers/tools are listed even when the external
    server list is empty.
 
@@ -134,8 +134,8 @@ the partial stream. Correct the device and enable again; it must reach
 
 ### 2.5 Web interface, i18n, media controls, and stop display
 
-Return from chat, then use **7. Start Web Interface** and **8. Web Interface
-Status**. Open the reported HTTPS URL using a paired browser.
+Return from chat, then use **5. Local Web Interface** and **6. Local Web
+Interface Status**. Open the reported HTTPS URL using a paired browser.
 
 1. Confirm the main surface contains Camera, Web Microphone, Voice Input, and
    Record Once. Voice Input and Record Once must be directly below the first
@@ -174,29 +174,33 @@ but user profile and long-term memory remain shared and model-independent.
 
 ### 2.7 ngrok remote access and pairing
 
-In the Agent Interactive Tool choose **11. Remote Access**.
+In the Agent Interactive Tool choose **8. Ngrok Remote Access**.
 
-1. Select **1. Configure token, install ngrok, and activate**. Enter the
-   authtoken twice at the hidden prompts.
+1. Select **1. Set ngrok token**. Enter the authtoken twice at the hidden
+   prompts.
 2. Expected: a valid existing ngrok v3 binary is reused, or a replacement is
    installed without `Text file busy`.
-3. Select **2. Status**. Expected: `waiting_for_connection` (or connected), a
+3. Select **2. Activate ngrok remote access service**, then return to the main
+   menu and start the Agent if it is not already running.
+4. Select **3. Ngrok service status**. Expected: `waiting_for_connection` (or connected), a
    public HTTPS URL, and pairing available. `configuration_invalid` is a fail.
-4. Select **3. Show current pairing URL**. Expected: a URL with a short-lived
+5. Select **4. Show existing pairing URL**. Expected: a URL with a short-lived
    `#pair=` fragment. There is no separate numeric pairing code and no browser
    username/password prompt.
-5. Open it from a device outside the LAN. Complete any ngrok interstitial.
+6. Open it from a device outside the LAN. Complete any ngrok interstitial.
    Expected: one exchange removes the fragment and creates the normal dashboard.
-6. Reuse the consumed URL in another private browser. Expected: it cannot gain
+7. Reuse the consumed URL in another private browser. Expected: it cannot gain
    control.
-7. Select **4. Revoke browsers and rotate pairing**. Expected: the first remote
-   browser is revoked and a new URL is issued.
-8. Disconnect networking briefly. Expected: local terminal/LAN control and
-   hardware remain usable. Restore it and confirm transient recovery uses one
+8. While the tunnel is healthy, select **5. Local Web Interface** from the main
+   menu. Expected: `ready: false`, `running: false`, `url: null`, with the ngrok
+   instruction.
+9. Disconnect networking briefly. Expected: Local Web fallback and a local QR
+   appear. Restore it and confirm recovery returns to remote-only mode using one
    endpoint/process.
-9. Select **5. Deactivate**. Expected: public URL clears and remote sessions are
+10. Select **5. Stop ngrok remote access service**. Expected: public URL clears and remote sessions are
    revoked while local service/memory/hardware remain available.
-10. Activate remote access again before the boot-onboarding test.
+11. Confirm Local Web does not start silently; start it explicitly and verify
+    the local URL works. Activate remote access again before boot validation.
 
 If Status reports a permanent authentication/account/configuration error,
 correct it and explicitly activate again. The supervisor should not continuously
@@ -206,28 +210,25 @@ usage traceback.
 
 ### 2.8 Auto-start, QR onboarding, and Greeting
 
-In the Agent Interactive Tool select **15. Auto-Start & Deployment**.
+In the Agent Interactive Tool select **12. Startup Agent Deployment**.
 
-1. Select **1. Show deployment status** and record the result.
-2. Select **7. Back up configuration and user data** and provide a private
-   archive path.
-3. Select **2. Install/repair and enable automatic startup** and type `ENABLE`.
-   Expected: `systemd_unit`, `poweroff_helper`, and `sudoers_rule` are all true,
-   and boot enablement is persisted only after all three install successfully.
-4. Select **4. Start installed service now** with wheels raised.
-5. Select **6. Show recent service logs**. Expected: one service owns IDE, web,
-   voice, onboarding, and remote lifecycle; the source path matches this clone.
-6. Select **5. Stop installed service**. Expected: all hardware releases.
-7. Select **1. Show deployment status** again; installed and enabled must both
-   be true and every artifact must remain present.
-8. Reboot the Pi normally.
-9. Expected after boot: QR onboarding appears without Greeting or motion. If a
+1. Select **3. Show startup Agent status** and record the result. An older
+   failed installation may correctly show `enabled: true`, `running: false`,
+   `ready: false`, plus its systemd result and restart count.
+2. Select **1. Install and deploy automatic startup Agent** and type `ENABLE`.
+   Expected: `systemd_unit`, `poweroff_helper`, and `sudoers_rule` are all true;
+   `running_now` and `ready` are true. Setup must clear an old start-limit and
+   must not report success merely because the unit is enabled.
+3. Select **3. Show startup Agent status** again. Expected: installed, enabled,
+   running, and ready are true and every artifact remains present.
+4. Reboot the Pi normally.
+5. Expected after boot: QR onboarding appears without Greeting or motion. If a
    configured ngrok endpoint is healthy, its remote QR remains while waiting.
    Local mDNS is used only after an explicit remote failure or when remote
    access is disabled.
-10. Pair and connect a browser. Expected: QR clears, Greeting runs exactly
+6. Pair and connect a browser. Expected: QR clears, Greeting runs exactly
     once, and Idle follows. Reload/reconnect must not replay Greeting.
-11. Reboot once with the microphone disconnected and once with networking
+7. Reboot once with the microphone disconnected and once with networking
     unavailable. Expected: safe error/degraded reporting, no unbounded startup,
     local recovery where applicable, and no unexpected movement.
 

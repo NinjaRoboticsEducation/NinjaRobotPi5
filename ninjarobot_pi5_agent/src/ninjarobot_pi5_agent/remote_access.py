@@ -27,6 +27,7 @@ from .secrets import SecretStore
 PersistRemoteSetting = Callable[[bool], Awaitable[None]]
 StartWebServer = Callable[[], Awaitable[dict[str, object]]]
 StopWebServer = Callable[[], Awaitable[dict[str, object]]]
+TransitionWebAccess = Callable[[], Awaitable[dict[str, object]]]
 PERMANENT_REMOTE_ERRORS = frozenset(
     {
         "account_rejected",
@@ -180,6 +181,8 @@ class RemoteAccessService:
         start_web: StartWebServer,
         persist_enabled: PersistRemoteSetting,
         stop_web: StopWebServer | None = None,
+        remote_ready: TransitionWebAccess | None = None,
+        remote_unavailable: TransitionWebAccess | None = None,
     ) -> None:
         self._backend = backend
         self._pairing = pairing
@@ -188,6 +191,8 @@ class RemoteAccessService:
         self._config = config
         self._start_web = start_web
         self._stop_web = stop_web
+        self._remote_ready = remote_ready
+        self._remote_unavailable = remote_unavailable
         self._persist_enabled = persist_enabled
         self._task: asyncio.Task[None] | None = None
         self._stop = asyncio.Event()
@@ -327,6 +332,8 @@ class RemoteAccessService:
                     self._public_url = public_url
                     self._last_error_code = None
                     self._pairing.set_remote_url(public_url)
+                    if self._remote_ready is not None:
+                        await self._remote_ready()
                     self._release_status.update(
                         "remote_access",
                         ReleaseFeatureState.WAITING_FOR_CONNECTION,
@@ -366,6 +373,13 @@ class RemoteAccessService:
                     self._public_url = None
                     self._pairing.clear_remote_url()
                     await self._backend.close(lost_url)
+                    if self._remote_unavailable is not None:
+                        try:
+                            await self._remote_unavailable()
+                        except Exception:
+                            logging.getLogger(__name__).exception(
+                                "Local web fallback could not be restored."
+                            )
                     failures += 1
                     state = (
                         ReleaseFeatureState.FAILED

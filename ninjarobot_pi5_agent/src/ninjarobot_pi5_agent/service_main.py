@@ -361,9 +361,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
         request_service_stop=request_service_stop,
     )
     web_access = WebAccessState()
-    if config.remote_access.enabled:
-        web_access.enable_remote()
-    elif onboarding_enabled:
+    if onboarding_enabled:
         web_access.enable_local_fallback()
     web_app = create_web_app(
         runtime=runtime,
@@ -399,6 +397,8 @@ async def run_service(arguments: argparse.Namespace) -> None:
         config=config.remote_access,
         start_web=web.start_remote,
         stop_web=web.stop_remote,
+        remote_ready=web.activate_remote,
+        remote_unavailable=web.start_local_fallback,
         persist_enabled=lambda enabled: persist_remote_access_enabled(
             arguments.config,
             enabled,
@@ -414,9 +414,8 @@ async def run_service(arguments: argparse.Namespace) -> None:
         events=events,
         release_status=release_status,
         remote=remote_access,
-        allow_local_fallback=config.deployment.auto_start_enabled,
         start_local_fallback=web.start_local_fallback,
-        stop_local_fallback=web.stop_local_fallback,
+        activate_remote_access=web.activate_remote,
     )
     onboarding_holder["coordinator"] = onboarding
     server = AgentIPCServer(
@@ -435,10 +434,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
     await server.start()
     try:
         if onboarding_enabled:
-            if config.remote_access.enabled:
-                await web.start_remote()
-            else:
-                await web.start_local_fallback()
+            await web.start_local_fallback()
             await onboarding.start(remote_enabled=config.remote_access.enabled)
         else:
             await _complete_startup_liveliness(ide=ide, runtime=runtime, events=events)

@@ -32,7 +32,8 @@ Rollback: stop the agent locally. No actuator should have moved yet.
 ## Remote/fallback communication tests
 
 1. Enable ngrok and restart. Confirm **Connecting…** appears while the tunnel
-   starts, then the remote pairing QR replaces it.
+   starts, Local Web is not prematurely rejected, then the remote pairing QR
+   replaces it and Local Web status no longer exposes a URL.
 2. Keep the remote tunnel healthy without connecting a browser beyond the
    token lifetime; confirm the QR refreshes and the newest scan works.
 3. Force a real ngrok configuration/network/tunnel failure. Confirm the display
@@ -44,7 +45,8 @@ Expected: a healthy ngrok endpoint waits indefinitely; local fallback happens
 only on actual failure; endpoint replacement invalidates old pairing access;
 no URL/token appears in normal status or event logs.
 
-Rollback: deactivate ngrok locally and use the newly displayed local code.
+Rollback: deactivate ngrok locally, then explicitly start Local Web and use its
+newly displayed local code.
 
 ## Actuator-moving Greeting test
 

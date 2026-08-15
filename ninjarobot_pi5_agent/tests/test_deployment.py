@@ -22,6 +22,7 @@ from ninjarobot_pi5_agent.deployment import (
     render_unit,
     restore_backup,
 )
+from ninjarobot_pi5_agent.mcp_config import load_mcp_configuration
 
 from ninjarobot_pi5_ide import load_robot_config
 
@@ -86,6 +87,27 @@ def test_rendered_unit_is_real_hardware_absolute_hardened_and_not_uv(tmp_path: P
             timeout=10.0,
         )
         assert verified.returncode == 0, verified.stderr
+
+
+def test_deployment_spec_rejects_invalid_mcp_configuration(tmp_path: Path) -> None:
+    spec = _spec(tmp_path)
+    spec.mcp_config.write_text("schema_version = 2\nservers = []\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="schema_version"):
+        spec.validate()
+
+
+def test_deployment_creates_loadable_canonical_empty_mcp_configuration(
+    tmp_path: Path,
+) -> None:
+    spec = _spec(tmp_path)
+    spec.mcp_config.unlink()
+    manager = DeploymentManager(spec)
+
+    manager._prepare_optional_user_files()
+
+    assert load_mcp_configuration(spec.mcp_config).schema_version == 1
+    assert spec.mcp_config.read_text(encoding="utf-8") == "schema_version = 1\n"
 
 
 def test_current_spec_preserves_virtual_environment_interpreter_symlink(
@@ -242,9 +264,17 @@ def test_install_and_enable_starts_service_in_one_transaction(tmp_path: Path) ->
     def runner(command: object) -> subprocess.CompletedProcess[str]:
         rendered = list(command)  # type: ignore[arg-type]
         calls.append(rendered)
+        if rendered[1:3] == ["show", UNIT_NAME]:
+            return subprocess.CompletedProcess(
+                rendered,
+                0,
+                "ActiveState=active\nSubState=running\nResult=success\nNRestarts=0\n"
+                "ExecMainStatus=0\nUnitFileState=enabled\n",
+                "",
+            )
         return subprocess.CompletedProcess(rendered, 0, "", "")
 
-    manager = DeploymentManager(spec, runner=runner)
+    manager = DeploymentManager(spec, runner=runner, readiness_probe=lambda _path: True)
     manager.artifact_status = Mock(
         return_value={  # type: ignore[method-assign]
             "systemd_unit": False,
@@ -258,7 +288,46 @@ def test_install_and_enable_starts_service_in_one_transaction(tmp_path: Path) ->
     result = manager.install_and_enable(confirmed=True)
 
     assert result["running_now"] is True
+    assert result["ready"] is True
+    reset = ["/usr/bin/sudo", "/usr/bin/systemctl", "reset-failed", UNIT_NAME]
+    start = ["/usr/bin/sudo", "/usr/bin/systemctl", "start", UNIT_NAME]
+    assert reset in calls
+    assert calls.index(reset) < calls.index(start)
     assert ["/usr/bin/sudo", "/usr/bin/systemctl", "start", UNIT_NAME] in calls
+
+
+def test_install_and_enable_rejects_service_that_exits_during_startup(tmp_path: Path) -> None:
+    spec = _spec(tmp_path)
+    calls: list[list[str]] = []
+
+    def runner(command: object) -> subprocess.CompletedProcess[str]:
+        rendered = list(command)  # type: ignore[arg-type]
+        calls.append(rendered)
+        if rendered[1:3] == ["show", UNIT_NAME]:
+            return subprocess.CompletedProcess(
+                rendered,
+                0,
+                "ActiveState=failed\nSubState=failed\nResult=exit-code\nNRestarts=5\n"
+                "ExecMainStatus=1\nUnitFileState=enabled\n",
+                "",
+            )
+        return subprocess.CompletedProcess(rendered, 0, "", "")
+
+    manager = DeploymentManager(spec, runner=runner, readiness_timeout_seconds=0)
+    manager.artifact_status = Mock(
+        return_value={  # type: ignore[method-assign]
+            "systemd_unit": False,
+            "poweroff_helper": False,
+            "sudoers_rule": False,
+        }
+    )
+    manager.install = Mock(return_value={"installed": True})  # type: ignore[method-assign]
+    manager.enable = Mock(return_value={"enabled": True})  # type: ignore[method-assign]
+
+    with pytest.raises(RuntimeError, match=r"exit_status=1, restarts=5"):
+        manager.install_and_enable(confirmed=True)
+
+    assert ["/usr/bin/sudo", "/usr/bin/systemctl", "disable", "--now", UNIT_NAME] in calls
 
 
 def test_backup_is_private_and_contains_only_user_data(tmp_path: Path) -> None:

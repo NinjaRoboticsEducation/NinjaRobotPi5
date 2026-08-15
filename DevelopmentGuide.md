@@ -552,8 +552,9 @@ The web interface never accepts provider secrets. The terminal uses hidden, doub
 ### Remote access and pairing boundary
 
 `ninjarobot_pi5_agent.remote_access.RemoteAccessService` owns one optional
-pyngrok endpoint and process. Online activation asks `WebServerManager` for its
-remote-only HTTPS backend, verifies the already-installed ngrok executable, loads the authtoken
+pyngrok endpoint and process. Online activation starts `WebServerManager`'s
+shared HTTPS backend without claiming remote readiness, verifies the
+already-installed ngrok executable, loads the authtoken
 from `SecretStore`, and verifies upstream TLS against the NinjaRobot local CA.
 The private ngrok config is mode `0600`; the token is written only for process
 startup and immediately removed again so it is not left in the process command
@@ -574,7 +575,8 @@ keyed hash. Rotation, tunnel replacement/loss, explicit deactivation, or
 service shutdown invalidates pending tokens and completed sessions. The normal
 controller lease remains exclusive after pairing.
 
-The supervisor validates an HTTPS public origin, uses exponential capped
+The supervisor validates an HTTPS public origin, changes the access gate to
+remote-only only after that origin is ready, uses exponential capped
 backoff for transient failures, stops retrying permanent configuration,
 credential, executable, and account failures, publishes only stable failure
 categories, and keeps local agent/web/
@@ -610,15 +612,17 @@ saves the token without starting a tunnel. When no Agent is running, activate
 validates the token, executable, and required pairing secrets and persists the
 enabled state for the next start. The Agent service remains the only tunnel
 process owner. Manual deactivation stops remote ownership and does not silently
-start Local Web.
+start a new Local Web session.
 
 `WebAccessState` is shared by the ASGI gate and `WebServerManager`. Its modes
 are `none`, `local`, `remote`, and `local_fallback`. In remote mode, direct local
 HTTP and WebSocket access is rejected and public Local Web status intentionally
-returns `ready=false`, `running=false`, and `url=null`. A local fallback is
-started automatically only by the deployed startup/onboarding recovery path
-when remote access is unavailable; remote recovery stops that fallback before
-publishing a new remote QR.
+returns `ready=false`, `running=false`, and `url=null`. Configured intent and a
+connecting supervisor do not enter this mode. Startup keeps a local-capable
+backend until `remote_ready`; `remote_error` or `tunnel_lost` restores
+`local_fallback`, and recovery atomically enters `remote` before publishing a
+new remote QR. Explicit deactivation clears remote/fallback ownership, so the
+user still starts an ordinary Local Web session deliberately.
 
 ### QR onboarding and startup liveliness
 
@@ -643,9 +647,10 @@ runtime, web server, remote tunnel, ownership lock, and socket are released.
 If remote access is enabled, the display shows **Connecting…** until ngrok is
 ready or fails. A ready tunnel displays its remote one-use QR indefinitely and
 refreshes it before token expiry. During deployed automatic startup, a real
-failure starts the local HTTPS backend and selects a local mDNS QR while remote
-retry continues; recovery stops the fallback and replaces the QR before any
-controller connects. With remote disabled, local QR is immediate.
+failure selects a local mDNS QR while remote retry continues; the HTTPS backend
+also remains local-capable while the initial tunnel connects. Recovery
+withdraws local routes and replaces the QR before any controller connects.
+With remote disabled, local QR is immediate.
 
 During onboarding, local and remote HTTP assets and WebSockets require the
 same Secure/HttpOnly paired-browser session. Health probes, crawlers, static
@@ -677,10 +682,15 @@ clean intentional stop remains stopped. This follows systemd's
 
 Installation is explicitly confirmed and disabled by default at package
 installation time. The normal-user **deployment setup** transaction runs
-`systemd-analyze verify` and `visudo -cf`, installs all three privileged
+strict robot/MCP configuration preflight, `systemd-analyze verify`, and
+`visudo -cf`, installs all three privileged
 artifacts, enables the unit, persists onboarding/web-power settings, and starts
-the service immediately. A failed first start invokes `disable --now`, so the
-next boot does not retry a broken deployment. Status checks the unit/helper as
+the service immediately. It clears stale systemd failed/start-limit state, then
+waits for `ActiveState=active` and a successful owner-only `startup_status` IPC
+probe. `running_now` and `ready` are never inferred from enablement or an
+accepted start command. A failed first start invokes `disable --now`, so the
+next boot does not retry a broken deployment. Status reports parsed active,
+substate, result, restart, and exit-status fields and checks the unit/helper as
 ordinary paths but verifies the protected sudoers authorization through the
 exact non-interactive `sudo -n -l /usr/libexec/ninjarobot-poweroff` query; it
 never traverses `/etc/sudoers.d` as the unprivileged user. The fixed root-owned helper contains only
@@ -833,6 +843,8 @@ optional external servers and may validly be absent/empty. The format for a
 remote (Streamable HTTP) server:
 
 ```toml
+schema_version = 1
+
 [[servers]]
 id = "example"
 enabled = false
@@ -848,6 +860,8 @@ max_result_bytes = 131072
 For a local `stdio` server:
 
 ```toml
+schema_version = 1
+
 [[servers]]
 id = "example-local"
 enabled = false
@@ -860,6 +874,8 @@ max_result_bytes = 131072
 ```
 
 Rules:
+- `schema_version = 1` is canonical; legacy files without it load as version 1,
+  while unsupported future versions fail during deployment preflight
 - Remote bearer credentials name an environment secret — never the secret itself
 - `stdio` commands use absolute paths; no shell pipelines, redirection, or command substitution
 - A failed server degrades only its own tools and never stops the IDE or agent service
@@ -1385,6 +1401,8 @@ A configuration change that points to another host is rejected — preventing cr
 | Text is sideways on the display | Authoritative V4 rotation is 90°. Confirm `--config` points to the correct TOML file |
 | Hardware already owned by another process | Use the existing agent interface, or run `uv run --frozen --extra hardware ninjarobot-agent service stop`, then retry. Also stop both integrated tools before opening a standalone `pi5*` tool |
 | `uv run ninjarobot-agent` reports `No module named 'qrcode'` | Pull the dependency fix and run `uv sync --frozen --extra hardware`. qrcode 8.2 is now an unconditional IDE dependency; do not install an unrelated QR package manually |
+| Agent boot fails because `schema_version` is an extra MCP field | Pull the MCP schema/deployment repair. The canonical `mcp.toml` begins with `schema_version = 1`; rerun **Install and deploy automatic startup Agent** so preflight validates it and clears the old systemd failed limit |
+| Deployment status says `enabled: true` but `running: false` | Enablement only means systemd will attempt boot. Inspect the structured `systemd` result/exit status and Agent log, repair the reported configuration, then rerun the confirmed deployment setup; success requires `ready: true` |
 | A repaired `pi5*` source file is present but Python runs an older copy | Run `uv sync --frozen --extra hardware`, then `scripts/verify_workspace_driver_sources.py`. Editable dependencies must resolve into this checkout |
 | Camera reports unavailable while `/usr/bin/python3` imports Picamera2 | Run `./scripts/bootstrap-rpi-camera-workspace.sh`; both standalone and integrated capture should then use the bounded system-Python bridge. Do not recreate `.venv` with `--system-site-packages` |
 | `pi5mic` reports PortAudio missing | Install `libportaudio2` and `portaudio19-dev`, then run `pi5mic devices`. Local transcription also requires a built `whisper-cli` and `ggml-base.bin` |
@@ -1396,7 +1414,7 @@ A configuration change that points to another host is rejected — preventing cr
 | Voice input reports `detector_unavailable` | Run the packaged-asset checksum tests and the hardware-extra model-load check. The service never downloads a missing model during boot |
 | Remote access reports `executable_unavailable` | Run `ninjarobot-agent remote configure` locally. Unattended boot intentionally refuses to download ngrok |
 | Remote access reports `authtoken_unavailable` or `authentication_failed` | Replace the token through the local Remote Access menu; do not paste it into web chat, TOML, logs, or issue reports |
-| Remote access reports `account_rejected` | Inspect the ngrok dashboard for account/endpoint/plan limits. A deployed boot starts local fallback; in manual mode deactivate remote and explicitly start Local Web. Robot control remains available |
+| Remote access reports `account_rejected` | Inspect the ngrok dashboard for account/endpoint/plan limits. Local fallback is restored while remote access is unavailable; explicit deactivation does not start a new Local Web session. Robot control remains available |
 | Remote access reports `configuration_invalid` | Correct/reconfigure ngrok locally. Permanent configuration failures deliberately stop retrying so a broken endpoint cannot leave a process continuously restarting |
 | Pairing URL reports `tunnel_not_ready` | Use Remote Access Status, correct the reported tunnel failure, and activate again. A pairing fragment exists only after a public HTTPS endpoint is ready |
 | Pairing link is expired or already used | Run `ninjarobot-agent remote rotate-pairing`; this deliberately revokes existing remote browser sessions |

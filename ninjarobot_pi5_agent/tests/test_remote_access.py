@@ -83,6 +83,7 @@ def build_service(backend: FakeBackend, *, enabled: bool = False):
     )
     persisted: list[bool] = []
     web_starts = 0
+    access_transitions: list[str] = []
 
     async def start_web() -> dict[str, object]:
         nonlocal web_starts
@@ -92,6 +93,14 @@ def build_service(backend: FakeBackend, *, enabled: bool = False):
     async def persist(value: bool) -> None:
         persisted.append(value)
 
+    async def remote_ready() -> dict[str, object]:
+        access_transitions.append("remote")
+        return {"access_mode": "remote"}
+
+    async def remote_unavailable() -> dict[str, object]:
+        access_transitions.append("local_fallback")
+        return {"access_mode": "local_fallback"}
+
     service = RemoteAccessService(
         backend=backend,
         pairing=pairing(),
@@ -100,14 +109,16 @@ def build_service(backend: FakeBackend, *, enabled: bool = False):
         config=fast_config(enabled=enabled),
         start_web=start_web,
         persist_enabled=persist,
+        remote_ready=remote_ready,
+        remote_unavailable=remote_unavailable,
     )
-    return service, events, release, persisted, lambda: web_starts
+    return service, events, release, persisted, lambda: web_starts, access_transitions
 
 
 def test_activate_waits_for_web_issues_pairing_and_closes_exact_tunnel() -> None:
     async def scenario() -> None:
         backend = FakeBackend(["https://robot.example"])
-        service, events, release, persisted, web_starts = build_service(backend)
+        service, events, release, persisted, web_starts, transitions = build_service(backend)
 
         status = await service.activate()
 
@@ -116,6 +127,7 @@ def test_activate_waits_for_web_issues_pairing_and_closes_exact_tunnel() -> None
         assert status["public_url"] == "https://robot.example"
         assert "#pair=" in service.pairing_url()
         assert release.status()["remote_access"]["state"] == "waiting_for_connection"
+        assert transitions == ["remote"]
         assert all("#pair=" not in event.model_dump_json() for event in await events.history())
 
         await service.deactivate()
@@ -135,7 +147,7 @@ def test_failure_is_sanitized_and_background_recovery_keeps_local_service_alive(
                 "https://recovered.example",
             ]
         )
-        service, events, _release, _persisted, _web_starts = build_service(backend)
+        service, events, _release, _persisted, _web_starts, transitions = build_service(backend)
 
         first = await service.activate()
         assert first["detail"] == "tunnel_unavailable"
@@ -145,6 +157,7 @@ def test_failure_is_sanitized_and_background_recovery_keeps_local_service_alive(
             await asyncio.sleep(0.01)
 
         assert service.status()["public_url"] == "https://recovered.example"
+        assert transitions[:2] == ["local_fallback", "remote"]
         serialized = " ".join(event.model_dump_json() for event in await events.history())
         assert raw not in serialized
         assert "local agent and web control remain ready" in serialized
@@ -273,7 +286,7 @@ def test_pyngrok_backend_requires_installed_binary_and_preserves_upstream_tls(
 def test_permanent_configuration_failure_does_not_retry_forever() -> None:
     async def scenario() -> None:
         backend = FakeBackend([RemoteAccessError("configuration_invalid")])
-        service, _events, _release, _persisted, _web_starts = build_service(backend)
+        service, _events, _release, _persisted, _web_starts, _transitions = build_service(backend)
 
         status = await service.activate()
         await asyncio.sleep(0.05)

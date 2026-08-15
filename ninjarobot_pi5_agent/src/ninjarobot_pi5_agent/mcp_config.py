@@ -7,7 +7,7 @@ import re
 import tomllib
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import (
     BaseModel,
@@ -110,6 +110,7 @@ class MCPConfiguration(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
+    schema_version: Literal[1] = 1
     servers: tuple[MCPServerConfig, ...] = ()
 
     @field_validator("servers")
@@ -179,7 +180,7 @@ def save_mcp_configuration(configuration: MCPConfiguration, path: str | Path) ->
     config_path = Path(path).expanduser()
     config_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     config_path.parent.chmod(0o700)
-    lines: list[str] = []
+    lines: list[str] = [f"schema_version = {configuration.schema_version}", ""]
     for server in configuration.servers:
         payload = server.model_dump(mode="json")
         lines.append("[[servers]]")

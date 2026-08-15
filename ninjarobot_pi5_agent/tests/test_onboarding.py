@@ -116,9 +116,8 @@ async def _coordinator(
     *,
     ide: _IDE | None = None,
     refresh_interval_seconds: float | None = None,
-    allow_local_fallback: bool = False,
     start_local_fallback: Any = None,
-    stop_local_fallback: Any = None,
+    activate_remote_access: Any = None,
 ) -> tuple[OnboardingCoordinator, _IDE, _Runtime, _Remote, EventBroker]:
     pairing = _pairing()
     events = EventBroker()
@@ -134,9 +133,8 @@ async def _coordinator(
         events=events,
         release_status=_status(),
         remote=remote,
-        allow_local_fallback=allow_local_fallback,
         start_local_fallback=start_local_fallback,
-        stop_local_fallback=stop_local_fallback,
+        activate_remote_access=activate_remote_access,
         refresh_interval_seconds=refresh_interval_seconds,
     )
     return coordinator, selected_ide, runtime, remote, events
@@ -145,22 +143,21 @@ async def _coordinator(
 def test_remote_failure_selects_local_qr_then_recovery_replaces_it() -> None:
     async def exercise() -> None:
         fallback_starts = 0
-        fallback_stops = 0
+        remote_activations = 0
 
         async def start_fallback() -> dict[str, Any]:
             nonlocal fallback_starts
             fallback_starts += 1
             return {"running": True}
 
-        async def stop_fallback() -> dict[str, Any]:
-            nonlocal fallback_stops
-            fallback_stops += 1
-            return {"running": False}
+        async def activate_remote() -> dict[str, Any]:
+            nonlocal remote_activations
+            remote_activations += 1
+            return {"running": True, "access_mode": "remote"}
 
         coordinator, ide, _runtime, remote, events = await _coordinator(
-            allow_local_fallback=True,
             start_local_fallback=start_fallback,
-            stop_local_fallback=stop_fallback,
+            activate_remote_access=activate_remote,
         )
         await coordinator.start(remote_enabled=True)
         assert ide.statuses == ["connecting"]
@@ -185,13 +182,13 @@ def test_remote_failure_selects_local_qr_then_recovery_replaces_it() -> None:
         )
         await _wait_until(lambda: ide.urls[-1].startswith("https://robot.example/"))
         assert ide.urls[-1].startswith("https://robot.example/#pair=")
-        assert fallback_stops == 1
+        assert remote_activations == 1
         await coordinator.close()
 
     asyncio.run(exercise())
 
 
-def test_manual_remote_failure_shows_error_without_starting_local_web() -> None:
+def test_remote_failure_restores_local_web_even_without_deployment() -> None:
     async def exercise() -> None:
         fallback_starts = 0
 
@@ -210,10 +207,10 @@ def test_manual_remote_failure_shows_error_without_starting_local_web() -> None:
             "remote failed",
             data={"kind": "remote_error", "code": "network_unavailable"},
         )
-        await _wait_until(lambda: ide.statuses[-1:] == ["error"])
+        await _wait_until(lambda: bool(ide.urls))
 
-        assert fallback_starts == 0
-        assert ide.urls == []
+        assert fallback_starts == 1
+        assert ide.urls[-1].startswith("https://127.0.0.1:8443/#pair=")
         await coordinator.close()
 
     asyncio.run(exercise())
@@ -225,7 +222,6 @@ def test_deployed_post_startup_remote_failure_shows_local_qr_then_idle() -> None
             return {"running": True}
 
         coordinator, ide, runtime, remote, events = await _coordinator(
-            allow_local_fallback=True,
             start_local_fallback=start_fallback,
         )
         await coordinator.start(remote_enabled=False)

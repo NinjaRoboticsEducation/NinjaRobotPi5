@@ -347,12 +347,14 @@ Terminal chat can display a non-revoking additional link with `/show remote
 access`; after the new browser pairs, the display returns directly to Idle
 without replaying Greeting.
 
-Local Web and ngrok are explicit, mutually exclusive controller modes. While
-remote mode is enabled, Local Web status exposes no URL and directs the user to
-the ngrok pairing flow. Manual remote deactivation does not silently start
-Local Web. During deployed automatic startup, an unavailable ngrok connection
-starts the local mDNS HTTPS fallback and refreshes the physical QR; recovery
-returns ownership to the remote endpoint.
+Local Web and ngrok are explicit, mutually exclusive controller modes. Merely
+configuring or enabling ngrok does not withdraw Local Web: the shared HTTPS
+backend stays locally available while the tunnel connects or is degraded. Only
+a verified public ngrok endpoint changes the access gate to remote-only, at
+which point Local Web status exposes no URL and directs the user to the pairing
+flow. A tunnel failure restores local fallback; recovery atomically returns
+ownership to the remote endpoint. Explicit remote deactivation stops remote
+ownership without silently starting a new Local Web session.
 
 An ngrok authtoken identifies the Pi agent; it does not authenticate a browser.
 The project therefore enforces its own short-lived pairing, exact Origin/Host
@@ -363,7 +365,10 @@ possible charges remain governed by [ngrok's current limits](https://ngrok.com/d
 Automatic startup is opt-in through **Startup Agent Deployment**. Its install
 action validates and installs the fixed unit, power-off helper, and narrow
 sudoers rule, then enables and starts the real-hardware service in the same
-transaction. A failed first start is disabled again. Deployment status checks
+transaction. Robot and versioned MCP configuration are parsed before
+privileged changes. Setup clears an earlier systemd failed/start-limit state
+and reports success only after systemd is active and the owner-only Agent IPC
+endpoint responds. A failed first start is disabled again. Deployment status checks
 the exact non-interactive power-off authorization without reading the protected
 `/etc/sudoers.d` directory; the paired web power-off button never receives
 general sudo access.

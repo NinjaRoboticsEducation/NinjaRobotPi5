@@ -63,9 +63,8 @@ class OnboardingCoordinator:
         events: EventBroker,
         release_status: ReleaseStatusRegistry,
         remote: RemoteOnboardingSource,
-        allow_local_fallback: bool = False,
         start_local_fallback: Callable[[], Awaitable[dict[str, Any]]] | None = None,
-        stop_local_fallback: Callable[[], Awaitable[dict[str, Any]]] | None = None,
+        activate_remote_access: Callable[[], Awaitable[dict[str, Any]]] | None = None,
         refresh_interval_seconds: float | None = None,
     ) -> None:
         self._enabled = enabled
@@ -76,9 +75,8 @@ class OnboardingCoordinator:
         self._events = events
         self._release_status = release_status
         self._remote = remote
-        self._allow_local_fallback = allow_local_fallback
         self._start_local_fallback = start_local_fallback
-        self._stop_local_fallback = stop_local_fallback
+        self._activate_remote_access = activate_remote_access
         self._refresh_interval = (
             refresh_interval_seconds
             if refresh_interval_seconds is not None
@@ -125,14 +123,11 @@ class OnboardingCoordinator:
             return
         status = self._remote.status()
         if status.get("public_url"):
-            if await self._disable_local_fallback():
+            if await self._activate_remote():
                 await self._show_remote_pairing()
         elif status.get("state") in {"degraded", "failed", "unavailable", "disabled"}:
-            if self._allow_local_fallback:
-                if await self._enable_local_fallback():
-                    await self._show_local_pairing()
-            else:
-                await self._show_remote_unavailable()
+            if await self._enable_local_fallback():
+                await self._show_local_pairing()
 
     async def controller_connected(self, *, paired: bool, remote: bool = False) -> None:
         """Attempt Greeting once for the first authenticated controller."""
@@ -220,18 +215,15 @@ class OnboardingCoordinator:
                 continue
             kind = event.data.get("kind")
             if kind == "remote_ready":
-                if await self._disable_local_fallback():
+                if await self._activate_remote():
                     if self._greeting_attempted:
                         self._post_startup_pairing_scope = "remote"
                     await self._show_remote_pairing()
             elif kind == "remote_error":
-                if self._allow_local_fallback:
-                    if await self._enable_local_fallback():
-                        if self._greeting_attempted:
-                            self._post_startup_pairing_scope = "local"
-                        await self._show_local_pairing()
-                else:
-                    await self._show_remote_unavailable()
+                if await self._enable_local_fallback():
+                    if self._greeting_attempted:
+                        self._post_startup_pairing_scope = "local"
+                    await self._show_local_pairing()
 
     async def _refresh_loop(self) -> None:
         while True:
@@ -323,13 +315,13 @@ class OnboardingCoordinator:
             return False
         return True
 
-    async def _disable_local_fallback(self) -> bool:
-        if self._stop_local_fallback is None:
+    async def _activate_remote(self) -> bool:
+        if self._activate_remote_access is None:
             return True
         try:
-            await self._stop_local_fallback()
+            await self._activate_remote_access()
         except Exception as exc:
-            await self._fail("local_fallback_stop_failed", exc)
+            await self._fail("remote_access_activation_failed", exc)
             return False
         return True
 

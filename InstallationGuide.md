@@ -658,11 +658,11 @@ does not open GPIO, SPI, I2C, PWM, camera, microphone, or the robot action ledge
 **Start the HTTPS web interface:** return to the main Agent menu, select
 **Local Web Interface**, and use the exact `url` printed by the tool. The Agent
 service must already be running; the web command controls the server owned by
-that service and does not start a second Agent. Local Web is intentionally
-available only while ngrok Remote Access is disabled. If Remote Access is
-enabled, the result has `ready: false`, `running: false`, and `url: null`, and
-directs you to the ngrok pairing link or display QR instead of silently opening
-a competing local controller.
+that service and does not start a second Agent. Local Web remains available
+when ngrok is disabled, not configured, connecting, or degraded. Only after a
+public ngrok endpoint is verified does the result intentionally have
+`ready: false`, `running: false`, and `url: null`, directing you to the ngrok
+pairing link or display QR instead of opening a competing controller.
 
 For phones or computers that require trusted local HTTPS, export the public CA
 certificate with this optional advanced command (it contains no private key):
@@ -747,9 +747,10 @@ chat connects → Greeting face and sound → silent Idle
 While ngrok is healthy, direct local Web requests are rejected and the robot
 keeps waiting on its remote QR. In ordinary manual operation, stopping Remote
 Access does not silently start Local Web; select **Local Web Interface** if you
-want it. During deployed automatic startup only, a confirmed tunnel,
-configuration, or network failure starts the local HTTPS fallback and replaces
-the display with a fresh local pairing QR while remote recovery continues.
+want it. While a requested tunnel is connecting, Local Web is not withdrawn.
+A confirmed tunnel, configuration, or network failure restores the local HTTPS
+fallback and replaces the display with a fresh local pairing QR while remote
+recovery continues. A recovered verified endpoint returns to remote-only mode.
 Never expose port 8443 through router port forwarding.
 
 ### Step 9 — Enable and Test Automatic Startup (Optional)
@@ -761,10 +762,15 @@ manually started Agent cleanly, then this single transaction installs and
 validates all three privileged artifacts—the systemd unit, fixed power-off
 helper, and narrow sudoers rule—enables boot, and starts the installed service
 immediately. If the first systemd start fails, boot enablement is rolled back.
+Before privileged installation, setup parses both `config.toml` and the
+versioned optional `mcp.toml`. It clears a prior systemd failed/start-limit
+state and waits for both an active unit and a responding Agent IPC endpoint;
+therefore a successful result includes `running_now: true` and `ready: true`.
 
 Select **Show startup Agent status**. Pass criteria are:
 
 - `installed: true` and `enabled: true`
+- `running: true` and `ready: true`
 - all `artifacts` values are `true`
 - the unit references the current checkout and `.venv` Python
 
@@ -1610,6 +1616,11 @@ ninjarobot-ide-tool hardware status
 Tavily lets the AI search the internet for current information. It is optional:
 the IDE, robot-control, and memory MCP providers load without `mcp.toml`, and
 the robot works normally without Tavily.
+
+The Agent writes a canonical versioned catalog beginning with
+`schema_version = 1`. Older catalogs without this line remain compatible. Do
+not set a different version: deployment preflight intentionally rejects an
+unsupported schema before systemd is changed.
 
 > [!IMPORTANT]
 > Tavily may provide a free allowance. Check the

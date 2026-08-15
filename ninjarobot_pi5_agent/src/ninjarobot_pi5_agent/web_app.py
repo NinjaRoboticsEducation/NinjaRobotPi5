@@ -807,6 +807,12 @@ class WebServerManager:
         return self.status()
 
     async def start_remote(self) -> dict[str, Any]:
+        """Start the shared backend without claiming that the tunnel is ready."""
+        await self._start_backend()
+        return self.backend_status()
+
+    async def activate_remote(self) -> dict[str, Any]:
+        """Withdraw local access only after ngrok reports a usable endpoint."""
         self._access_state.enable_remote()
         await self._start_backend()
         return self.backend_status()

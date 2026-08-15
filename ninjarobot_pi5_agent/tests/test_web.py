@@ -22,6 +22,7 @@ from ninjarobot_pi5_agent.runtime import AgentRuntime
 from ninjarobot_pi5_agent.shutdown import PoweroffCoordinator
 from ninjarobot_pi5_agent.web_app import (
     WebAccessState,
+    WebServerManager,
     _dispatch_web_message,
     create_web_app,
     ensure_self_signed_certificate,
@@ -553,6 +554,37 @@ def test_web_access_state_does_not_silently_restore_local_after_remote_stop() ->
     access.enable_local_fallback()
     assert access.mode == "local_fallback"
     assert access.local_available is True
+
+
+def test_remote_backend_start_preserves_local_access_until_tunnel_is_ready(tmp_path) -> None:
+    async def exercise() -> None:
+        access = WebAccessState()
+        access.enable_local_fallback()
+        leases = ControllerLeaseManager(on_revoke=lambda _lease: None)
+        manager = WebServerManager(
+            app=cast(Any, object()),
+            leases=leases,
+            host="127.0.0.1",
+            port=8443,
+            certificate_path=tmp_path / "cert.pem",
+            key_path=tmp_path / "key.pem",
+            access_state=access,
+        )
+
+        async def backend_already_started() -> None:
+            return None
+
+        manager._start_backend = backend_already_started  # type: ignore[method-assign]
+
+        await manager.start_remote()
+        assert access.mode == "local_fallback"
+        assert access.local_available is True
+
+        await manager.activate_remote()
+        assert access.mode == "remote"
+        assert access.local_available is False
+
+    asyncio.run(exercise())
 
 
 def test_onboarding_requires_local_pairing_before_websocket_acceptance() -> None:

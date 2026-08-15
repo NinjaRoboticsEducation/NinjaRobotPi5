@@ -1,5 +1,47 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-15 — Boot readiness and verified local/remote access repair
+
+### Root causes and implementation
+
+- confirmed systemd had enabled and attempted the Agent five times, but the
+  deployment-generated `mcp.toml` contained `schema_version = 1` while the
+  strict MCP model rejected that field; the unit then reached its restart limit
+- made MCP schema version 1 canonical and serializable, retained compatibility
+  with legacy unversioned catalogs, rejected unsupported future versions, and
+  added robot/MCP parsing to deployment preflight
+- replaced the deployment's hand-written empty MCP file with the canonical
+  serializer so a clean installation cannot create a file the Agent rejects
+- separated requested ngrok state from verified remote readiness: connecting
+  and degraded tunnels preserve/restore Local Web, while only a validated
+  public endpoint withdraws local routes; tunnel recovery switches back
+  atomically before the remote QR is published
+- made tunnel health callbacks enforce the access transition independently of
+  QR onboarding, covering runtime activation as well as boot
+- made deployment setup clear stale systemd failed/start-limit state and wait
+  for both `ActiveState=active` and a read-only Agent `startup_status` IPC reply
+  before reporting `running_now`/`ready`
+- changed deployment status to report installed, enabled, running, IPC-ready,
+  and parsed systemd result/restart/exit fields separately
+
+### Validation
+
+- managed-driver verification passed for 222 tracked files and 47 authorized
+  repairs after every phase; no managed driver or `NinjaClawBot` file changed
+- compileall, Ruff lint, Ruff format, targeted MCP/web/remote/deployment tests,
+  and the full suite passed with 550 tests and one existing upstream
+  Starlette/httpx deprecation warning
+- the real persisted version-1 MCP catalog loaded successfully; read-only
+  deployment status accurately reported the currently enabled but failed unit
+
+### Raspberry Pi status and follow-up
+
+No service, ngrok tunnel, GPIO, display, buzzer, servo, camera, microphone, or
+power action was started during automated validation. The operator must rerun
+the confirmed deployment setup to install the repaired behavior and clear the
+existing systemd failure limit, then complete the local/remote/boot checklist
+with both wheels raised.
+
 ## 2026-08-15 — Base QR dependency and bare `uv run` startup repair
 
 ### Root cause and implementation
