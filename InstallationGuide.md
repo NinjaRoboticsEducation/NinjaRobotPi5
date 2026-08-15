@@ -478,11 +478,11 @@ pi5mic mic-tool
 Choose **Run setup wizard**, select your USB microphone, and accept a supported sample rate. Then choose **Run doctor** and **Show status**. Recording and speech-to-text tests are in [Microphone test](#-microphone-test) because they require consent.
 
 > [!NOTE]
-> If the tool selects 44.1 kHz when you configured 16 kHz, this is normal. Some USB microphones do not support 16 kHz. The robot software handles this fallback automatically.
-> 1.whisper.cpp cli path: /home/rogerchang/whisper.cpp/build/bin/whisper-cli
-> 2.whisper.cpp model path:   /home/rogerchang/whisper.cpp/models/ggml-base.bin
-> 3.WakeWord model path (.tflite or .onnx): pi5mic/voiceinput/hey_Ninja.onnx
-> 4.After initiallized, you need to manually copy the weke word model to  NinjaRobot ide directory: cp pi5mic/voiceinput/hey_Ninja.onnx ninjarobot_pi5_ide/assets/hey_Ninja.onnx 
+- If the tool selects 44.1 kHz when you configured 16 kHz, this is normal. Some USB microphones do not support 16 kHz. The robot software handles this fallback automatically.
+- 1.whisper.cpp cli path: /home/rogerchang/whisper.cpp/build/bin/whisper-cli
+- 2.whisper.cpp model path:   /home/rogerchang/whisper.cpp/models/ggml-base.bin
+- 3.WakeWord model path (.tflite or .onnx): pi5mic/voiceinput/hey_Ninja.onnx
+- 4.After initiallized, you need to manually copy the weke word model to  NinjaRobot ide directory: cp pi5mic/voiceinput/hey_Ninja.onnx ninjarobot_pi5_ide/assets/hey_Ninja.onnx 
 ---
 
 ### Step 5 — Import Settings into the Integrated Robot Configuration
