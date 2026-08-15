@@ -5,7 +5,26 @@ import logging
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
-from ninjarobot_pi5_agent.service_main import _complete_startup_liveliness
+from ninjarobot_pi5_agent.service_main import (
+    _complete_startup_liveliness,
+    _effective_onboarding_enabled,
+)
+
+
+def test_effective_onboarding_covers_every_startup_trigger() -> None:
+    assert not _effective_onboarding_enabled(
+        configured=False,
+        remote_access=False,
+        auto_start=False,
+    )
+    for enabled_trigger in ("configured", "remote_access", "auto_start"):
+        inputs = {
+            "configured": False,
+            "remote_access": False,
+            "auto_start": False,
+        }
+        inputs[enabled_trigger] = True
+        assert _effective_onboarding_enabled(**inputs)
 
 
 def test_startup_liveliness_success_marks_runtime_ready() -> None:

@@ -301,8 +301,8 @@ bounded error and leaves voice disabled instead of remaining indefinitely in
 
 ### Optional remote access
 
-Remote access is disabled by default. Start the agent service, then use the
-Interactive Tool's **Remote Access** menu, or the scriptable commands:
+Remote access is disabled by default. Before the first Agent start, use the
+Interactive Tool's **Ngrok Remote Access** menu, or the scriptable commands:
 
 ```bash
 ninjarobot-agent remote configure
@@ -310,25 +310,49 @@ ninjarobot-agent remote activate
 ninjarobot-agent remote pairing-url
 ```
 
-`remote configure` is the only operation allowed to download/install the ngrok
-agent. It reuses a valid ngrok v3 binary and installs replacements atomically,
-so a running binary is never overwritten in place. It uses hidden double-entry
-for the authtoken and stores credentials in the owner-only secret store.
-Service boot never downloads or updates ngrok.
+`remote configure` is the one-time operation allowed to download/install the
+ngrok agent and save its token; it does not start a tunnel. It reuses a valid
+ngrok v3 binary and installs replacements atomically, so a running binary is
+never overwritten in place. It uses hidden double-entry for the authtoken and
+stores credentials in the owner-only secret store. With no Agent running,
+`remote activate` validates the saved configuration and enables it for the next
+Agent start. The Agent remains the sole tunnel owner, and service boot never
+downloads or updates ngrok.
 Remote activation also enables QR-first onboarding. The first authenticated
 browser or owner-only terminal chat runs Greeting exactly once and then enters
 silent Idle; model changes and additional interfaces do not create a second
 hardware owner.
+Startup derives this onboarding state from remote access, explicit onboarding,
+and boot deployment together, so an older configuration with remote access
+enabled and an explicit onboarding flag still disabled remains valid.
 Open the returned pairing URL on the controlling browser. The URL fragment is
 exchanged once for a Secure/HttpOnly cookie, so there is no second username or
 password prompt. Use `remote rotate-pairing` to revoke browsers and issue a new
 link, or `remote deactivate` to stop the exact tunnel and revoke all sessions.
+Terminal chat can display a non-revoking additional link with `/show remote
+access`; after the new browser pairs, the display returns directly to Idle
+without replaying Greeting.
+
+Local Web and ngrok are explicit, mutually exclusive controller modes. While
+remote mode is enabled, Local Web status exposes no URL and directs the user to
+the ngrok pairing flow. Manual remote deactivation does not silently start
+Local Web. During deployed automatic startup, an unavailable ngrok connection
+starts the local mDNS HTTPS fallback and refreshes the physical QR; recovery
+returns ownership to the remote endpoint.
 
 An ngrok authtoken identifies the Pi agent; it does not authenticate a browser.
 The project therefore enforces its own short-lived pairing, exact Origin/Host
 checks, and an ngrok-injected transport marker before exposing assets or the
 WebSocket controller. ngrok accounts, free-plan interstitials/limits, and
 possible charges remain governed by [ngrok's current limits](https://ngrok.com/docs/pricing-limits/free-plan-limits).
+
+Automatic startup is opt-in through **Startup Agent Deployment**. Its install
+action validates and installs the fixed unit, power-off helper, and narrow
+sudoers rule, then enables and starts the real-hardware service in the same
+transaction. A failed first start is disabled again. Deployment status checks
+the exact non-interactive power-off authorization without reading the protected
+`/etc/sudoers.d` directory; the paired web power-off button never receives
+general sudo access.
 
 The complete normal-user Raspberry Pi acceptance workflow is in the
 [Phase 8 interactive validation guide](docs/validation/phase-8-final-interactive-pi-validation-2026-08-14.md).

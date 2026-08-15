@@ -36,6 +36,7 @@ class AgentIPCServer:
         web: WebServerManager | None = None,
         remote_access: RemoteAccessService | None = None,
         on_local_controller: Callable[[], Awaitable[None]] | None = None,
+        show_remote_access: Callable[[], Awaitable[dict[str, object]]] | None = None,
     ) -> None:
         self._runtime = runtime
         self._socket_path = Path(socket_path).expanduser()
@@ -43,6 +44,7 @@ class AgentIPCServer:
         self._web = web
         self._remote_access = remote_access
         self._on_local_controller = on_local_controller
+        self._show_remote_access = show_remote_access
         self._server: asyncio.AbstractServer | None = None
         self._stop = asyncio.Event()
 
@@ -411,6 +413,14 @@ class AgentIPCServer:
                 {"type": "result", "data": await self._remote_access.rotate_pairing()},
             )
             return
+        if command == "remote_show_qr":
+            if self._show_remote_access is None:
+                raise AgentIPCError("remote QR display is not configured")
+            await _write_message(
+                writer,
+                {"type": "result", "data": await self._show_remote_access()},
+            )
+            return
         if command == "resume_system":
             resume_result = await self._runtime.resume_system(
                 _required_text(payload, "session_id"),
@@ -501,13 +511,25 @@ class AgentIPCClient:
             writer.write(encoded)
             await writer.drain()
             while raw := await reader.readline():
-                decoded = json.loads(raw)
+                try:
+                    decoded = json.loads(raw)
+                except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+                    raise AgentIPCError("service response was not valid JSON") from exc
                 if not isinstance(decoded, dict):
                     raise AgentIPCError("service response was not an object")
                 yield decoded
+        except AgentIPCError:
+            raise
+        except (ConnectionError, OSError) as exc:
+            raise AgentIPCError("agent service connection closed unexpectedly") from exc
         finally:
             writer.close()
-            await writer.wait_closed()
+            try:
+                await writer.wait_closed()
+            except (ConnectionError, OSError):
+                # The response has already been handled, or the exchange error above is
+                # more useful. A peer reset while closing must not replace either result.
+                pass
 
     async def request(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Return the single terminal result or raise its sanitized error."""

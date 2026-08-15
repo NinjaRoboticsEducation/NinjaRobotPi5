@@ -6,6 +6,8 @@ import subprocess
 import sys
 import tarfile
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 from ninjarobot_pi5_agent.deployment import (
@@ -16,6 +18,7 @@ from ninjarobot_pi5_agent.deployment import (
     DeploymentManager,
     DeploymentSpec,
     create_backup,
+    current_spec,
     render_unit,
     restore_backup,
 )
@@ -83,6 +86,42 @@ def test_rendered_unit_is_real_hardware_absolute_hardened_and_not_uv(tmp_path: P
             timeout=10.0,
         )
         assert verified.returncode == 0, verified.stderr
+
+
+def test_current_spec_preserves_virtual_environment_interpreter_symlink(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base_python = tmp_path / "uv-python"
+    base_python.write_text("", encoding="utf-8")
+    venv_python = tmp_path / ".venv" / "bin" / "python"
+    venv_python.parent.mkdir(parents=True)
+    venv_python.symlink_to(base_python)
+    monkeypatch.setattr(sys, "executable", str(venv_python))
+    monkeypatch.setattr("getpass.getuser", lambda: "robot-user")
+    paths = {
+        name: tmp_path / name
+        for name in (
+            "config",
+            "mcp_config",
+            "secret_file",
+            "skill_dir",
+            "conversation_db",
+            "ledger",
+            "service_socket",
+            "service_lock",
+            "benchmark_dir",
+            "whisper_command",
+            "whisper_model",
+            "web_certificate",
+            "web_key",
+        )
+    }
+
+    spec = current_spec(SimpleNamespace(**paths))
+
+    assert spec.python == venv_python.absolute()
+    assert spec.python != base_python.resolve()
 
 
 def test_installer_is_disabled_by_default_idempotent_and_uses_fixed_targets(
@@ -163,6 +202,63 @@ def test_enable_rejects_partial_privileged_install_before_changing_config(tmp_pa
         manager.enable(confirmed=True)
 
     assert spec.config.read_bytes() == before
+
+
+def test_artifact_status_does_not_read_protected_sudoers_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spec = _spec(tmp_path)
+    calls: list[list[str]] = []
+    original_is_file = Path.is_file
+
+    def protected_is_file(path: Path) -> bool:
+        if path == SUDOERS_PATH:
+            raise PermissionError("protected sudoers directory")
+        if path in {UNIT_PATH, HELPER_PATH}:
+            return True
+        return original_is_file(path)
+
+    def runner(command: object) -> subprocess.CompletedProcess[str]:
+        rendered = list(command)  # type: ignore[arg-type]
+        calls.append(rendered)
+        return subprocess.CompletedProcess(rendered, 0, "allowed\n", "")
+
+    monkeypatch.setattr(Path, "is_file", protected_is_file)
+    artifacts = DeploymentManager(spec, runner=runner).artifact_status()
+
+    assert artifacts == {
+        "systemd_unit": True,
+        "poweroff_helper": True,
+        "sudoers_rule": True,
+    }
+    assert ["/usr/bin/sudo", "-n", "-l", str(HELPER_PATH)] in calls
+
+
+def test_install_and_enable_starts_service_in_one_transaction(tmp_path: Path) -> None:
+    spec = _spec(tmp_path)
+    calls: list[list[str]] = []
+
+    def runner(command: object) -> subprocess.CompletedProcess[str]:
+        rendered = list(command)  # type: ignore[arg-type]
+        calls.append(rendered)
+        return subprocess.CompletedProcess(rendered, 0, "", "")
+
+    manager = DeploymentManager(spec, runner=runner)
+    manager.artifact_status = Mock(
+        return_value={  # type: ignore[method-assign]
+            "systemd_unit": False,
+            "poweroff_helper": False,
+            "sudoers_rule": False,
+        }
+    )
+    manager.install = Mock(return_value={"installed": True})  # type: ignore[method-assign]
+    manager.enable = Mock(return_value={"enabled": True})  # type: ignore[method-assign]
+
+    result = manager.install_and_enable(confirmed=True)
+
+    assert result["running_now"] is True
+    assert ["/usr/bin/sudo", "/usr/bin/systemctl", "start", UNIT_NAME] in calls
 
 
 def test_backup_is_private_and_contains_only_user_data(tmp_path: Path) -> None:

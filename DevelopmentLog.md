@@ -1,5 +1,98 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-15 — Explicit Web ownership, ngrok setup, QR, and deployment refinement
+
+### Root causes and implementation
+
+- separated physical HTTPS backend ownership from the public Local Web mode:
+  local, remote, and deployed local-fallback states now have explicit status
+  and request gates, so ngrok cannot accidentally expose a competing local
+  controller URL
+- made manual Remote Access configuration two steps: one-time hidden token
+  setup/atomic ngrok installation, followed by activation; offline activation
+  validates and persists configuration while the Agent remains the only tunnel
+  process owner
+- added deployed remote-failure fallback to local mDNS HTTPS and recovery back
+  to the remote endpoint; manual deactivation intentionally does not start
+  Local Web
+- added terminal `/show remote access`, which creates a fresh one-use pairing
+  token without revoking existing browsers, clears the QR to Idle after the new
+  browser pairs, and never replays Greeting
+- corrected ASGI WebSocket rejection to use Starlette's denial-response method
+  only when the server advertises the corresponding extension
+- simplified the normal-user Interactive Tool to the approved 14-item main,
+  six-item ngrok, and four-item deployment menus while keeping advanced
+  session, certificate, pairing rotation, credential removal, logs, backup,
+  rollback, and uninstall commands scriptable
+- changed deployment setup to install, enable, and start systemd in one
+  transaction, with `disable --now` rollback after a failed first start; status
+  now verifies the exact power-off authorization using `sudo -n -l` rather than
+  traversing the protected `/etc/sudoers.d` directory
+- preserved the absolute `.venv/bin/python` entry point in generated units;
+  resolving that symlink had selected uv's base interpreter and could omit the
+  project's installed environment at boot
+- updated beginner, release, and developer documentation, including optional
+  search-only Tavily enrollment through the private secret store and MCP preset
+
+### Validation
+
+- each implementation phase passed the 222-file/47-repair managed-driver
+  verifier, Ruff lint/format, and combined IDE/Agent MyPy gate
+- focused access/onboarding/IPC/Web tests passed 69 cases; Interactive Tool
+  tests passed 20 cases; deployment/CLI/shutdown tests passed 35 cases
+- final validation passed workspace source provenance, managed-driver
+  integrity, compileall, Ruff lint/format, MyPy across 81 source files,
+  `git diff --check`, and 542 tests; one upstream Starlette/httpx test-client
+  deprecation warning remains
+
+### Hardware validation status
+
+No actuator-moving, camera capture, microphone capture, ngrok account change,
+systemd installation, reboot, or Raspberry Pi power-off action was executed by
+the automated implementation. These remain explicitly separated manual Pi
+acceptance steps with raised-wheel and privacy precautions.
+
+## 2026-08-14 — Agent onboarding startup and IPC reset hardening
+
+### Root cause and implementation
+
+- traced the reported CLI `ConnectionResetError` to an earlier background
+  service failure: remote access made onboarding operationally required while
+  the release-status registry used only the older explicit onboarding flag and
+  rejected the coordinator's first state transition
+- introduced one effective onboarding invariant—explicit onboarding, remote
+  access, or auto-start—and reused it across release status, pairing/web
+  startup, and the coordinator
+- moved web/onboarding initialization inside the service cleanup boundary so a
+  startup exception releases Agent runtime and hardware ownership rather than
+  bypassing normal close handling
+- converted IPC read/write peer resets into controlled `AgentIPCError`
+  responses and prevented a reset during `wait_closed()` from replacing either
+  a valid response or the more useful exchange failure
+- added regression tests for every onboarding trigger, a reset after a valid
+  response, and a reset while reading the service response
+
+### Validation
+
+- Phase 1: managed-driver verification, Ruff, formatting, combined IDE/Agent
+  MyPy, and 4 service-main tests passed
+- Phase 2: managed-driver verification, Ruff, formatting, combined IDE/Agent
+  MyPy, and 30 IPC/CLI tests passed
+- full validation passed: workspace-source verification, 222-file/47-repair
+  managed-driver verification, compileall, Ruff lint/format, MyPy across 81
+  source files, `git diff --check`, and 529 tests; one upstream
+  Starlette/httpx deprecation warning remains
+
+### Raspberry Pi status
+
+A bounded non-moving Pi startup passed with the existing remote-enabled and
+explicit-onboarding-disabled configuration. The service reported ready in
+`onboarding`, enabled QR/pairing status, and a ready model plus IDE,
+robot-control, and memory tool providers. Remote access reached
+`waiting_for_connection`. No Greeting or actuator movement was triggered.
+Remote access, Web, Agent service, and the older Interactive Tool process were
+then stopped; no ngrok process, Agent socket, or port 8443 listener remained.
+
 ## 2026-08-14 — Fresh-install, hardware recovery, onboarding, and deployment repair
 
 ### Root causes and implementation

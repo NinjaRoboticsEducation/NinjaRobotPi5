@@ -307,6 +307,7 @@ def create_web_app(
     pairing: PairingSessionManager | None = None,
     poweroff: PoweroffCoordinator | None = None,
     require_local_pairing: bool = False,
+    access_state: WebAccessState | None = None,
     on_authenticated_controller: Callable[[bool, bool], Awaitable[None]] | None = None,
 ) -> FastAPI:
     """Build the fixed local-network API; arbitrary tool calls are never exposed."""
@@ -334,6 +335,11 @@ def create_web_app(
             return PlainTextResponse("Invalid request host.", status_code=421)
         if scope == "denied":
             return PlainTextResponse("Unknown request host.", status_code=421)
+        if scope == "local" and access_state is not None and not access_state.local_available:
+            return PlainTextResponse(
+                "Local Web Interface is unavailable while ngrok Remote Access is active.",
+                status_code=503,
+            )
         if request.url.path == "/pair":
             return await call_next(request)
         if scope == "local" and not require_local_pairing:
@@ -427,6 +433,12 @@ def create_web_app(
                 if scope == "denied":
                     raise PairingError("unknown request host")
                 remote_connection = scope == "remote"
+                if (
+                    scope == "local"
+                    and access_state is not None
+                    and not access_state.local_available
+                ):
+                    raise PairingError("local web interface is disabled")
                 try:
                     paired_connection = pairing.authorize_controller(
                         websocket.cookies.get(SESSION_COOKIE_NAME),
@@ -441,7 +453,10 @@ def create_web_app(
             except PairingError:
                 denial = PlainTextResponse("Remote browser pairing required.", status_code=401)
                 send_denial = getattr(websocket, "send_denial_response", None)
-                if send_denial is not None:
+                denial_supported = "websocket.http.response" in websocket.scope.get(
+                    "extensions", {}
+                )
+                if send_denial is not None and denial_supported:
                     await send_denial(denial)
                 else:
                     await websocket.close(code=4401, reason="Pairing required")
@@ -456,7 +471,8 @@ def create_web_app(
                 status_code=423,
             )
             send_denial = getattr(websocket, "send_denial_response", None)
-            if send_denial is not None:
+            denial_supported = "websocket.http.response" in websocket.scope.get("extensions", {})
+            if send_denial is not None and denial_supported:
                 await send_denial(denial)
             else:
                 await websocket.close(code=4423, reason="423 Locked")
@@ -700,6 +716,64 @@ async def _dispatch_web_message(
     raise ValueError(f"unsupported web request type: {kind}")
 
 
+class WebAccessState:
+    """Track user-visible local access separately from the shared HTTPS backend."""
+
+    def __init__(self) -> None:
+        self._local_requested = False
+        self._remote_enabled = False
+        self._local_fallback = False
+
+    @property
+    def mode(self) -> str:
+        if self._local_fallback:
+            return "local_fallback"
+        if self._remote_enabled:
+            return "remote"
+        if self._local_requested:
+            return "local"
+        return "none"
+
+    @property
+    def local_available(self) -> bool:
+        return self._local_requested or self._local_fallback
+
+    @property
+    def backend_required(self) -> bool:
+        return self._remote_enabled or self.local_available
+
+    def request_local(self) -> bool:
+        if self._remote_enabled and not self._local_fallback:
+            return False
+        self._local_requested = True
+        return True
+
+    def stop_local(self) -> None:
+        self._local_requested = False
+        self._local_fallback = False
+
+    def enable_remote(self) -> None:
+        self._remote_enabled = True
+        self._local_requested = False
+        self._local_fallback = False
+
+    def disable_remote(self) -> None:
+        self._remote_enabled = False
+        self._local_fallback = False
+
+    def enable_local_fallback(self) -> None:
+        self._local_requested = False
+        self._local_fallback = True
+
+    def disable_local_fallback(self) -> None:
+        self._local_fallback = False
+
+    def reset(self) -> None:
+        self._local_requested = False
+        self._remote_enabled = False
+        self._local_fallback = False
+
+
 class WebServerManager:
     """Start and stop one uvicorn HTTPS server inside the agent owner process."""
 
@@ -712,6 +786,7 @@ class WebServerManager:
         port: int,
         certificate_path: str | Path,
         key_path: str | Path,
+        access_state: WebAccessState | None = None,
     ) -> None:
         if not 1 <= port <= 65_535:
             raise ValueError("web port must be from 1 through 65535")
@@ -721,12 +796,35 @@ class WebServerManager:
         self._port = port
         self._certificate_path = Path(certificate_path).expanduser()
         self._key_path = Path(key_path).expanduser()
+        self._access_state = access_state or WebAccessState()
         self._server: uvicorn.Server | None = None
         self._task: asyncio.Task[None] | None = None
 
     async def start(self) -> dict[str, Any]:
-        if self._task is not None and not self._task.done():
+        if not self._access_state.request_local():
             return self.status()
+        await self._start_backend()
+        return self.status()
+
+    async def start_remote(self) -> dict[str, Any]:
+        self._access_state.enable_remote()
+        await self._start_backend()
+        return self.backend_status()
+
+    async def start_local_fallback(self) -> dict[str, Any]:
+        self._access_state.enable_local_fallback()
+        await self._start_backend()
+        return self.status()
+
+    async def stop_local_fallback(self) -> dict[str, Any]:
+        self._access_state.disable_local_fallback()
+        if not self._access_state.backend_required:
+            await self._stop_backend()
+        return self.status()
+
+    async def _start_backend(self) -> None:
+        if self._task is not None and not self._task.done():
+            return
         certificate, key = await asyncio.to_thread(
             ensure_local_ca_certificate,
             self._certificate_path,
@@ -748,15 +846,28 @@ class WebServerManager:
         self._task = task
         for _ in range(100):
             if server.started:
-                return self.status()
+                return
             if task.done():
                 await task
                 raise RuntimeError("web server stopped before it became ready")
             await asyncio.sleep(0.05)
-        await self.stop()
+        await self._stop_backend()
         raise RuntimeError("web server did not become ready within five seconds")
 
     async def stop(self) -> dict[str, Any]:
+        self._access_state.stop_local()
+        if self._access_state.backend_required:
+            return self.status()
+        await self._stop_backend()
+        return self.status()
+
+    async def stop_remote(self) -> dict[str, Any]:
+        self._access_state.disable_remote()
+        if not self._access_state.backend_required:
+            await self._stop_backend()
+        return self.status()
+
+    async def _stop_backend(self) -> None:
         server = self._server
         task = self._task
         self._server = None
@@ -770,10 +881,10 @@ class WebServerManager:
                 task.cancel()
                 await asyncio.gather(task, return_exceptions=True)
         await self._leases.close()
-        return self.status()
 
     def status(self) -> dict[str, Any]:
-        running = self._task is not None and not self._task.done()
+        backend_running = self._task is not None and not self._task.done()
+        running = backend_running and self._access_state.local_available
         display_host = mdns_hostname() if self._host in {"0.0.0.0", "::"} else self._host
         ca_certificate, _ca_key = local_ca_paths(self._certificate_path)
         url = f"https://{display_host}:{self._port}/" if running else None
@@ -792,12 +903,25 @@ class WebServerManager:
                 "certificate, export and trust the NinjaRobot local CA from the "
                 "Interactive Tool. Use Remote Access when mDNS is unavailable."
                 if running
-                else "Start the web interface from the Interactive Tool."
+                else (
+                    "Connect the web interface via the ngrok pairing link or remote access QR code."
+                    if self._access_state.mode == "remote"
+                    else "Start the web interface from the Interactive Tool."
+                )
             ),
         }
 
+    def backend_status(self) -> dict[str, Any]:
+        running = self._task is not None and not self._task.done()
+        return {
+            "running": running,
+            "ready": running and bool(self._server and self._server.started),
+            "access_mode": self._access_state.mode,
+        }
+
     async def close(self) -> None:
-        await self.stop()
+        self._access_state.reset()
+        await self._stop_backend()
 
 
 def _required_string(payload: dict[str, Any], key: str) -> str:

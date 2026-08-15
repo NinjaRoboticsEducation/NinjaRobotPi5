@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
 
 from .events import AgentEvent, AgentEventType, EventBroker
@@ -21,6 +22,8 @@ class OnboardingIDE(Protocol):
     async def prepare_onboarding_greeting(self) -> dict[str, Any]: ...
 
     async def start_liveliness(self) -> dict[str, Any]: ...
+
+    async def restore_idle_face(self) -> object: ...
 
 
 class OnboardingRuntime(Protocol):
@@ -60,6 +63,9 @@ class OnboardingCoordinator:
         events: EventBroker,
         release_status: ReleaseStatusRegistry,
         remote: RemoteOnboardingSource,
+        allow_local_fallback: bool = False,
+        start_local_fallback: Callable[[], Awaitable[dict[str, Any]]] | None = None,
+        stop_local_fallback: Callable[[], Awaitable[dict[str, Any]]] | None = None,
         refresh_interval_seconds: float | None = None,
     ) -> None:
         self._enabled = enabled
@@ -70,6 +76,9 @@ class OnboardingCoordinator:
         self._events = events
         self._release_status = release_status
         self._remote = remote
+        self._allow_local_fallback = allow_local_fallback
+        self._start_local_fallback = start_local_fallback
+        self._stop_local_fallback = stop_local_fallback
         self._refresh_interval = (
             refresh_interval_seconds
             if refresh_interval_seconds is not None
@@ -86,6 +95,7 @@ class OnboardingCoordinator:
         self._terminal_failure = False
         self._closed = False
         self._displayed_scope: str | None = None
+        self._post_startup_pairing_scope: str | None = None
 
     async def start(self, *, remote_enabled: bool) -> None:
         """Begin display supervision before remote startup can publish an event."""
@@ -115,13 +125,34 @@ class OnboardingCoordinator:
             return
         status = self._remote.status()
         if status.get("public_url"):
-            await self._show_remote_pairing()
+            if await self._disable_local_fallback():
+                await self._show_remote_pairing()
         elif status.get("state") in {"degraded", "failed", "unavailable", "disabled"}:
-            await self._show_local_pairing()
+            if self._allow_local_fallback:
+                if await self._enable_local_fallback():
+                    await self._show_local_pairing()
+            else:
+                await self._show_remote_unavailable()
 
-    async def controller_connected(self, *, paired: bool) -> None:
+    async def controller_connected(self, *, paired: bool, remote: bool = False) -> None:
         """Attempt Greeting once for the first authenticated controller."""
         if not self._enabled or not paired or self._terminal_failure:
+            return
+        connection_scope = "remote" if remote else "local"
+        if self._post_startup_pairing_scope == connection_scope:
+            async with self._presentation_lock:
+                self._post_startup_pairing_scope = None
+                self._displayed_scope = None
+                try:
+                    await self._ide.restore_idle_face()
+                except Exception as exc:
+                    await self._fail("pairing_idle_restore_failed", exc)
+                    return
+            await self._events.publish(
+                AgentEventType.ONBOARDING,
+                "The additional browser paired; the QR was cleared and Idle restored.",
+                data={"kind": "pairing_qr_completed", "scope": connection_scope},
+            )
             return
         async with self._greeting_lock:
             if self._greeting_attempted or self._terminal_failure:
@@ -143,6 +174,28 @@ class OnboardingCoordinator:
                 "and Idle is active.",
                 data={"kind": "onboarding_complete"},
             )
+
+    async def show_remote_access(self) -> dict[str, object]:
+        """Display a fresh non-revoking remote pairing QR after startup."""
+        if not self._enabled or self._terminal_failure:
+            raise RuntimeError("remote QR display is unavailable")
+        status = self._remote.status()
+        public_url = status.get("public_url")
+        if not isinstance(public_url, str) or not public_url:
+            raise RuntimeError("ngrok Remote Access is not ready")
+        pairing_url = self._pairing.rotate(invalidate_sessions=False)
+        self._post_startup_pairing_scope = "remote"
+        self._displayed_scope = None
+        await self._show_pairing(pairing_url, scope="remote")
+        if self._terminal_failure or self._displayed_scope != "remote":
+            raise RuntimeError("ngrok pairing QR could not be displayed")
+        return {
+            "displayed": True,
+            "scope": "remote",
+            "public_url": public_url,
+            "existing_browser_sessions_revoked": False,
+            "next_step": "Scan the QR code; the display returns to Idle after pairing.",
+        }
 
     async def close(self) -> None:
         self._closed = True
@@ -167,9 +220,18 @@ class OnboardingCoordinator:
                 continue
             kind = event.data.get("kind")
             if kind == "remote_ready":
-                await self._show_remote_pairing()
+                if await self._disable_local_fallback():
+                    if self._greeting_attempted:
+                        self._post_startup_pairing_scope = "remote"
+                    await self._show_remote_pairing()
             elif kind == "remote_error":
-                await self._show_local_pairing()
+                if self._allow_local_fallback:
+                    if await self._enable_local_fallback():
+                        if self._greeting_attempted:
+                            self._post_startup_pairing_scope = "local"
+                        await self._show_local_pairing()
+                else:
+                    await self._show_remote_unavailable()
 
     async def _refresh_loop(self) -> None:
         while True:
@@ -184,7 +246,11 @@ class OnboardingCoordinator:
         await self._show_pairing(pairing_url, scope="remote")
 
     async def _show_local_pairing(self) -> None:
-        if self._closed or self._terminal_failure or self._greeting_attempted:
+        if (
+            self._closed
+            or self._terminal_failure
+            or (self._greeting_attempted and self._post_startup_pairing_scope != "local")
+        ):
             return
         try:
             self._pairing.set_local_url(self._local_origin)
@@ -198,7 +264,7 @@ class OnboardingCoordinator:
         if (
             self._closed
             or self._terminal_failure
-            or self._greeting_attempted
+            or (self._greeting_attempted and self._post_startup_pairing_scope is None)
             or self._displayed_scope is None
         ):
             return
@@ -211,7 +277,11 @@ class OnboardingCoordinator:
 
     async def _show_pairing(self, pairing_url: str, *, scope: str) -> None:
         async with self._presentation_lock:
-            if self._closed or self._terminal_failure or self._greeting_attempted:
+            if (
+                self._closed
+                or self._terminal_failure
+                or (self._greeting_attempted and self._post_startup_pairing_scope is None)
+            ):
                 return
             try:
                 await self._ide.show_onboarding_qr(pairing_url)
@@ -229,6 +299,39 @@ class OnboardingCoordinator:
                 "A physical-presence browser pairing QR is ready.",
                 data={"kind": "pairing_qr_ready", "scope": scope},
             )
+
+    async def _show_remote_unavailable(self) -> None:
+        self._displayed_scope = None
+        self._post_startup_pairing_scope = None
+        self._release_status.update(
+            "onboarding",
+            ReleaseFeatureState.DEGRADED,
+            detail="remote_access_unavailable",
+        )
+        try:
+            await self._ide.show_onboarding_status("error")
+        except Exception as exc:
+            await self._fail("onboarding_status_failed", exc)
+
+    async def _enable_local_fallback(self) -> bool:
+        if self._start_local_fallback is None:
+            return True
+        try:
+            await self._start_local_fallback()
+        except Exception as exc:
+            await self._fail("local_fallback_start_failed", exc)
+            return False
+        return True
+
+    async def _disable_local_fallback(self) -> bool:
+        if self._stop_local_fallback is None:
+            return True
+        try:
+            await self._stop_local_fallback()
+        except Exception as exc:
+            await self._fail("local_fallback_stop_failed", exc)
+            return False
+        return True
 
     async def _fail(self, code: str, error: BaseException) -> None:
         if self._terminal_failure:

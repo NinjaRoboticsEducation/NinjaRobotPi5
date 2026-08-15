@@ -17,6 +17,7 @@ class _IDE:
         self.statuses: list[str] = []
         self.clear_calls = 0
         self.greeting_calls = 0
+        self.idle_restores = 0
 
     async def show_onboarding_qr(self, url: str) -> dict[str, Any]:
         if self.fail_qr:
@@ -38,6 +39,10 @@ class _IDE:
         if self.fail_greeting:
             raise RuntimeError("greeting failed")
         return {"name": "greeting"}
+
+    async def restore_idle_face(self) -> dict[str, Any]:
+        self.idle_restores += 1
+        return {"face": "idle"}
 
 
 class _Runtime:
@@ -111,6 +116,9 @@ async def _coordinator(
     *,
     ide: _IDE | None = None,
     refresh_interval_seconds: float | None = None,
+    allow_local_fallback: bool = False,
+    start_local_fallback: Any = None,
+    stop_local_fallback: Any = None,
 ) -> tuple[OnboardingCoordinator, _IDE, _Runtime, _Remote, EventBroker]:
     pairing = _pairing()
     events = EventBroker()
@@ -126,6 +134,9 @@ async def _coordinator(
         events=events,
         release_status=_status(),
         remote=remote,
+        allow_local_fallback=allow_local_fallback,
+        start_local_fallback=start_local_fallback,
+        stop_local_fallback=stop_local_fallback,
         refresh_interval_seconds=refresh_interval_seconds,
     )
     return coordinator, selected_ide, runtime, remote, events
@@ -133,7 +144,24 @@ async def _coordinator(
 
 def test_remote_failure_selects_local_qr_then_recovery_replaces_it() -> None:
     async def exercise() -> None:
-        coordinator, ide, _runtime, remote, events = await _coordinator()
+        fallback_starts = 0
+        fallback_stops = 0
+
+        async def start_fallback() -> dict[str, Any]:
+            nonlocal fallback_starts
+            fallback_starts += 1
+            return {"running": True}
+
+        async def stop_fallback() -> dict[str, Any]:
+            nonlocal fallback_stops
+            fallback_stops += 1
+            return {"running": False}
+
+        coordinator, ide, _runtime, remote, events = await _coordinator(
+            allow_local_fallback=True,
+            start_local_fallback=start_fallback,
+            stop_local_fallback=stop_fallback,
+        )
         await coordinator.start(remote_enabled=True)
         assert ide.statuses == ["connecting"]
 
@@ -145,6 +173,7 @@ def test_remote_failure_selects_local_qr_then_recovery_replaces_it() -> None:
         )
         await _wait_until(lambda: bool(ide.urls))
         assert ide.urls[-1].startswith("https://127.0.0.1:8443/#pair=")
+        assert fallback_starts == 1
 
         remote.public_url = "https://robot.example"
         remote.state = "waiting_for_connection"
@@ -156,6 +185,66 @@ def test_remote_failure_selects_local_qr_then_recovery_replaces_it() -> None:
         )
         await _wait_until(lambda: ide.urls[-1].startswith("https://robot.example/"))
         assert ide.urls[-1].startswith("https://robot.example/#pair=")
+        assert fallback_stops == 1
+        await coordinator.close()
+
+    asyncio.run(exercise())
+
+
+def test_manual_remote_failure_shows_error_without_starting_local_web() -> None:
+    async def exercise() -> None:
+        fallback_starts = 0
+
+        async def start_fallback() -> dict[str, Any]:
+            nonlocal fallback_starts
+            fallback_starts += 1
+            return {"running": True}
+
+        coordinator, ide, _runtime, remote, events = await _coordinator(
+            start_local_fallback=start_fallback
+        )
+        await coordinator.start(remote_enabled=True)
+        remote.state = "degraded"
+        await events.publish(
+            AgentEventType.REMOTE_ACCESS,
+            "remote failed",
+            data={"kind": "remote_error", "code": "network_unavailable"},
+        )
+        await _wait_until(lambda: ide.statuses[-1:] == ["error"])
+
+        assert fallback_starts == 0
+        assert ide.urls == []
+        await coordinator.close()
+
+    asyncio.run(exercise())
+
+
+def test_deployed_post_startup_remote_failure_shows_local_qr_then_idle() -> None:
+    async def exercise() -> None:
+        async def start_fallback() -> dict[str, Any]:
+            return {"running": True}
+
+        coordinator, ide, runtime, remote, events = await _coordinator(
+            allow_local_fallback=True,
+            start_local_fallback=start_fallback,
+        )
+        await coordinator.start(remote_enabled=False)
+        await coordinator.controller_connected(paired=True, remote=False)
+        initial_url_count = len(ide.urls)
+
+        remote.state = "degraded"
+        await events.publish(
+            AgentEventType.REMOTE_ACCESS,
+            "remote failed",
+            data={"kind": "remote_error", "code": "network_unavailable"},
+        )
+        await _wait_until(lambda: len(ide.urls) > initial_url_count)
+        assert ide.urls[-1].startswith("https://127.0.0.1:8443/#pair=")
+
+        await coordinator.controller_connected(paired=True, remote=False)
+        assert ide.idle_restores == 1
+        assert ide.greeting_calls == 1
+        assert runtime.completed == 1
         await coordinator.close()
 
     asyncio.run(exercise())
@@ -206,6 +295,47 @@ def test_unpaired_connection_never_runs_greeting() -> None:
         await coordinator.controller_connected(paired=False)
         assert ide.greeting_calls == 0
         assert runtime.completed == 0
+        await coordinator.close()
+
+    asyncio.run(exercise())
+
+
+def test_show_remote_access_preserves_sessions_and_restores_idle_without_greeting() -> None:
+    async def exercise() -> None:
+        coordinator, ide, runtime, remote, _events = await _coordinator()
+        await coordinator.start(remote_enabled=False)
+        await coordinator.controller_connected(paired=True, remote=False)
+        assert ide.greeting_calls == 1
+
+        remote.public_url = "https://robot.example"
+        remote.state = "waiting_for_connection"
+        remote.pairing.set_remote_url(remote.public_url)
+        existing_token = remote.pairing.pairing_url().split("#pair=", maxsplit=1)[1]
+        remote.pairing.exchange(
+            existing_token,
+            origin="https://robot.example",
+            host="robot.example",
+            remote_marker="r" * 43,
+        )
+        before = remote.pairing.status().active_sessions
+        result = await coordinator.show_remote_access()
+        remote_token = ide.urls[-1].split("#pair=", maxsplit=1)[1]
+
+        assert result["existing_browser_sessions_revoked"] is False
+        assert ide.urls[-1].startswith("https://robot.example/#pair=")
+        assert remote.pairing.status().active_sessions == before
+
+        remote.pairing.exchange(
+            remote_token,
+            origin="https://robot.example",
+            host="robot.example",
+            remote_marker="r" * 43,
+        )
+        await coordinator.controller_connected(paired=True, remote=True)
+
+        assert ide.idle_restores == 1
+        assert ide.greeting_calls == 1
+        assert runtime.completed == 1
         await coordinator.close()
 
     asyncio.run(exercise())

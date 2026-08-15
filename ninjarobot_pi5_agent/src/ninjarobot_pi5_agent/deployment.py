@@ -263,9 +263,10 @@ class DeploymentManager:
                 "--no-pager",
             ]
         )
+        artifacts = self.artifact_status()
         return {
-            "installed": all(self.artifact_status().values()),
-            "artifacts": self.artifact_status(),
+            "installed": all(artifacts.values()),
+            "artifacts": artifacts,
             "enabled": self.is_enabled(),
             "systemd": result.stdout.strip() if result.returncode == 0 else "unavailable",
             "spec": _public_spec(self.spec),
@@ -281,22 +282,37 @@ class DeploymentManager:
         }
 
     def install_and_enable(self, *, confirmed: bool, repair: bool = False) -> dict[str, Any]:
-        """Install all privileged artifacts, then transactionally enable boot."""
+        """Install, enable, and start the real-hardware service transactionally."""
         if not confirmed:
             raise ValueError("deployment setup requires --confirm")
         existing = self.artifact_status()
         upgrade = repair or any(existing.values())
         installed = self.install(confirmed=True, upgrade=upgrade)
         enabled = self.enable(confirmed=True)
-        return {"installed": installed["installed"], **enabled}
-
-    @staticmethod
-    def artifact_status() -> dict[str, bool]:
-        """Report every privileged artifact required by boot and web power-off."""
+        try:
+            started = self.action("start")
+        except Exception:
+            # A failed first start must not leave a broken unit enabled for the
+            # next boot. User data and installed artifacts remain available for
+            # diagnosis and repair.
+            try:
+                self.disable()
+            except Exception:
+                pass
+            raise
         return {
-            "systemd_unit": UNIT_PATH.is_file(),
-            "poweroff_helper": HELPER_PATH.is_file(),
-            "sudoers_rule": SUDOERS_PATH.is_file(),
+            "installed": installed["installed"],
+            **enabled,
+            "started": started["accepted"],
+            "running_now": True,
+        }
+
+    def artifact_status(self) -> dict[str, bool]:
+        """Report privileged artifacts without directly traversing protected sudoers."""
+        return {
+            "systemd_unit": _safe_is_file(UNIT_PATH),
+            "poweroff_helper": _safe_is_file(HELPER_PATH),
+            "sudoers_rule": self._poweroff_authorized(),
         }
 
     def logs(self, *, lines: int = 100) -> subprocess.CompletedProcess[str]:
@@ -321,6 +337,11 @@ class DeploymentManager:
         result = self._runner(command)
         if result.returncode != 0:
             raise RuntimeError(f"deployment command failed: {Path(command[0]).name}")
+
+    def _poweroff_authorized(self) -> bool:
+        """Check the exact passwordless helper authorization without reading /etc/sudoers.d."""
+        result = self._runner([str(SUDO), "-n", "-l", str(HELPER_PATH)])
+        return result.returncode == 0
 
     def _persist_auto_start(self, enabled: bool) -> None:
         config = load_robot_config(self.spec.config)
@@ -437,7 +458,10 @@ def current_spec(arguments: Any) -> DeploymentSpec:
         raise ValueError("run deployment commands as the non-root robot user")
     return DeploymentSpec(
         user=user,
-        python=Path(sys.executable).resolve(),
+        # Preserve the venv entry point. Resolving this symlink reaches uv's
+        # base interpreter and loses the project's installed environment when
+        # systemd executes it directly.
+        python=Path(sys.executable).absolute(),
         working_directory=Path.cwd().resolve(),
         config=arguments.config.expanduser().resolve(),
         mcp_config=arguments.mcp_config.expanduser().resolve(),
@@ -475,3 +499,10 @@ def _public_spec(spec: DeploymentSpec) -> dict[str, str]:
 
 def _run(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(command, check=False, capture_output=True, text=True, timeout=30.0)
+
+
+def _safe_is_file(path: Path) -> bool:
+    try:
+        return path.is_file()
+    except OSError:
+        return False

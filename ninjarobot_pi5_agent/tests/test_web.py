@@ -21,6 +21,7 @@ from ninjarobot_pi5_agent.pairing import PairingSessionManager
 from ninjarobot_pi5_agent.runtime import AgentRuntime
 from ninjarobot_pi5_agent.shutdown import PoweroffCoordinator
 from ninjarobot_pi5_agent.web_app import (
+    WebAccessState,
     _dispatch_web_message,
     create_web_app,
     ensure_self_signed_certificate,
@@ -500,6 +501,58 @@ def test_remote_pairing_gate_denies_unknown_public_host_and_preserves_lan() -> N
     with TestClient(app, base_url="https://192.168.1.20:8443") as local:
         assert local.get("/").status_code == 200
         assert local.get("/assets/app.js").status_code == 200
+
+
+def test_remote_access_mode_blocks_direct_local_http_until_fallback() -> None:
+    runtime = _FakeRuntime()
+    controller = _FakeController()
+    leases = ControllerLeaseManager(on_revoke=controller.lease_revoked)
+    pairing = PairingSessionManager(
+        pairing_secret=b"p" * 32,
+        session_secret=b"s" * 32,
+        remote_header_secret="r" * 43,
+        pairing_lifetime_seconds=60,
+        session_lifetime_seconds=300,
+    )
+    access = WebAccessState()
+    access.enable_remote()
+    static = Path(__file__).resolve().parents[1] / "src" / "ninjarobot_pi5_agent" / "web_static"
+    app = create_web_app(
+        runtime=cast(AgentRuntime, runtime),
+        controller=cast(WebRobotController, controller),
+        leases=leases,
+        static_directory=static,
+        pairing=pairing,
+        access_state=access,
+    )
+
+    with TestClient(app, base_url="https://ninjarobotpi5.local:8443") as client:
+        blocked = client.get("/")
+        assert blocked.status_code == 503
+        assert "ngrok Remote Access" in blocked.text
+
+        access.enable_local_fallback()
+        assert client.get("/").status_code == 200
+
+
+def test_web_access_state_does_not_silently_restore_local_after_remote_stop() -> None:
+    access = WebAccessState()
+
+    assert access.request_local() is True
+    assert access.mode == "local"
+    access.enable_remote()
+    assert access.mode == "remote"
+    assert access.local_available is False
+    assert access.request_local() is False
+
+    access.disable_remote()
+    assert access.mode == "none"
+    assert access.local_available is False
+
+    access.enable_remote()
+    access.enable_local_fallback()
+    assert access.mode == "local_fallback"
+    assert access.local_available is True
 
 
 def test_onboarding_requires_local_pairing_before_websocket_acceptance() -> None:

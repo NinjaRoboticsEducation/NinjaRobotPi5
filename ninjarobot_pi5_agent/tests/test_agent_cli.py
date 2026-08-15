@@ -29,6 +29,55 @@ def run_cli(arguments: list[str]) -> None:
     assert exit_info.value.code == 0
 
 
+def test_interactive_menu_uses_public_release_order_and_hides_advanced_actions(
+    monkeypatch,
+    capsys,
+) -> None:
+    monkeypatch.setattr("builtins.input", lambda _prompt="": "14")
+
+    result = asyncio.run(agent_cli._interactive(SimpleNamespace()))  # noqa: SLF001
+
+    assert result == 0
+    output = capsys.readouterr().out
+    expected_options = (
+        "1. Set Agent Model",
+        "2. Start Agent Service",
+        "3. Agent Service Status",
+        "4. Start NinjaRobot Chat Interface",
+        "5. Local Web Interface",
+        "6. Local Web Interface Status",
+        "7. Stop Local Web Interface",
+        "8. Ngrok Remote Access",
+        "9. MCP Tools (Built-in and External)",
+        "10. Agent Skills",
+        "11. Agent Memory Management",
+        "12. Startup Agent Deployment",
+        "13. Stop Agent Service",
+        "14. Exit",
+    )
+    assert all(option in output for option in expected_options)
+    assert "Conversation Sessions" not in output
+    assert "Export Browser Trust Certificate" not in output
+
+
+def test_deployment_menu_uses_integrated_public_release_actions(
+    monkeypatch,
+    capsys,
+) -> None:
+    monkeypatch.setattr("builtins.input", lambda _prompt="": "4")
+
+    asyncio.run(agent_cli._interactive_deployment(SimpleNamespace()))  # noqa: SLF001
+
+    output = capsys.readouterr().out
+    assert "1. Install and deploy automatic startup Agent" in output
+    assert "2. Disable and stop automatic startup Agent" in output
+    assert "3. Show startup Agent status" in output
+    assert "4. Back to the Interactive Tool" in output
+    assert "Show recent service logs" not in output
+    assert "Back up configuration" not in output
+    assert "Uninstall service" not in output
+
+
 def test_chat_resume_requires_confirmation_and_bypasses_the_model(
     monkeypatch,
     capsys,
@@ -151,6 +200,33 @@ def test_chat_voice_commands_bypass_the_model_and_use_exact_service_commands(
         {"command": "voice_disable"},
     ]
     assert "/voice input status" not in capsys.readouterr().err
+
+
+def test_chat_help_explains_commands_and_remote_qr_bypasses_model(
+    monkeypatch,
+    capsys,
+) -> None:
+    inputs = iter(("/help", "/show remote access", "/exit"))
+    monkeypatch.setattr("builtins.input", lambda _prompt="": next(inputs))
+    service_request = AsyncMock(return_value=0)
+    monkeypatch.setattr(agent_cli, "_service_request", service_request)
+
+    result = asyncio.run(
+        agent_cli._chat_repl(  # noqa: SLF001
+            SimpleNamespace(),
+            session_id="local-cli",
+        )
+    )
+
+    assert result == 0
+    assert [call.args[1] for call in service_request.await_args_list] == [
+        {"command": "controller_connected", "interface": "terminal"},
+        {"command": "remote_show_qr"},
+    ]
+    output = capsys.readouterr().out
+    assert "/show remote access" in output
+    assert "without revoking existing browsers" in output
+    assert "/arm\n  Confirm and arm physical AI motion" in output
 
 
 def test_memory_cli_requires_confirmation_and_sends_bounded_settings(monkeypatch) -> None:
@@ -301,6 +377,77 @@ def test_remote_setup_hides_token_installs_only_explicitly_and_saves_pairing_sec
     assert store.contains("NINJAROBOT_SESSION_SECRET")
     assert store.contains("NINJAROBOT_REMOTE_HEADER_SECRET")
     assert secret_file.stat().st_mode & 0o777 == 0o600
+
+
+def test_remote_activation_can_be_enabled_before_agent_start(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    config_path = tmp_path / "config.toml"
+    config_path.write_bytes((ROOT / "config/ninjarobot_pi5.toml.example").read_bytes())
+    secret_file = tmp_path / "secrets.env"
+    SecretStore(secret_file).set("NGROK_AUTHTOKEN", "private-token")
+    request = AsyncMock(side_effect=agent_cli.AgentIPCError("agent service is not running"))
+    monkeypatch.setattr(agent_cli, "_service_request", request)
+    monkeypatch.setattr(agent_cli, "ngrok_binary_ready", lambda _path: True)
+    arguments = agent_cli.build_parser().parse_args(
+        [
+            "--config",
+            str(config_path),
+            "--secret-file",
+            str(secret_file),
+            "remote",
+            "activate",
+        ]
+    )
+
+    assert asyncio.run(agent_cli._run_remote_command(arguments)) == 0  # noqa: SLF001
+
+    output = json.loads(capsys.readouterr().out)
+    config = load_robot_config(config_path)
+    store = SecretStore(secret_file)
+    assert output["state"] == "enabled_for_next_agent_start"
+    assert output["service_running"] is False
+    assert config.remote_access.enabled is True
+    assert config.onboarding.enabled is True
+    assert store.contains("NINJAROBOT_PAIRING_SECRET")
+    assert store.contains("NINJAROBOT_SESSION_SECRET")
+    assert store.contains("NINJAROBOT_REMOTE_HEADER_SECRET")
+
+
+def test_remote_status_without_agent_reports_saved_configuration(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    config_path = tmp_path / "config.toml"
+    config_path.write_bytes((ROOT / "config/ninjarobot_pi5.toml.example").read_bytes())
+    secret_file = tmp_path / "secrets.env"
+    SecretStore(secret_file).set("NGROK_AUTHTOKEN", "private-token")
+    monkeypatch.setattr(
+        agent_cli,
+        "_service_request",
+        AsyncMock(side_effect=agent_cli.AgentIPCError("agent service is not running")),
+    )
+    monkeypatch.setattr(agent_cli, "ngrok_binary_ready", lambda _path: True)
+    arguments = agent_cli.build_parser().parse_args(
+        [
+            "--config",
+            str(config_path),
+            "--secret-file",
+            str(secret_file),
+            "remote",
+            "status",
+        ]
+    )
+
+    assert asyncio.run(agent_cli._run_remote_command(arguments)) == 0  # noqa: SLF001
+
+    output = json.loads(capsys.readouterr().out)
+    assert output["configured"] is True
+    assert output["enabled"] is False
+    assert output["state"] == "disabled"
 
 
 def test_agent_cli_validates_installs_simulates_and_removes_skill(

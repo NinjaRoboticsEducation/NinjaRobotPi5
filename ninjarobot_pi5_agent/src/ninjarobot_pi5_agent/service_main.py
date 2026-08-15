@@ -51,10 +51,26 @@ from .shutdown import PoweroffCoordinator
 from .skills import SkillRepository
 from .tools import IDEToolProvider, ToolProvider, ToolRegistry
 from .voice_service import VoiceInputService, persist_voice_input_enabled
-from .web_app import WebServerManager, create_web_app, local_ca_paths, mdns_hostname
+from .web_app import (
+    WebAccessState,
+    WebServerManager,
+    create_web_app,
+    local_ca_paths,
+    mdns_hostname,
+)
 from .web_control import ControllerLeaseManager, WebRobotController
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _effective_onboarding_enabled(
+    *,
+    configured: bool,
+    remote_access: bool,
+    auto_start: bool,
+) -> bool:
+    """Return the single onboarding state used by every startup component."""
+    return configured or remote_access or auto_start
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -190,10 +206,15 @@ async def run_service(arguments: argparse.Namespace) -> None:
     arms = MotionArmManager()
     camera_grants = CameraGrantManager()
     events = EventBroker()
+    onboarding_enabled = _effective_onboarding_enabled(
+        configured=config.onboarding.enabled,
+        remote_access=config.remote_access.enabled,
+        auto_start=config.deployment.auto_start_enabled,
+    )
     release_status = ReleaseStatusRegistry(
         voice_enabled=config.voice_input.enabled,
         remote_access_enabled=config.remote_access.enabled,
-        onboarding_enabled=config.onboarding.enabled,
+        onboarding_enabled=onboarding_enabled,
         shutdown_enabled=config.deployment.web_poweroff_enabled,
     )
     policy = PolicyEngine(arms, camera_grants)
@@ -308,11 +329,6 @@ async def run_service(arguments: argparse.Namespace) -> None:
     )
     remote_holder: dict[str, RemoteAccessService] = {}
     onboarding_holder: dict[str, OnboardingCoordinator] = {}
-    onboarding_enabled = (
-        config.onboarding.enabled
-        or config.remote_access.enabled
-        or config.deployment.auto_start_enabled
-    )
 
     async def authenticated_controller(remote: bool, paired: bool) -> None:
         service = remote_holder.get("service")
@@ -320,13 +336,13 @@ async def run_service(arguments: argparse.Namespace) -> None:
             await service.controller_authenticated(remote)
         coordinator = onboarding_holder.get("coordinator")
         if coordinator is not None:
-            await coordinator.controller_connected(paired=paired)
+            await coordinator.controller_connected(paired=paired, remote=remote)
 
     async def local_controller_connected() -> None:
         """The owner-only Unix socket is an authenticated local controller."""
         coordinator = onboarding_holder.get("coordinator")
         if coordinator is not None:
-            await coordinator.controller_connected(paired=True)
+            await coordinator.controller_connected(paired=True, remote=False)
 
     server_holder: dict[str, AgentIPCServer] = {}
 
@@ -344,6 +360,11 @@ async def run_service(arguments: argparse.Namespace) -> None:
         release_status=release_status,
         request_service_stop=request_service_stop,
     )
+    web_access = WebAccessState()
+    if config.remote_access.enabled:
+        web_access.enable_remote()
+    elif onboarding_enabled:
+        web_access.enable_local_fallback()
     web_app = create_web_app(
         runtime=runtime,
         controller=web_controller,
@@ -352,6 +373,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
         pairing=pairing,
         poweroff=poweroff,
         require_local_pairing=onboarding_enabled,
+        access_state=web_access,
         on_authenticated_controller=authenticated_controller,
     )
     web = WebServerManager(
@@ -361,6 +383,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
         port=arguments.web_port,
         certificate_path=arguments.web_certificate,
         key_path=arguments.web_key,
+        access_state=web_access,
     )
     ca_certificate, _ca_key = local_ca_paths(arguments.web_certificate)
     remote_access = RemoteAccessService(
@@ -374,7 +397,8 @@ async def run_service(arguments: argparse.Namespace) -> None:
         events=events,
         release_status=release_status,
         config=config.remote_access,
-        start_web=web.start,
+        start_web=web.start_remote,
+        stop_web=web.stop_remote,
         persist_enabled=lambda enabled: persist_remote_access_enabled(
             arguments.config,
             enabled,
@@ -390,6 +414,9 @@ async def run_service(arguments: argparse.Namespace) -> None:
         events=events,
         release_status=release_status,
         remote=remote_access,
+        allow_local_fallback=config.deployment.auto_start_enabled,
+        start_local_fallback=web.start_local_fallback,
+        stop_local_fallback=web.stop_local_fallback,
     )
     onboarding_holder["coordinator"] = onboarding
     server = AgentIPCServer(
@@ -399,27 +426,35 @@ async def run_service(arguments: argparse.Namespace) -> None:
         web=web,
         remote_access=remote_access,
         on_local_controller=local_controller_connected,
+        show_remote_access=onboarding.show_remote_access,
     )
     server_holder["server"] = server
     loop_object = asyncio.get_running_loop()
     for signal_number in (signal.SIGINT, signal.SIGTERM):
         loop_object.add_signal_handler(signal_number, server.request_stop)
     await server.start()
-    if onboarding_enabled:
-        await web.start()
-        await onboarding.start(remote_enabled=config.remote_access.enabled)
-    else:
-        await _complete_startup_liveliness(ide=ide, runtime=runtime, events=events)
     try:
-        await voice_input.start_configured()
-    except Exception:
-        LOGGER.exception("Configured voice input could not start; text interfaces remain ready.")
-    try:
-        await remote_access.start_configured()
-    except Exception:
-        LOGGER.exception("Configured remote access could not start; local interfaces remain ready.")
-    await onboarding.remote_start_completed()
-    try:
+        if onboarding_enabled:
+            if config.remote_access.enabled:
+                await web.start_remote()
+            else:
+                await web.start_local_fallback()
+            await onboarding.start(remote_enabled=config.remote_access.enabled)
+        else:
+            await _complete_startup_liveliness(ide=ide, runtime=runtime, events=events)
+        try:
+            await voice_input.start_configured()
+        except Exception:
+            LOGGER.exception(
+                "Configured voice input could not start; text interfaces remain ready."
+            )
+        try:
+            await remote_access.start_configured()
+        except Exception:
+            LOGGER.exception(
+                "Configured remote access could not start; local interfaces remain ready."
+            )
+        await onboarding.remote_start_completed()
         await server.serve()
     finally:
         await onboarding.close()

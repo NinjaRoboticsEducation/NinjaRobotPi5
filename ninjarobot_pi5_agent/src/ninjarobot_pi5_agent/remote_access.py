@@ -26,6 +26,7 @@ from .secrets import SecretStore
 
 PersistRemoteSetting = Callable[[bool], Awaitable[None]]
 StartWebServer = Callable[[], Awaitable[dict[str, object]]]
+StopWebServer = Callable[[], Awaitable[dict[str, object]]]
 PERMANENT_REMOTE_ERRORS = frozenset(
     {
         "account_rejected",
@@ -178,6 +179,7 @@ class RemoteAccessService:
         config: RemoteAccessConfig,
         start_web: StartWebServer,
         persist_enabled: PersistRemoteSetting,
+        stop_web: StopWebServer | None = None,
     ) -> None:
         self._backend = backend
         self._pairing = pairing
@@ -185,6 +187,7 @@ class RemoteAccessService:
         self._release_status = release_status
         self._config = config
         self._start_web = start_web
+        self._stop_web = stop_web
         self._persist_enabled = persist_enabled
         self._task: asyncio.Task[None] | None = None
         self._stop = asyncio.Event()
@@ -245,6 +248,8 @@ class RemoteAccessService:
         self._public_url = None
         await self._backend.close(public_url)
         self._pairing.clear_remote_url()
+        if self._stop_web is not None:
+            await self._stop_web()
         self._release_status.set_enabled("remote_access", False)
         self._release_status.set_enabled("pairing", False)
         if persist:
@@ -433,6 +438,15 @@ def install_ngrok_binary(path: str | Path) -> Path:
     if not _valid_ngrok_v3_binary(destination):
         raise RemoteAccessError("ngrok_install_invalid")
     return destination
+
+
+def ngrok_binary_ready(path: str | Path) -> bool:
+    """Return whether the private configured executable is a usable ngrok v3 binary."""
+    try:
+        executable = _private_path(path)
+    except RemoteAccessError:
+        return False
+    return _valid_ngrok_v3_binary(executable)
 
 
 def _valid_ngrok_v3_binary(path: Path) -> bool:

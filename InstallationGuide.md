@@ -611,11 +611,11 @@ ninjarobot-agent
 
 Use the menus in this order:
 
-1. **Change Agent Model** — select Ollama and `qwen3:4b` (or a configured cloud model).
+1. **Set Agent Model** — select Ollama and `qwen3:4b` (or a configured cloud model).
 2. **Start Agent Service** — choose **real hardware**. Only one service owns hardware.
-3. **Agent Status** — confirm `started`, the selected provider, built-in tool providers, and robot tools are ready.
+3. **Agent Service Status** — confirm `started`, the selected provider, built-in tool providers, and robot tools are ready.
 4. **MCP Tools (Built-in and External)** — confirm IDE, robot-control, and read-only memory tools appear even when `external_servers` is empty.
-5. **Chat with NinjaRobot** — create the first owner profile and complete face enrollment.
+5. **Start NinjaRobot Chat Interface** — create the first owner profile and complete face enrollment.
 
 The first chat asks for your name, displays a photo countdown, and creates the
 owner/default profile. If the camera is unavailable, chat continues with a
@@ -644,13 +644,22 @@ Expected result: `"passed": true`. The benchmark uses a temporary database and
 does not open GPIO, SPI, I2C, PWM, camera, microphone, or the robot action ledger.
 
 **Start the HTTPS web interface:** return to the main Agent menu, select
-**Start Web Interface**, and use the exact `url` printed by the tool. The Agent
+**Local Web Interface**, and use the exact `url` printed by the tool. The Agent
 service must already be running; the web command controls the server owned by
-that service and does not start a second Agent.
+that service and does not start a second Agent. Local Web is intentionally
+available only while ngrok Remote Access is disabled. If Remote Access is
+enabled, the result has `ready: false`, `running: false`, and `url: null`, and
+directs you to the ngrok pairing link or display QR instead of silently opening
+a competing local controller.
 
-Select **Export Browser Trust Certificate** to write
-`~/ninjarobotpi5-local-ca.pem` for phones or computers that require trusted
-local HTTPS.
+For phones or computers that require trusted local HTTPS, export the public CA
+certificate with this optional advanced command (it contains no private key):
+
+```bash
+ninjarobot-agent web export-ca
+```
+
+This writes `~/ninjarobotpi5-local-ca.pem`.
 
 Verify the certificate contains two entries (server certificate + local CA):
 
@@ -682,7 +691,7 @@ Open the printed URL from a browser on the same local network. If the hostname d
 8. ✅ USB Microphone returns simulated recognized text
 9. ✅ Web Microphone fills the message box with recognized text (sent only when you press **Send**)
 
-Use **Stop Web Interface** or **Stop Agent Service** from the same tool when
+Use **Stop Local Web Interface** or **Stop Agent Service** from the same tool when
 needed. With ordinary startup (onboarding disabled), real mode runs Greeting
 once and then silent Idle. After remote access or automatic startup is enabled,
 startup instead shows the current pairing QR; the first authenticated browser
@@ -694,11 +703,21 @@ Idle → Thinking → Speaking (or emotion) → robot action → Idle
 
 ### Step 8 — Configure and Test Remote Access (Optional)
 
-1. Open `ninjarobot-agent` and select **Remote Access**.
-2. Select **Configure token, install ngrok, and activate**.
-3. Paste your ngrok authtoken twice when the hidden prompts request it.
-4. Select **Status** and wait for a non-empty `public_url`.
-5. Select **Show current pairing URL** and open that exact URL in the browser.
+For the cleanest first setup, stop any manually running Agent service. Then:
+
+1. Open `ninjarobot-agent` and select **Ngrok Remote Access**.
+2. Select **Set ngrok token**. Paste the authtoken twice at the hidden prompts.
+   This one-time step installs or validates ngrok and stores the token privately;
+   it does not start a tunnel.
+3. Select **Activate ngrok remote access service**. Before the Agent is running,
+   this validates the saved token and executable and enables Remote Access for
+   the next Agent start. The Agent service remains the only process allowed to
+   own the tunnel.
+4. Return to the main menu and select **Start Agent Service**.
+5. Return to **Ngrok Remote Access**, choose **Ngrok service status**, and wait
+   for a non-empty `public_url`.
+6. Scan the display QR or choose **Show existing pairing URL** and open that
+   exact URL in the browser.
 
 The configuration operation downloads/replaces ngrok atomically, preventing
 the former `Text file busy` overwrite. The authtoken identifies the local ngrok
@@ -706,37 +725,42 @@ agent but is not a browser password. Browser authentication uses the short-lived
 pairing fragment in the URL, then a Secure/HttpOnly cookie; the QR contains no
 secret that remains in browser history after pairing.
 
-After remote access is enabled, the next Agent start follows this sequence:
+After remote access is enabled, Agent startup follows this sequence:
 
 ```text
 Agent/web start → ngrok QR on robot display → authenticated browser or terminal
 chat connects → Greeting face and sound → silent Idle
 ```
 
-While ngrok is healthy the robot keeps waiting on its remote QR. A confirmed
-tunnel/configuration/network failure switches the display to a fresh local
-pairing QR while remote recovery continues. Never expose port 8443 through
-router port forwarding.
+While ngrok is healthy, direct local Web requests are rejected and the robot
+keeps waiting on its remote QR. In ordinary manual operation, stopping Remote
+Access does not silently start Local Web; select **Local Web Interface** if you
+want it. During deployed automatic startup only, a confirmed tunnel,
+configuration, or network failure starts the local HTTPS fallback and replaces
+the display with a fresh local pairing QR while remote recovery continues.
+Never expose port 8443 through router port forwarding.
 
 ### Step 9 — Enable and Test Automatic Startup (Optional)
 
-Keep both wheels raised. Open `ninjarobot-agent`, select **Auto-Start &
-Deployment**, then select **Install/repair and enable automatic startup**. Type
-`ENABLE` only after reading the prompt. This single transaction installs and
+Keep both wheels raised. Open `ninjarobot-agent`, select **Startup Agent
+Deployment**, then select **Install and deploy automatic startup Agent**. Type
+`ENABLE` only after reading the prompt. The Interactive Tool first stops a
+manually started Agent cleanly, then this single transaction installs and
 validates all three privileged artifacts—the systemd unit, fixed power-off
-helper, and narrow sudoers rule—before persisting boot enablement.
+helper, and narrow sudoers rule—enables boot, and starts the installed service
+immediately. If the first systemd start fails, boot enablement is rolled back.
 
-Select **Show deployment status**. Pass criteria are:
+Select **Show startup Agent status**. Pass criteria are:
 
 - `installed: true` and `enabled: true`
 - all `artifacts` values are `true`
 - the unit references the current checkout and `.venv` Python
 
 Reboot with `sudo reboot`. After reconnecting by SSH, open `ninjarobot-agent`
-and check **Agent Status** and **Auto-Start & Deployment → Show deployment
-status**. The display should show the current remote pairing QR, or a local QR
-only when remote service is unavailable. Scan/open it and confirm Greeting then
-Idle.
+and check **Agent Service Status** and **Startup Agent Deployment → Show startup
+Agent status**. The display should show the current remote pairing QR, or a
+local QR only when remote service is unavailable. Scan/open it and confirm
+Greeting then Idle.
 
 Finally, test **Power off NinjaRobot** in the paired web hamburger menu. Choose
 **Cancel** once, then repeat and choose **Power off**. If the deployment helper
@@ -766,6 +790,10 @@ Useful slash commands inside chat:
 | `/disarm` | Revoke motion authorization and stop servos |
 | `/camera` | Grant one AI-controlled photo for this session |
 | `/resume` | Recover from Emergency Stop |
+| `/voice input on` | Enable the global “Hey Ninja” listener |
+| `/voice input off` | Disable the global wake-word listener |
+| `/voice input status` | Show listener state and the last stable error |
+| `/show remote access` | Put a fresh one-use ngrok pairing QR on the robot display |
 | `/confirm <request>` | Approve a sensitive one-off action |
 | `/new user` | Register another local profile and attempt face enrollment |
 | `/switch user` | Name a profile, then switch only after its registered face matches |
@@ -798,7 +826,7 @@ user; transcript-only replies are never treated as persistent preferences.
 
 ### Managing Persistent Memory
 
-Open the interactive tool and choose **Manage Memory**:
+Open the interactive tool and choose **Agent Memory Management**:
 
 ```bash
 ninjarobot-agent
@@ -1181,6 +1209,14 @@ ninjarobot-agent service status
 tail -n 100 "$HOME/.local/state/ninjarobot_pi5/agent-service.log"
 ```
 
+If the Interactive Tool says the service connection closed unexpectedly, the
+background service exited while its startup status was being checked. The
+message is controlled; use the last command above to find the primary error.
+Do not delete the socket or lock while a service process is running. Current
+releases accept configurations where remote access is enabled even if an older
+explicit onboarding setting is false—the effective QR-onboarding state is
+derived automatically from remote access, onboarding, and auto-start settings.
+
 ---
 
 #### 🔒 Web Interface Shows `423 Locked`
@@ -1271,11 +1307,15 @@ may show an ngrok-controlled interstitial and have endpoint, request, and data
 limits; review [ngrok's current limits](https://ngrok.com/docs/pricing-limits/free-plan-limits)
 before relying on the service.
 
-Start the agent service, launch `ninjarobot-agent`, select **11. Remote
-Access**, then select **1. Configure token, install ngrok, and activate**. The
-same menu provides Status, current
-pairing URL, rotation, deactivation, and credential removal. Scriptable
-equivalents are:
+Launch `ninjarobot-agent` before starting the Agent service, select **8. Ngrok
+Remote Access**, choose **1. Set ngrok token** once, then choose **2. Activate
+ngrok remote access service** whenever remote control is wanted. Activation in
+this pre-service state validates and persists the setting; only the later Agent
+service owns the tunnel. The simplified menu also provides service status,
+the current pairing URL, and deactivation. Pairing rotation and credential
+removal remain available as advanced scriptable commands.
+
+Scriptable equivalents are:
 
 ```bash
 ninjarobot-agent remote configure
@@ -1287,10 +1327,11 @@ The first command prompts twice for the ngrok authtoken and explicitly installs
 the ngrok agent. A valid v3 binary is reused; a replacement is downloaded to a
 private temporary directory, version-checked, and atomically installed. This
 prevents `Text file busy` when an older process still references the previous
-inode. The token is never printed. The service will not download or update
-ngrok on startup. Open the pairing URL on the controlling browser. No
-browser username or password is required: the one-use URL fragment becomes a
-short-lived Secure/HttpOnly session cookie.
+inode. It saves configuration but does not activate a tunnel. The token is
+never printed. The service will not download or update ngrok on startup. Run
+the activation operation, then start the Agent service and open its pairing URL
+on the controlling browser. No browser username or password is required: the
+one-use URL fragment becomes a short-lived Secure/HttpOnly session cookie.
 
 The tunnel removes any client-supplied transport marker and adds the trusted
 marker through ngrok Traffic Policy `remove-headers` and `add-headers` actions.
@@ -1299,8 +1340,9 @@ This follows ngrok's current
 while retaining verified TLS to the robot's private local CA.
 Permanent authentication/account/configuration failures stop retrying until
 the operator corrects them; transient network/tunnel loss continues with
-capped backoff. If **Show current pairing URL** reports
-`detail: tunnel_not_ready`, first use **Status** and correct/activate the tunnel.
+capped backoff. If **Show existing pairing URL** reports
+`detail: tunnel_not_ready`, first use **Ngrok service status** and
+correct/activate the tunnel.
 The “pairing code” is the short-lived URL fragment generated only after a
 healthy public HTTPS endpoint exists; it is not a separate number.
 
@@ -1316,9 +1358,11 @@ ninjarobot-agent remote remove-credentials --confirm
 Rotation revokes all existing remote browser sessions. Deactivation stops the
 exact tunnel and also revokes sessions. Credential removal deletes the private
 token/pairing files but retains the ngrok executable for a later reconfiguration.
-Local HTTPS, terminal chat, robot memory, and hardware continue working if the
-tunnel or ngrok account is unavailable. Never configure router port forwarding
-to port 8443 as an alternative.
+Manually stopping ngrok does not silently start Local Web. A deployed
+automatic-start service does start the local mDNS HTTPS fallback and refresh
+the display QR when ngrok is unavailable; terminal chat, robot memory, and
+hardware remain available. Never configure router port forwarding to port 8443
+as an alternative.
 
 #### 🌏 Use the Multilingual Robot Menu
 
@@ -1358,9 +1402,9 @@ beginners should not edit TOML. Startup initializes the robot and web server
 without moving, then
 shows **Connecting…** while configured ngrok access starts. A healthy remote
 endpoint displays its pairing QR and waits; an actual tunnel/configuration/
-network failure displays the local `https://ninjarobotpi5.local:8443` pairing
-QR while remote retries. If remote access is disabled, the local QR appears
-immediately.
+network failure starts the deployed local fallback and displays the local
+`https://ninjarobotpi5.local:8443` pairing QR while remote retries. If remote
+access is disabled, the local QR appears immediately.
 
 Scan the displayed code. The one-use fragment creates a Secure/HttpOnly browser
 session and removes itself from the address. Only after that paired browser
@@ -1369,6 +1413,11 @@ run once. Refreshing or reconnecting does not replay Greeting. If the display
 or Greeting fails, the robot shows **Error**, keeps AI/voice motion disarmed,
 attempts to stop servos, and requires a local service restart after the fault is
 corrected.
+
+After startup has already completed, enter `/show remote access` in terminal
+chat to display a new one-use ngrok QR without revoking browsers that are
+already paired. The QR clears directly to Idle after that new browser pairs;
+Greeting is not replayed.
 
 #### 🚀 Install Opt-In Automatic Startup
 
@@ -1383,14 +1432,16 @@ ninjarobot-agent deployment status
 ```
 
 Setup uses sudo only to place the root-owned unit, fixed power-off helper, and
-narrow sudoers rule. It checks that all three files exist, enables the next-boot
-service, and only then persists onboarding and web power-off settings. A partial
-or failed installation remains disabled. Test safely with raised wheels:
+narrow sudoers rule. It checks that all three artifacts are operational,
+enables the next-boot service, persists onboarding and web power-off settings,
+and starts the systemd service immediately. Status verifies the exact
+passwordless helper permission with `sudo -n -l`; it does not try to read the
+protected `/etc/sudoers.d` directory. A partial install or failed first start is
+left disabled. Test safely with raised wheels:
 
 ```bash
-ninjarobot-agent deployment start
+ninjarobot-agent deployment status
 ninjarobot-agent deployment logs --lines 200
-ninjarobot-agent deployment stop
 ```
 
 Reboot only after the raised-wheel test succeeds:
@@ -1524,36 +1575,52 @@ ninjarobot-ide-tool hardware status
 
 ### 🌐 Set Up Tavily Web Search (Optional)
 
-Tavily lets the AI search the internet for current information. It is optional — the robot works fully without it.
+Tavily lets the AI search the internet for current information. It is optional:
+the IDE, robot-control, and memory MCP providers load without `mcp.toml`, and
+the robot works normally without Tavily.
 
 > [!IMPORTANT]
-> Tavily may provide a free allowance. Check [current API credit documentation](https://docs.tavily.com/documentation/api-credits) before registering, because price, quota, and terms can change.
+> Tavily may provide a free allowance. Check the
+> [current Tavily quickstart](https://docs.tavily.com/documentation/quickstart)
+> before registering because price, quota, and terms can change. Never paste an
+> API key into chat, source code, `config.toml`, screenshots, or issue reports.
 
-1. Create a free account at [app.tavily.com](https://app.tavily.com/) and copy your API key.
+1. Open the [Tavily Platform](https://app.tavily.com/), create or sign in to
+   your account, open its API Keys area, and copy an active key. Tavily's
+   official quickstart identifies the dashboard as the place to obtain the key.
 
-2. Store the key securely (the prompt hides what you type):
+2. If the Agent service is running, stop it from the Interactive Tool with
+   **13. Stop Agent Service**. MCP catalog and secret changes take effect on the
+   next Agent start; setup never restarts a working robot silently.
+
+3. Store the key in NinjaRobot's private secret file. The prompt hides the
+   value and asks for it twice:
 
 ```bash
 cd "$HOME/NinjaRobotPi5"
 ninjarobot-agent secret set TAVILY_API_KEY
 ```
 
-3. Install the bundled Tavily preset:
+4. Add the bundled, search-only Tavily preset to the optional external MCP
+   catalog:
 
 ```bash
 ninjarobot-agent mcp add --preset tavily --id tavily
 ```
 
-4. Verify the connection:
+5. Verify configuration, health, and the allowlisted tools before starting the
+   Agent:
 
 ```bash
+ninjarobot-agent mcp list
 ninjarobot-agent mcp health tavily
 ninjarobot-agent mcp tools tavily
 ```
 
-Expected result: the server is healthy and the API key shows as redacted (not visible).
+Expected result: server `tavily` is enabled and ready, and the allowlist exposes
+`tavily-search`. Secret values are never printed.
 
-5. Run a test search:
+6. Run one read-only test search:
 
 ```bash
 ninjarobot-agent \
@@ -1561,13 +1628,24 @@ ninjarobot-agent \
   --arguments '{"query":"Raspberry Pi official news","max_results":3}'
 ```
 
-6. Restart the agent service so it picks up the new MCP catalog, then ask:
+7. Open `ninjarobot-agent`, select **2. Start Agent Service**, then select
+   **9. MCP Tools (Built-in and External)**. Confirm the Tavily provider and
+   `mcp.tavily.tavily-search` appear. Open **4. Start NinjaRobot Chat
+   Interface**, then ask:
 
 ```text
 Search the web for the latest official Raspberry Pi news and show your sources.
 ```
 
 Expected result: the answer includes source links. If internet access or quota is unavailable, the agent should say it cannot verify a current answer.
+
+If health reports a missing credential, repeat `secret set` and start the Agent
+again. If `mcp add` reports that `tavily` already exists, use `mcp list` rather
+than adding a duplicate; use `ninjarobot-agent mcp enable tavily` if it is
+disabled. For an exposed key, revoke it immediately in the Tavily dashboard,
+create a replacement, save it with `secret set`, and restart the Agent. This
+matches Tavily's official
+[API-key rotation guidance](https://docs.tavily.com/documentation/best-practices/api-key-management).
 
 ---
 

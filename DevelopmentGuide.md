@@ -538,8 +538,8 @@ The web interface never accepts provider secrets. The terminal uses hidden, doub
 ### Remote access and pairing boundary
 
 `ninjarobot_pi5_agent.remote_access.RemoteAccessService` owns one optional
-pyngrok endpoint and process. Activation first starts the existing local HTTPS
-server, verifies the already-installed ngrok executable, loads the authtoken
+pyngrok endpoint and process. Online activation asks `WebServerManager` for its
+remote-only HTTPS backend, verifies the already-installed ngrok executable, loads the authtoken
 from `SecretStore`, and verifies upstream TLS against the NinjaRobot local CA.
 The private ngrok config is mode `0600`; the token is written only for process
 startup and immediately removed again so it is not left in the process command
@@ -590,6 +590,22 @@ three pairing/session/transport secrets, the authtoken, and private ngrok
 config. It never deletes profiles, memories, face data, behavior assets, or the
 main robot configuration.
 
+The Interactive Tool deliberately separates one-time `remote configure` from
+`remote activate`. Configure validates/atomically installs ngrok and privately
+saves the token without starting a tunnel. When no Agent is running, activate
+validates the token, executable, and required pairing secrets and persists the
+enabled state for the next start. The Agent service remains the only tunnel
+process owner. Manual deactivation stops remote ownership and does not silently
+start Local Web.
+
+`WebAccessState` is shared by the ASGI gate and `WebServerManager`. Its modes
+are `none`, `local`, `remote`, and `local_fallback`. In remote mode, direct local
+HTTP and WebSocket access is rejected and public Local Web status intentionally
+returns `ready=false`, `running=false`, and `url=null`. A local fallback is
+started automatically only by the deployed startup/onboarding recovery path
+when remote access is unavailable; remote recovery stops that fallback before
+publishing a new remote QR.
+
 ### QR onboarding and startup liveliness
 
 When onboarding is explicitly enabled, remote access is enabled, or boot
@@ -602,12 +618,20 @@ plus one URL-fragment pairing token; arbitrary images never cross the agent/IDE
 boundary. This follows the Python qrcode project's
 [documented `QRCode` configuration](https://github.com/lincolnloop/python-qrcode).
 
+`service_main` computes that effective onboarding condition once and uses it
+for the release-status registry, pairing gate, web startup, and coordinator.
+Do not initialize any of those components from only the explicit
+`[onboarding].enabled` value: persisted configurations may legitimately have
+remote access enabled while that older explicit flag is false. Startup failures
+after the IPC socket is bound remain inside the service cleanup boundary so the
+runtime, web server, remote tunnel, ownership lock, and socket are released.
+
 If remote access is enabled, the display shows **Connecting…** until ngrok is
 ready or fails. A ready tunnel displays its remote one-use QR indefinitely and
-refreshes it before token expiry. A real failure selects a local mDNS HTTPS QR
-while remote retry continues; recovery replaces and invalidates the local
-endpoint before any controller connects. With remote disabled, local QR is
-immediate.
+refreshes it before token expiry. During deployed automatic startup, a real
+failure starts the local HTTPS backend and selects a local mDNS QR while remote
+retry continues; recovery stops the fallback and replaces the QR before any
+controller connects. With remote disabled, local QR is immediate.
 
 During onboarding, local and remote HTTP assets and WebSockets require the
 same Secure/HttpOnly paired-browser session. Health probes, crawlers, static
@@ -618,6 +642,12 @@ Greeting once through the IDE, then marks Idle ready. Reconnects never replay
 Greeting. QR/display/Greeting failure marks
 startup degraded, disarms voice and AI motion, attempts a servo stop, and
 leaves a stable Error presentation rather than falsely reporting Idle.
+
+After Greeting is complete, the deterministic `remote_show_qr` IPC operation
+supports terminal `/show remote access`. It rotates only the pending one-use
+token (`invalidate_sessions=False`), so paired browsers remain valid. A browser
+that consumes this additional QR clears the display directly to Idle and does
+not rerun startup Greeting.
 
 ### systemd deployment boundary
 
@@ -634,9 +664,12 @@ clean intentional stop remains stopped. This follows systemd's
 Installation is explicitly confirmed and disabled by default at package
 installation time. The normal-user **deployment setup** transaction runs
 `systemd-analyze verify` and `visudo -cf`, installs all three privileged
-artifacts, enables the unit, and only then persists onboarding/web-power
-settings. Partial installation or configuration persistence failure leaves the
-unit disabled. The fixed root-owned helper contains only
+artifacts, enables the unit, persists onboarding/web-power settings, and starts
+the service immediately. A failed first start invokes `disable --now`, so the
+next boot does not retry a broken deployment. Status checks the unit/helper as
+ordinary paths but verifies the protected sudoers authorization through the
+exact non-interactive `sudo -n -l /usr/libexec/ninjarobot-poweroff` query; it
+never traverses `/etc/sudoers.d` as the unprivileged user. The fixed root-owned helper contains only
 `/usr/bin/systemctl poweroff --no-wall`; sudoers permits the service user to
 execute only that argument-free helper. The web coordinator calls it as
 `/usr/bin/sudo -n /usr/libexec/ninjarobot-poweroff` after resource cleanup.
@@ -1348,11 +1381,12 @@ A configuration change that points to another host is rejected — preventing cr
 | Voice input reports `detector_unavailable` | Run the packaged-asset checksum tests and the hardware-extra model-load check. The service never downloads a missing model during boot |
 | Remote access reports `executable_unavailable` | Run `ninjarobot-agent remote configure` locally. Unattended boot intentionally refuses to download ngrok |
 | Remote access reports `authtoken_unavailable` or `authentication_failed` | Replace the token through the local Remote Access menu; do not paste it into web chat, TOML, logs, or issue reports |
-| Remote access reports `account_rejected` | Inspect the ngrok dashboard for account/endpoint/plan limits. Local web and robot control remain available |
+| Remote access reports `account_rejected` | Inspect the ngrok dashboard for account/endpoint/plan limits. A deployed boot starts local fallback; in manual mode deactivate remote and explicitly start Local Web. Robot control remains available |
 | Remote access reports `configuration_invalid` | Correct/reconfigure ngrok locally. Permanent configuration failures deliberately stop retrying so a broken endpoint cannot leave a process continuously restarting |
 | Pairing URL reports `tunnel_not_ready` | Use Remote Access Status, correct the reported tunnel failure, and activate again. A pairing fragment exists only after a public HTTPS endpoint is ready |
 | Pairing link is expired or already used | Run `ninjarobot-agent remote rotate-pairing`; this deliberately revokes existing remote browser sessions |
 | Remote request returns `401` or `421` | Use the exact current pairing URL through the ngrok endpoint. Do not override Host/Origin headers or expose port 8443 directly |
+| Agent startup reports a controlled connection-closed error | The background service exited while the CLI was polling it. Inspect `~/.local/state/ninjarobot_pi5/agent-service.log` for the primary exception. IPC peer resets, including resets during `wait_closed()`, must never escape as a raw traceback or overwrite an already received response |
 | VL53L0X reference calibration retries once | This is the bounded recovery path on the live revision-`0x10` device. A second timeout is a hard initialization failure — do not bypass calibration |
 | Clean checkout reports `recovery_required` | Inspect `robot.safety.reason` and `robot.safety.fault_detail`, close any standalone `pi5*` programs, and use the confirmed recovery path. Never remove `safety.json` as a repair |
 

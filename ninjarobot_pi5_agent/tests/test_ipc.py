@@ -483,11 +483,18 @@ def test_ipc_remote_management_is_local_owner_only_and_lifecycle_bounded(tmp_pat
         socket_path = tmp_path / "remote-agent.sock"
         runtime = build_runtime(tmp_path)
         remote = _FakeRemoteAccess()
+        show_remote_access = AsyncMock(
+            return_value={
+                "displayed": True,
+                "existing_browser_sessions_revoked": False,
+            }
+        )
         server = AgentIPCServer(
             runtime=runtime,
             socket_path=socket_path,
             ownership=ServiceOwnership(tmp_path / "remote-agent.lock"),
             remote_access=remote,  # type: ignore[arg-type]
+            show_remote_access=show_remote_access,
         )
         await server.start()
         serve_task = asyncio.create_task(server.serve())
@@ -499,6 +506,10 @@ def test_ipc_remote_management_is_local_owner_only_and_lifecycle_bounded(tmp_pat
         assert status["data"]["state"] == "waiting_for_connection"
         pairing = await client.request({"command": "remote_pairing_url"})
         assert pairing["data"]["pairing_url"].startswith("https://")
+        displayed = await client.request({"command": "remote_show_qr"})
+        assert displayed["data"]["displayed"] is True
+        assert displayed["data"]["existing_browser_sessions_revoked"] is False
+        show_remote_access.assert_awaited_once_with()
         rotated = await client.request({"command": "remote_rotate_pairing"})
         assert rotated["data"]["sessions_revoked"] is True
         assert remote.rotations == 1
@@ -701,5 +712,75 @@ def test_ipc_client_disconnect_during_error_reporting_is_clean(tmp_path) -> None
         await server._handle_client(reader, writer)  # type: ignore[arg-type]
 
         assert writer.closed is True
+
+    asyncio.run(exercise())
+
+
+def test_ipc_client_close_reset_does_not_replace_valid_result(tmp_path, monkeypatch) -> None:
+    class ResultReader:
+        def __init__(self) -> None:
+            self.responses = [b'{"type":"result","data":{"ready":true}}\n', b""]
+
+        async def readline(self) -> bytes:
+            return self.responses.pop(0)
+
+    class ResetOnCloseWriter:
+        def write(self, _data: bytes) -> None:
+            return None
+
+        async def drain(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+        async def wait_closed(self) -> None:
+            raise ConnectionResetError("peer closed after response")
+
+    monkeypatch.setattr(
+        asyncio,
+        "open_unix_connection",
+        AsyncMock(return_value=(ResultReader(), ResetOnCloseWriter())),
+    )
+
+    async def exercise() -> None:
+        response = await AgentIPCClient(tmp_path / "agent.sock").request(
+            {"command": "startup_status"}
+        )
+        assert response == {"data": {"ready": True}}
+
+    asyncio.run(exercise())
+
+
+def test_ipc_client_read_reset_becomes_controlled_agent_error(tmp_path, monkeypatch) -> None:
+    class ResetReader:
+        async def readline(self) -> bytes:
+            raise ConnectionResetError("service exited")
+
+    class CleanWriter:
+        def write(self, _data: bytes) -> None:
+            return None
+
+        async def drain(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+        async def wait_closed(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        asyncio,
+        "open_unix_connection",
+        AsyncMock(return_value=(ResetReader(), CleanWriter())),
+    )
+
+    async def exercise() -> None:
+        with pytest.raises(
+            AgentIPCError,
+            match="agent service connection closed unexpectedly",
+        ):
+            await AgentIPCClient(tmp_path / "agent.sock").request({"command": "startup_status"})
 
     asyncio.run(exercise())
