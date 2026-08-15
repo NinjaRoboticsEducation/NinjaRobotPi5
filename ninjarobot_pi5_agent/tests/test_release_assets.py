@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from importlib.metadata import version
+from importlib.metadata import metadata, requires, version
 from importlib.resources import files
 from pathlib import Path
 
@@ -31,6 +31,17 @@ def test_public_release_versions_and_packaged_phase_8_assets_are_consistent() ->
         ("deployment", "ninjarobot-poweroff.sudoers.in"),
     ):
         assert agent.joinpath(*relative).is_file()
+
+
+def test_qrcode_is_an_unconditional_ide_runtime_dependency() -> None:
+    requirements = requires("ninjarobot-pi5-ide") or []
+    qrcode_requirements = [
+        requirement for requirement in requirements if requirement.casefold().startswith("qrcode")
+    ]
+
+    assert qrcode_requirements == ["qrcode[pil]==8.2"]
+    assert all("extra ==" not in requirement for requirement in qrcode_requirements)
+    assert "display-qr" in (metadata("ninjarobot-pi5-ide").get_all("Provides-Extra") or [])
 
 
 def test_packaged_wake_model_matches_approved_manifest() -> None:

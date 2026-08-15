@@ -234,6 +234,18 @@ Your prompt normally begins with `(NinjaRobotPi5)`. All remaining beginner
 commands assume this environment is active. If a command is not found, return
 to the project directory and activate it again.
 
+> [!IMPORTANT]
+> On the Raspberry Pi, prefer the activated-environment commands shown in this
+> guide. A bare `uv run ninjarobot-agent` synchronizes the default software-only
+> dependency set and may remove optional hardware packages from `.venv`.
+> NinjaRobot's QR renderer is a base dependency, so the Agent CLI itself remains
+> importable, but real GPIO, camera, voice, and ngrok operation still needs the
+> hardware extra. If you deliberately use `uv run`, include it:
+>
+> ```bash
+> uv run --extra hardware ninjarobot-agent
+> ```
+
 **Set up the camera bridge:**
 
 ```bash
@@ -1071,6 +1083,26 @@ If that works, reconnect over SSH so the shell loads the installer changes. If i
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
+
+---
+
+#### Agent Reports `No module named 'qrcode'`
+
+This means the environment was created from older dependency metadata or was
+not synchronized after updating the checkout. Repair it without changing robot
+configuration or memory:
+
+```bash
+cd "$HOME/NinjaRobotPi5"
+uv sync --frozen --extra hardware
+source .venv/bin/activate
+python -c "import qrcode; from importlib.metadata import version; print('qrcode:', version('qrcode'))"
+ninjarobot-agent
+```
+
+Expected result: qrcode version `8.2` is printed and the Interactive Tool opens.
+Do not install a separate similarly named QR package with `pip`; the lock file
+selects the approved `qrcode[pil]` distribution.
 
 ---
 

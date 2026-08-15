@@ -166,6 +166,20 @@ ninjarobot-agent service stop
 
 For full Raspberry Pi hardware setup, follow the [Installation Guide](InstallationGuide.md).
 
+On Raspberry Pi, install the hardware extra once and then use the activated
+environment:
+
+```bash
+uv sync --frozen --extra hardware
+source .venv/bin/activate
+ninjarobot-agent
+```
+
+The QR renderer is an unconditional IDE runtime dependency, so software-only
+Agent startup does not require a special QR extra. A bare `uv run` can still
+remove optional Raspberry Pi drivers while reconciling `.venv`; when using that
+form for real hardware, run `uv run --extra hardware ninjarobot-agent`.
+
 ---
 
 ## 🏗️ Architecture Overview

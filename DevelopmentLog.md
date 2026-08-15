@@ -1,5 +1,38 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-15 — Base QR dependency and bare `uv run` startup repair
+
+### Root cause and implementation
+
+- reproduced `ModuleNotFoundError: No module named 'qrcode'` after bare `uv
+  run ninjarobot-agent` synchronized the default dependency set and removed the
+  unselected `display-qr` extra
+- confirmed that `ninjarobot_pi5_ide.qr_display` is imported unconditionally
+  through IDE initialization, so treating qrcode as optional contradicted the
+  actual base runtime graph
+- moved pinned `qrcode[pil]==8.2` into the IDE base dependencies, retained an
+  empty `display-qr` compatibility extra, and refreshed `uv.lock`
+- added package-metadata regression coverage requiring an unconditional qrcode
+  requirement and continued advertisement of the compatibility extra
+- documented activated-environment use on Raspberry Pi and the need for
+  `--extra hardware` when intentionally using `uv run` for physical hardware
+
+### Validation
+
+- a default `uv sync --frozen` installed qrcode 8.2 and the exact no-extra
+  `ninjarobot-agent --help` import path succeeded
+- restored the hardware extra and passed workspace driver-source verification,
+  222-file/47-repair managed-driver integrity, compileall, Ruff lint/format,
+  MyPy across 81 source files, `git diff --check`, 16 focused QR/release tests,
+  and 543 full-suite tests
+- one upstream Starlette/httpx test-client deprecation warning remains
+
+### Raspberry Pi status and follow-up
+
+No GPIO, SPI, I2C, PWM, servo, display, camera, microphone, ngrok, systemd, or
+power action was executed. The remaining Pi check is non-moving: synchronize
+the hardware environment, import qrcode, and open the Interactive Tool.
+
 ## 2026-08-15 — Explicit Web ownership, ngrok setup, QR, and deployment refinement
 
 ### Root causes and implementation

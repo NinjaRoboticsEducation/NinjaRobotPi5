@@ -470,18 +470,32 @@ contains a token, cookie, transport marker, or signing key.
 
 ### Phase 8 Optional Dependencies and Status
 
-The normal `uv sync --frozen` software-only environment remains lightweight.
-On Raspberry Pi, the existing hardware extra now also resolves the release
+The normal `uv sync --frozen` software-only environment remains lightweight,
+but includes `qrcode[pil]==8.2` because `ninjarobot_pi5_ide.qr_display` is in
+the IDE's unconditional import graph. The historical `display-qr` extra remains
+as an empty compatibility marker for existing installers; it is no longer the
+owner of the runtime requirement. This prevents a default `uv run
+ninjarobot-agent` synchronization from removing qrcode and breaking the CLI
+before argument parsing.
+
+On Raspberry Pi, the hardware extra resolves the device, voice, and remote
 runtime dependencies:
 
 ```bash
 uv sync --frozen --extra hardware
 ```
 
-Pinned release packages are `openwakeword==0.6.0`,
-`onnxruntime==1.27.0`, `pyngrok==8.1.2`, and `qrcode[pil]==8.2`.
+Pinned release packages are `qrcode[pil]==8.2` in the base IDE, plus
+`openwakeword==0.6.0`, `onnxruntime==1.27.0`, and `pyngrok==8.1.2` through the
+hardware-selected voice/remote extras.
 ONNX Runtime 1.27.0 publishes a CPython 3.11 manylinux aarch64 wheel; the
 target-Pi import/model-load check remains a mandatory device validation.
+
+Developers should distinguish `uv sync` from `uv run`: `uv run` first
+reconciles the selected project extras unless `--no-sync` is used. Therefore a
+real-Pi one-shot command must use `uv run --extra hardware ...`, or preferably
+run plain entry points after `source .venv/bin/activate` as documented for
+normal users.
 
 `ninjarobot-agent status` now includes `release.voice`,
 `release.remote_access`, `release.pairing`, `release.onboarding`, and
@@ -1369,7 +1383,8 @@ A configuration change that points to another host is rejected — preventing cr
 | Display shows `simulated: true` | A scriptable simulation command was selected. The interactive IDE tool runs physical hardware directly after installation |
 | Screen goes dark when a command exits | Intentional cleanup. Add `--hold 5` to a real manual test to keep the backlight active for inspection |
 | Text is sideways on the display | Authoritative V4 rotation is 90°. Confirm `--config` points to the correct TOML file |
-| Hardware already owned by another process | Use the existing agent interface, or run `uv run --frozen ninjarobot-agent service stop`, then retry. Also stop both integrated tools before opening a standalone `pi5*` tool |
+| Hardware already owned by another process | Use the existing agent interface, or run `uv run --frozen --extra hardware ninjarobot-agent service stop`, then retry. Also stop both integrated tools before opening a standalone `pi5*` tool |
+| `uv run ninjarobot-agent` reports `No module named 'qrcode'` | Pull the dependency fix and run `uv sync --frozen --extra hardware`. qrcode 8.2 is now an unconditional IDE dependency; do not install an unrelated QR package manually |
 | A repaired `pi5*` source file is present but Python runs an older copy | Run `uv sync --frozen --extra hardware`, then `scripts/verify_workspace_driver_sources.py`. Editable dependencies must resolve into this checkout |
 | Camera reports unavailable while `/usr/bin/python3` imports Picamera2 | Run `./scripts/bootstrap-rpi-camera-workspace.sh`; both standalone and integrated capture should then use the bounded system-Python bridge. Do not recreate `.venv` with `--system-site-packages` |
 | `pi5mic` reports PortAudio missing | Install `libportaudio2` and `portaudio19-dev`, then run `pi5mic devices`. Local transcription also requires a built `whisper-cli` and `ggml-base.bin` |

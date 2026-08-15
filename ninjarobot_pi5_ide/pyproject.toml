@@ -13,12 +13,13 @@ dependencies = [
     "click>=8.1,<9",
     "pillow>=10.1,<13",
     "pydantic>=2.12,<3",
+    "qrcode[pil]==8.2",
 ]
 
 [project.optional-dependencies]
-display-qr = [
-    "qrcode[pil]==8.2",
-]
+# Kept as an empty compatibility extra for existing installers. QR rendering is
+# part of the base IDE import/runtime contract and can no longer be optional.
+display-qr = []
 voice = [
     "onnxruntime==1.27.0",
     "openwakeword==0.6.0",

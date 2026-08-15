@@ -845,12 +845,10 @@ dependencies = [
     { name = "click" },
     { name = "pillow" },
     { name = "pydantic" },
+    { name = "qrcode", extra = ["pil"] },
 ]
 
 [package.optional-dependencies]
-display-qr = [
-    { name = "qrcode", extra = ["pil"] },
-]
 voice = [
     { name = "onnxruntime" },
     { name = "openwakeword" },
@@ -864,7 +862,7 @@ requires-dist = [
     { name = "openwakeword", marker = "extra == 'voice'", specifier = "==0.6.0" },
     { name = "pillow", specifier = ">=10.1,<13" },
     { name = "pydantic", specifier = ">=2.12,<3" },
-    { name = "qrcode", extras = ["pil"], marker = "extra == 'display-qr'", specifier = "==8.2" },
+    { name = "qrcode", extras = ["pil"], specifier = "==8.2" },
 ]
 provides-extras = ["display-qr", "voice"]
 
@@ -880,7 +878,7 @@ dependencies = [
 [package.optional-dependencies]
 hardware = [
     { name = "ninjarobot-pi5-agent", extra = ["remote"] },
-    { name = "ninjarobot-pi5-ide", extra = ["display-qr", "voice"] },
+    { name = "ninjarobot-pi5-ide", extra = ["voice"] },
     { name = "pi5buzzer", extra = ["pi"] },
     { name = "pi5camera" },
     { name = "pi5disp", extra = ["pi"] },
