@@ -479,14 +479,17 @@ Choose **Run setup wizard**, select your USB microphone, and accept a supported 
 
 > [!NOTE]
 > If the tool selects 44.1 kHz when you configured 16 kHz, this is normal. Some USB microphones do not support 16 kHz. The robot software handles this fallback automatically.
-
+> 1.whisper.cpp cli path: /home/rogerchang/whisper.cpp/build/bin/whisper-cli
+> 2.whisper.cpp model path:   /home/rogerchang/whisper.cpp/models/ggml-base.bin
+> 3.WakeWord model path (.tflite or .onnx): pi5mic/voiceinput/hey_Ninja.onnx
+> 4.After initiallized, you need to manually copy the weke word model to  NinjaRobot ide directory: cp pi5mic/voiceinput/hey_Ninja.onnx ninjarobot_pi5_ide/assets/hey_Ninja.onnx 
 ---
 
 ### Step 5 — Import Settings into the Integrated Robot Configuration
 
 The NinjaRobotPi5 IDE reads its own unified configuration file, separate from the individual module JSON files. This step copies the relevant settings from Steps 4.1–4.6 into that unified file.
 
-> [!IMPORTANT]
+> [!Important]
 > The import is one-way and read-only. The IDE never rewrites the standalone `pi5*` JSON files, and the standalone tools never rewrite the integrated `config.toml`.
 
 **Check which standalone files the IDE finds:**
