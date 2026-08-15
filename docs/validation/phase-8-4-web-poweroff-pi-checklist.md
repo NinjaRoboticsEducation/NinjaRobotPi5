@@ -16,6 +16,10 @@ policy.
 - In **Startup Agent Deployment → Show startup Agent status**, require
   `full_poweroff.ready: true`. If setup instead reports a compatible pending
   update, reboot once before this test.
+- Require `poweroff_helper: true` after running the latest deployment repair;
+  this must validate the helper content and metadata, not only path existence.
+- For a Geekworm X1208, verify the pogo pin contacts the Pi 5 `PSW` through-hole
+  and that only the X1208 USB-C input supplies the system.
 
 ## Safe smoke tests
 
@@ -83,7 +87,9 @@ systemd does not restart an intentional shutdown; the Pi remains off instead
 of rebooting; and helper denial after confirmation leaves hardware stopped with
 `sudo systemctl poweroff` in the local service log. Missing and pending EEPROM
 states are covered by automated fail-closed tests; do not alter a working
-bootloader configuration solely to recreate those cases on hardware.
+bootloader configuration solely to recreate those cases on hardware. With an
+X1208, its controller should automatically remove the 5 V output after the Pi
+reaches standby.
 
 Rollback: if the OS remains running, execute `sudo systemctl poweroff` locally.
 If actuators are unsafe, use the physical disconnect. After boot, inspect logs

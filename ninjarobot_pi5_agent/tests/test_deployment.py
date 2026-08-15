@@ -12,8 +12,10 @@ from unittest.mock import Mock
 import pytest
 from ninjarobot_pi5_agent.deployment import (
     HELPER_PATH,
+    INSTALL,
     RASPI_CONFIG,
     RPI_EEPROM_CONFIG,
+    SUDO,
     SUDOERS_PATH,
     UNIT_NAME,
     UNIT_PATH,
@@ -25,6 +27,7 @@ from ninjarobot_pi5_agent.deployment import (
     read_full_poweroff_status,
     render_unit,
     restore_backup,
+    validate_poweroff_helper,
 )
 from ninjarobot_pi5_agent.mcp_config import load_mcp_configuration
 
@@ -157,10 +160,17 @@ def test_installer_is_disabled_by_default_idempotent_and_uses_fixed_targets(
 ) -> None:
     spec = _spec(tmp_path)
     calls: list[list[str]] = []
+    installed_payloads: dict[str, tuple[str, str]] = {}
 
     def runner(command: object) -> subprocess.CompletedProcess[str]:
         rendered = list(command)  # type: ignore[arg-type]
         calls.append(rendered)
+        if rendered[:2] == [str(SUDO), str(INSTALL)]:
+            mode = rendered[rendered.index("-m") + 1]
+            installed_payloads[rendered[-1]] = (
+                mode,
+                Path(rendered[-2]).read_text(encoding="utf-8"),
+            )
         if rendered == [str(RPI_EEPROM_CONFIG)]:
             return subprocess.CompletedProcess(rendered, 0, FULL_POWEROFF_CONFIG, "")
         if rendered[1:3] == ["is-enabled", UNIT_NAME]:
@@ -176,6 +186,16 @@ def test_installer_is_disabled_by_default_idempotent_and_uses_fixed_targets(
         command[-1] for command in calls if len(command) > 1 and "install" in command[1]
     }
     assert destinations == {str(UNIT_PATH), str(HELPER_PATH), str(SUDOERS_PATH)}
+    staged_sources = [command[-2] for command in calls if command[:2] == [str(SUDO), str(INSTALL)]]
+    assert len(staged_sources) == len(set(staged_sources)) == 3
+    assert installed_payloads[str(HELPER_PATH)] == (
+        "0755",
+        "#!/bin/sh\nset -eu\nexec /usr/bin/systemctl poweroff --no-wall\n",
+    )
+    assert installed_payloads[str(SUDOERS_PATH)] == (
+        "0440",
+        f"{spec.user} ALL=(root) NOPASSWD: /usr/libexec/ninjarobot-poweroff\n",
+    )
     assert any(command[:2] == ["/usr/bin/systemd-analyze", "verify"] for command in calls)
     assert any(command[:2] == ["/usr/sbin/visudo", "-cf"] for command in calls)
     assert ["/usr/bin/sudo", "/usr/bin/systemctl", "disable", UNIT_NAME] in calls
@@ -363,7 +383,7 @@ def test_artifact_status_does_not_read_protected_sudoers_directory(
     def protected_is_file(path: Path) -> bool:
         if path == SUDOERS_PATH:
             raise PermissionError("protected sudoers directory")
-        if path in {UNIT_PATH, HELPER_PATH}:
+        if path == UNIT_PATH:
             return True
         return original_is_file(path)
 
@@ -373,6 +393,10 @@ def test_artifact_status_does_not_read_protected_sudoers_directory(
         return subprocess.CompletedProcess(rendered, 0, "allowed\n", "")
 
     monkeypatch.setattr(Path, "is_file", protected_is_file)
+    monkeypatch.setattr(
+        "ninjarobot_pi5_agent.deployment.validate_poweroff_helper",
+        lambda: True,
+    )
     artifacts = DeploymentManager(spec, runner=runner).artifact_status()
 
     assert artifacts == {
@@ -381,6 +405,40 @@ def test_artifact_status_does_not_read_protected_sudoers_directory(
         "sudoers_rule": True,
     }
     assert ["/usr/bin/sudo", "-n", "-l", str(HELPER_PATH)] in calls
+
+
+def test_poweroff_helper_validation_rejects_overwritten_mode_and_symlink(
+    tmp_path: Path,
+) -> None:
+    assets = Path(__file__).resolve().parents[1] / "src" / "ninjarobot_pi5_agent" / "deployment"
+    helper = tmp_path / "ninjarobot-poweroff"
+    helper.write_text(
+        (assets / "ninjarobot-poweroff").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    helper.chmod(0o755)
+    metadata = helper.stat()
+    identity = {"expected_uid": metadata.st_uid, "expected_gid": metadata.st_gid}
+
+    assert validate_poweroff_helper(helper, **identity) is True
+
+    helper.write_text(
+        "robot ALL=(root) NOPASSWD: /usr/libexec/ninjarobot-poweroff\n",
+        encoding="utf-8",
+    )
+    assert validate_poweroff_helper(helper, **identity) is False
+
+    helper.write_text(
+        (assets / "ninjarobot-poweroff").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    helper.chmod(0o744)
+    assert validate_poweroff_helper(helper, **identity) is False
+
+    helper.chmod(0o755)
+    link = tmp_path / "helper-link"
+    link.symlink_to(helper)
+    assert validate_poweroff_helper(link, **identity) is False
 
 
 def test_install_and_enable_starts_service_in_one_transaction(tmp_path: Path) -> None:

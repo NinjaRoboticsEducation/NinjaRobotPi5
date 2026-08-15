@@ -369,9 +369,10 @@ transaction. Robot and versioned MCP configuration are parsed before
 privileged changes. Setup clears an earlier systemd failed/start-limit state
 and reports success only after systemd is active and the owner-only Agent IPC
 endpoint responds. A failed first start is disabled again. Deployment status checks
-the exact non-interactive power-off authorization without reading the protected
-`/etc/sudoers.d` directory; the paired web power-off button never receives
-general sudo access.
+the helper's exact approved bytes, root ownership, non-symlink identity, and
+executable mode, plus the exact non-interactive power-off authorization without
+reading the protected `/etc/sudoers.d` directory. The paired web power-off
+button never receives general sudo access.
 
 On Raspberry Pi 5, setup also uses Raspberry Pi OS's official `raspi-config`
 shutdown setting to schedule `POWER_OFF_ON_HALT=1` and `WAKE_ON_GPIO=0` in the
@@ -380,6 +381,12 @@ If status reports `poweroff_reboot_required: true`, reboot
 once before using the web Power Off button. The button fails safely before it
 stops the Agent when the setting is missing or still pending, preventing a
 shutdown that immediately boots again.
+
+For the supported Geekworm X1208 power chain, connect the supply only to the
+X1208 USB-C input and install the supplied pogo pin against the Pi 5 `PSW`
+through-hole. The X1208 then detects the Pi shutdown state and removes its 5 V
+output automatically; NinjaRobot does not issue an undocumented UPS GPIO power
+cut. See the [X1208 hardware guide](https://wiki.geekworm.com/X1208).
 
 The complete normal-user Raspberry Pi acceptance workflow is in the
 [Phase 8 interactive validation guide](docs/validation/phase-8-final-interactive-pi-validation-2026-08-14.md).

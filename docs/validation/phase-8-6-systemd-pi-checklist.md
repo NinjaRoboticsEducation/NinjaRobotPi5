@@ -25,6 +25,10 @@ preservation. The following real Pi tests remain mandatory.
    button yet. Reboot once, return to deployment status, and require
    `full_poweroff.ready: true`, `configured: true`, and
    `update_pending: false`.
+7. Confirm `poweroff_helper: true`. This now verifies exact packaged content,
+   root ownership, a regular non-symlink file, and mode `0755`; it must reject
+   the historical failure where the sudoers rule was installed at the helper
+   path.
 
 Expected: the service runs as the non-root robot user with one real-hardware
 agent process, journald receives output, clean stop is not restarted, and the
@@ -54,6 +58,13 @@ Rollback: disable the unit and use terminal/manual service startup.
 
 ## Actuator and power-risk tests
 
+For Geekworm X1208 hardware, power down and inspect before the live test:
+
+- the supply connects only to the X1208 USB-C input, never simultaneously to
+  the Pi 5 USB-C input
+- the supplied pogo pin firmly contacts the Pi 5 `PSW` through-hole
+- the X1208 40-pin header and NVMe connections are fully seated
+
 Follow the Phase 8.5 raised-wheel Greeting test after reboot. Then follow the
 Phase 8.4 paired-controller power-off test. Confirm the web path stops hardware
 and resources before invoking exactly
@@ -65,7 +76,8 @@ or other hardware is stopped.
 
 Expected: Greeting occurs once after pairing, orderly shutdown powers off the
 Pi and leaves it off rather than rebooting, and systemd does not restart the
-agent during the shutdown transaction.
+agent during the shutdown transaction. The X1208 should automatically remove
+its 5 V output after it detects the Pi shutdown state.
 
 Rollback: use Emergency Stop/physical cutoff for unsafe motion. If helper
 authorization fails after cleanup, run `sudo systemctl poweroff` locally. To

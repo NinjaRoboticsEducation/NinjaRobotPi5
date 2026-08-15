@@ -36,6 +36,20 @@ run once; daily use happens through `ninjarobot-ide-tool` and
 | Another computer | For writing the OS image and SSH access |
 | microSD card reader | To write the OS image |
 
+#### Geekworm X1208 power installation
+
+1. Assemble the X1208 with the Pi completely disconnected from power.
+2. Install the supplied pogo pin so it makes firm contact with the Raspberry Pi
+   5 `PSW` through-hole. This carries the Pi power-button/detection signal.
+3. Connect the 27 W, 5 V/5 A supply to the **X1208 USB-C input only**. Do not
+   simultaneously power the Raspberry Pi 5 USB-C socket.
+4. Confirm the Pi, X1208 40-pin header, spacers, battery, and NVMe cable are
+   seated exactly as shown in the [official X1208 guide](https://wiki.geekworm.com/X1208).
+
+The X1208 automatically removes its 5 V output after it detects a completed Pi
+5 shutdown. NinjaRobot therefore uses the standard operating-system power-off
+path; it does not need an additional UPS-specific power-cut script.
+
 ### Safety Rules — Read These First
 
 > [!CAUTION]
@@ -789,6 +803,12 @@ Select **Show startup Agent status**. Pass criteria are:
   `full_poweroff.update_pending: false`
 - the unit references the current checkout and `.venv` Python
 
+`poweroff_helper: true` now means more than “a file exists.” It verifies the
+approved script content, root ownership, `0755` mode, and that the path is not a
+symbolic link. An older installation containing a sudoers line at the helper
+path reports `false`; rerun **Install and deploy automatic startup Agent** to
+repair it before testing Power Off.
+
 Reboot with `sudo reboot`. After reconnecting by SSH, open `ninjarobot-agent`
 and check **Agent Service Status** and **Startup Agent Deployment → Show startup
 Agent status**. The display should show the current remote pairing QR, or a
@@ -802,6 +822,13 @@ is rejected before the Agent stops and the web error gives the next step. A
 successful confirmation stops robot modules and Raspberry Pi OS, then leaves
 the Pi powered off rather than rebooting. Disconnect external power before
 touching wiring even when the Pi is shut down.
+
+For an X1208 installation, also confirm:
+
+- power enters only through the X1208 USB-C input
+- the supplied pogo pin firmly contacts the Pi 5 `PSW` through-hole
+- the X1208 power-status LED changes to its documented standby/off state
+- the Pi does not remain reachable by SSH and does not start again by itself
 
 ---
 
@@ -1498,9 +1525,10 @@ not edit unrelated EEPROM keys. If setup reports
 `poweroff_reboot_required: true`, reboot once and confirm
 `full_poweroff.ready: true` in deployment status before testing web Power Off.
 Status verifies the exact
-passwordless helper permission with `sudo -n -l`; it does not try to read the
-protected `/etc/sudoers.d` directory. A partial install or failed first start is
-left disabled. Test safely with raised wheels:
+helper bytes, root ownership, `0755` mode, non-symlink identity, and passwordless
+permission with `sudo -n -l`; it does not try to read the protected
+`/etc/sudoers.d` directory. A partial install or failed first start is left
+disabled. Test safely with raised wheels:
 
 ```bash
 ninjarobot-agent deployment status

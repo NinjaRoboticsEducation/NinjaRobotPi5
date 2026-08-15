@@ -699,6 +699,14 @@ execute only that argument-free helper. The web coordinator calls it as
 `/usr/bin/sudo -n /usr/libexec/ninjarobot-poweroff` after resource cleanup.
 No general passwordless sudo is installed.
 
+The unit, helper, and sudoers rule use deliberately distinct temporary staging
+names. The helper and sudoers destinations both end in
+`ninjarobot-poweroff`; deriving both staging paths from that basename would
+overwrite the helper with the sudoers line. `validate_poweroff_helper` now
+requires the exact packaged bytes, root owner/group, regular non-symlink file,
+and mode `0755`. Both deployment status and runtime preflight use this check,
+while sudo authorization remains a separate exact `sudo -n -l` probe.
+
 Pi 5 shutdown has a second, platform-level prerequisite. Deployment reads the
 active bootloader config and any `/boot/.../pieeprom.upd` image separately. If
 full PMIC shutdown is absent, confirmed setup calls only the official
@@ -1137,7 +1145,8 @@ deployment is rejected before the Agent stops. It then issues a
 consumes it before stopping hardware and voice. The service then closes the
 tunnel, web server, durable stores, IDE, and ownership lock before invoking the
 fixed `/usr/libexec/ninjarobot-poweroff` helper with fixed argv and no shell. A
-rare helper failure after cleanup leaves the robot stopped and logs
+rare helper failure after cleanup leaves the robot stopped and logs its exit
+status plus at most 500 printable diagnostic characters, followed by
 `sudo systemctl poweroff` as the local recovery action.
 
 - Started and stopped through IPC — cannot create a second IDE or hardware owner
@@ -1417,6 +1426,8 @@ A configuration change that points to another host is rejected — preventing cr
 | Deployment status says `enabled: true` but `running: false` | Enablement only means systemd will attempt boot. Inspect the structured `systemd` result/exit status and Agent log, repair the reported configuration, then rerun the confirmed deployment setup; success requires `ready: true` |
 | Web Power Off stops the Agent but the Pi boots again | The Pi 5 bootloader is not using full PMIC shutdown. Pull this repair, rerun **Startup Agent Deployment → Install and deploy automatic startup Agent**, reboot once when `poweroff_reboot_required` is true, then require `full_poweroff.ready: true` before retesting. |
 | Web Power Off says an EEPROM update is pending | Setup successfully queued the official full-power-off setting, but it is not active yet. Keep wheels raised, reboot once, and recheck Startup Agent status. Do not keep retrying Power Off before that reboot. |
+| Startup Agent status reports `poweroff_helper: false` | The fixed helper is missing or its bytes, root ownership, non-symlink identity, or `0755` mode are wrong. Rerun **Install and deploy automatic startup Agent**. Older affected installations may contain the sudoers rule at `/usr/libexec/ninjarobot-poweroff`; do not edit it manually. |
+| X1208 stays on after a confirmed OS shutdown | First require `poweroff_helper: true` and `full_poweroff.ready: true`. Then disconnect power and verify the X1208 pogo pin contacts the Pi 5 `PSW` through-hole, power enters only through the X1208 USB-C input, and the 40-pin connection is fully seated. |
 | A repaired `pi5*` source file is present but Python runs an older copy | Run `uv sync --frozen --extra hardware`, then `scripts/verify_workspace_driver_sources.py`. Editable dependencies must resolve into this checkout |
 | Camera reports unavailable while `/usr/bin/python3` imports Picamera2 | Run `./scripts/bootstrap-rpi-camera-workspace.sh`; both standalone and integrated capture should then use the bounded system-Python bridge. Do not recreate `.venv` with `--system-site-packages` |
 | `pi5mic` reports PortAudio missing | Install `libportaudio2` and `portaudio19-dev`, then run `pi5mic devices`. Local transcription also requires a built `whisper-cli` and `ggml-base.bin` |

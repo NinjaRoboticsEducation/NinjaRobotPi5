@@ -7,6 +7,7 @@ import json
 import pwd
 import shlex
 import socket
+import stat
 import subprocess
 import sys
 import tarfile
@@ -227,12 +228,21 @@ class DeploymentManager:
         sudoers = _asset("ninjarobot-poweroff.sudoers.in").replace("@USER@", self.spec.user)
         with tempfile.TemporaryDirectory(prefix="ninjarobot-deploy-") as temporary:
             root = Path(temporary)
-            unit_source = root / UNIT_PATH.name
-            helper_source = root / HELPER_PATH.name
-            sudoers_source = root / SUDOERS_PATH.name
+            # HELPER_PATH and SUDOERS_PATH deliberately share the basename
+            # ``ninjarobot-poweroff``. Staging by destination basename would
+            # therefore overwrite the helper with the sudoers rule.
+            unit_source = root / "systemd-unit.install"
+            helper_source = root / "poweroff-helper.install"
+            sudoers_source = root / "poweroff-sudoers.install"
+            if len({unit_source, helper_source, sudoers_source}) != 3:
+                raise RuntimeError("deployment staging paths are not unique")
             unit_source.write_text(unit, encoding="utf-8")
             helper_source.write_text(helper, encoding="utf-8")
             sudoers_source.write_text(sudoers, encoding="utf-8")
+            if helper_source.read_text(encoding="utf-8") != helper:
+                raise RuntimeError("power-off helper staging verification failed")
+            if sudoers_source.read_text(encoding="utf-8") != sudoers:
+                raise RuntimeError("power-off sudoers staging verification failed")
             self._checked([str(SYSTEMD_ANALYZE), "verify", str(unit_source)])
             self._checked([str(VISUDO), "-cf", str(sudoers_source)])
             commands = (
@@ -426,7 +436,7 @@ class DeploymentManager:
         """Report privileged artifacts without directly traversing protected sudoers."""
         return {
             "systemd_unit": _safe_is_file(UNIT_PATH),
-            "poweroff_helper": _safe_is_file(HELPER_PATH),
+            "poweroff_helper": validate_poweroff_helper(),
             "sudoers_rule": self._poweroff_authorized(),
         }
 
@@ -797,4 +807,24 @@ def _safe_is_file(path: Path) -> bool:
     try:
         return path.is_file()
     except OSError:
+        return False
+
+
+def validate_poweroff_helper(
+    path: Path = HELPER_PATH,
+    *,
+    expected_uid: int = 0,
+    expected_gid: int = 0,
+) -> bool:
+    """Verify the fixed helper identity, bytes, ownership, and executable mode."""
+    try:
+        if path.is_symlink() or not path.is_file():
+            return False
+        metadata = path.stat()
+        if metadata.st_uid != expected_uid or metadata.st_gid != expected_gid:
+            return False
+        if stat.S_IMODE(metadata.st_mode) != 0o755:
+            return False
+        return path.read_text(encoding="utf-8") == _asset("ninjarobot-poweroff")
+    except (OSError, UnicodeError):
         return False

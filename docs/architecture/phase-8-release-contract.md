@@ -62,7 +62,9 @@ work, flushes durable state, closes IDE resources, and then uses a narrowly
 authorized operating-system helper. The web process never receives unrestricted
 passwordless `sudo`. On Raspberry Pi 5, confirmed deployment also schedules the
 official full-PMIC shutdown EEPROM mode when absent. Power-off is rejected
-before cleanup until that mode is active after the required reboot.
+before cleanup until that mode is active after the required reboot. The helper
+must match the packaged bytes, root ownership, regular-file identity, and
+executable mode; existence alone never authorizes shutdown.
 
 ## Network and dependency contract
 

@@ -223,6 +223,9 @@ In the Agent Interactive Tool select **12. Startup Agent Deployment**.
    pending full-power-off EEPROM update.
 3. Select **3. Show startup Agent status** again. Expected: installed, enabled,
    running, and ready are true and every artifact remains present.
+   `poweroff_helper: true` must represent exact script-content and metadata
+   validation; an older sudoers-contaminated helper must report false until
+   deployment setup repairs it.
 4. Reboot the Pi normally. After reconnecting, status must show
    `full_poweroff.ready: true`, `configured: true`, and
    `update_pending: false`. Do not proceed to the final power-off test while
@@ -241,11 +244,16 @@ In the Agent Interactive Tool select **12. Startup Agent Deployment**.
 
 From the paired active browser, open the hamburger and choose Power Off.
 
+For the Geekworm X1208, first disconnect power and verify its pogo pin contacts
+the Pi 5 `PSW` through-hole, the 40-pin header is seated, and the power adapter
+connects only to the X1208 USB-C input. Restore power before continuing.
+
 1. Choose Cancel. Expected: nothing shuts down.
 2. Reopen it, choose Power Off, and confirm in the second popup.
 3. Expected order: hardware safe stop, voice/tunnel/web closure, durable-store
    and IDE cleanup, then Raspberry Pi power-off. The Pi must remain off rather
-   than starting the Agent again.
+   than starting the Agent again; the X1208 must remove its 5 V output after
+   detecting the Pi shutdown state.
 4. After power is fully off, inspect the filesystem/log/database on the next
    boot. Expected: no corruption and no restart loop.
 

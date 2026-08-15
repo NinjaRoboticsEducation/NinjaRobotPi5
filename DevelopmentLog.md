@@ -1,5 +1,58 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-16 — Power-off helper staging and X1208 shutdown repair
+
+### Root cause and implementation
+
+- correlated the failed web Power Off with the current system journal: the
+  Agent reached the privileged helper, but the helper exited nonzero before an
+  operating-system power-off request was accepted
+- inspected the installed helper and found that it contained the sudoers rule
+  instead of the packaged shell program; deployment had staged both artifacts
+  under the same `ninjarobot-poweroff` basename, so the second write silently
+  replaced the first before installation
+- assigned unique staging filenames to the systemd unit, power-off helper, and
+  sudoers rule, then verified each staged payload before invoking the privileged
+  installer
+- replaced existence-only helper status with fail-closed validation of the
+  exact packaged bytes, root ownership, regular-file/non-symlink type, and
+  `0755` mode; a contaminated or manually altered helper now reports deployment
+  not ready and is rejected before `sudo` is called
+- made runtime failures preserve the helper exit status and a bounded,
+  printable diagnostic so future installation or systemd failures are
+  actionable without placing unbounded subprocess output in logs or Web errors
+- documented the X1208 hardware contract: power the stack through the X1208
+  USB-C input only, seat the power pogo pin against the Pi 5 `PSW` through-hole,
+  and use the standard operating-system power-off path; no undocumented
+  UPS-specific GPIO cut-off command was added
+
+### Validation
+
+- deployment and shutdown tests cover unique staged artifacts, exact installed
+  helper validation, replacement by sudoers content, wrong mode, symlink
+  rejection, preflight refusal, and bounded nonzero-exit diagnostics
+- focused deployment tests passed 15 cases; the combined shutdown, Web,
+  service, deployment, and release-assets suite passed 50 cases with one
+  existing upstream Starlette/httpx deprecation warning
+- the complete release gate passed workspace-source provenance, compileall,
+  Ruff lint/format, strict MyPy across 81 source files, JavaScript syntax,
+  `git diff --check`, and 556 tests with that same single upstream warning
+- managed-driver verification passed for 222 tracked files and 47 authorized
+  repairs after both implementation phases; no managed driver or
+  `NinjaClawBot` file changed
+
+### Raspberry Pi status and follow-up
+
+Automated validation did not replace the root-owned installed helper, start a
+service, change EEPROM, reboot, power off the Pi, or energize an actuator. The
+operator must rerun **Startup Agent deployment → Install and deploy automatic
+startup Agent** to reinstall the exact helper, verify
+`artifacts.poweroff_helper: true` and `full_poweroff.ready: true`, and then run
+one paired-browser Power Off test last. On X1208 hardware, a clean operating-
+system shutdown must be followed by automatic removal of the Pi's 5 V rail; if
+the OS shuts down but 5 V remains, inspect X1208 power input, pogo-pin/`PSW`
+contact, and board seating before changing software.
+
 ## 2026-08-15 — Raspberry Pi 5 full-power-off bootloader repair
 
 ### Root cause and implementation

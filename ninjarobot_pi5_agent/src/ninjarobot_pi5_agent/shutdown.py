@@ -11,11 +11,12 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
-from .deployment import read_full_poweroff_status
+from .deployment import read_full_poweroff_status, validate_poweroff_helper
 from .events import AgentEventType, EventBroker
 from .release_foundations import ReleaseFeatureState, ReleaseStatusRegistry
 
 NONCE_LIFETIME_SECONDS = 30.0
+MAX_HELPER_DIAGNOSTIC_CHARACTERS = 500
 LOGGER = logging.getLogger(__name__)
 HelperProbe = Callable[[Path], tuple[bool, str | None]]
 
@@ -142,12 +143,22 @@ class PoweroffCoordinator:
                 text=True,
                 timeout=15.0,
             )
-        except Exception as exc:
+        except subprocess.TimeoutExpired as exc:
             raise RuntimeError(
-                "power-off helper failed; run `sudo systemctl poweroff` locally"
+                "power-off helper timed out; run `sudo systemctl poweroff` locally"
+            ) from exc
+        except OSError as exc:
+            raise RuntimeError(
+                "power-off helper could not execute; run `sudo systemctl poweroff` locally"
             ) from exc
         if completed.returncode != 0:
-            raise RuntimeError("power-off helper was denied; run `sudo systemctl poweroff` locally")
+            detail = _bounded_helper_diagnostic(completed)
+            suffix = f": {detail}" if detail else ""
+            raise RuntimeError(
+                f"power-off helper exited with status {completed.returncode}{suffix}; "
+                "run `sudo systemctl poweroff` locally"
+            )
+        LOGGER.info("Orderly operating-system power-off request was accepted.")
 
     async def _stop_after_response(self) -> None:
         await asyncio.sleep(0.25)
@@ -177,10 +188,11 @@ def _probe_poweroff_helper(helper: Path) -> tuple[bool, str | None]:
             False,
             "power-off helper path is not approved; use Startup Agent deployment to repair it",
         )
-    if not helper.is_file() or helper.is_symlink():
+    if not validate_poweroff_helper(helper):
         return (
             False,
-            "power-off helper file is missing; use Startup Agent deployment to repair it",
+            "power-off helper content, ownership, or mode is invalid; use Startup Agent "
+            "deployment to repair it",
         )
     try:
         completed = subprocess.run(
@@ -223,3 +235,11 @@ def _probe_poweroff_helper(helper: Path) -> tuple[bool, str | None]:
             "Raspberry Pi full power-off is not configured; repair Startup Agent deployment",
         )
     return True, None
+
+
+def _bounded_helper_diagnostic(completed: subprocess.CompletedProcess[str]) -> str:
+    """Return one bounded printable line from a fixed helper's process output."""
+    output = completed.stderr.strip() or completed.stdout.strip()
+    printable = "".join(character if character.isprintable() else " " for character in output)
+    normalized = " ".join(printable.split())
+    return normalized[:MAX_HELPER_DIAGNOSTIC_CHARACTERS]

@@ -224,8 +224,10 @@ def test_poweroff_probe_requires_active_full_poweroff_eeprom_configuration(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     approved = Path("/usr/libexec/ninjarobot-poweroff")
-    monkeypatch.setattr(Path, "is_file", lambda path: path == approved)
-    monkeypatch.setattr(Path, "is_symlink", lambda _path: False)
+    monkeypatch.setattr(
+        "ninjarobot_pi5_agent.shutdown.validate_poweroff_helper",
+        lambda path: path == approved,
+    )
     monkeypatch.setattr(
         "ninjarobot_pi5_agent.shutdown.subprocess.run",
         lambda arguments, **_kwargs: subprocess.CompletedProcess(arguments, 0, "", ""),
@@ -269,6 +271,63 @@ def test_poweroff_probe_requires_active_full_poweroff_eeprom_configuration(
     )
     monkeypatch.setattr("ninjarobot_pi5_agent.shutdown.read_full_poweroff_status", lambda: active)
     assert _probe_poweroff_helper(approved) == (True, None)
+
+
+def test_poweroff_probe_rejects_overwritten_helper_before_sudo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    approved = Path("/usr/libexec/ninjarobot-poweroff")
+    monkeypatch.setattr(
+        "ninjarobot_pi5_agent.shutdown.validate_poweroff_helper",
+        lambda _path: False,
+    )
+    monkeypatch.setattr(
+        "ninjarobot_pi5_agent.shutdown.subprocess.run",
+        lambda *_args, **_kwargs: pytest.fail("sudo probe must not run for an invalid helper"),
+    )
+
+    ready, detail = _probe_poweroff_helper(approved)
+
+    assert ready is False
+    assert detail is not None and "content, ownership, or mode is invalid" in detail
+
+
+def test_poweroff_helper_failure_reports_bounded_process_diagnostic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def exercise() -> None:
+        coordinator = PoweroffCoordinator(
+            enabled=True,
+            helper_path="/usr/libexec/ninjarobot-poweroff",
+            runtime=_Runtime(),
+            controller=_Controller(),
+            events=EventBroker(),
+            release_status=_release_status(),
+            request_service_stop=lambda: None,
+            helper_probe=lambda _path: (True, None),
+        )
+        issued = await coordinator.issue_nonce("lease-owner")
+        await coordinator.confirm("lease-owner", str(issued["nonce"]))
+        diagnostic = "exec format error\n" + ("x" * 1000)
+        monkeypatch.setattr(
+            "ninjarobot_pi5_agent.shutdown.subprocess.run",
+            lambda arguments, **_kwargs: subprocess.CompletedProcess(
+                arguments,
+                126,
+                "",
+                diagnostic,
+            ),
+        )
+
+        with pytest.raises(RuntimeError) as raised:
+            await coordinator.invoke_helper()
+
+        message = str(raised.value)
+        assert "exited with status 126: exec format error" in message
+        assert "run `sudo systemctl poweroff` locally" in message
+        assert len(message) < 650
+
+    asyncio.run(exercise())
 
 
 def test_all_web_locales_have_identical_keys_and_cover_markup_and_script() -> None:
