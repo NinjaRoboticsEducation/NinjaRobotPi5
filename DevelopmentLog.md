@@ -1,5 +1,50 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-15 — Raspberry Pi 5 full-power-off bootloader repair
+
+### Root cause and implementation
+
+- correlated the reported web shutdown with the Agent log and systemd state:
+  the fixed helper completed a clean `systemctl poweroff`, systemd recorded no
+  Agent restart, but the Pi booted again about 28 seconds later
+- inspected the active Pi 5 EEPROM configuration and found neither
+  `POWER_OFF_ON_HALT=1` nor `WAKE_ON_GPIO=0`; this left the board in a
+  halt/sleep mode that could start again instead of remaining fully off
+- added read-only reporting for the active EEPROM image and a separately queued
+  `/boot/.../pieeprom.upd` image, including available, configured, pending,
+  scheduled, ready, and exact shutdown-key fields
+- made confirmed Startup Agent deployment use Raspberry Pi OS's official
+  `raspi-config nonint do_power_off_on_halt B1` operation when required;
+  compatible queued settings are accepted for deployment but clearly require
+  one reboot, while incompatible pending updates fail closed
+- made web Power Off verify that the full-power-off mode is active before it
+  issues a nonce or stops any Agent/hardware resource; missing, unreadable, and
+  pending configurations now return an actionable error
+- retained the fixed argument-free root helper and narrow sudoers rule; no
+  general privilege, bootloader write path, or AI-accessible power tool was
+  added
+
+### Validation
+
+- deployment/shutdown focused lint and formatting passed; 21 focused tests
+  cover active, pending-compatible, missing, and unavailable EEPROM states
+- the combined deployment, shutdown, web, and release-assets suite passed 43
+  tests with one existing upstream Starlette/httpx deprecation warning
+- the complete release gate passed workspace-source provenance, compileall,
+  Ruff lint/format, strict MyPy across 81 source files, JavaScript syntax,
+  `git diff --check`, and 553 tests with that same single upstream warning
+- managed-driver verification passed for 222 tracked files and 47 authorized
+  repairs; no managed driver or `NinjaClawBot` file changed
+
+### Raspberry Pi status and follow-up
+
+Automated validation did not schedule an EEPROM update, reboot, power off the
+Pi, or energize hardware. With both wheels raised, the operator must rerun
+**Startup Agent Deployment → Install and deploy automatic startup Agent**,
+reboot once if requested, require `full_poweroff.ready: true`, and perform the
+paired-browser Power Off test last. The expected result is an orderly shutdown
+that remains off rather than restarting.
+
 ## 2026-08-15 — Boot readiness and verified local/remote access repair
 
 ### Root causes and implementation

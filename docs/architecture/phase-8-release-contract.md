@@ -60,7 +60,9 @@ Power-off requires the paired active controller, a Power Off/Cancel modal, and
 a single-use server nonce. Cleanup stops motion and voice, closes tunnel/web
 work, flushes durable state, closes IDE resources, and then uses a narrowly
 authorized operating-system helper. The web process never receives unrestricted
-passwordless `sudo`.
+passwordless `sudo`. On Raspberry Pi 5, confirmed deployment also schedules the
+official full-PMIC shutdown EEPROM mode when absent. Power-off is rejected
+before cleanup until that mode is active after the required reboot.
 
 ## Network and dependency contract
 

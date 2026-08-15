@@ -32,9 +32,54 @@ SUDO = Path("/usr/bin/sudo")
 INSTALL = Path("/usr/bin/install")
 SYSTEMD_ANALYZE = Path("/usr/bin/systemd-analyze")
 VISUDO = Path("/usr/sbin/visudo")
+RASPI_CONFIG = Path("/usr/bin/raspi-config")
+RPI_EEPROM_CONFIG = Path("/usr/bin/rpi-eeprom-config")
+EEPROM_UPDATE_PATHS = (
+    Path("/boot/firmware/pieeprom.upd"),
+    Path("/boot/pieeprom.upd"),
+)
 
 CommandRunner = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
 ReadinessProbe = Callable[[Path], bool]
+
+
+@dataclass(frozen=True, slots=True)
+class FullPoweroffStatus:
+    """Raspberry Pi bootloader state required for a true PMIC power-off."""
+
+    available: bool
+    configured: bool
+    update_pending: bool
+    pending_configured: bool
+    power_off_on_halt: str | None
+    wake_on_gpio: str | None
+    pending_power_off_on_halt: str | None = None
+    pending_wake_on_gpio: str | None = None
+    detail: str | None = None
+
+    @property
+    def ready(self) -> bool:
+        return self.configured and not self.update_pending
+
+    @property
+    def scheduled(self) -> bool:
+        """Return whether full power-off is active or queued for the next boot."""
+        return self.ready or (self.update_pending and self.pending_configured)
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "available": self.available,
+            "configured": self.configured,
+            "update_pending": self.update_pending,
+            "pending_configured": self.pending_configured,
+            "scheduled": self.scheduled,
+            "ready": self.ready,
+            "power_off_on_halt": self.power_off_on_halt,
+            "wake_on_gpio": self.wake_on_gpio,
+            "pending_power_off_on_halt": self.pending_power_off_on_halt,
+            "pending_wake_on_gpio": self.pending_wake_on_gpio,
+            "detail": self.detail,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -233,7 +278,14 @@ class DeploymentManager:
                 self._checked(command)
             if not upgrade:
                 self._checked([str(SUDO), str(SYSTEMCTL), "disable", UNIT_NAME])
-        return {"installed": True, "enabled": self.is_enabled(), "spec": _public_spec(self.spec)}
+        poweroff = self._ensure_full_poweroff_configuration()
+        return {
+            "installed": True,
+            "enabled": self.is_enabled(),
+            "full_poweroff": poweroff["status"],
+            "poweroff_reboot_required": poweroff["changed"] or poweroff["pending"],
+            "spec": _public_spec(self.spec),
+        }
 
     def enable(self, *, confirmed: bool) -> dict[str, Any]:
         if not confirmed:
@@ -243,6 +295,11 @@ class DeploymentManager:
             missing = ", ".join(name for name, ready in artifacts.items() if not ready)
             raise RuntimeError(
                 f"deployment is incomplete ({missing}); install or repair it before enabling"
+            )
+        poweroff = self._full_poweroff_status()
+        if not poweroff.scheduled:
+            raise RuntimeError(
+                "full Raspberry Pi power-off is not configured; run deployment setup/repair"
             )
         self._checked([str(SUDO), str(SYSTEMCTL), "enable", UNIT_NAME])
         try:
@@ -275,12 +332,15 @@ class DeploymentManager:
         artifacts = self.artifact_status()
         active = systemd.get("ActiveState") == "active"
         ipc_ready = active and self._readiness_probe(self.spec.socket)
+        poweroff = self._full_poweroff_status()
         return {
             "installed": all(artifacts.values()),
             "artifacts": artifacts,
             "enabled": self.is_enabled(),
             "running": active,
             "ready": ipc_ready,
+            "full_poweroff": poweroff.as_dict(),
+            "next_step": _full_poweroff_next_step(poweroff),
             "systemd": systemd,
             "spec": _public_spec(self.spec),
         }
@@ -288,9 +348,12 @@ class DeploymentManager:
     def validate(self) -> dict[str, Any]:
         self.spec.validate()
         artifacts = self.artifact_status()
+        poweroff = self._full_poweroff_status()
         return {
-            "valid": all(artifacts.values()),
+            "valid": all(artifacts.values()) and poweroff.ready,
             "artifacts": artifacts,
+            "full_poweroff": poweroff.as_dict(),
+            "next_step": _full_poweroff_next_step(poweroff),
             "spec": _public_spec(self.spec),
         }
 
@@ -321,6 +384,8 @@ class DeploymentManager:
             "started": started["accepted"],
             "running_now": readiness["running"],
             "ready": readiness["ready"],
+            "full_poweroff": installed.get("full_poweroff"),
+            "poweroff_reboot_required": installed.get("poweroff_reboot_required", False),
             "systemd": readiness["systemd"],
         }
 
@@ -392,6 +457,53 @@ class DeploymentManager:
         """Check the exact passwordless helper authorization without reading /etc/sudoers.d."""
         result = self._runner([str(SUDO), "-n", "-l", str(HELPER_PATH)])
         return result.returncode == 0
+
+    def _full_poweroff_status(self) -> FullPoweroffStatus:
+        return read_full_poweroff_status(runner=self._runner)
+
+    def _ensure_full_poweroff_configuration(self) -> dict[str, object]:
+        status = self._full_poweroff_status()
+        if not status.available:
+            raise RuntimeError(
+                "Raspberry Pi EEPROM configuration is unavailable; install/update "
+                "raspi-config and rpi-eeprom before repairing deployment"
+            )
+        if status.ready:
+            return {
+                "changed": False,
+                "pending": status.update_pending,
+                "status": status.as_dict(),
+            }
+        if status.update_pending:
+            if status.pending_configured:
+                return {
+                    "changed": False,
+                    "pending": True,
+                    "status": status.as_dict(),
+                }
+            raise RuntimeError(
+                "a different Raspberry Pi EEPROM update is pending; reboot or cancel it "
+                "before repairing full power-off"
+            )
+        self._checked(
+            [
+                str(SUDO),
+                str(RASPI_CONFIG),
+                "nonint",
+                "do_power_off_on_halt",
+                "B1",
+            ]
+        )
+        updated = self._full_poweroff_status()
+        if not updated.scheduled:
+            raise RuntimeError(
+                "Raspberry Pi full power-off configuration was not scheduled successfully"
+            )
+        return {
+            "changed": True,
+            "pending": updated.update_pending,
+            "status": updated.as_dict(),
+        }
 
     def _persist_auto_start(self, enabled: bool) -> None:
         config = load_robot_config(self.spec.config)
@@ -545,6 +657,94 @@ def _public_spec(spec: DeploymentSpec) -> dict[str, str]:
         key: "configured-private-file" if key in hidden else str(value)
         for key, value in asdict(spec).items()
     }
+
+
+def read_full_poweroff_status(
+    *,
+    runner: CommandRunner | None = None,
+    pending_paths: Sequence[Path] = EEPROM_UPDATE_PATHS,
+) -> FullPoweroffStatus:
+    """Read the effective/pending EEPROM shutdown configuration without changing it."""
+    command_runner = runner or _run
+    try:
+        result = command_runner([str(RPI_EEPROM_CONFIG)])
+    except (OSError, subprocess.SubprocessError):
+        result = None
+    pending_path = next((path for path in pending_paths if _safe_is_file(path)), None)
+    pending = pending_path is not None
+    pending_values: dict[str, str] = {}
+    if pending_path is not None:
+        try:
+            pending_result = command_runner([str(RPI_EEPROM_CONFIG), str(pending_path)])
+        except (OSError, subprocess.SubprocessError):
+            pending_result = None
+        if pending_result is not None and pending_result.returncode == 0:
+            pending_values = _parse_bootloader_configuration(pending_result.stdout)
+    pending_power_off = pending_values.get("POWER_OFF_ON_HALT")
+    pending_wake = pending_values.get("WAKE_ON_GPIO")
+    pending_configured = pending_power_off == "1" and pending_wake == "0"
+    if result is None or result.returncode != 0:
+        return FullPoweroffStatus(
+            available=False,
+            configured=False,
+            update_pending=pending,
+            pending_configured=pending_configured,
+            power_off_on_halt=None,
+            wake_on_gpio=None,
+            pending_power_off_on_halt=pending_power_off,
+            pending_wake_on_gpio=pending_wake,
+            detail="Raspberry Pi EEPROM configuration could not be read",
+        )
+    values = _parse_bootloader_configuration(result.stdout)
+    power_off = values.get("POWER_OFF_ON_HALT")
+    wake = values.get("WAKE_ON_GPIO")
+    configured = power_off == "1" and wake == "0"
+    detail: str | None = None
+    if pending and not pending_configured:
+        detail = (
+            "a pending EEPROM update does not enable full PMIC power-off; "
+            "reboot or cancel it before deployment repair"
+        )
+    elif pending:
+        detail = "EEPROM update is pending; reboot once before using web power-off"
+    elif not configured:
+        detail = "full PMIC power-off requires POWER_OFF_ON_HALT=1 and WAKE_ON_GPIO=0"
+    return FullPoweroffStatus(
+        available=True,
+        configured=configured,
+        update_pending=pending,
+        pending_configured=pending_configured,
+        power_off_on_halt=power_off,
+        wake_on_gpio=wake,
+        pending_power_off_on_halt=pending_power_off,
+        pending_wake_on_gpio=pending_wake,
+        detail=detail,
+    )
+
+
+def _parse_bootloader_configuration(output: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for raw_line in output.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith(("#", "[")):
+            continue
+        key, separator, value = line.partition("=")
+        if separator and key:
+            values[key.strip()] = value.strip()
+    return values
+
+
+def _full_poweroff_next_step(status: FullPoweroffStatus) -> str | None:
+    if status.update_pending:
+        if status.pending_configured:
+            return "Reboot once to apply the Raspberry Pi full power-off EEPROM setting."
+        return "Reboot or cancel the incompatible pending EEPROM update, then repair deployment."
+    if not status.configured:
+        return (
+            "Run Install and deploy automatic startup Agent to configure full "
+            "Raspberry Pi power-off."
+        )
+    return None
 
 
 def _agent_ipc_ready(socket_path: Path) -> bool:

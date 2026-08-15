@@ -767,11 +767,26 @@ versioned optional `mcp.toml`. It clears a prior systemd failed/start-limit
 state and waits for both an active unit and a responding Agent IPC endpoint;
 therefore a successful result includes `running_now: true` and `ready: true`.
 
+On Raspberry Pi 5, the same setup also checks the bootloader shutdown mode. If
+needed, it schedules Raspberry Pi OS's official **Full power off** setting. The
+result then shows:
+
+- `poweroff_reboot_required: true`
+- `full_poweroff.pending_configured: true`
+- `full_poweroff.ready: false`
+
+This is expected: EEPROM means the small bootloader memory on the Pi board, and
+its new setting becomes active only after one reboot. The Agent may run before
+that reboot, but the web Power Off action is deliberately unavailable so it
+cannot stop the Agent and then let the Pi start again.
+
 Select **Show startup Agent status**. Pass criteria are:
 
 - `installed: true` and `enabled: true`
 - `running: true` and `ready: true`
 - all `artifacts` values are `true`
+- after the required reboot, `full_poweroff.ready: true` and
+  `full_poweroff.update_pending: false`
 - the unit references the current checkout and `.venv` Python
 
 Reboot with `sudo reboot`. After reconnecting by SSH, open `ninjarobot-agent`
@@ -782,9 +797,11 @@ Greeting then Idle.
 
 Finally, test **Power off NinjaRobot** in the paired web hamburger menu. Choose
 **Cancel** once, then repeat and choose **Power off**. If the deployment helper
-or sudo rule is missing, the request is rejected before the Agent stops and the
-web error tells you to run the deployment repair. A successful confirmation
-stops robot modules and then powers off Raspberry Pi OS.
+or sudo rule is missing, or the EEPROM change still needs a reboot, the request
+is rejected before the Agent stops and the web error gives the next step. A
+successful confirmation stops robot modules and Raspberry Pi OS, then leaves
+the Pi powered off rather than rebooting. Disconnect external power before
+touching wiring even when the Pi is shut down.
 
 ---
 
@@ -1425,9 +1442,11 @@ obtains a short-lived confirmation and then shows separate **Power off** and
 **Cancel** actions. Cancel changes nothing. Confirmation first stops hardware
 and voice and closes agent resources. Phase 8.6 installs the narrow helper for
 the final OS shutdown; the agent never receives general passwordless sudo. If
-the helper or sudo rule is missing, preflight rejects the request before the
-Agent stops. A rare failure after confirmed cleanup leaves the robot safely
-stopped; the local recovery is:
+the helper, sudo rule, or active Raspberry Pi full-power-off EEPROM setting is
+missing, preflight rejects the request before the Agent stops. A compatible
+pending EEPROM update is also rejected until one reboot applies it. A rare
+failure after confirmed cleanup leaves the robot safely stopped; the local
+recovery is:
 
 ```bash
 sudo systemctl poweroff
@@ -1472,7 +1491,13 @@ ninjarobot-agent deployment status
 Setup uses sudo only to place the root-owned unit, fixed power-off helper, and
 narrow sudoers rule. It checks that all three artifacts are operational,
 enables the next-boot service, persists onboarding and web power-off settings,
-and starts the systemd service immediately. Status verifies the exact
+and starts the systemd service immediately. On Raspberry Pi 5 it also invokes
+the official non-interactive Raspberry Pi OS **Full power off** configuration
+when needed. That schedules `POWER_OFF_ON_HALT=1` and `WAKE_ON_GPIO=0`; it does
+not edit unrelated EEPROM keys. If setup reports
+`poweroff_reboot_required: true`, reboot once and confirm
+`full_poweroff.ready: true` in deployment status before testing web Power Off.
+Status verifies the exact
 passwordless helper permission with `sudo -n -l`; it does not try to read the
 protected `/etc/sudoers.d` directory. A partial install or failed first start is
 left disabled. Test safely with raised wheels:

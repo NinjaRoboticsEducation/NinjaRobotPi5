@@ -218,10 +218,15 @@ In the Agent Interactive Tool select **12. Startup Agent Deployment**.
 2. Select **1. Install and deploy automatic startup Agent** and type `ENABLE`.
    Expected: `systemd_unit`, `poweroff_helper`, and `sudoers_rule` are all true;
    `running_now` and `ready` are true. Setup must clear an old start-limit and
-   must not report success merely because the unit is enabled.
+   must not report success merely because the unit is enabled. If
+   `poweroff_reboot_required` is true, the result must also show a compatible
+   pending full-power-off EEPROM update.
 3. Select **3. Show startup Agent status** again. Expected: installed, enabled,
    running, and ready are true and every artifact remains present.
-4. Reboot the Pi normally.
+4. Reboot the Pi normally. After reconnecting, status must show
+   `full_poweroff.ready: true`, `configured: true`, and
+   `update_pending: false`. Do not proceed to the final power-off test while
+   the setting is missing, unreadable, or pending.
 5. Expected after boot: QR onboarding appears without Greeting or motion. If a
    configured ngrok endpoint is healthy, its remote QR remains while waiting.
    Local mDNS is used only after an explicit remote failure or when remote
@@ -239,13 +244,15 @@ From the paired active browser, open the hamburger and choose Power Off.
 1. Choose Cancel. Expected: nothing shuts down.
 2. Reopen it, choose Power Off, and confirm in the second popup.
 3. Expected order: hardware safe stop, voice/tunnel/web closure, durable-store
-   and IDE cleanup, then Raspberry Pi power-off.
+   and IDE cleanup, then Raspberry Pi power-off. The Pi must remain off rather
+   than starting the Agent again.
 4. After power is fully off, inspect the filesystem/log/database on the next
    boot. Expected: no corruption and no restart loop.
 
 This is a power-risk test. If deployment is incomplete, the browser must reject
 the request before the Agent or hardware is stopped and direct the operator to
-repair deployment. A rare helper failure after confirmed cleanup leaves the
+repair deployment. The same fail-safe behavior is required if the Pi 5 EEPROM
+setting is missing or still pending after setup. A rare helper failure after confirmed cleanup leaves the
 robot stopped; use the documented local orderly shutdown. Use the physical
 disconnect immediately if any actuator remains unsafe.
 

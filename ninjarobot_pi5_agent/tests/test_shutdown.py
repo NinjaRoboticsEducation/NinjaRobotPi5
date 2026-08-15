@@ -8,9 +8,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from ninjarobot_pi5_agent.deployment import FullPoweroffStatus
 from ninjarobot_pi5_agent.events import EventBroker
 from ninjarobot_pi5_agent.release_foundations import ReleaseStatusRegistry
-from ninjarobot_pi5_agent.shutdown import PoweroffCoordinator
+from ninjarobot_pi5_agent.shutdown import PoweroffCoordinator, _probe_poweroff_helper
 
 
 class _Runtime:
@@ -203,7 +204,11 @@ def test_poweroff_rejects_before_nonce_when_privileged_installation_is_missing()
             events=EventBroker(),
             release_status=_release_status(),
             request_service_stop=stopped.set,
-            helper_probe=lambda _path: (False, "power-off helper file is missing"),
+            helper_probe=lambda _path: (
+                False,
+                "power-off helper file is missing; use Startup Agent deployment to install or "
+                "repair it",
+            ),
         )
 
         with pytest.raises(PermissionError, match="install or repair"):
@@ -213,6 +218,57 @@ def test_poweroff_rejects_before_nonce_when_privileged_installation_is_missing()
         assert stopped.is_set() is False
 
     asyncio.run(exercise())
+
+
+def test_poweroff_probe_requires_active_full_poweroff_eeprom_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    approved = Path("/usr/libexec/ninjarobot-poweroff")
+    monkeypatch.setattr(Path, "is_file", lambda path: path == approved)
+    monkeypatch.setattr(Path, "is_symlink", lambda _path: False)
+    monkeypatch.setattr(
+        "ninjarobot_pi5_agent.shutdown.subprocess.run",
+        lambda arguments, **_kwargs: subprocess.CompletedProcess(arguments, 0, "", ""),
+    )
+
+    pending = FullPoweroffStatus(
+        available=True,
+        configured=False,
+        update_pending=True,
+        pending_configured=True,
+        power_off_on_halt=None,
+        wake_on_gpio=None,
+        pending_power_off_on_halt="1",
+        pending_wake_on_gpio="0",
+    )
+    monkeypatch.setattr("ninjarobot_pi5_agent.shutdown.read_full_poweroff_status", lambda: pending)
+    ready, detail = _probe_poweroff_helper(approved)
+    assert ready is False
+    assert detail is not None and "reboot once" in detail
+
+    missing = FullPoweroffStatus(
+        available=True,
+        configured=False,
+        update_pending=False,
+        pending_configured=False,
+        power_off_on_halt=None,
+        wake_on_gpio=None,
+    )
+    monkeypatch.setattr("ninjarobot_pi5_agent.shutdown.read_full_poweroff_status", lambda: missing)
+    ready, detail = _probe_poweroff_helper(approved)
+    assert ready is False
+    assert detail is not None and "repair Startup Agent deployment" in detail
+
+    active = FullPoweroffStatus(
+        available=True,
+        configured=True,
+        update_pending=False,
+        pending_configured=False,
+        power_off_on_halt="1",
+        wake_on_gpio="0",
+    )
+    monkeypatch.setattr("ninjarobot_pi5_agent.shutdown.read_full_poweroff_status", lambda: active)
+    assert _probe_poweroff_helper(approved) == (True, None)
 
 
 def test_all_web_locales_have_identical_keys_and_cover_markup_and_script() -> None:

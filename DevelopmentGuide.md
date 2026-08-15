@@ -699,6 +699,17 @@ execute only that argument-free helper. The web coordinator calls it as
 `/usr/bin/sudo -n /usr/libexec/ninjarobot-poweroff` after resource cleanup.
 No general passwordless sudo is installed.
 
+Pi 5 shutdown has a second, platform-level prerequisite. Deployment reads the
+active bootloader config and any `/boot/.../pieeprom.upd` image separately. If
+full PMIC shutdown is absent, confirmed setup calls only the official
+`raspi-config nonint do_power_off_on_halt B1` operation, which schedules
+`POWER_OFF_ON_HALT=1` and `WAKE_ON_GPIO=0` without replacing unrelated keys.
+`FullPoweroffStatus` distinguishes active, pending-compatible, and
+pending-incompatible states. Setup may start the service with a compatible
+update pending, but validation remains false until a reboot applies it. The web
+coordinator rechecks the active state before issuing its nonce and rejects the
+request before any cleanup when the setting is absent, unreadable, or pending.
+
 Deployment commands cover transactional setup, validate/install/upgrade,
 enable/disable,
 start/stop/restart, status/journal, private backup, verified overlay rollback,
@@ -1119,8 +1130,9 @@ controller surface.
 
 Web power-off is a deterministic service operation, never a model tool. Only a
 paired browser holding the exclusive controller lease receives access. The
-server first verifies the fixed helper and its narrow passwordless sudo rule;
-an incomplete deployment is rejected before the Agent stops. It then issues a
+server first verifies the fixed helper, its narrow passwordless sudo rule, and
+the active Pi 5 full-power-off EEPROM state; an incomplete or pending
+deployment is rejected before the Agent stops. It then issues a
 30-second, one-use, lease-bound nonce; explicit confirmation
 consumes it before stopping hardware and voice. The service then closes the
 tunnel, web server, durable stores, IDE, and ownership lock before invoking the
@@ -1403,6 +1415,8 @@ A configuration change that points to another host is rejected — preventing cr
 | `uv run ninjarobot-agent` reports `No module named 'qrcode'` | Pull the dependency fix and run `uv sync --frozen --extra hardware`. qrcode 8.2 is now an unconditional IDE dependency; do not install an unrelated QR package manually |
 | Agent boot fails because `schema_version` is an extra MCP field | Pull the MCP schema/deployment repair. The canonical `mcp.toml` begins with `schema_version = 1`; rerun **Install and deploy automatic startup Agent** so preflight validates it and clears the old systemd failed limit |
 | Deployment status says `enabled: true` but `running: false` | Enablement only means systemd will attempt boot. Inspect the structured `systemd` result/exit status and Agent log, repair the reported configuration, then rerun the confirmed deployment setup; success requires `ready: true` |
+| Web Power Off stops the Agent but the Pi boots again | The Pi 5 bootloader is not using full PMIC shutdown. Pull this repair, rerun **Startup Agent Deployment → Install and deploy automatic startup Agent**, reboot once when `poweroff_reboot_required` is true, then require `full_poweroff.ready: true` before retesting. |
+| Web Power Off says an EEPROM update is pending | Setup successfully queued the official full-power-off setting, but it is not active yet. Keep wheels raised, reboot once, and recheck Startup Agent status. Do not keep retrying Power Off before that reboot. |
 | A repaired `pi5*` source file is present but Python runs an older copy | Run `uv sync --frozen --extra hardware`, then `scripts/verify_workspace_driver_sources.py`. Editable dependencies must resolve into this checkout |
 | Camera reports unavailable while `/usr/bin/python3` imports Picamera2 | Run `./scripts/bootstrap-rpi-camera-workspace.sh`; both standalone and integrated capture should then use the bounded system-Python bridge. Do not recreate `.venv` with `--system-site-packages` |
 | `pi5mic` reports PortAudio missing | Install `libportaudio2` and `portaudio19-dev`, then run `pi5mic devices`. Local transcription also requires a built `whisper-cli` and `ggml-base.bin` |

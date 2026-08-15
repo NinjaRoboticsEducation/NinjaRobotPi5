@@ -12,19 +12,25 @@ from unittest.mock import Mock
 import pytest
 from ninjarobot_pi5_agent.deployment import (
     HELPER_PATH,
+    RASPI_CONFIG,
+    RPI_EEPROM_CONFIG,
     SUDOERS_PATH,
     UNIT_NAME,
     UNIT_PATH,
     DeploymentManager,
     DeploymentSpec,
+    FullPoweroffStatus,
     create_backup,
     current_spec,
+    read_full_poweroff_status,
     render_unit,
     restore_backup,
 )
 from ninjarobot_pi5_agent.mcp_config import load_mcp_configuration
 
 from ninjarobot_pi5_ide import load_robot_config
+
+FULL_POWEROFF_CONFIG = "POWER_OFF_ON_HALT=1\nWAKE_ON_GPIO=0\n"
 
 
 def _spec(tmp_path: Path) -> DeploymentSpec:
@@ -155,6 +161,8 @@ def test_installer_is_disabled_by_default_idempotent_and_uses_fixed_targets(
     def runner(command: object) -> subprocess.CompletedProcess[str]:
         rendered = list(command)  # type: ignore[arg-type]
         calls.append(rendered)
+        if rendered == [str(RPI_EEPROM_CONFIG)]:
+            return subprocess.CompletedProcess(rendered, 0, FULL_POWEROFF_CONFIG, "")
         if rendered[1:3] == ["is-enabled", UNIT_NAME]:
             return subprocess.CompletedProcess(rendered, 1, "disabled\n", "")
         return subprocess.CompletedProcess(rendered, 0, "", "")
@@ -163,7 +171,10 @@ def test_installer_is_disabled_by_default_idempotent_and_uses_fixed_targets(
     result = DeploymentManager(spec, runner=runner).install(confirmed=True)
 
     assert result["enabled"] is False
-    destinations = {command[-1] for command in calls if "install" in command[1]}
+    assert result["poweroff_reboot_required"] is False
+    destinations = {
+        command[-1] for command in calls if len(command) > 1 and "install" in command[1]
+    }
     assert destinations == {str(UNIT_PATH), str(HELPER_PATH), str(SUDOERS_PATH)}
     assert any(command[:2] == ["/usr/bin/systemd-analyze", "verify"] for command in calls)
     assert any(command[:2] == ["/usr/sbin/visudo", "-cf"] for command in calls)
@@ -182,6 +193,8 @@ def test_enable_and_disable_persist_boot_onboarding_without_deleting_data(
     def runner(command: object) -> subprocess.CompletedProcess[str]:
         rendered = list(command)  # type: ignore[arg-type]
         calls.append(rendered)
+        if rendered == [str(RPI_EEPROM_CONFIG)]:
+            return subprocess.CompletedProcess(rendered, 0, FULL_POWEROFF_CONFIG, "")
         return subprocess.CompletedProcess(rendered, 0, "enabled\n", "")
 
     manager = DeploymentManager(spec, runner=runner)
@@ -205,6 +218,119 @@ def test_enable_and_disable_persist_boot_onboarding_without_deleting_data(
     assert load_robot_config(spec.config).deployment.auto_start_enabled is False
     assert spec.secret_file.is_file()
     assert ["/usr/bin/sudo", "/usr/bin/systemctl", "disable", "--now", UNIT_NAME] in calls
+
+
+def test_full_poweroff_status_requires_exact_values_and_no_pending_update(
+    tmp_path: Path,
+) -> None:
+    def configured(command: object) -> subprocess.CompletedProcess[str]:
+        rendered = list(command)  # type: ignore[arg-type]
+        return subprocess.CompletedProcess(rendered, 0, FULL_POWEROFF_CONFIG, "")
+
+    ready = read_full_poweroff_status(runner=configured, pending_paths=())
+    assert ready.configured is True
+    assert ready.ready is True
+
+    pending = tmp_path / "pieeprom.upd"
+    pending.write_bytes(b"pending")
+    waiting = read_full_poweroff_status(
+        runner=configured,
+        pending_paths=(pending,),
+    )
+    assert waiting.configured is True
+    assert waiting.update_pending is True
+    assert waiting.pending_configured is True
+    assert waiting.ready is False
+
+    def incomplete(command: object) -> subprocess.CompletedProcess[str]:
+        rendered = list(command)  # type: ignore[arg-type]
+        return subprocess.CompletedProcess(rendered, 0, "BOOT_ORDER=0xf146\n", "")
+
+    missing = read_full_poweroff_status(runner=incomplete, pending_paths=())
+    assert missing.available is True
+    assert missing.configured is False
+    assert missing.scheduled is False
+    assert missing.ready is False
+
+    def scheduled(command: object) -> subprocess.CompletedProcess[str]:
+        rendered = list(command)  # type: ignore[arg-type]
+        output = FULL_POWEROFF_CONFIG if len(rendered) == 2 else "BOOT_ORDER=0xf146\n"
+        return subprocess.CompletedProcess(rendered, 0, output, "")
+
+    scheduled_update = read_full_poweroff_status(
+        runner=scheduled,
+        pending_paths=(pending,),
+    )
+    assert scheduled_update.configured is False
+    assert scheduled_update.pending_configured is True
+    assert scheduled_update.scheduled is True
+    assert scheduled_update.ready is False
+
+    def unavailable(_command: object) -> subprocess.CompletedProcess[str]:
+        raise FileNotFoundError("rpi-eeprom-config")
+
+    unavailable_status = read_full_poweroff_status(
+        runner=unavailable,
+        pending_paths=(),
+    )
+    assert unavailable_status.available is False
+    assert unavailable_status.ready is False
+
+
+def test_installer_schedules_official_full_poweroff_configuration_once(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spec = _spec(tmp_path)
+    calls: list[list[str]] = []
+
+    def runner(command: object) -> subprocess.CompletedProcess[str]:
+        rendered = list(command)  # type: ignore[arg-type]
+        calls.append(rendered)
+        if rendered == [str(RPI_EEPROM_CONFIG)]:
+            return subprocess.CompletedProcess(rendered, 0, "BOOT_ORDER=0xf146\n", "")
+        if rendered[1:3] == ["is-enabled", UNIT_NAME]:
+            return subprocess.CompletedProcess(rendered, 1, "disabled\n", "")
+        return subprocess.CompletedProcess(rendered, 0, "", "")
+
+    monkeypatch.setattr(Path, "exists", lambda path: False if path == UNIT_PATH else path.is_file())
+    manager = DeploymentManager(spec, runner=runner)
+    statuses = iter(
+        (
+            FullPoweroffStatus(
+                available=True,
+                configured=False,
+                update_pending=False,
+                pending_configured=False,
+                power_off_on_halt=None,
+                wake_on_gpio=None,
+            ),
+            FullPoweroffStatus(
+                available=True,
+                configured=False,
+                update_pending=True,
+                pending_configured=True,
+                power_off_on_halt=None,
+                wake_on_gpio=None,
+                pending_power_off_on_halt="1",
+                pending_wake_on_gpio="0",
+            ),
+        )
+    )
+    monkeypatch.setattr(manager, "_full_poweroff_status", lambda: next(statuses))
+    result = manager.install(confirmed=True)
+
+    configure_command = [
+        "/usr/bin/sudo",
+        str(RASPI_CONFIG),
+        "nonint",
+        "do_power_off_on_halt",
+        "B1",
+    ]
+    assert calls.count(configure_command) == 1
+    assert result["poweroff_reboot_required"] is True
+    assert result["full_poweroff"]["configured"] is False
+    assert result["full_poweroff"]["pending_configured"] is True
 
 
 def test_enable_rejects_partial_privileged_install_before_changing_config(tmp_path: Path) -> None:

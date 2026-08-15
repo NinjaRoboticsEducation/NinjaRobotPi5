@@ -373,6 +373,14 @@ the exact non-interactive power-off authorization without reading the protected
 `/etc/sudoers.d` directory; the paired web power-off button never receives
 general sudo access.
 
+On Raspberry Pi 5, setup also uses Raspberry Pi OS's official `raspi-config`
+shutdown setting to schedule `POWER_OFF_ON_HALT=1` and `WAKE_ON_GPIO=0` in the
+[bootloader EEPROM](https://www.raspberrypi.com/documentation/computers/raspberry-pi.html).
+If status reports `poweroff_reboot_required: true`, reboot
+once before using the web Power Off button. The button fails safely before it
+stops the Agent when the setting is missing or still pending, preventing a
+shutdown that immediately boots again.
+
 The complete normal-user Raspberry Pi acceptance workflow is in the
 [Phase 8 interactive validation guide](docs/validation/phase-8-final-interactive-pi-validation-2026-08-14.md).
 

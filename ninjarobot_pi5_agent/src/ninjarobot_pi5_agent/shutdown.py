@@ -11,6 +11,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
+from .deployment import read_full_poweroff_status
 from .events import AgentEventType, EventBroker
 from .release_foundations import ReleaseFeatureState, ReleaseStatusRegistry
 
@@ -160,10 +161,8 @@ class PoweroffCoordinator:
         ready, detail = await asyncio.to_thread(self._helper_probe, self._helper_path)
         if ready:
             return
-        message = (
-            "web power-off is unavailable: "
-            + (detail or "deployment helper is not ready")
-            + "; use Auto-Start & Deployment to install or repair it"
+        message = "web power-off is unavailable: " + (
+            detail or "deployment helper is not ready; use Startup Agent deployment to repair it"
         )
         if runtime_error:
             raise RuntimeError(message)
@@ -174,9 +173,15 @@ def _probe_poweroff_helper(helper: Path) -> tuple[bool, str | None]:
     """Verify the fixed helper and passwordless narrow sudo rule without mutating state."""
     approved = Path("/usr/libexec/ninjarobot-poweroff")
     if not helper.is_absolute() or helper != approved:
-        return False, "power-off helper path is not approved"
+        return (
+            False,
+            "power-off helper path is not approved; use Startup Agent deployment to repair it",
+        )
     if not helper.is_file() or helper.is_symlink():
-        return False, "power-off helper file is missing"
+        return (
+            False,
+            "power-off helper file is missing; use Startup Agent deployment to repair it",
+        )
     try:
         completed = subprocess.run(
             ["/usr/bin/sudo", "-n", "-l", str(helper)],
@@ -186,7 +191,35 @@ def _probe_poweroff_helper(helper: Path) -> tuple[bool, str | None]:
             timeout=5.0,
         )
     except (OSError, subprocess.TimeoutExpired):
-        return False, "power-off sudo authorization could not be checked"
+        return (
+            False,
+            "power-off sudo authorization could not be checked; repair Startup Agent deployment",
+        )
     if completed.returncode != 0:
-        return False, "passwordless power-off sudo authorization is missing"
+        return (
+            False,
+            "passwordless power-off sudo authorization is missing; repair Startup Agent deployment",
+        )
+    poweroff = read_full_poweroff_status()
+    if not poweroff.available:
+        return (
+            False,
+            "Raspberry Pi EEPROM status is unavailable; repair Startup Agent deployment",
+        )
+    if poweroff.update_pending:
+        if poweroff.pending_configured:
+            return (
+                False,
+                "the full-power-off EEPROM update is pending; reboot once before using Power Off",
+            )
+        return (
+            False,
+            "an incompatible EEPROM update is pending; reboot or cancel it, then repair Startup "
+            "Agent deployment",
+        )
+    if not poweroff.configured:
+        return (
+            False,
+            "Raspberry Pi full power-off is not configured; repair Startup Agent deployment",
+        )
     return True, None

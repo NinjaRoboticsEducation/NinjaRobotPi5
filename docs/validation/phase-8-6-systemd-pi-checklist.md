@@ -14,13 +14,22 @@ preservation. The following real Pi tests remain mandatory.
 3. Select **1. Install and deploy automatic startup Agent**, type `ENABLE`, and
    wait for the bounded readiness result.
 4. Confirm all three artifacts are true and the result reports
-   `running_now: true` and `ready: true`. Inspect the installed paths only with
-   appropriate administrator access if advanced evidence is required.
+   `running_now: true` and `ready: true`. If
+   `poweroff_reboot_required: true`, also confirm
+   `full_poweroff.pending_configured: true`; this means the official Pi 5
+   EEPROM change was queued successfully. Inspect the installed paths only
+   with appropriate administrator access if advanced evidence is required.
 5. Select **3. Show startup Agent status** and confirm installed, enabled,
    running, and ready remain true.
+6. If the power-off EEPROM update is pending, do not test the web Power Off
+   button yet. Reboot once, return to deployment status, and require
+   `full_poweroff.ready: true`, `configured: true`, and
+   `update_pending: false`.
 
 Expected: the service runs as the non-root robot user with one real-hardware
-agent process, journald receives output, and clean stop is not restarted.
+agent process, journald receives output, clean stop is not restarted, and the
+Pi 5 full-PMIC shutdown configuration is active after at most one requested
+reboot.
 
 Rollback: `ninjarobot-agent deployment disable`; if necessary run
 `sudo systemctl disable --now ninjarobot-agent.service`.
@@ -49,13 +58,20 @@ Follow the Phase 8.5 raised-wheel Greeting test after reboot. Then follow the
 Phase 8.4 paired-controller power-off test. Confirm the web path stops hardware
 and resources before invoking exactly
 `sudo -n /usr/libexec/ninjarobot-poweroff`; no other passwordless sudo command
-works for the service user.
+works for the service user. Before confirming the popup, deployment status must
+show `full_poweroff.ready: true`. If the EEPROM setting is missing or pending,
+confirm that the browser rejects Power Off before the Agent, display, buzzer,
+or other hardware is stopped.
 
 Expected: Greeting occurs once after pairing, orderly shutdown powers off the
-Pi, and systemd does not restart the agent during the shutdown transaction.
+Pi and leaves it off rather than rebooting, and systemd does not restart the
+agent during the shutdown transaction.
 
 Rollback: use Emergency Stop/physical cutoff for unsafe motion. If helper
-authorization fails after cleanup, run `sudo systemctl poweroff` locally.
+authorization fails after cleanup, run `sudo systemctl poweroff` locally. To
+return the bootloader to compatibility/VPU sleep mode, use Raspberry Pi
+Configuration's shutdown-behavior option, reboot, and keep web Power Off
+disabled until deployment is repaired again.
 
 ## Upgrade, rollback, and uninstall
 
