@@ -702,7 +702,12 @@ No general passwordless sudo is installed.
 The unit, helper, and sudoers rule use deliberately distinct temporary staging
 names. The helper and sudoers destinations both end in
 `ninjarobot-poweroff`; deriving both staging paths from that basename would
-overwrite the helper with the sudoers line. `validate_poweroff_helper` now
+overwrite the helper with the sudoers line. The staged unit specifically keeps
+the canonical `ninjarobot-agent.service` name: `systemd-analyze verify` derives
+the unit type from the filename and rejects a generic `.install` suffix before
+reading otherwise valid content. Failed deployment commands retain their exit
+status and at most 500 normalized printable diagnostic characters.
+`validate_poweroff_helper` now
 requires the exact packaged bytes, root owner/group, regular non-symlink file,
 and mode `0755`. Both deployment status and runtime preflight use this check,
 while sudo authorization remains a separate exact `sudo -n -l` probe.

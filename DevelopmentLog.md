@@ -14,6 +14,13 @@
 - assigned unique staging filenames to the systemd unit, power-off helper, and
   sudoers rule, then verified each staged payload before invoking the privileged
   installer
+- corrected the unit staging name to the canonical
+  `ninjarobot-agent.service` after Raspberry Pi systemd correctly rejected the
+  generic `systemd-unit.install` suffix; the helper and sudoers files remain
+  collision-safe under distinct names
+- made failed deployment commands report their exit status and at most 500
+  normalized printable diagnostic characters instead of hiding the verifier's
+  actionable error
 - replaced existence-only helper status with fail-closed validation of the
   exact packaged bytes, root ownership, regular-file/non-symlink type, and
   `0755` mode; a contaminated or manually altered helper now reports deployment
@@ -31,12 +38,13 @@
 - deployment and shutdown tests cover unique staged artifacts, exact installed
   helper validation, replacement by sudoers content, wrong mode, symlink
   rejection, preflight refusal, and bounded nonzero-exit diagnostics
-- focused deployment tests passed 15 cases; the combined shutdown, Web,
-  service, deployment, and release-assets suite passed 50 cases with one
+- focused deployment tests passed 16 cases, including the real host
+  `systemd-analyze` path and bounded-error regression; the combined shutdown,
+  Web, service, deployment, and release-assets suite passed 50 cases with one
   existing upstream Starlette/httpx deprecation warning
 - the complete release gate passed workspace-source provenance, compileall,
   Ruff lint/format, strict MyPy across 81 source files, JavaScript syntax,
-  `git diff --check`, and 556 tests with that same single upstream warning
+  `git diff --check`, and 557 tests with that same single upstream warning
 - managed-driver verification passed for 222 tracked files and 47 authorized
   repairs after both implementation phases; no managed driver or
   `NinjaClawBot` file changed

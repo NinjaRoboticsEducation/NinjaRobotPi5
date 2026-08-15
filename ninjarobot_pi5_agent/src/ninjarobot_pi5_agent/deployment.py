@@ -39,6 +39,7 @@ EEPROM_UPDATE_PATHS = (
     Path("/boot/firmware/pieeprom.upd"),
     Path("/boot/pieeprom.upd"),
 )
+MAX_DEPLOYMENT_DIAGNOSTIC_CHARACTERS = 500
 
 CommandRunner = Callable[[Sequence[str]], subprocess.CompletedProcess[str]]
 ReadinessProbe = Callable[[Path], bool]
@@ -231,7 +232,10 @@ class DeploymentManager:
             # HELPER_PATH and SUDOERS_PATH deliberately share the basename
             # ``ninjarobot-poweroff``. Staging by destination basename would
             # therefore overwrite the helper with the sudoers rule.
-            unit_source = root / "systemd-unit.install"
+            # systemd-analyze derives the unit type from the filename. Keep
+            # the canonical .service suffix while giving the two same-basename
+            # power-off artifacts distinct staging names.
+            unit_source = root / UNIT_NAME
             helper_source = root / "poweroff-helper.install"
             sudoers_source = root / "poweroff-sudoers.install"
             if len({unit_source, helper_source, sudoers_source}) != 3:
@@ -461,7 +465,12 @@ class DeploymentManager:
     def _checked(self, command: Sequence[str]) -> None:
         result = self._runner(command)
         if result.returncode != 0:
-            raise RuntimeError(f"deployment command failed: {Path(command[0]).name}")
+            diagnostic = _bounded_command_diagnostic(result)
+            suffix = f": {diagnostic}" if diagnostic else ""
+            raise RuntimeError(
+                f"deployment command failed: {Path(command[0]).name} "
+                f"(exit {result.returncode}){suffix}"
+            )
 
     def _poweroff_authorized(self) -> bool:
         """Check the exact passwordless helper authorization without reading /etc/sudoers.d."""
@@ -808,6 +817,14 @@ def _safe_is_file(path: Path) -> bool:
         return path.is_file()
     except OSError:
         return False
+
+
+def _bounded_command_diagnostic(completed: subprocess.CompletedProcess[str]) -> str:
+    """Return one bounded printable line from a deployment subprocess."""
+    output = completed.stderr.strip() or completed.stdout.strip()
+    printable = "".join(character if character.isprintable() else " " for character in output)
+    normalized = " ".join(printable.split())
+    return normalized[:MAX_DEPLOYMENT_DIAGNOSTIC_CHARACTERS]
 
 
 def validate_poweroff_helper(

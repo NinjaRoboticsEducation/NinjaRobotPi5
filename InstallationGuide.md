@@ -809,6 +809,14 @@ symbolic link. An older installation containing a sudoers line at the helper
 path reports `false`; rerun **Install and deploy automatic startup Agent** to
 repair it before testing Power Off.
 
+The deployment verifier must complete without a `systemd-analyze` error. The
+current installer stages the temporary unit as `ninjarobot-agent.service`,
+because systemd derives the unit type from its filename suffix. If an older
+checkout reports only `deployment command failed: systemd-analyze`, update the
+repository and rerun this deployment action. Current failures include a
+bounded verifier explanation and exit status; do not bypass this safety check
+or install the unit manually.
+
 Reboot with `sudo reboot`. After reconnecting by SSH, open `ninjarobot-agent`
 and check **Agent Service Status** and **Startup Agent Deployment → Show startup
 Agent status**. The display should show the current remote pairing QR, or a

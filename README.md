@@ -366,7 +366,10 @@ Automatic startup is opt-in through **Startup Agent Deployment**. Its install
 action validates and installs the fixed unit, power-off helper, and narrow
 sudoers rule, then enables and starts the real-hardware service in the same
 transaction. Robot and versioned MCP configuration are parsed before
-privileged changes. Setup clears an earlier systemd failed/start-limit state
+privileged changes. The temporary unit retains its canonical `.service`
+suffix so `systemd-analyze verify` validates the same unit type that will be
+installed; bounded verifier diagnostics are returned on failure. Setup clears
+an earlier systemd failed/start-limit state
 and reports success only after systemd is active and the owner-only Agent IPC
 endpoint responds. A failed first start is disabled again. Deployment status checks
 the helper's exact approved bytes, root ownership, non-symlink identity, and

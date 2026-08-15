@@ -30,6 +30,13 @@ preservation. The following real Pi tests remain mandatory.
    the historical failure where the sudoers rule was installed at the helper
    path.
 
+The install step must not report a `deployment command failed` error from
+`systemd-analyze`. The staged unit is required to retain the
+`ninjarobot-agent.service` suffix, and the verifier runs before any privileged
+artifact is installed. If verification fails, record the displayed exit status
+and bounded diagnostic, leave the old deployment untouched, and stop this
+checklist rather than bypassing verification.
+
 Expected: the service runs as the non-root robot user with one real-hardware
 agent process, journald receives output, clean stop is not restarted, and the
 Pi 5 full-PMIC shutdown configuration is active after at most one requested

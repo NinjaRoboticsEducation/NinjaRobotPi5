@@ -17,6 +17,7 @@ from ninjarobot_pi5_agent.deployment import (
     RPI_EEPROM_CONFIG,
     SUDO,
     SUDOERS_PATH,
+    SYSTEMD_ANALYZE,
     UNIT_NAME,
     UNIT_PATH,
     DeploymentManager,
@@ -165,6 +166,14 @@ def test_installer_is_disabled_by_default_idempotent_and_uses_fixed_targets(
     def runner(command: object) -> subprocess.CompletedProcess[str]:
         rendered = list(command)  # type: ignore[arg-type]
         calls.append(rendered)
+        if rendered[:2] == [str(SYSTEMD_ANALYZE), "verify"] and SYSTEMD_ANALYZE.is_file():
+            return subprocess.run(
+                rendered,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=10.0,
+            )
         if rendered[:2] == [str(SUDO), str(INSTALL)]:
             mode = rendered[rendered.index("-m") + 1]
             installed_payloads[rendered[-1]] = (
@@ -188,6 +197,11 @@ def test_installer_is_disabled_by_default_idempotent_and_uses_fixed_targets(
     assert destinations == {str(UNIT_PATH), str(HELPER_PATH), str(SUDOERS_PATH)}
     staged_sources = [command[-2] for command in calls if command[:2] == [str(SUDO), str(INSTALL)]]
     assert len(staged_sources) == len(set(staged_sources)) == 3
+    analyze_calls = [
+        command for command in calls if command[:2] == [str(SYSTEMD_ANALYZE), "verify"]
+    ]
+    assert len(analyze_calls) == 1
+    assert Path(analyze_calls[0][-1]).name == UNIT_NAME
     assert installed_payloads[str(HELPER_PATH)] == (
         "0755",
         "#!/bin/sh\nset -eu\nexec /usr/bin/systemctl poweroff --no-wall\n",
@@ -201,6 +215,23 @@ def test_installer_is_disabled_by_default_idempotent_and_uses_fixed_targets(
     assert ["/usr/bin/sudo", "/usr/bin/systemctl", "disable", UNIT_NAME] in calls
     with pytest.raises(ValueError, match="requires --confirm"):
         DeploymentManager(spec, runner=runner).install(confirmed=False)
+
+
+def test_deployment_failure_includes_bounded_process_diagnostic(tmp_path: Path) -> None:
+    diagnostic = "Failed to prepare filename\n" + ("x" * 1000)
+
+    def runner(command: object) -> subprocess.CompletedProcess[str]:
+        rendered = list(command)  # type: ignore[arg-type]
+        return subprocess.CompletedProcess(rendered, 1, "", diagnostic)
+
+    manager = DeploymentManager(_spec(tmp_path), runner=runner)
+
+    with pytest.raises(RuntimeError) as raised:
+        manager._checked([str(SYSTEMD_ANALYZE), "verify", "/tmp/example.service"])
+
+    message = str(raised.value)
+    assert "systemd-analyze (exit 1): Failed to prepare filename" in message
+    assert len(message) < 570
 
 
 def test_enable_and_disable_persist_boot_onboarding_without_deleting_data(
