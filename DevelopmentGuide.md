@@ -683,8 +683,13 @@ an interactive shell. One non-root service owns IDE hardware, web, voice, QR,
 pairing, and ngrok. The unit uses required device groups, strict filesystem and
 kernel hardening compatible with Pi access, private temporary storage,
 journald, bounded shutdown, restart throttling, and `Restart=on-failure` so a
-clean intentional stop remains stopped. This follows systemd's
-[recommended long-running service policy](https://github.com/systemd/systemd/blob/main/man/systemd.service.xml).
+clean intentional stop remains stopped. It sets `LG_WD=/run/ninjarobot-agent`
+and uses `RuntimeDirectory=ninjarobot-agent` with mode `0700`, giving `lgpio` a
+service-owned location for `.lgd-nfy*` notification pipes without making the
+repository writable. The behavior follows upstream `lgpio` work-directory and
+[notification-pipe handling](https://github.com/joan2937/lg/blob/master/lgNotify.c)
+plus systemd's
+[`RuntimeDirectory` lifecycle](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html#RuntimeDirectory=).
 
 Installation is explicitly confirmed and disabled by default at package
 installation time. The normal-user **deployment setup** transaction runs
@@ -692,9 +697,13 @@ strict robot/MCP configuration preflight, `systemd-analyze verify`, and
 `visudo -cf`, installs all three privileged
 artifacts, enables the unit, persists onboarding/web-power settings, and starts
 the service immediately. It clears stale systemd failed/start-limit state, then
-waits for `ActiveState=active` and a successful owner-only `startup_status` IPC
-probe. `running_now` and `ready` are never inferred from enablement or an
-accepted start command. A failed first start invokes `disable --now`, so the
+waits for `ActiveState=active` and an owner-only `startup_status` IPC response
+whose `started` and `ready` fields are both exactly true. Onboarding remains
+not ready while its release state is only `starting`; it becomes ready after a
+QR presentation advances that state to `pairing` (or after startup has fully
+completed). `running_now` and `ready` are never inferred from enablement, an
+accepted start command, or IPC availability alone. A failed first start invokes
+`disable --now`, so the
 next boot does not retry a broken deployment. Status reports parsed active,
 substate, result, restart, and exit-status fields and checks the unit/helper as
 ordinary paths but verifies the protected sudoers authorization through the
@@ -1435,6 +1444,7 @@ A configuration change that points to another host is rejected — preventing cr
 | `uv run ninjarobot-agent` reports `No module named 'qrcode'` | Pull the dependency fix and run `uv sync --frozen --extra hardware`. qrcode 8.2 is now an unconditional IDE dependency; do not install an unrelated QR package manually |
 | Agent boot fails because `schema_version` is an extra MCP field | Pull the MCP schema/deployment repair. The canonical `mcp.toml` begins with `schema_version = 1`; rerun **Install and deploy automatic startup Agent** so preflight validates it and clears the old systemd failed limit |
 | Deployment status says `enabled: true` but `running: false` | Enablement only means systemd will attempt boot. Inspect the structured `systemd` result/exit status and Agent log, repair the reported configuration, then rerun the confirmed deployment setup; success requires `ready: true` |
+| Boot Agent runs but the display shows no QR; journal contains `xCreatePipe`, `.lgd-nfy`, or `Read-only file system` | The installed unit predates the private `lgpio` runtime-directory repair. Pull the current checkout, synchronize dependencies, and rerun confirmed deployment setup so `/etc/systemd/system/ninjarobot-agent.service` receives `RuntimeDirectory=ninjarobot-agent` and `LG_WD=/run/ninjarobot-agent`; then reboot with wheels raised. Do not make the repository writable. |
 | Web Power Off stops the Agent but the Pi boots again | The Pi 5 bootloader is not using full PMIC shutdown. Pull this repair, rerun **Startup Agent Deployment → Install and deploy automatic startup Agent**, reboot once when `poweroff_reboot_required` is true, then require `full_poweroff.ready: true` before retesting. |
 | Web Power Off says an EEPROM update is pending | Setup successfully queued the official full-power-off setting, but it is not active yet. Keep wheels raised, reboot once, and recheck Startup Agent status. Do not keep retrying Power Off before that reboot. |
 | Startup Agent status reports `poweroff_helper: false` | The fixed helper is missing or its bytes, root ownership, non-symlink identity, or `0755` mode are wrong. Rerun **Install and deploy automatic startup Agent**. Older affected installations may contain the sudoers rule at `/usr/libexec/ninjarobot-poweroff`; do not edit it manually. |

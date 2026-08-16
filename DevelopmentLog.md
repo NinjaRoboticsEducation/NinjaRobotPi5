@@ -1,5 +1,52 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-16 — Fresh-clone automatic-start QR and lgpio runtime repair
+
+### Root cause and implementation
+
+- compared both local checkouts, the installed unit, persisted configuration,
+  deployment status, listening sockets, process tree, Agent log, and boot
+  journal; both repositories were clean and identical, and systemd had started
+  the public-clone Agent and ngrok successfully
+- identified the decisive boot-only display fault in the journal:
+  `lgpio` attempted to create `.lgd-nfy*` in the repository working directory,
+  while the hardened service correctly exposed the home directory as read-only
+- gave the service a private systemd-managed `/run/ninjarobot-agent` directory
+  and set `LG_WD` to it, retaining the read-only home/repository boundary and
+  the existing single IDE-owned hardware path
+- corrected deployment readiness so an arbitrary successful IPC reply is not
+  enough: `startup_status.started` and `startup_status.ready` must both be true,
+  and onboarding no longer becomes ready during its pre-QR `starting` state
+- added bounded journal milestones for waiting on ngrok, successful QR
+  presentation, and the Greeting-to-Idle handoff
+
+### Validation
+
+- focused deployment, IPC, and onboarding coverage passed 45 tests after the
+  runtime-directory and readiness changes
+- deployment template coverage verifies the private runtime directory, mode,
+  `LG_WD`, read-only home boundary, and absence of a writable repository path
+- the complete root gate passed managed-driver/workspace provenance,
+  compileall, Ruff lint/format, strict MyPy across 81 source files, packaging,
+  installer dry-run, JavaScript/Bash syntax, documentation governance,
+  `git diff --check`, and 573 tests with one existing Starlette/httpx warning
+- all six driver suites passed independently: buzzer 68, camera 27, display 65,
+  microphone 92, servo 134, and distance sensor 71; the microphone suite kept
+  its existing Python `audioop` deprecation warning
+- no managed `pi5*` driver source, public CLI, configuration schema, database,
+  MCP, model, web, memory, or behavior contract changed
+
+### Raspberry Pi follow-up
+
+Automated validation did not replace the installed root-owned unit, restart the
+live Agent, access GPIO, display a QR, move an actuator, reboot, or power off the
+Pi. The operator must update the public clone, synchronize its locked hardware
+environment, rerun the confirmed deployment transaction, and reboot with the
+wheels raised. Acceptance requires an on-display remote QR (or local fallback
+QR), `running: true`, `ready: true`, no `xCreatePipe`/read-only filesystem
+error, one Greeting after connection, and stable Idle. See the
+[boot QR runtime checklist](docs/validation/boot-autostart-lgpio-runtime-pi-checklist.md).
+
 ## 2026-08-16 — Public installation and documentation optimization
 
 ### Scope and implementation

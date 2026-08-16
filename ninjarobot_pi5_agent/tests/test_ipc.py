@@ -9,6 +9,10 @@ from unittest.mock import AsyncMock
 import pytest
 from ninjarobot_pi5_agent.models import ToolExecutionResult, ToolExecutionStatus
 from ninjarobot_pi5_agent.pairing import PairingError
+from ninjarobot_pi5_agent.release_foundations import (
+    ReleaseFeatureState,
+    ReleaseStatusRegistry,
+)
 
 from ninjarobot_pi5_agent import (
     AgentIPCClient,
@@ -122,6 +126,7 @@ def build_runtime(
     *,
     robot_status: Callable[[], Mapping[str, Any]] | None = None,
     with_memory: bool = False,
+    release_status: Callable[[], Mapping[str, Any]] | None = None,
 ) -> AgentRuntime:
     async def enroll_identity(user_id: str) -> dict[str, Any]:
         return {
@@ -173,6 +178,7 @@ def build_runtime(
         commit_identity_reset=commit_identity_reset if with_memory else None,
         rollback_identity_reset=rollback_identity_reset if with_memory else None,
         initial_memory_settings=MemorySettings() if with_memory else None,
+        release_status=release_status,
     )
 
 
@@ -312,6 +318,32 @@ def test_startup_status_does_not_probe_model_tools_or_database(tmp_path) -> None
         provider_health.assert_not_called()
         tool_health.assert_not_called()
         sessions.assert_not_called()
+        await runtime.close()
+
+    asyncio.run(exercise())
+
+
+def test_startup_status_waits_until_onboarding_qr_is_presented(tmp_path) -> None:
+    async def exercise() -> None:
+        release = ReleaseStatusRegistry(
+            voice_enabled=False,
+            remote_access_enabled=True,
+            onboarding_enabled=True,
+            shutdown_enabled=False,
+        )
+        runtime = build_runtime(tmp_path, release_status=release.status)
+        runtime.begin_startup_liveliness()
+        await runtime.start()
+
+        release.update("onboarding", ReleaseFeatureState.STARTING)
+        starting = runtime.startup_status()
+        assert starting["ready"] is False
+        assert starting["operational_state"] == "starting"
+
+        release.update("onboarding", ReleaseFeatureState.PAIRING)
+        pairing = runtime.startup_status()
+        assert pairing["ready"] is True
+        assert pairing["operational_state"] == "onboarding"
         await runtime.close()
 
     asyncio.run(exercise())

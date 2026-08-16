@@ -11,6 +11,9 @@ User=@USER@
 SupplementaryGroups=audio video gpio i2c spi
 WorkingDirectory=@WORKING_DIRECTORY@
 Environment=PYTHONUNBUFFERED=1
+Environment=LG_WD=/run/ninjarobot-agent
+RuntimeDirectory=ninjarobot-agent
+RuntimeDirectoryMode=0700
 ExecStart=@EXEC_START@
 StandardOutput=journal
 StandardError=journal

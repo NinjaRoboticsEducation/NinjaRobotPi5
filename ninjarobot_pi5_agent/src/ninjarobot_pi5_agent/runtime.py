@@ -324,7 +324,7 @@ class AgentRuntime:
         onboarding_waiting = bool(
             isinstance(onboarding, Mapping)
             and onboarding.get("enabled") is True
-            and onboarding.get("state") in {"starting", "pairing", "connected"}
+            and onboarding.get("state") in {"pairing", "connected"}
         )
         ready = (
             (startup_complete or onboarding_waiting)

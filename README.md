@@ -210,6 +210,7 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 | [Phase 8 Final Interactive Validation](docs/validation/phase-8-final-interactive-pi-validation-2026-08-14.md) | Existing checkout, clean clone, normal-user tools, hardware, remote, boot, power, and soak acceptance |
 | [v1.0.0 Support Matrix](docs/architecture/v1.0.0-support-matrix.md) | Supported platforms/features, compatibility guarantees, known limitations, and open Pi acceptance |
 | [Installation Optimization Validation](docs/validation/v1.0.0-installation-optimization-pi-checklist.md) | Clean-install, device, actuator, regression, boot, and power acceptance |
+| [Boot QR Runtime Validation](docs/validation/boot-autostart-lgpio-runtime-pi-checklist.md) | Fresh-clone deployment repair, reboot ownership, display QR, Greeting, Idle, and rollback |
 
 ---
 
@@ -323,6 +324,11 @@ hardware owner.
 Startup derives this onboarding state from remote access, explicit onboarding,
 and boot deployment together, so an older configuration with remote access
 enabled and an explicit onboarding flag still disabled remains valid.
+The installed service gives Raspberry Pi `lgpio` a private writable runtime
+directory under `/run`; this keeps boot-time GPIO notification pipes out of the
+read-only repository checkout. Deployment reports `ready` only after the
+pairing QR is actually presented (or ordinary non-onboarding startup completes),
+not merely because the IPC socket accepted a request.
 Open the returned pairing URL on the controlling browser. The URL fragment is
 exchanged once for a Secure/HttpOnly cookie, so there is no second username or
 password prompt. Use `remote rotate-pairing` to revoke browsers and issue a new

@@ -23,6 +23,7 @@ from ninjarobot_pi5_agent.deployment import (
     DeploymentManager,
     DeploymentSpec,
     FullPoweroffStatus,
+    _startup_response_ready,
     create_backup,
     current_spec,
     read_full_poweroff_status,
@@ -35,6 +36,24 @@ from ninjarobot_pi5_agent.mcp_config import load_mcp_configuration
 from ninjarobot_pi5_ide import load_robot_config
 
 FULL_POWEROFF_CONFIG = "POWER_OFF_ON_HALT=1\nWAKE_ON_GPIO=0\n"
+
+
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        ({"type": "result", "data": {"started": True, "ready": True}}, True),
+        ({"type": "result", "data": {"started": True, "ready": False}}, False),
+        ({"type": "result", "data": {"started": False, "ready": True}}, False),
+        ({"type": "error", "data": {"started": True, "ready": True}}, False),
+        ({"type": "result"}, False),
+        (None, False),
+    ],
+)
+def test_startup_response_requires_agent_and_presentation_readiness(
+    message: object,
+    expected: bool,
+) -> None:
+    assert _startup_response_ready(message) is expected
 
 
 def _spec(tmp_path: Path) -> DeploymentSpec:
@@ -83,6 +102,11 @@ def test_rendered_unit_is_real_hardware_absolute_hardened_and_not_uv(tmp_path: P
     assert "Restart=always" not in unit
     assert "SupplementaryGroups=audio video gpio i2c spi" in unit
     assert "ProtectSystem=strict" in unit
+    assert "ProtectHome=read-only" in unit
+    assert "RuntimeDirectory=ninjarobot-agent" in unit
+    assert "RuntimeDirectoryMode=0700" in unit
+    assert "Environment=LG_WD=/run/ninjarobot-agent" in unit
+    assert f"ReadWritePaths={spec.working_directory}" not in unit
     assert "NoNewPrivileges" not in unit
     assert str(spec.secret_file) not in repr({"spec": "configured-private-file"})
     analyzer = shutil.which("systemd-analyze")

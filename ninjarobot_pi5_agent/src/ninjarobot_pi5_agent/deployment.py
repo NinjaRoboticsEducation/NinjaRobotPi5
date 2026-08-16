@@ -767,7 +767,7 @@ def _full_poweroff_next_step(status: FullPoweroffStatus) -> str | None:
 
 
 def _agent_ipc_ready(socket_path: Path) -> bool:
-    """Probe the owner-only Agent IPC endpoint without mutating robot state."""
+    """Probe for completed startup presentation without mutating robot state."""
     try:
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
             connection.settimeout(1.0)
@@ -785,7 +785,15 @@ def _agent_ipc_ready(socket_path: Path) -> bool:
         message = json.loads(payload.partition(b"\n")[0])
     except (json.JSONDecodeError, UnicodeDecodeError):
         return False
-    return isinstance(message, dict) and message.get("type") == "result"
+    return _startup_response_ready(message)
+
+
+def _startup_response_ready(message: object) -> bool:
+    """Accept only a successful startup response whose presentation is ready."""
+    if not isinstance(message, dict) or message.get("type") != "result":
+        return False
+    data = message.get("data")
+    return isinstance(data, dict) and data.get("started") is True and data.get("ready") is True
 
 
 def _parse_systemd_properties(output: str) -> dict[str, str]:

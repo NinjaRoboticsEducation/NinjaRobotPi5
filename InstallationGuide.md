@@ -710,8 +710,19 @@ helper, and narrow sudoers rule—enables boot, and starts the installed service
 immediately. If the first systemd start fails, boot enablement is rolled back.
 Before privileged installation, setup parses both `config.toml` and the
 versioned optional `mcp.toml`. It clears a prior systemd failed/start-limit
-state and waits for both an active unit and a responding Agent IPC endpoint;
-therefore a successful result includes `running_now: true` and `ready: true`.
+state and waits for an active unit, a responding Agent IPC endpoint, and a
+successfully presented startup state. For QR onboarding, `ready: true` means
+the remote or local pairing QR has been rendered on the robot display; the
+earlier **Connecting…** state is not accepted as ready. For ordinary startup,
+it means Greeting/Idle startup completed. A successful result therefore
+includes `running_now: true` and `ready: true`.
+
+The generated service also creates the private directory
+`/run/ninjarobot-agent` and sets `LG_WD` to that location. Raspberry Pi
+`lgpio` uses it for `.lgd-nfy*` notification pipes. This is required because
+the hardened service intentionally mounts the repository and home directory
+read-only. Do not remove `RuntimeDirectory` or point `LG_WD` back into the
+checkout.
 
 On Raspberry Pi 5, the same setup also checks the bootloader shutdown mode. If
 needed, it schedules Raspberry Pi OS's official **Full power off** setting. The
@@ -754,6 +765,23 @@ and check **Agent Service Status** and **Startup Agent Deployment → Show start
 Agent status**. The display should show the current remote pairing QR, or a
 local QR only when remote service is unavailable. Scan/open it and confirm
 Greeting then Idle.
+
+If this Pi previously installed an older unit, pulling the repository alone is
+not enough: the root-owned unit under `/etc/systemd/system` is a deployed copy.
+Run **Install and deploy automatic startup Agent** again and enter `ENABLE` to
+replace it. A corrected boot log contains `Startup pairing QR is displayed`
+and must not contain `xCreatePipe`, `.lgd-nfy`, or `Read-only file system`.
+Use **Show startup Agent status** first. If it is not ready, inspect the bounded
+logs with:
+
+```bash
+ninjarobot-agent deployment logs --lines 200
+```
+
+Expected result: the unit is active, the pairing QR message is present, and no
+GPIO runtime-directory error appears. The complete safe acceptance and
+rollback procedure is in the
+[Boot QR runtime validation checklist](docs/validation/boot-autostart-lgpio-runtime-pi-checklist.md).
 
 Finally, test **Power off NinjaRobot** in the paired web hamburger menu. Choose
 **Cancel** once, then repeat and choose **Power off**. If the deployment helper

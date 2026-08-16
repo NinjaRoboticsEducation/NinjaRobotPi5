@@ -110,6 +110,7 @@ class OnboardingCoordinator:
             name="ninjarobot-onboarding-refresh",
         )
         if remote_enabled:
+            LOGGER.info("Startup onboarding is waiting for ngrok before displaying its pairing QR.")
             try:
                 await self._ide.show_onboarding_status("connecting")
             except Exception as exc:
@@ -163,6 +164,7 @@ class OnboardingCoordinator:
                 return
             self._runtime.complete_startup_liveliness()
             self._release_status.update("onboarding", ReleaseFeatureState.READY)
+            LOGGER.info("Startup Greeting completed; the robot is now Idle.")
             await self._events.publish(
                 AgentEventType.ONBOARDING,
                 "The first authenticated controller connected; Greeting completed "
@@ -285,6 +287,10 @@ class OnboardingCoordinator:
                 "onboarding",
                 ReleaseFeatureState.PAIRING,
                 detail=None,
+            )
+            LOGGER.info(
+                "Startup pairing QR is displayed and ready for a %s browser connection.",
+                scope,
             )
             await self._events.publish(
                 AgentEventType.ONBOARDING,
