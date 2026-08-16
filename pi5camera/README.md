@@ -312,7 +312,7 @@ Recommended first choices:
 - **Image width / height**: `1280` × `720`
 - **Camera warm-up time**: `1.0`
 - **Use camera preview**: `n`
-- **Autofocus mode**: `continuous`
+- **Autofocus mode**: `none` (the fixed-focus NinjaRobotPi5 camera default)
 - **Recognition tolerance**: `0.6` (lower = stricter)
 - **Save crops for unknown faces**: `y`
 - **Pending-recognition expiry**: `86400` (24 hours)

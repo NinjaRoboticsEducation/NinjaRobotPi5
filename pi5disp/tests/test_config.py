@@ -34,6 +34,17 @@ class TestConfigManager:
         """Should load default config if file does not exist."""
         config = self.manager.load()
         assert config == DEFAULT_CONFIG
+        assert config == {
+            "display_profile": "st7789v_2inch8",
+            "dc_pin": 4,
+            "rst_pin": 5,
+            "backlight_pin": 6,
+            "width": 240,
+            "height": 320,
+            "rotation": 90,
+            "brightness": 75,
+            "spi_speed_mhz": 32,
+        }
 
     def test_default_path_uses_xdg_config_home(self, monkeypatch, tmp_path: Path) -> None:
         """Default configuration should live in writable user runtime state."""

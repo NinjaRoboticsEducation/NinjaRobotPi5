@@ -29,9 +29,9 @@ DISPLAY_PROFILES = {
 }
 
 DEFAULT_PINS = {
-    "dc_pin": 14,
-    "rst_pin": 15,
-    "backlight_pin": 16,
+    "dc_pin": 4,
+    "rst_pin": 5,
+    "backlight_pin": 6,
 }
 
 DEFAULT_CONFIG = {
@@ -42,7 +42,7 @@ DEFAULT_CONFIG = {
     "width": 240,
     "height": 320,
     "rotation": 90,
-    "brightness": 100,
+    "brightness": 75,
     "spi_speed_mhz": 32,
 }
 
@@ -187,7 +187,7 @@ class ConfigManager:
         print("--- Display Settings ---")
         print()
         rotation = _prompt_choice("  Rotation (0/90/180/270)", 90, [0, 90, 180, 270])
-        brightness = _prompt_int("  Brightness (0-100%)", 100, 0, 100)
+        brightness = _prompt_int("  Brightness (0-100%)", DEFAULT_CONFIG["brightness"], 0, 100)
 
         self._config = {
             "display_profile": profile_key,

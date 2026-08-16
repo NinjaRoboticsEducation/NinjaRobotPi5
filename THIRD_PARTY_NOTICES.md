@@ -25,6 +25,18 @@ those projects.
 | Click | IDE command-line interface | BSD-3-Clause | <https://github.com/pallets/click> |
 | Blessed | Terminal interactive interface | MIT | <https://github.com/jquast/blessed> |
 
+## Installation toolchain
+
+The optional Raspberry Pi installer retrieves these projects from their
+official upstream distribution points. Reviewed versions or commits are pinned
+in `scripts/install-versions.env`; each project retains its own terms.
+
+| Component | Purpose | License or terms | Source |
+|---|---|---|---|
+| uv | Python/runtime and locked dependency management | Apache-2.0 OR MIT | <https://github.com/astral-sh/uv> |
+| Ollama | Local model runtime; downloaded models retain their own licenses | MIT for the runtime; model-specific terms | <https://github.com/ollama/ollama> |
+| whisper.cpp | Local speech-to-text runtime | MIT | <https://github.com/ggml-org/whisper.cpp> |
+
 `uv.lock` is the exact transitive Python dependency inventory for this release.
 Each installed distribution retains its own license metadata and files. The
 table above covers all direct Phase 8 agent/IDE dependencies; the managed

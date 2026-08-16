@@ -29,6 +29,9 @@ def find_whisper_cpp_command(
         resolved = shutil.which(candidate)
         if resolved:
             return Path(resolved).resolve()
+    project_install = Path.home() / "whisper.cpp" / "build" / "bin" / "whisper-cli"
+    if project_install.is_file():
+        return project_install.resolve()
     return None
 
 

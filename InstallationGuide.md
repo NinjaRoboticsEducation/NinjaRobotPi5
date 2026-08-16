@@ -1,8 +1,9 @@
 # NinjaRobotPi5 Installation Guide
 
-> [!WARNING]
-> **v1.0.0 release candidate.** The software gate is complete. Finish every applicable Phase 8 Raspberry Pi checklist before public tagging or allowing free floor movement.
-> For the consolidated normal-user run, use the [Phase 8 Final Interactive Raspberry Pi Validation](docs/validation/phase-8-final-interactive-pi-validation-2026-08-14.md).
+> [!IMPORTANT]
+> **v1.0.0 is validated on the reference Raspberry Pi 5 robot.** Every new
+> build still needs its own calibration and raised-wheel acceptance because
+> wiring, servo neutral points, microphones, cameras, and power boards vary.
 
 This guide takes you from a blank Raspberry Pi to a fully calibrated, running robot. Follow the numbered steps in order. The testing, troubleshooting, and extension sections at the end are available whenever you need them.
 
@@ -16,9 +17,9 @@ run once; daily use happens through `ninjarobot-ide-tool` and
 
 ---
 
-## 📋 Before You Begin
+## Before you begin
 
-### Hardware You Need
+### Hardware you need
 
 | Item | Notes |
 |---|---|
@@ -50,7 +51,7 @@ The X1208 automatically removes its 5 V output after it detects a completed Pi
 5 shutdown. NinjaRobot therefore uses the standard operating-system power-off
 path; it does not need an additional UPS-specific power-cut script.
 
-### Safety Rules — Read These First
+### Safety rules — read these first
 
 > [!CAUTION]
 > Follow these rules every time you work with the robot.
@@ -63,7 +64,7 @@ path; it does not need an additional UPS-specific power-cut script.
 
 ---
 
-## 📁 Project File Layout
+## Project file layout
 
 After installation, the important folders are:
 
@@ -95,9 +96,9 @@ Your personal settings and captured media are stored **outside** the project fol
 
 ---
 
-## 🛠️ Installation Steps
+## Installation steps
 
-### Step 1 — Install Raspberry Pi OS on Your Pi
+### Step 1 — Install Raspberry Pi OS on your Pi
 
 You need another computer and a microSD card reader for this step.
 
@@ -136,207 +137,125 @@ All remaining commands in this guide run in this SSH terminal.
 
 ---
 
-### Step 2 — Configure the Operating System
+### Step 2 — Update Raspberry Pi OS and enable interfaces
 
-**Update the OS:**
+Update the operating system before installing NinjaRobotPi5:
 
 ```bash
 sudo apt update
 sudo apt full-upgrade -y
 ```
 
-**Install system tools:**
+Open the Raspberry Pi configuration tool:
 
 ```bash
-sudo apt install -y \
-  ca-certificates \
-  build-essential \
-  cmake \
-  pkg-config \
-  python3-dev \
-  swig \
-  git \
-  curl \
-  i2c-tools \
-  alsa-utils \
-  libportaudio2 \
-  portaudio19-dev \
-  python3-picamera2 \
-  python3-libcamera \
-  rpicam-apps \
-  avahi-daemon \
-  libnss-mdns
+sudo raspi-config
 ```
 
-**Enable I2C and SPI:**
+Choose **Interface Options**, enable **I2C**, and then enable **SPI**. I2C is
+used by the distance sensor and SPI is used by the display. Finish and return
+to the terminal. Do not manually install the remaining system packages or edit
+the PWM overlay; the project installer performs those steps consistently.
 
-I2C (two-wire bus) is used by the distance sensor and expansion board. SPI (Serial Peripheral Interface) is used by the display.
+### Step 3 — Clone and run the project installer
+
+Install Git, clone the current public branch, and enter the repository:
 
 ```bash
-sudo raspi-config nonint do_i2c 0
-sudo raspi-config nonint do_spi 0
+sudo apt install -y git
+git clone https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
+cd NinjaRobotPi5
 ```
 
-**Enable hardware PWM on GPIO12 and GPIO13:**
-
-PWM (pulse-width modulation) is the electrical signal that controls the servo speed and direction.
+Preview the installation without changing the Raspberry Pi:
 
 ```bash
-sudo nano /boot/firmware/config.txt
+./install.sh --dry-run
 ```
 
-Inside the editor:
+Review the displayed actions, then run the installer:
 
-1. Find `dtparam=audio=on` and change it to `dtparam=audio=off`. If the line is absent, add `dtparam=audio=off` under the `[all]` section.
-2. Add this line in the same section:
-
-```ini
-dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4
+```bash
+./install.sh
 ```
 
-3. Press `Ctrl+O`, Enter, then `Ctrl+X` to save and exit.
+The installer asks for confirmation and then:
 
-**Reboot:**
+- installs the required Raspberry Pi OS packages, including Picamera2,
+  libcamera, ALSA, PortAudio, build tools, and mDNS support;
+- installs the project-tested `uv` and Ollama releases from their official
+  installation scripts;
+- enables the Ollama system service without downloading an AI model;
+- checks out the tested `whisper.cpp` commit in `~/whisper.cpp`, builds
+  `whisper-cli`, and downloads the multilingual `base` speech model;
+- backs up `/boot/firmware/config.txt`, disables onboard audio, and adds the
+  exact two-channel hardware-PWM overlay for GPIO12 and GPIO13;
+- creates private NinjaRobotPi5 configuration directories;
+- installs the locked Python environment with the Raspberry Pi hardware extra;
+- validates the bounded system-Python Picamera2 bridge; and
+- verifies the six managed driver source and provenance records.
+
+Pinned installer versions are recorded in `scripts/install-versions.env` for
+repeatable maintenance. Existing healthy installations and the managed boot
+block are reused, making the installer safe to rerun. It refuses unsupported
+platforms or conflicting unmanaged PWM overlays instead of guessing.
+
+> [!IMPORTANT]
+> The installer never downloads an Ollama model, starts NinjaRobotAgent,
+> deploys boot startup, opens a camera or microphone, or activates a motor.
+
+Reboot so the PWM overlay takes effect:
 
 ```bash
 sudo reboot
 ```
 
-Wait about one minute, then reconnect:
+Reconnect, enter the repository, and run the read-only readiness check:
 
 ```bash
 ssh YOUR_USERNAME@ninjarobotpi5.local
+cd "$HOME/NinjaRobotPi5"
+./install.sh --check
 ```
 
-**Install `uv` (Python package manager):**
+Expected result: every prerequisite is reported as ready. If a check fails,
+the message identifies the missing package, interface, file, or command. See
+[Installer troubleshooting](#installer-troubleshooting) before continuing.
 
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-export PATH="$HOME/.local/bin:$PATH"
-uv --version
-```
-
-Expected result: a `uv` version number is printed. The installer also adds `uv` to future SSH sessions automatically.
-
----
-
-### Step 3 — Download and Install NinjaRobotPi5
-
-**Clone the project:**
-
-```bash
-git clone -b public_v01 https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
-cd NinjaRobotPi5
-```
-
-**Install Python dependencies:**
-
-```bash
-uv sync --frozen --extra hardware
-```
-
-`--frozen` makes the one-time installation match the checked-in lock file;
-`--extra hardware` installs Raspberry Pi backends. Neither flag is a daily
-runtime option. Activate the installed environment now and again after every
-new SSH login:
+Activate the project environment. Repeat this after each new SSH login:
 
 ```bash
 source .venv/bin/activate
 ```
 
-Your prompt normally begins with `(NinjaRobotPi5)`. All remaining beginner
-commands assume this environment is active. If a command is not found, return
-to the project directory and activate it again.
-
-> [!IMPORTANT]
-> On the Raspberry Pi, prefer the activated-environment commands shown in this
-> guide. A bare `uv run ninjarobot-agent` synchronizes the default software-only
-> dependency set and may remove optional hardware packages from `.venv`.
-> NinjaRobot's QR renderer is a base dependency, so the Agent CLI itself remains
-> importable, but real GPIO, camera, voice, and ngrok operation still needs the
-> hardware extra. If you deliberately use `uv run`, include it:
->
-> ```bash
-> uv run --extra hardware ninjarobot-agent
-> ```
-
-**Set up the camera bridge:**
+Download at least one local AI model manually. This choice is intentionally not
+made by the installer because model size and performance depend on your Pi:
 
 ```bash
-./scripts/bootstrap-rpi-camera-workspace.sh
-```
-
-This verifies the Raspberry Pi OS Picamera2/libcamera installation and the
-bounded system-Python bridge without taking a photograph. Both standalone
-`pi5camera` and the integrated IDE now use this bridge when the isolated
-project environment cannot import apt-managed Picamera2 directly.
-
-> [!NOTE]
-> It is normal for `python -c "import picamera2"` inside the project `.venv` to fail. NinjaRobotPi5 routes real camera calls through `/usr/bin/python3` on purpose. The required check is `/usr/bin/python3 -s -c "import libcamera, picamera2"`.
-
-**Install Ollama and the local AI model:**
-
-```bash
-curl -fsSL https://ollama.com/install.sh | sh
-sudo systemctl enable --now ollama
 ollama pull qwen3:4b
 ollama list
 ```
 
-The model is approximately 2.3 GB and takes 10–20 minutes to download on typical home broadband. Qwen3:4B is a candidate model; it becomes accepted only after passing the benchmark in Step 7.
+The model download is about 2.3 GB. The model becomes accepted for robot use
+only after its benchmark passes in Step 7.
 
-**Build local speech-to-text (whisper.cpp):**
-
-```bash
-cd "$HOME"
-git clone https://github.com/ggml-org/whisper.cpp.git
-cd whisper.cpp
-
-cmake -B build \
-  -DWHISPER_BUILD_TESTS=OFF \
-  -DWHISPER_BUILD_EXAMPLES=ON
-cmake --build build --config Release -j2
-bash models/download-ggml-model.sh base
-
-test -x "$HOME/whisper.cpp/build/bin/whisper-cli"
-test -f "$HOME/whisper.cpp/models/ggml-base.bin"
-cd "$HOME/NinjaRobotPi5"
-```
-
-`-j2` uses two build jobs to limit heat. The multilingual `base` model handles both English and Japanese. Temporary audio is deleted after transcription; recognized text may remain in the seven-day conversation history.
-
-**Verify the driver sources:**
-
-```bash
-python scripts/verify_workspace_driver_sources.py
-python scripts/verify_immutable_drivers.py
-```
-
-Expected result: all six `pi5*` packages resolve into this checkout and all driver file checksums match their approved records.
+> [!NOTE]
+> It is normal for `.venv/bin/python -c "import picamera2"` to fail.
+> Apt-managed Picamera2 is isolated from the project environment, and
+> NinjaRobotPi5 deliberately accesses it through the bounded `/usr/bin/python3`
+> camera bridge.
 
 ---
 
-### Step 4 — Initialize and Calibrate Each Hardware Module
+### Step 4 — Initialize and calibrate each hardware module
 
 > [!IMPORTANT]
 > This step creates configuration files in `~/.config/pi5*`. The standalone
 > tools now choose those paths automatically, so routine commands do not need
 > `--config` or `-C` arguments and never dirty the Git checkout.
 
-**Create configuration folders:**
-
-```bash
-mkdir -p \
-  "$HOME/.config/pi5buzzer" \
-  "$HOME/.config/pi5camera" \
-  "$HOME/.config/pi5disp" \
-  "$HOME/.config/pi5mic" \
-  "$HOME/.config/pi5servo" \
-  "$HOME/.config/pi5vl53l0x" \
-  "$HOME/.config/ninjarobot_pi5"
-```
-
-The root `uv sync --extra hardware` installation supplies the Python packages
+The installer has already created the private configuration folders and
+supplied the Python packages
 for every managed library. The OS packages and interfaces each module also
 needs are:
 
@@ -361,11 +280,11 @@ OpenCV 4 face-recognition API.
 #### 4.1 — Buzzer (GPIO27)
 
 ```bash
-pi5buzzer init 27
 pi5buzzer buzzer-tool
 ```
 
-Use the menu to play a short tone or melody. Exit after confirming the buzzer sounds and becomes silent.
+Choose **Init** and press Enter to keep GPIO27. Use the menu to play a short
+tone or melody. Exit after confirming the buzzer sounds and becomes silent.
 
 ---
 
@@ -375,7 +294,8 @@ Use the menu to play a short tone or melody. Exit after confirming the buzzer so
 pi5disp display-tool
 ```
 
-Choose **Init** and enter the following values:
+Choose **Init** and press Enter at each prompt to accept the NinjaRobotPi5
+defaults:
 
 | Prompt | Value |
 |---|---:|
@@ -434,7 +354,7 @@ For these MG90D continuous-rotation servos, the calibrated center is the stop po
 pi5servo calib --show
 ```
 
-Expected result: both `gpio12` and `gpio13` are listed. If the result says `No calibrations stored`, see [Servo calibration saved to wrong file](#-servo-calibration-saved-to-the-wrong-file).
+Expected result: both `gpio12` and `gpio13` are listed. If the result says `No calibrations stored`, see [Servo calibration saved to wrong file](#servo-calibration-saved-to-the-wrong-file).
 
 ---
 
@@ -447,7 +367,8 @@ Expected result: both `gpio12` and `gpio13` are listed. If the result says `No c
 pi5camera camera-tool
 ```
 
-Choose **Run setup wizard**. For the current OV5647 camera, enter:
+Choose **Run setup wizard**. Press Enter to accept the current OV5647 camera
+defaults:
 
 - Width: `1280`
 - Height: `720`
@@ -475,17 +396,25 @@ Expected result: your USB microphone is listed as a capture device.
 pi5mic mic-tool
 ```
 
-Choose **Run setup wizard**, select your USB microphone, and accept a supported sample rate. Then choose **Run doctor** and **Show status**. Recording and speech-to-text tests are in [Microphone test](#-microphone-test) because they require consent.
+Choose **Run setup wizard**, select your USB microphone, and accept a supported
+sample rate. The wizard detects these installed defaults:
+
+- whisper.cpp command: `~/whisper.cpp/build/bin/whisper-cli`
+- whisper.cpp model: `~/whisper.cpp/models/ggml-base.bin`
+- wake model: the bundled `pi5mic/voiceinput/hey_Ninja.onnx`
+- maximum wake-command duration: `15` seconds, ending early after silence
+
+Then choose **Run doctor** and **Show status**. Recording and speech-to-text
+tests are in [Microphone test](#microphone-test) because they require consent.
 
 > [!NOTE]
-- If the tool selects 44.1 kHz when you configured 16 kHz, this is normal. Some USB microphones do not support 16 kHz. The robot software handles this fallback automatically.
-- 1.whisper.cpp cli path: /home/rogerchang/whisper.cpp/build/bin/whisper-cli
-- 2.whisper.cpp model path:   /home/rogerchang/whisper.cpp/models/ggml-base.bin
-- 3.WakeWord model path (.tflite or .onnx): pi5mic/voiceinput/hey_Ninja.onnx
-- 4.After initiallized, you need to manually copy the weke word model to  NinjaRobot ide directory: cp pi5mic/voiceinput/hey_Ninja.onnx ninjarobot_pi5_ide/assets/hey_Ninja.onnx 
+> If the tool selects 44.1 kHz when you configured 16 kHz, this is normal.
+> Some USB microphones do not support 16 kHz, and the robot handles this
+> fallback automatically. Do not copy the wake model into the IDE package; the
+> approved packaged IDE copy is already installed and checksum-protected.
 ---
 
-### Step 5 — Import Settings into the Integrated Robot Configuration
+### Step 5 — Import settings into the integrated robot configuration
 
 The NinjaRobotPi5 IDE reads its own unified configuration file, separate from the individual module JSON files. This step copies the relevant settings from Steps 4.1–4.6 into that unified file.
 
@@ -521,7 +450,7 @@ ninjarobot-ide-tool config import --apply
 ```
 
 > [!NOTE]
-> The first import does not overwrite an existing file. If the destination already exists, use the synchronization procedure in the [Appendix](#-synchronize-changed-module-settings-with-the-ide).
+> The first import does not overwrite an existing file. If the destination already exists, use the synchronization procedure in the [Appendix](#synchronize-changed-module-settings-with-the-ide).
 
 The generated configuration enables calibrated direct movement by default and
 stores the expanded servo calibration path, for example:
@@ -561,7 +490,7 @@ Expected result: validation succeeds, both servo endpoints are listed, and the c
 
 ---
 
-### Step 6 — Test the Installed Robot
+### Step 6 — Test the installed robot
 
 **Open the interactive robot tool:**
 
@@ -596,7 +525,7 @@ separate long command is not necessary.
 
 ---
 
-### Step 7 — Set Up and Verify NinjaRobotAgent
+### Step 7 — Set up and verify NinjaRobotAgent
 
 **Verify Ollama and whisper.cpp are ready:**
 
@@ -730,7 +659,7 @@ or terminal chat runs Greeting once and then enters Idle. The normal flow is:
 Idle → Thinking → Speaking (or emotion) → robot action → Idle
 ```
 
-### Step 8 — Configure and Test Remote Access (Optional)
+### Step 8 — Configure and test remote access (optional)
 
 For the cleanest first setup, stop any manually running Agent service. Then:
 
@@ -770,7 +699,7 @@ fallback and replaces the display with a fresh local pairing QR while remote
 recovery continues. A recovered verified endpoint returns to remote-only mode.
 Never expose port 8443 through router port forwarding.
 
-### Step 9 — Enable and Test Automatic Startup (Optional)
+### Step 9 — Enable and test automatic startup (optional)
 
 Keep both wheels raised. Open `ninjarobot-agent`, select **Startup Agent
 Deployment**, then select **Install and deploy automatic startup Agent**. Type
@@ -843,9 +772,9 @@ For an X1208 installation, also confirm:
 
 ---
 
-## 🤖 Using the AI Agent
+## Using the AI agent
 
-### Chat Commands
+### Chat commands
 
 Once the service is running, open a chat session:
 
@@ -897,7 +826,7 @@ value. The same user's saved robot name and form of address are available after
 changing models and from terminal/web sessions that independently select that
 user; transcript-only replies are never treated as persistent preferences.
 
-### Managing Persistent Memory
+### Managing persistent memory
 
 Open the interactive tool and choose **Agent Memory Management**:
 
@@ -949,7 +878,7 @@ they share that user's profile, preferences, and long-term behavior memory.
 Changing the AI model/provider preserves the current session, active user, and
 long-term memory, but intentionally revokes motion authorization.
 
-### Enabling AI Motion (Physical Movement)
+### Enabling AI motion (physical movement)
 
 To let the AI move the robot's wheels, raise the wheels first, then:
 
@@ -992,11 +921,11 @@ The quoted-name fallback also accepts natural affirmative wording with minor
 surrounding typos, for example `Yes and name this behavor "my exciting move"`;
 the exact quoted label is retained while the catalog identifier is normalized.
 
-### Recovering from Emergency Stop
+### Recovering from emergency stop
 
 If the Emergency Stop is triggered (Level 2), enter `/resume` in the terminal or web chat box and type `RESUME` when asked. The agent runs all-module health checks directly — it does not ask the AI model. On success, the Emergency Stop clears and Idle returns. AI motion stays disarmed; use `/arm` separately before asking for another servo movement.
 
-### Enabling an AI-Controlled Photo
+### Enabling an AI-controlled photo
 
 Enter `/camera` or press **AI camera** in the web controller, then ask:
 
@@ -1014,9 +943,9 @@ The display counts down `3`, `2`, `1`, then shows a camera icon while capturing.
 
 ---
 
-## 🧪 Testing and Troubleshooting
+## Testing and troubleshooting
 
-### Recommended Validation Order
+### Recommended validation order
 
 1. Software and simulation test
 2. Buzzer test
@@ -1030,7 +959,7 @@ The display counts down `3`, `2`, `1`, then shows a camera icon while capturing.
 
 Never change wiring while the robot is powered.
 
-### 🔬 Software and Simulation Test
+### Software and simulation test
 
 ```bash
 cd "$HOME/NinjaRobotPi5"
@@ -1040,7 +969,7 @@ pytest -q
 
 Expected result: driver verification passes and all tests pass. These tests use simulation only.
 
-### 🔊 Buzzer Test
+### Buzzer test
 
 ```bash
 pi5buzzer buzzer-tool
@@ -1049,7 +978,7 @@ pi5buzzer buzzer-tool
 Expected result: a short tone or melody plays through GPIO27 and the buzzer is silent afterward.
 Full checklist: [Phase 3.1 buzzer validation](docs/validation/phase-3-1-buzzer-validation-2026-07-26.md)
 
-### 🖥️ Display Test
+### Display test
 
 ```bash
 pi5disp display-tool
@@ -1058,7 +987,7 @@ pi5disp display-tool
 Expected result: text and colors are correctly oriented at 320×240 after the 90° rotation, and brightness changes take effect.
 Full checklist: [Phase 3.2 display validation](docs/validation/phase-3-2-display-validation-2026-07-26.md)
 
-### 📡 Distance Sensor Test
+### Distance sensor test
 
 ```bash
 pi5vl53l0x sensor-tool
@@ -1067,7 +996,7 @@ pi5vl53l0x sensor-tool
 Expected result: a target within range produces changing millimetre readings. Open space may produce the raw value `8191`, which means no target is measurable.
 Full checklist: [Phase 2 distance validation](docs/validation/phase-2-validation-2026-07-26.md)
 
-### ⚙️ Servo Test
+### Servo test
 
 > [!CAUTION]
 > Raise the wheels and keep an operator ready to remove power.
@@ -1079,7 +1008,7 @@ pi5servo servo-tool
 Expected result: each motor turns in both directions and stops at its calibrated center. Recalibrate if a motor creeps at center.
 Full checklist: [Phase 3.3 servo validation](docs/validation/phase-3-3-servo-validation-2026-07-26.md)
 
-### 📷 Camera Test
+### Camera test
 
 > [!CAUTION]
 > Tell everyone nearby and obtain consent before capturing.
@@ -1095,7 +1024,7 @@ pi5camera camera-tool
 
 Full checklist: [Phase 3.4 camera validation](docs/validation/phase-3-4-camera-validation-2026-07-26.md)
 
-### 🎙️ Microphone Test
+### Microphone test
 
 > [!CAUTION]
 > Tell everyone nearby and obtain consent before recording.
@@ -1109,7 +1038,7 @@ pi5mic mic-tool
 Choose **Run one capture cycle**. If the sample rate falls back to 44.1 kHz, that is normal when the device reports ready.
 Full checklist: [Phase 3.5 microphone validation](docs/validation/phase-3-5-microphone-validation-2026-07-26.md)
 
-### 🤖 Integrated Behavior Test
+### Integrated behavior test
 
 ```bash
 ninjarobot-ide-tool
@@ -1130,7 +1059,22 @@ Full checklists:
 
 ---
 
-### Common Problems and Fixes
+### Common problems and fixes
+
+#### Installer troubleshooting
+
+Run the installer check again from the repository root:
+
+```bash
+./install.sh --check
+```
+
+If the check reports an unsupported platform, do not force installation. The
+hardware installer supports 64-bit Raspberry Pi OS on Raspberry Pi 5. If it
+reports a conflicting PWM overlay, restore the backup named in the message or
+remove the old, unmanaged servo overlay after confirming the correct pins.
+Rerunning `./install.sh` repairs missing packages and project files without
+replacing healthy pinned installations. It never reboots automatically.
 
 #### `uv: command not found`
 
@@ -1200,7 +1144,7 @@ ninjarobot-ide-tool config import \
   --apply
 ```
 
-If the destination already exists, use the synchronization procedure in the [Appendix](#-synchronize-changed-module-settings-with-the-ide).
+If the destination already exists, use the synchronization procedure in the [Appendix](#synchronize-changed-module-settings-with-the-ide).
 
 ---
 
@@ -1578,9 +1522,9 @@ vcgencmd get_throttled
 
 ---
 
-## 📎 Appendix
+## Appendix
 
-### 🔧 Using Optional Cloud AI Providers
+### Using optional cloud AI providers
 
 You can skip this section and keep using Ollama. Cloud providers require an internet connection, send your conversation and tool descriptions to the provider, and may charge your account. Robot tools still run locally — the cloud adapter cannot access the Pi hardware directly.
 
@@ -1632,7 +1576,7 @@ any support report.
 
 ---
 
-### 🔄 Synchronize Changed Module Settings with the IDE
+### Synchronize changed module settings with the IDE
 
 Use this procedure after changing buzzer, display, camera, or microphone settings in the standalone tools.
 
@@ -1675,7 +1619,7 @@ ninjarobot-ide-tool hardware status
 
 ---
 
-### 🌐 Set Up Tavily Web Search (Optional)
+### Set up Tavily web search (optional)
 
 Tavily lets the AI search the internet for current information. It is optional:
 the IDE, robot-control, and memory MCP providers load without `mcp.toml`, and
@@ -1756,7 +1700,7 @@ matches Tavily's official
 
 ---
 
-### 🛠️ Standalone `pi5*` Library Reference
+### Standalone `pi5*` library reference
 
 | Library | Canonical config file | What the IDE copies |
 |---|---|---|
@@ -1792,7 +1736,7 @@ Stop the agent and integrated IDE before opening any standalone hardware tool.
 
 ---
 
-### 📦 Updating NinjaRobotPi5
+### Updating NinjaRobotPi5
 
 Stop all tools and services before updating:
 

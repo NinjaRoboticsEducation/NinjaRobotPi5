@@ -35,6 +35,7 @@ data/
 /pi5camera/photo/
 /pi5servo/servo.json
 /pi5vl53l0x/src/pi5vl53l0x/config/vl53l0x.json
+/mic.json
 
 # Editor and operating-system files
 *.swp

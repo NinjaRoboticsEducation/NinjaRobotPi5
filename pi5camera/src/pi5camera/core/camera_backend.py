@@ -324,7 +324,7 @@ def build_camera_backend(config: dict[str, Any]) -> CameraBackend:
         "height": height,
         "warmup_seconds": float(camera_config.get("warmup_seconds", 1.0)),
         "use_preview": bool(camera_config.get("use_preview", False)),
-        "autofocus_mode": str(camera_config.get("autofocus_mode", "continuous")),
+        "autofocus_mode": str(camera_config.get("autofocus_mode", "none")),
     }
     try:
         return Picamera2StillBackend(**arguments)

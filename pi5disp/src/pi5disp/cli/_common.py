@@ -16,11 +16,11 @@ def create_display(*, rotation: int | None = None) -> ST7789V:
     """Create an ST7789V instance from the saved config."""
     _manager, config = load_config()
     display_rotation = rotation if rotation is not None else config.get("rotation", 0)
-    brightness = int(config.get("brightness", 100))
+    brightness = int(config.get("brightness", 75))
     lcd = ST7789V(
-        dc_pin=config.get("dc_pin", 14),
-        rst_pin=config.get("rst_pin", 15),
-        backlight_pin=config.get("backlight_pin", 16),
+        dc_pin=config.get("dc_pin", 4),
+        rst_pin=config.get("rst_pin", 5),
+        backlight_pin=config.get("backlight_pin", 6),
         width=config.get("width", 240),
         height=config.get("height", 320),
         rotation=display_rotation,

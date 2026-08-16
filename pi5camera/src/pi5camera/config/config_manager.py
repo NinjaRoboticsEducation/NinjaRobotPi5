@@ -19,7 +19,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "height": 720,
         "warmup_seconds": 1.0,
         "use_preview": False,
-        "autofocus_mode": "continuous",
+        "autofocus_mode": "none",
     },
     "recognition": {
         "backend": "mediapipe_opencv",

@@ -230,10 +230,11 @@ for Raspberry Pi 5 is still Python 3.11 with the normal wheel install.
 
 This saves the GPIO pin number in `buzzer.json` and tries a short test beep.
 
-Example: use GPIO 17.
+The NinjaRobotPi5 wiring profile uses GPIO 27 by default. Press Enter in the
+interactive setup to keep this value.
 
 ```bash
-uv run pi5buzzer init 17
+uv run pi5buzzer init 27
 ```
 
 What should happen:
@@ -358,7 +359,7 @@ This is the easiest way to use the driver in your own Python program.
 ```python
 from pi5buzzer import MusicBuzzer
 
-with MusicBuzzer(pin=17) as buzzer:
+with MusicBuzzer(pin=27) as buzzer:
     buzzer.play_sound(440, 0.5)
     buzzer.play_note("C5", 0.3)
     buzzer.play_emotion("happy")
@@ -380,7 +381,7 @@ from pi5buzzer import MusicBuzzer
 from pi5buzzer.core.driver import create_default_backend
 
 pi = create_default_backend()
-buzzer = MusicBuzzer(pin=17, pi=pi, volume=128)
+buzzer = MusicBuzzer(pin=27, pi=pi, volume=128)
 
 try:
     buzzer.initialize()

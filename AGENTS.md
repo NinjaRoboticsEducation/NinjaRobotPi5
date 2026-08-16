@@ -1,80 +1,110 @@
 # AGENTS.md
 
-## Project identity
-This repository is for NinjaRobot: Python-based robot software and hardware drivers developed and validated primarily on raspberry pi 5, synchronized through GitHub.
+## Purpose
 
-## Non-negotiable workflow
-Follow this sequence for all substantial implementation tasks unless the user explicitly asks to skip a step:
+This file defines the required workflow and safety boundaries for AI-assisted
+development of NinjaRobotPi5. The repository targets Raspberry Pi 5 and
+contains code that can move motors, capture personal data, expose a network
+service, modify boot configuration, and power off the computer. Treat those
+effects as real even when development occurs on another platform.
 
-1. Understand the user's request fully.
-   - If there is any ambiguity or questions about user's query and instructions, ask for comfirmation before any planning and executions.
-   - Extract goals, constraints, hardware assumptions, safety concerns, target files, and expected outputs.
-   - If anything in the prompt implies OpenAI APIs, Codex behavior, or model/tool usage, use the OpenAI developer documentation MCP server first.
-   - If anything depends on third-party libraries, frameworks, device SDKs, setup instructions, or current package behavior, use Context7 first.
-   - If the task requires understanding the repository, architecture, symbol relationships, or code correctness, use Serena first.
-   - If the task requires repository, branch, issue, PR, or workflow context, use the GitHub MCP server first.
+## Architecture boundaries
 
-2. Research and code review before planning.
-   - For repository/code review, activate Serena and use:
-     - `activate_project`
-     - `check_onboarding_performed`
-     - `initial_instructions`
-   - Prefer Serena's `list_dir`, `find_file`, `get_symbols_overview`, `find_symbol`, and `search_for_pattern` before using `read_file`.
-   - Use `read_file` for line-by-line review only when targeted symbolic review is insufficient or when reviewing non-code documents/config files.
+NinjaRobotPi5 has one permitted hardware path:
 
-3. Produce a phased implementation plan.
-   - Break work into explicit phases.
-   - For each phase, define:
-     - objective
-     - files/modules likely to change
-     - lint/test/validation checks
-     - hardware risk level
-     - documentation updates required
-   - Present the phased plan to the user for review and approval before coding.
+```text
+user/model -> ninjarobot_pi5_agent -> ninjarobot_pi5_ide -> pi5* driver -> device
+```
 
-4. Implement only after the user approves the plan.
-   - Work phase by phase.
-   - Keep diffs small and reviewable.
-   - Prefer modifying existing code over adding disconnected new files.
-   - For hardware-facing changes, clearly identify impacts to GPIO, I2C, SPI, serial, PWM, motors, sensors, camera, or power behavior.
+- `ninjarobot_pi5_agent` may not import a `pi5*` library or access GPIO, I2C,
+  SPI, PWM, camera, microphone, serial, or system power directly.
+- Cross-device coordination, locks, safety state, behavior execution, and
+  hardware ownership belong in `ninjarobot_pi5_ide`.
+- A managed `pi5*` library owns only its device and standalone setup/test UI.
+  Do not add agent, memory, MCP, web, or multi-device responsibilities there.
+- Models and external MCP servers propose typed actions. Only deterministic
+  Agent policy and IDE contracts may authorize and execute them.
+- The ignored `NinjaClawBot/` history is immutable. Never edit, import, package,
+  or copy its runtime into this project.
 
-5. Mandatory linting and validation gate after every implementation phase.
-   - Do not proceed to the next phase until the current phase passes linting/validation.
-   - Prefer existing project commands if defined in the repo.
-   - If no project-standard commands exist, use this default Python gate:
-     - `python -m compileall .`
-     - `ruff check .`
-     - `ruff format --check .`
-     - `pytest -q`
-   - If typing is already part of the project, also run `mypy .`.
-   - If linting or tests fail, stop, fix the problems, and rerun the checks before continuing.
+## Required workflow
 
-6. Mandatory Raspberry Pi validation planning for hardware-relevant work.
-   - After hardware-facing changes, produce a Pi validation checklist.
-   - Separate:
-     - safe smoke tests
-     - device communication tests
-     - actuator-moving tests
-     - power-risk tests
-   - Explicitly note expected outcomes and rollback steps.
+Follow this sequence for every substantial task unless the project owner
+explicitly approves a different sequence.
 
-7. Mandatory documentation pass before closing the task.
-   - Review and update:
-     - `README.md` for a complete project introduction, features, drivers, setup, and examples
-     - `DevelopmentGuide.md` as the developer wiki/reference manual
-     - `DevelopmentLog.md` as the chronological archive of changes, rationale, validation, and progress
-   - If behavior changed but docs were not updated, the task is not complete.
+### 1. Establish scope
 
-8. Final handoff format
-   - Summarize:
-     - walkthrough of what changed, what passed linting/tests, what still needs Raspberry Pi validation and what docs were updated
-     - Clear step-by-step instructions for user to test new development manually
-     - recommended next step
+- Restate the outcome, target files, compatibility expectations, hardware
+  assumptions, privacy/security impact, and required documentation.
+- Inspect `git status --short` and preserve all unrelated user changes.
+- Ask for clarification before planning when different reasonable answers would
+  materially change behavior, safety, stored data, public APIs, dependencies,
+  deployment, or hardware operation.
+- Do not infer approval to push, publish, merge, tag, open a pull request, alter
+  an external account, run a live power command, or delete user data.
 
-## NinjaRobotPi5V4 managed-driver policy
+### 2. Research and inspect before planning
 
-The following root directories began as exact copies of the historical
-hardware dependencies:
+- Use repository-aware symbol tools first for architecture, references, and
+  code review when available. Use targeted `rg`, symbol inspection, and file
+  reads when they are unavailable; state the fallback rather than blocking.
+- Use the official OpenAI developer documentation for OpenAI products.
+- Use official or primary upstream documentation for current third-party APIs,
+  device SDKs, systemd, Raspberry Pi, ngrok, and installation behavior.
+- Use GitHub repository tools for branch, issue, pull-request, or workflow state
+  when available. Read-only local Git is the fallback for checkout state.
+- Never paste secrets, credentials, captured media, conversation databases, or
+  private configuration into prompts, logs, fixtures, or commits.
+
+### 3. Propose a phased plan
+
+For each phase, name the objective, likely files, compatibility contract,
+validation gate, documentation work, and hardware risk level. Obtain explicit
+approval before implementation.
+
+### 4. Implement in reviewable phases
+
+- Prefer small changes to existing components over parallel mechanisms.
+- Preserve public CLI, configuration, database, IPC, behavior, and tool
+  contracts unless the approved plan explicitly changes them.
+- Make migrations backward-compatible and idempotent. Existing private
+  configuration and user data take precedence over new defaults.
+- Use timeouts and deterministic cleanup for hardware, subprocess, socket,
+  network, and service lifecycles. Cancellation must leave actuators and shared
+  devices safe.
+- Do not perform live hardware actions as part of an automated test.
+- Pin new installer inputs and document provenance and licenses. Installers must
+  be rerunnable, previewable, explicit about privilege, and must not silently
+  start the Agent, move hardware, capture media, deploy boot startup, or choose
+  a large model.
+
+### 5. Pass the gate after every phase
+
+Run the project commands applicable to the change and stop to repair failures:
+
+```bash
+uv run --frozen python scripts/verify_immutable_drivers.py
+uv run --frozen python scripts/verify_workspace_driver_sources.py
+uv run --frozen python -m compileall -q \
+  ninjarobot_pi5_ide/src ninjarobot_pi5_agent/src scripts tests
+uv run --frozen ruff check .
+uv run --frozen ruff format --check .
+uv run --frozen mypy \
+  ninjarobot_pi5_ide/src ninjarobot_pi5_agent/src
+uv run --frozen pytest -q
+git diff --check
+```
+
+Run each managed driver's tests in a separate pytest process because standalone
+suites intentionally reuse test module names. Run relevant packaging,
+installer dry-run, documentation-link, service, or security tests when those
+areas change. Never describe a baseline failure as introduced by the current
+change, but do not ignore it: reproduce, explain, and repair it when in scope.
+
+## Managed-driver policy
+
+These directories are managed copies of independently tested historical
+drivers:
 
 - `pi5buzzer/`
 - `pi5camera/`
@@ -83,18 +113,61 @@ hardware dependencies:
 - `pi5servo/`
 - `pi5vl53l0x/`
 
-The project owner authorized robust, independently validated repairs to these
-copies on 2026-07-25. Preserve the original import hashes in
-`docs/validation/immutable_driver_baseline.json`. Every repaired file must also
-be recorded in `docs/validation/authorized_driver_changes.json` with its
-original hash, approved hash, date, authorizer, and reason. Keep driver changes
-small and do not add agent or middleware responsibilities to a hardware
-library. All cross-device integration belongs in `ninjarobot_pi5_ide`. The
-agent must access robot capabilities only through the IDE.
+Preserve `docs/validation/immutable_driver_baseline.json`; never regenerate it
+to make a change pass. Run the verifier before and after every implementation
+phase. Every approved managed-file change must be independently tested and
+recorded in `docs/validation/authorized_driver_changes.json` with its original
+hash, approved hash, authorization date, authorizer, and precise reason:
 
-Run `uv run python scripts/verify_immutable_drivers.py` before and after every
-implementation phase. If verification fails, stop and either revert the
-unintended difference or record an explicitly authorized, tested repair.
+```bash
+uv run python scripts/verify_immutable_drivers.py \
+  --record-authorized path/to/changed-file \
+  --reason "approved reason" \
+  --authorized-by "Project owner" \
+  --authorized-on YYYY-MM-DD
+```
 
-The nested `NinjaClawBot/` repository remains immutable and ignored. V4 must
-not edit it, import it, package it, or copy its OpenClaw runtime.
+If verification fails, stop. Revert an unintended change or obtain explicit
+authorization and validate the repair before recording it.
+
+## Hardware and deployment safety
+
+Classify and communicate changes affecting GPIO, I2C, SPI, PWM, motors,
+sensors, camera, microphone, network exposure, systemd, sudoers, boot files,
+UPS behavior, or shutdown.
+
+- Keep actuator tests opt-in; require raised wheels and an operator ready to
+  remove power.
+- Require consent before camera or microphone capture and avoid retaining test
+  media.
+- Never expose the local web port through router forwarding. Remote access must
+  use the approved pairing and tunnel boundary.
+- Do not write `/boot`, `/etc/systemd`, `/etc/sudoers.d`, or live user
+  configuration during repository tests.
+- Power-off tests are manual power-risk tests. Automated coverage must stop at
+  command construction, authorization, and helper validation.
+- End hardware-relevant work with separate safe smoke, device communication,
+  actuator-moving, and power-risk checklists, each with expected result and
+  rollback.
+
+## Documentation and release hygiene
+
+Before closing behavior, setup, dependency, architecture, or workflow changes:
+
+- update `README.md` for public behavior and supported features;
+- update `InstallationGuide.md` for beginner setup or operations;
+- update `DevelopmentGuide.md` for architecture and developer workflow;
+- append the rationale and validation to `DevelopmentLog.md`;
+- update `THIRD_PARTY_NOTICES.md` for dependency or service changes; and
+- follow `docs/markdown-style-guide.md`.
+
+Historical plans and audits live in `docs/project-history/`. Validation evidence
+belongs in `docs/validation/`. Never commit checkout-root runtime JSON, `.env`
+files, API keys, tokens, TLS private keys, databases, media, or logs.
+
+## Final handoff
+
+Lead with the outcome. Summarize changed behavior and files, compatibility and
+safety decisions, exact gates and results, documentation updates, remaining
+Raspberry Pi validation, and beginner-friendly manual test steps. Recommend the
+next safe action. Do not claim hardware validation that was not actually run.

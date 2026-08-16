@@ -17,7 +17,7 @@ except ImportError:
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
-    "pin": 17,
+    "pin": 27,
     "volume": 128,
 }
 

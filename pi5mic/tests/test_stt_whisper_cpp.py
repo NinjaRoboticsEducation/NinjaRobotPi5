@@ -25,6 +25,16 @@ def test_find_whisper_cpp_command_uses_which(monkeypatch, tmp_path) -> None:
     assert install_module.find_whisper_cpp_command() == command_path.resolve()
 
 
+def test_find_whisper_cpp_command_uses_ninjarobot_home_install(monkeypatch, tmp_path) -> None:
+    command_path = tmp_path / "whisper.cpp" / "build" / "bin" / "whisper-cli"
+    command_path.parent.mkdir(parents=True)
+    command_path.write_text("", encoding="utf-8")
+    monkeypatch.setattr(install_module.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(install_module.Path, "home", lambda: tmp_path)
+
+    assert install_module.find_whisper_cpp_command() == command_path.resolve()
+
+
 def test_resolve_model_path_rejects_missing_file(tmp_path) -> None:
     with pytest.raises(STTError, match="Whisper model file not found"):
         install_module.resolve_model_path(tmp_path / "missing.bin")

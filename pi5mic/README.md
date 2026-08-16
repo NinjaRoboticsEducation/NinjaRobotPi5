@@ -512,14 +512,15 @@ If you also want to prepare the always-on listener during setup:
 
 - `Prepare always-on voice input now?`: `y`
 - `Wake word`: `hey Ninja`
-- `openWakeWord model path`: your real `.onnx` or `.tflite` model path
+- `openWakeWord model path`: accept the bundled
+  `pi5mic/voiceinput/hey_Ninja.onnx` model
 - `Wake-word detection threshold`: `0.5`
-- `Wake-word VAD threshold`: `0`
+- `Wake-word VAD threshold`: `0.3`
 - `Enable openWakeWord noise suppression?`: `n` for the first test
 - `openWakeWord inference framework`: `auto`
-- `Silence stop timeout`: `3`
-- `Maximum recorded command length`: `10`
-- `Cooldown`: `1.5`
+- `Silence stop timeout`: `1.25`
+- `Maximum recorded command length`: `15`
+- `Cooldown`: `1.0`
 
 What this does:
 

@@ -32,7 +32,7 @@ def info() -> None:
     click.echo(f"  Display:     {profile_name}")
     click.echo(f"  Resolution:  {config.get('width', 240)} × {config.get('height', 320)}")
     click.echo(f"  Rotation:    {config.get('rotation', 0)}°")
-    click.echo(f"  Brightness:  {config.get('brightness', 100)}%")
+    click.echo(f"  Brightness:  {config.get('brightness', 75)}%")
     click.echo(f"  SPI Speed:   {config.get('spi_speed_mhz', 32)} MHz")
     click.echo()
     click.echo(click.style("  GPIO Pins:", bold=True))

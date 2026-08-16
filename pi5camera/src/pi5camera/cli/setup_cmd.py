@@ -68,7 +68,7 @@ def setup_cmd(ctx: click.Context) -> None:
     camera_config["autofocus_mode"] = click.prompt(
         "Autofocus mode",
         type=click.Choice(["continuous", "auto", "manual", "none"]),
-        default=str(camera_config.get("autofocus_mode", "continuous")),
+        default=str(camera_config.get("autofocus_mode", "none")),
         show_choices=True,
     )
     recognition_config["tolerance"] = click.prompt(

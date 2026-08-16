@@ -141,28 +141,28 @@ class BuzzerDevice:
         volume: int,
     ) -> dict[str, Any]:
         """Play one bounded tone and remain interruptible by emergency stop."""
-        async with self._lock:
-            driver = await self._require_driver_locked()
-            driver.volume = volume
-            self._stop_event.clear()
-            try:
-                await _run_thread_to_completion(
-                    driver.play_sound,
-                    frequency_hz,
-                    duration_seconds,
-                )
-            except Exception as exc:
-                raise _buzzer_error(
-                    code="BUZZER_PLAY_FAILED",
-                    message="The buzzer could not queue the requested tone.",
-                    technical_detail=f"{type(exc).__name__}: {exc}",
-                    definitely_not_executed=False,
-                    retry_safety=RetrySafety.UNKNOWN,
-                    capability="buzzer.play_tone",
-                ) from exc
-
-        interrupted = False
         try:
+            async with self._lock:
+                driver = await self._require_driver_locked()
+                driver.volume = volume
+                self._stop_event.clear()
+                try:
+                    await _run_thread_to_completion(
+                        driver.play_sound,
+                        frequency_hz,
+                        duration_seconds,
+                    )
+                except Exception as exc:
+                    raise _buzzer_error(
+                        code="BUZZER_PLAY_FAILED",
+                        message="The buzzer could not queue the requested tone.",
+                        technical_detail=f"{type(exc).__name__}: {exc}",
+                        definitely_not_executed=False,
+                        retry_safety=RetrySafety.UNKNOWN,
+                        capability="buzzer.play_tone",
+                    ) from exc
+
+            interrupted = False
             try:
                 await asyncio.wait_for(
                     self._stop_event.wait(),
@@ -172,6 +172,9 @@ class BuzzerDevice:
             except TimeoutError:
                 pass
         except asyncio.CancelledError:
+            # Cancellation may arrive while the short driver call is still
+            # returning. Always release the play lock and confirm silence
+            # before reporting the action as cancelled.
             await self.stop()
             raise
 

@@ -28,7 +28,11 @@ def test_load_returns_defaults_when_file_is_missing(tmp_path) -> None:
     assert config["audio"]["sample_rate"] == DEFAULT_CONFIG["audio"]["sample_rate"]
     assert config["stt"]["selected"] == "whisper_cpp"
     assert config["wakeword"]["backend"] == "openwakeword"
+    assert config["wakeword"]["vad_threshold"] == 0.3
     assert config["voiceinput"]["enabled"] is False
+    assert config["voiceinput"]["silence_timeout_seconds"] == 1.25
+    assert config["voiceinput"]["max_capture_seconds"] == 15.0
+    assert config["voiceinput"]["cooldown_seconds"] == 1.0
     assert config["voiceinput"]["session_strategy"] == "agent_main"
     assert config["integration"]["openclaw"]["gateway_url"] == "ws://127.0.0.1:18789"
     assert config["integration"]["openclaw"]["session_key"] == "voice-local-mic"

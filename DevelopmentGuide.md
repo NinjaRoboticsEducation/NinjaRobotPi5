@@ -1,10 +1,13 @@
 # NinjaRobotPi5 Development Guide
 
-This guide is the single source of truth for developers, maintainers, and AI coding agents working on NinjaRobotPi5. When this guide conflicts with the implementation plan, [`NinjaRobotPi5V4_ImplementationPlan.md`](NinjaRobotPi5V4_ImplementationPlan.md) takes precedence.
+This guide is the developer reference for NinjaRobotPi5. Historical phase
+decisions remain in the
+[implementation plan](docs/project-history/NinjaRobotPi5V4_ImplementationPlan.md),
+while current contribution guardrails are defined in [AGENTS.md](AGENTS.md).
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture overview
 
 ### The Three-Layer Boundary Model
 
@@ -55,7 +58,7 @@ The boundary has three concrete safety consequences:
 
 ---
 
-## 📁 Repository Layout
+## Repository layout
 
 ```text
 NinjaRobotPi5/
@@ -128,6 +131,9 @@ NinjaRobotPi5/
 │
 ├── scripts/
 │   ├── bootstrap-rpi-camera-workspace.sh   Camera bridge setup
+│   ├── configure_rpi_boot.py               Idempotent PWM boot configuration
+│   ├── install-rpi.sh                      Raspberry Pi environment installer
+│   ├── install-versions.env                Reviewed external tool versions
 │   ├── verify_immutable_drivers.py         Driver SHA-256 checksum verification
 │   └── verify_workspace_driver_sources.py  Editable-source path verification
 │
@@ -139,7 +145,7 @@ NinjaRobotPi5/
 
 ---
 
-## 🔧 Development Environment Setup
+## Development environment setup
 
 ### Prerequisites
 
@@ -152,8 +158,7 @@ NinjaRobotPi5/
 ### First-Time Setup (Simulation — No Hardware)
 
 ```bash
-git clone --branch public_v01 --single-branch \
-  https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
+git clone https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
 cd NinjaRobotPi5
 
 # Install all Python dependencies (hardware packages excluded)
@@ -172,19 +177,18 @@ must include `"simulated": true`.
 ### First-Time Setup (With Hardware — Raspberry Pi Only)
 
 ```bash
-# Install hardware packages
-uv sync --frozen --extra hardware
-
-# Verify all six managed drivers resolve to this checkout
-uv run --frozen --extra hardware python \
-  scripts/verify_workspace_driver_sources.py
-
-# Verify all driver checksums match approved records
-uv run --frozen python scripts/verify_immutable_drivers.py
-
-# Set up the camera bridge (first time only)
-./scripts/bootstrap-rpi-camera-workspace.sh
+# Preview and run the maintained OS/project installer
+./install.sh --dry-run
+./install.sh
 ```
+
+The installer is the supported beginner path. It installs the reviewed OS
+packages, `uv`, Ollama, and pinned whisper.cpp; manages the GPIO12/GPIO13 PWM
+boot block; creates private configuration directories; installs locked hardware
+dependencies; and validates the camera bridge and managed-driver provenance.
+It intentionally does not choose an Ollama model, initialize hardware, deploy
+systemd startup, or start the Agent. See `InstallationGuide.md` for the
+operator workflow.
 
 ### Running the Test Suite
 
@@ -196,7 +200,7 @@ Hardware tests are excluded from the default run. They are in a `hardware` pytes
 
 ---
 
-## ✅ Root Quality Gate
+## Root quality gate
 
 Run this full gate before merging any change. Every check must pass.
 
@@ -231,7 +235,7 @@ Strict mypy typing is mandatory for `ninjarobot_pi5_ide` and `ninjarobot_pi5_age
 
 ---
 
-## 🚦 Development Workflow
+## Development workflow
 
 ### Release licensing and binary assets
 
@@ -253,7 +257,9 @@ The approved Phase 8 wake-model record is
 `docs/validation/phase-8-wake-model.json`. Unattended service boot must never
 download or replace this model or its inference assets.
 
-1. **Read** the relevant phase in `NinjaRobotPi5V4_ImplementationPlan.md` and any related Architecture Decision Records (ADRs) in `docs/adr/`.
+1. **Read** the relevant historical phase in
+   `docs/project-history/NinjaRobotPi5V4_ImplementationPlan.md` and any related
+   Architecture Decision Records (ADRs) in `docs/adr/`.
 2. **Review** the affected code using Serena or your preferred editor.
 3. **Present** your plan and obtain explicit approval before writing code.
 4. **Implement** only the V4-owned files or the approved driver repair.
@@ -265,7 +271,7 @@ download or replace this model or its inference assets.
 
 ---
 
-## 🔒 Managed Driver Policy
+## Managed driver policy
 
 ### What "Managed Driver" Means
 
@@ -296,7 +302,7 @@ Because the drivers are editable path dependencies, a pulled or locally authoriz
 2. File an issue describing the defect and proposed fix.
 3. Get maintainer approval **before writing code**.
 4. Apply the minimal fix inside the affected `pi5*` directory.
-5. Run the driver's own isolated test suite (see [Driver Package Validation Commands](#-driver-package-validation-commands)).
+5. Run the driver's own isolated test suite (see [Driver package validation commands](#driver-package-validation-commands)).
 6. Record the changed file with the authorized hash tool:
 
 ```bash
@@ -320,7 +326,7 @@ uv run --frozen pytest tests/test_repository_governance.py -q
 
 ---
 
-## ⚙️ Configuration System
+## Configuration system
 
 ### Schema Overview
 
@@ -407,7 +413,7 @@ The preview returns `"applied": false` by design — it is not a failure.
 
 ---
 
-## 🦺 Safety and Security Architecture
+## Safety and security architecture
 
 ### Hardware Ownership Lock
 
@@ -744,7 +750,7 @@ External text, MCP results, and Skill instructions cannot precede or replace the
 
 ---
 
-## 🤖 IDE — Core Modules and Responsibilities
+## IDE — core modules and responsibilities
 
 ### CapabilityRegistry
 
@@ -780,7 +786,7 @@ A daemon thread that calls the servo zero-pulse path directly if the main asynci
 
 ---
 
-## 🧑‍💻 Agent — Framework Design
+## Agent — framework design
 
 ### AgentIPCServer
 
@@ -1168,7 +1174,7 @@ The D-pad rows use the height allocated by the parent grid, preventing overlap w
 
 ---
 
-## 📐 Behavior System
+## Behavior system
 
 ### Behavior Format
 
@@ -1239,7 +1245,7 @@ re-executes the robot action.
 
 ---
 
-## 🔌 Extension Points
+## Extension points
 
 ### Adding a New Hardware Capability
 
@@ -1277,7 +1283,7 @@ See the [Installation Guide](InstallationGuide.md) Agent Skills section. For dev
 
 ---
 
-## 🧪 Testing and Validation
+## Testing and validation
 
 ### Test Categories
 
@@ -1336,7 +1342,7 @@ git diff --check
 
 ---
 
-## 🛠️ Driver Package Validation Commands
+## Driver package validation commands
 
 Each `pi5*` package has its own isolated test environment. Run tests using the package-local layout:
 
@@ -1386,7 +1392,7 @@ Each `pi5*` README must work for a user who has only that library folder. Requir
 
 ---
 
-## 🔍 Authentication Boundary Reference
+## Authentication boundary reference
 
 All three cloud providers use API-key-only authentication:
 
@@ -1406,7 +1412,7 @@ A configuration change that points to another host is rejected — preventing cr
 
 ---
 
-## 🐛 Developer Troubleshooting
+## Developer troubleshooting
 
 | Symptom | Cause and fix |
 |---|---|
@@ -1455,7 +1461,7 @@ A configuration change that points to another host is rejected — preventing cr
 
 ---
 
-## 📋 Phase and Feature Status
+## Phase and feature status
 
 | Phase | Status | Description |
 |---|---|---|
@@ -1470,12 +1476,15 @@ A configuration change that points to another host is rejected — preventing cr
 | Phase 4 | ✅ Complete | Integrated behaviors, 20 faces, IDE tool, safety engine |
 | Phase 5 | ✅ Complete | NinjaRobotAgent, Ollama, HTTPS web controller, MCP, Skills |
 | Phase 6 | ✅ Complete | OpenAI, Gemini, Anthropic cloud provider adapters |
-| Phase 7 | ✅ Software complete | Multi-user memory, face identity, capture, bounded retrieval, management |
-| Phase 8.2 | ✅ Software complete | IDE-owned always-on Hey Ninja voice input; Raspberry Pi microphone acceptance pending |
-| Phase 8.3 | ✅ Software complete | Optional ngrok lifecycle and passwordless pairing; live account acceptance pending |
-| Phase 8.4 | ✅ Software complete | Four-locale accessible dashboard and paired, nonce-confirmed orderly power-off; Pi power-risk acceptance pending Phase 8.6 |
-| Phase 8.5 | ✅ Software complete | IDE-owned QR onboarding, remote/local endpoint replacement, paired exactly-once Greeting; Pi display/motion acceptance pending |
-| Phase 8.6 | ✅ Software complete | Explicit systemd deployment, boot lifecycle, backup/rollback, and narrow power-off helper; Pi boot/power acceptance pending |
-| Pi Acceptance | 🔲 Pending | Full Raspberry Pi hardware validation by operator |
+| Phase 7 | Complete | Multi-user memory, face identity, capture, bounded retrieval, management |
+| Phase 8.2 | Complete | IDE-owned always-on Hey Ninja input and four transcription locales |
+| Phase 8.3 | Complete | Optional ngrok lifecycle and passwordless pairing |
+| Phase 8.4 | Complete | Four-locale dashboard and nonce-confirmed orderly power-off |
+| Phase 8.5 | Complete | QR onboarding and connection-triggered Greeting |
+| Phase 8.6 | Complete | Explicit systemd deployment, boot lifecycle, and power-off helper |
+| Pi acceptance | Complete | Phase 8 manually validated by the project owner on the reference robot |
 
-The implementation plan `NinjaRobotPi5V4_ImplementationPlan.md` remains the authoritative source for all design decisions and phase requirements.
+The historical implementation plan in
+`docs/project-history/NinjaRobotPi5V4_ImplementationPlan.md` records the design
+decisions that produced v1.0.0. Current work follows `AGENTS.md`, this guide,
+and applicable ADRs.

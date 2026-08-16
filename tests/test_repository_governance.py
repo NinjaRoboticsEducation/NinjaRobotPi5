@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -14,6 +15,17 @@ MANAGED_DRIVERS = (
     "pi5servo",
     "pi5vl53l0x",
 )
+PUBLIC_DOCUMENTS = (
+    "README.md",
+    "InstallationGuide.md",
+    "DevelopmentGuide.md",
+    "DevelopmentLog.md",
+    "THIRD_PARTY_NOTICES.md",
+    "AGENTS.md",
+    "docs/README.md",
+    "docs/markdown-style-guide.md",
+)
+MARKDOWN_LINK = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
 
 
 def test_managed_driver_directories_exist() -> None:
@@ -98,7 +110,37 @@ def test_required_project_documents_exist() -> None:
         "DevelopmentGuide.md",
         "DevelopmentLog.md",
         "InstallationGuide.md",
-        "NinjaRobotPi5V4_ImplementationPlan.md",
+        "THIRD_PARTY_NOTICES.md",
+        "docs/README.md",
+        "docs/markdown-style-guide.md",
+        "docs/project-history/NinjaRobotPi5V4_ImplementationPlan.md",
+        "docs/project-history/AuditReport_260731.md",
+        "docs/project-history/Pi5LibrariesAudit.md",
     )
     missing = [name for name in required if not (ROOT / name).is_file()]
     assert missing == []
+
+
+def test_checkout_root_does_not_contain_private_microphone_config() -> None:
+    assert not (ROOT / "mic.json").exists()
+    assert "/mic.json" in (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+
+
+def test_public_document_relative_links_resolve() -> None:
+    broken: list[str] = []
+    for relative_document in PUBLIC_DOCUMENTS:
+        document = ROOT / relative_document
+        for raw_target in MARKDOWN_LINK.findall(document.read_text(encoding="utf-8")):
+            target = raw_target.strip().split(maxsplit=1)[0].strip("<>")
+            if not target or target.startswith(("#", "http://", "https://", "mailto:")):
+                continue
+            path_text = target.split("#", maxsplit=1)[0]
+            if path_text and not (document.parent / path_text).resolve().exists():
+                broken.append(f"{relative_document}: {raw_target}")
+    assert broken == []
+
+
+def test_public_documents_use_project_history_paths() -> None:
+    current = "\n".join((ROOT / path).read_text(encoding="utf-8") for path in PUBLIC_DOCUMENTS)
+    assert "(NinjaRobotPi5V4_ImplementationPlan.md)" not in current
+    assert "(AuditReport_260731.md)" not in current

@@ -467,4 +467,3 @@ updates the lockfile and its authorization record.
 4. Create an approved managed-driver repair for the `pi5servo` lockfile
    mismatch.
 5. Rerun the provenance command after every future driver change.
-

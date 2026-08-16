@@ -1,11 +1,11 @@
 {
     "display_profile": "st7789v_2inch8",
-    "dc_pin": 14,
-    "rst_pin": 15,
-    "backlight_pin": 16,
+    "dc_pin": 4,
+    "rst_pin": 5,
+    "backlight_pin": 6,
     "width": 240,
     "height": 320,
-    "rotation": 0,
-    "brightness": 100,
+    "rotation": 90,
+    "brightness": 75,
     "spi_speed_mhz": 32
 }

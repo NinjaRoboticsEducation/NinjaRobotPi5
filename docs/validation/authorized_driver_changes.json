@@ -7,16 +7,16 @@
   "files": {
     "pi5buzzer/README.md": {
       "approved": {
-        "sha256": "5d74e88b2a588632307a1af64505cb81ad9cc738f7ddf34fcb9d3a557766c24a",
-        "size": 11971
+        "sha256": "6739b381ef87d08808597297ffc207e3803f6489c27e94ae1e1a1215fad16763",
+        "size": 12064
       },
-      "authorized_by": "project owner",
-      "authorized_on": "2026-07-26",
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
       "baseline": {
         "sha256": "a597351a8c39dd12e2365569a167cade946ba3215e81ee60f424103cafa9ccda",
         "size": 11550
       },
-      "reason": "Standalone installation, dependency, and CLI validation documentation, with the validated regression-test count updated after the shared-GPIO shutdown repair."
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
     },
     "pi5buzzer/pyproject.toml": {
       "approved": {
@@ -46,16 +46,16 @@
     },
     "pi5buzzer/src/pi5buzzer/config/config_manager.py": {
       "approved": {
-        "sha256": "d3874148967c0e6c612e1f2457b3cc0ee063112b33705b14bfbfef13c2ea7e37",
+        "sha256": "8d01d68527b01ae7aeb486c304c81720b2d7c37249704ee510828dc9be6c22fc",
         "size": 5049
       },
-      "authorized_by": "project owner",
-      "authorized_on": "2026-08-14",
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
       "baseline": {
         "sha256": "7b67e253d2123d528089b4254cb6dfe5e64e18d3543c6ba26b39100b90dfeb90",
         "size": 4857
       },
-      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
     },
     "pi5buzzer/src/pi5buzzer/core/driver.py": {
       "approved": {
@@ -72,16 +72,16 @@
     },
     "pi5buzzer/tests/test_config.py": {
       "approved": {
-        "sha256": "a890f1cb8bfd4b5372b4f2937b97597c65a72972169a436b69eb52e4d3f99fcd",
-        "size": 6902
+        "sha256": "6b4d5cafa74a1f10058593b6ea9dd1a917e0594abef8d1f14c619b5e8196e4d9",
+        "size": 7003
       },
-      "authorized_by": "project owner",
-      "authorized_on": "2026-08-14",
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
       "baseline": {
         "sha256": "95cba9d0fb998afa05969b65dbd4b972d581170dac5e4bf3a4c8b8da91675881",
         "size": 6635
       },
-      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
     },
     "pi5buzzer/tests/test_driver.py": {
       "approved": {
@@ -108,16 +108,16 @@
     },
     "pi5camera/README.md": {
       "approved": {
-        "sha256": "6b257588ec641af645f4e41a5c72a2fba646f387c04d626a4cbe46bd6306ba11",
-        "size": 17227
+        "sha256": "6aa0ca86f3475d8d0164e73263f69139090b570b265a689c0c7e3fb521d4afc5",
+        "size": 17268
       },
-      "authorized_by": "project owner",
-      "authorized_on": "2026-07-25",
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
       "baseline": {
         "sha256": "e98bb38e7b079e795dc0f4951469f62fa0e1eae19a98ac5133d7a92a2793f4ce",
         "size": 16874
       },
-      "reason": "Standalone installation, dependency, and CLI validation documentation"
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
     },
     "pi5camera/pyproject.toml": {
       "approved": {
@@ -197,31 +197,44 @@
       },
       "reason": "Normalize camera CLI failures at the CameraError boundary, add backend-unavailable regression coverage, and make the supported system-site Picamera2 environment reproducible with frozen dependencies."
     },
+    "pi5camera/src/pi5camera/cli/setup_cmd.py": {
+      "approved": {
+        "sha256": "8f8e684e60c7cfa3eb543d34f03509470a635f9065dc1f5b3c9f3b300907417a",
+        "size": 3208
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
+      "baseline": {
+        "sha256": "3c7e1afbf9dd5c071bf1d1360dd3ece18573a0c412f38e5e111f3329b17e6923",
+        "size": 3214
+      },
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
+    },
     "pi5camera/src/pi5camera/config/config_manager.py": {
       "approved": {
-        "sha256": "048fbddb0e6a2f246d7f3254aa397740fae8fc63ea588e6399fbf5a485928031",
-        "size": 7339
+        "sha256": "07a0af032772d9d155f9b8b3f5ca2c940a06d36138e01645ccbddcd58d1ddc41",
+        "size": 7333
       },
-      "authorized_by": "project owner",
-      "authorized_on": "2026-08-14",
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
       "baseline": {
         "sha256": "9b8103f95f3da65ec8a840d722b1d255ba038d93460b25c648bdf9f69b23ccd8",
         "size": 7161
       },
-      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
     },
     "pi5camera/src/pi5camera/core/camera_backend.py": {
       "approved": {
-        "sha256": "749bfbfd9c6bebb02e6cc67c0676fb15a8cd41cbb809a5976ab57949ab0aafb4",
-        "size": 11645
+        "sha256": "54c7e5a7bbadb705b868ee7f02c73ea200006bf779727baa8615313aa1644d15",
+        "size": 11639
       },
-      "authorized_by": "project owner",
-      "authorized_on": "2026-08-14",
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
       "baseline": {
         "sha256": "3bf34e48b9b33d73915d54de6f4d89a875d54a8c2360b51407b5e4e723ed82aa",
         "size": 6030
       },
-      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
     },
     "pi5camera/tests/test_camera_backend.py": {
       "approved": {
@@ -238,68 +251,120 @@
     },
     "pi5camera/tests/test_config_manager.py": {
       "approved": {
-        "sha256": "63f8c6461d9b065f1ebb9a65fadbd0a35fadc02671dd08c2285997fac8433d09",
-        "size": 3078
+        "sha256": "620798e3885dea73f2dff45903af7dc91650cdee38ff125119481a7377e15cbe",
+        "size": 3290
       },
-      "authorized_by": "project owner",
-      "authorized_on": "2026-08-14",
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
       "baseline": {
         "sha256": "6ffad2cab79a5d6832a54e06d933a86e97eb4b44c3809fa00bf0f28ef4b3e291",
         "size": 2819
       },
-      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
     },
     "pi5disp/README.md": {
       "approved": {
-        "sha256": "dfed75a2a2142949fe841c8da9f347cd8c2e3012bd82541aed0e30b86d4ef5e6",
-        "size": 16056
+        "sha256": "4c8cc14142528935fb1b86768ef2a29aba3fffdc94b0d29d622d42831f921265",
+        "size": 16184
       },
-      "authorized_by": "project owner",
-      "authorized_on": "2026-07-25",
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
       "baseline": {
         "sha256": "8c7ebe5ef454c2c54f334373b83695236a459add7b436e3d30a551f4b79acb0a",
         "size": 15495
       },
-      "reason": "Standalone installation, dependency, and CLI validation documentation"
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
+    },
+    "pi5disp/display.json": {
+      "approved": {
+        "sha256": "f97ad7acafd9c17adc3af5a04f63a25a53bd9b9467c0198ac2285347d9bba296",
+        "size": 207
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
+      "baseline": {
+        "sha256": "374f1619c9ccb1c7a8d8aff8b6ded447a250893b9a099b8af6e33cf7639f1b16",
+        "size": 210
+      },
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
+    },
+    "pi5disp/src/pi5disp/cli/_common.py": {
+      "approved": {
+        "sha256": "1be75c92cdce735174df20fe2e13d70fcd7675bc18940754b1a0a2b6ec49a65a",
+        "size": 1045
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
+      "baseline": {
+        "sha256": "21364f44a031d4c95778715e71a3fb4ff239f440b10496ca7c8162e08d823f1d",
+        "size": 1049
+      },
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
+    },
+    "pi5disp/src/pi5disp/cli/display_tool.py": {
+      "approved": {
+        "sha256": "8e2f23ab8075bc11a246480c694cb00f108227c904a02514bf2b91acd2c55399",
+        "size": 10492
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
+      "baseline": {
+        "sha256": "8d9def4ae10231470084325410538264513c341df0c30a62e5e8b53d9a9b9344",
+        "size": 10496
+      },
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
+    },
+    "pi5disp/src/pi5disp/cli/info_cmd.py": {
+      "approved": {
+        "sha256": "089d703f36a33b26580f0dd803b9dfb5f02782eb1061fc2090a9b2959c49b4c3",
+        "size": 2313
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
+      "baseline": {
+        "sha256": "41c4bf523ec796bc4f1087fb9c8cbc34a95ff94afc271e9cd70833ade6dea419",
+        "size": 2314
+      },
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
     },
     "pi5disp/src/pi5disp/config/config_manager.py": {
       "approved": {
-        "sha256": "ab2716a69e6adb892ab1737206789dd5394ebfb9bf7954c0fafcb74d242bf5f3",
-        "size": 7554
+        "sha256": "f2cdfac4863e60bc3cb5c0612da443dbec54ccf0b06cf578212145d85cbe303c",
+        "size": 7575
       },
-      "authorized_by": "project owner",
-      "authorized_on": "2026-07-25",
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
       "baseline": {
         "sha256": "f4bb50c705d9ce6d461c1f0f8009225a1dabce2627234a4eaae4d007193ffd04",
         "size": 6924
       },
-      "reason": "Move writable display state out of the package into a per-user config path, add an environment override and regression coverage, and document runtime configuration behavior."
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
     },
     "pi5disp/tests/test_config.py": {
       "approved": {
-        "sha256": "de8c58b4d80b0a9b0081255d59aaf476ed4f0aa67d9ffb32714f9197270c2a97",
-        "size": 4770
+        "sha256": "62445a98dae1a831f97ec7c976b81f2c572c6f2a4fd19a8451209e131fa4333b",
+        "size": 5083
       },
-      "authorized_by": "project owner",
-      "authorized_on": "2026-07-25",
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
       "baseline": {
         "sha256": "7028324fefb31b13ea7a91b5a1a78be21e996c8d15cd368ed24ddc6868c9d2db",
         "size": 3743
       },
-      "reason": "Move writable display state out of the package into a per-user config path, add an environment override and regression coverage, and document runtime configuration behavior."
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
     },
     "pi5mic/README.md": {
       "approved": {
-        "sha256": "d723104beacc1e65baa947d60058c6ccdf78ce7717080e4456d7845bcb14fc08",
-        "size": 39398
+        "sha256": "6135cbbf0bfd631dd6136538315dc5ec7816b034f4d56e86b0986b41fada591b",
+        "size": 39423
       },
-      "authorized_by": "project owner",
-      "authorized_on": "2026-07-25",
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
       "baseline": {
         "sha256": "ac8b9c14528c140c35ce3321bca998ea3d0f3d76ae801abf4b086ea99ca6ec6e",
         "size": 39220
       },
-      "reason": "Standalone installation, dependency, and CLI validation documentation"
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
     },
     "pi5mic/src/pi5mic/__main__.py": {
       "approved": {
@@ -314,18 +379,44 @@
       },
       "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
     },
+    "pi5mic/src/pi5mic/cli/setup_cmd.py": {
+      "approved": {
+        "sha256": "f820a902d85a771f8dcf2e4ff8fcd25c35be6efb5092664dedd661e4f894783e",
+        "size": 22922
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
+      "baseline": {
+        "sha256": "821e011b59d37e5186e222d3d5479b8fe83f37d0d0e40f7a06667a0a88f346c4",
+        "size": 22590
+      },
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
+    },
     "pi5mic/src/pi5mic/config/config_manager.py": {
       "approved": {
-        "sha256": "e0203687a0bdd01d40bf79c55bb4b6c2e7cf9d66920123d0a1fc576b8b4b2140",
-        "size": 8140
+        "sha256": "0c8e3003b9086ffa6ae2346e45535efdc5a19b2eb36f3d41109641c5446fbf84",
+        "size": 8141
       },
-      "authorized_by": "project owner",
-      "authorized_on": "2026-08-14",
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
       "baseline": {
         "sha256": "8d4657506d2f88262291f0bed0d125b6b70157b8d1f586a6cb462498e50691d9",
         "size": 7944
       },
-      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
+    },
+    "pi5mic/src/pi5mic/install/whisper_cpp.py": {
+      "approved": {
+        "sha256": "67f6d1a320ebe15203225bdaad84005ec6657778810d36b5c704b32b12f7387f",
+        "size": 1734
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
+      "baseline": {
+        "sha256": "929a65c1db20ad287f32378874f8cbf92731b6c018148ff05a238ac928ade1ee",
+        "size": 1575
+      },
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
     },
     "pi5mic/src/pi5mic/wakeword/openwakeword.py": {
       "approved": {
@@ -342,16 +433,29 @@
     },
     "pi5mic/tests/test_config.py": {
       "approved": {
-        "sha256": "281bd9020d17e4f1428b7608702abbb9e477298e8b2f41e48d9905831c63c495",
-        "size": 4181
+        "sha256": "1b0f92d005aa706c992efe84b5b8c17127d6801bc38c4dcc1f8a47a57413e895",
+        "size": 4424
       },
-      "authorized_by": "project owner",
-      "authorized_on": "2026-08-14",
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
       "baseline": {
         "sha256": "f363fcba53ae004d88f37f5c2383701248ead115be0ae51231e86bf17446e74e",
         "size": 4133
       },
-      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
+    },
+    "pi5mic/tests/test_stt_whisper_cpp.py": {
+      "approved": {
+        "sha256": "6af7105cc675ea9812476db3c4e1186f798866f39c9da9b2a08410ebcdfb5f1c",
+        "size": 7167
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-08-16",
+      "baseline": {
+        "sha256": "fa2d33557069e344558d4b6a8938d6b85d029ad832aa1eb0cab04b4204597105",
+        "size": 6671
+      },
+      "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
     },
     "pi5mic/tests/test_wakeword.py": {
       "approved": {

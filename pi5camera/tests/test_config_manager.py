@@ -25,6 +25,14 @@ def test_config_defaults_are_root_aware(tmp_path: Path) -> None:
     assert manager.active_root == config_path.parent.resolve()
     assert Path(config["paths"]["photo_dir"]) == config_path.parent.resolve() / "photo"
     assert Path(config["paths"]["data_dir"]) == config_path.parent.resolve() / "camera_data"
+    assert config["camera"] == {
+        "backend": "picamera2",
+        "width": 1280,
+        "height": 720,
+        "warmup_seconds": 1.0,
+        "use_preview": False,
+        "autofocus_mode": "none",
+    }
 
 
 def test_build_output_path_supports_directory_and_file_overrides(tmp_path: Path) -> None:

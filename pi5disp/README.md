@@ -118,9 +118,12 @@ Before you start, make sure you have:
 
 Default control pins used by this driver:
 
-- `DC` uses `GPIO 14`
-- `RST` uses `GPIO 15`
-- `BLK` (backlight) uses `GPIO 16`
+- `DC` uses `GPIO 4`
+- `RST` uses `GPIO 5`
+- `BLK` (backlight) uses `GPIO 6`
+
+The initial brightness is `75%`. The setup wizard presents these NinjaRobotPi5
+values as defaults, so press Enter to accept them.
 
 Default SPI connection used by this driver:
 

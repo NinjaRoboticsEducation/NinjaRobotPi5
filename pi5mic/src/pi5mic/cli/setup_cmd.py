@@ -301,7 +301,11 @@ def _configure_voiceinput(config: dict) -> None:
         ).strip()
         or "ninja"
     )
-    current_model_path = str(wakeword_config.get("model_path") or "").strip()
+    bundled_ninja_model = Path(__file__).resolve().parents[3] / "voiceinput" / "hey_Ninja.onnx"
+    current_model_path = str(
+        wakeword_config.get("model_path")
+        or (bundled_ninja_model if bundled_ninja_model.is_file() else "")
+    ).strip()
     if wakeword_config["keyword"].casefold() == "ninja":
         click.echo(
             "openWakeWord does not ship with a built-in 'Ninja' model, so you will usually "
@@ -458,8 +462,11 @@ def setup_cmd(ctx: click.Context) -> None:
         detected_command = find_whisper_cpp_command(whisper_config.get("command"))
         default_command = str(detected_command or whisper_config.get("command") or "whisper-cli")
         command_value = click.prompt("whisper.cpp command path", default=default_command).strip()
+        project_model = Path.home() / "whisper.cpp" / "models" / DEFAULT_MODEL_FILE
         default_model_path = whisper_config.get("model_path") or str(
-            Path.home() / ".local" / "share" / "pi5mic" / "models" / DEFAULT_MODEL_FILE
+            project_model
+            if project_model.is_file()
+            else Path.home() / ".local" / "share" / "pi5mic" / "models" / DEFAULT_MODEL_FILE
         )
         model_value = click.prompt("whisper.cpp model path", default=default_model_path).strip()
         whisper_config["command"] = command_value

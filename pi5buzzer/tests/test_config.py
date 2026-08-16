@@ -17,6 +17,10 @@ def test_default_config_path_uses_xdg_config_home(tmp_path, monkeypatch):
     assert get_default_config_filepath() == str(tmp_path / "pi5buzzer" / "buzzer.json")
 
 
+def test_ninjarobot_default_uses_gpio27():
+    assert DEFAULT_CONFIG == {"pin": 27, "volume": 128}
+
+
 class TestConfigManagerLoad:
     """Test load()."""
 

@@ -7,19 +7,22 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Platform: Raspberry Pi 5](https://img.shields.io/badge/platform-Raspberry%20Pi%205-red.svg)](https://www.raspberrypi.com/)
 [![AI: Local + Cloud](https://img.shields.io/badge/AI-Ollama%20%7C%20OpenAI%20%7C%20Gemini%20%7C%20Anthropic-4285F4.svg)](https://ollama.com/)
-[![Release: v1.0.0 RC](https://img.shields.io/badge/release-v1.0.0%20RC-orange.svg)](docs/architecture/v1.0.0-support-matrix.md)
+[![Release: v1.0.0](https://img.shields.io/badge/release-v1.0.0-blue.svg)](docs/architecture/v1.0.0-support-matrix.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 </div>
 
 ---
 
-> [!WARNING]
-> **v1.0.0 release candidate.** The complete software gate passes, but the Phase 8 display, microphone, ngrok, boot, actuator, and power checklists still require operator acceptance on the target Raspberry Pi before public tagging or normal floor operation. See the [support matrix](docs/architecture/v1.0.0-support-matrix.md) and [Installation Guide](InstallationGuide.md).
+> [!NOTE]
+> **v1.0.0 public release.** The project owner completed the Phase 8 manual
+> Raspberry Pi validation. New installations must still follow the safety and
+> calibration checks in the [Installation Guide](InstallationGuide.md) because
+> wiring and hardware tolerances differ between robots.
 
 ---
 
-## 🎯 What Is NinjaRobotPi5?
+## What is NinjaRobotPi5?
 
 **NinjaRobotPi5** is an AI-powered robot platform built on the Raspberry Pi 5. It brings a robot's display, buzzer, wheel servos, distance sensor, camera, and microphone together behind one clean software interface — and then adds a fully local AI agent that you can talk to, type to, or control from your phone.
 
@@ -27,7 +30,7 @@ Unlike traditional robot platforms, NinjaRobotPi5 is designed with a **hard safe
 
 ---
 
-## 🤔 What Problem Does It Solve?
+## What problem does it solve?
 
 Building an AI robot usually means either:
 - Writing low-level hardware code and forgetting about AI, or
@@ -43,7 +46,7 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 
 ---
 
-## 🤖 Hardware Profile
+## Hardware profile
 
 | Component | Specification |
 |---|---|
@@ -61,7 +64,7 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 | **Microphone** | USB audio input device |
 | **Power** | Official 27 W supply through the Geekworm X1208 |
 
-## 🧩 Software Stack
+## Software stack
 
 | Layer | Technology |
 |---|---|
@@ -76,9 +79,9 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 
 ---
 
-## ✨ Key Features
+## Key features
 
-### 🧠 Local AI Agent
+### Local AI agent
 - **Talk to your robot** — use natural language in English or Japanese
 - **Fully local** — the AI model runs on the Pi; no cloud account required for basic use
 - **Cloud optional** — connect OpenAI, Gemini, or Anthropic with an API key for more powerful models
@@ -88,7 +91,7 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 - **Personalization** — separate local profiles, preferences, and memories for each user
 - **Behavior learning** — confirm successful new behaviors into both searchable memory and the private IDE behavior catalog; technical failures remain available for analysis
 
-### 🧠 Persistent Multi-User Memory
+### Persistent multi-user memory
 - **First-user owner setup** — the first chat asks for a name and creates the default owner profile
 - **Face identity through the IDE** — enrollment and explicit `/identify` use the existing `pi5camera` API; identity is not authentication
 - **Recoverable profile enrollment** — `/update profile` shows the current name/face state and `register user face` retries or refreshes enrollment
@@ -102,7 +105,7 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 - **Clean initial-state reset** — “Clean All Robot Memory” removes every user (including the owner), transcript, learned behavior, preference, retrieval index, and face record; the next chat starts owner registration again
 - **Default retention** — raw conversations 7 days, failed behaviors 180 days, profiles and confirmed successes until manual deletion
 
-### 📱 HTTPS Web Controller
+### HTTPS web controller
 - **Phone-friendly** — full D-pad, AI chat, and live camera from any browser on your local network
 - **Exclusive controller lease** — only one browser controls the robot at a time
 - **Stable browser chat identity** — controller lease renewal or reconnect keeps that browser's chat session without switching terminal sessions or other browsers
@@ -110,12 +113,12 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 - **Four-language browser speech** — English, Japanese, Traditional Chinese, and Simplified Chinese on supported browsers
 - **Fullscreen on mobile** — add the controller to your iPhone Home Screen for a standalone app view
 
-### 🔊 Expression & Sound
+### Expression and sound
 - **20 animated face expressions** — idle, happy, laughing, sad, angry, surprising, sleepy, speaking, shy, scary, exciting, confusing, greeting, listening, thinking, curious, success, warning, error, and cry
 - **Named melodies and tones** — play sounds as part of any behavior
 - **Synchronized stages** — face, sound, and movement can start together in one behavior
 
-### 🦺 Safety By Design
+### Safety by design
 - **Simulation by default** — all commands simulate unless you explicitly add `--real`
 - **Motion arming** — wheel movement requires your explicit per-session confirmation
 - **Privacy confirmation** — camera and microphone require separate consent
@@ -125,7 +128,7 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 - **Watchdog** — a background thread stops the motors if the main loop freezes
 - **AI is sandboxed** — the AI model proposes actions; the IDE safety layer executes or refuses them
 
-### 🔌 Flexible Connectivity
+### Flexible connectivity
 - **Local Wi-Fi** — HTTPS controller at `https://ninjarobotpi5.local:8443/`
 - **USB microphone transcription** — offline speech-to-text using `whisper.cpp`
 - **Tavily web search** — let the AI search the internet for current information (optional)
@@ -134,55 +137,34 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 
 ---
 
-## 🚀 Quick Start (Software Only — No Hardware Required)
+## Quick start on Raspberry Pi 5
 
 ```bash
-# 1. Clone the repository
-git clone --branch public_v01 --single-branch \
-  https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
+# 1. Clone the current public repository
+git clone https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git
 cd NinjaRobotPi5
 
-# 2. Install dependencies
-uv sync --frozen
-source .venv/bin/activate
-
-# 3. Create and inspect the default private configuration
-ninjarobot-ide-tool config import --apply
-ninjarobot-ide-tool hardware status
-
-# 4. Start the agent in simulation (no hardware opened)
-ninjarobot-agent service start
-ninjarobot-agent chat
-# The first chat asks for your name and creates the owner profile.
-
-# 5. Open the web controller (simulation, no hardware)
-ninjarobot-agent web start
-# Open the printed URL in your browser
-
-# 6. Stop everything when done
-ninjarobot-agent web stop
-ninjarobot-agent service stop
+# 2. Preview, then run the Raspberry Pi installer
+./install.sh --dry-run
+./install.sh
 ```
 
-For full Raspberry Pi hardware setup, follow the [Installation Guide](InstallationGuide.md).
-
-On Raspberry Pi, install the hardware extra once and then use the activated
-environment:
+Reboot when the installer asks, initialize each hardware module through its
+interactive tool, then start the main user interface:
 
 ```bash
-uv sync --frozen --extra hardware
-source .venv/bin/activate
-ninjarobot-agent
+./install.sh --check
+uv run --frozen --extra hardware ninjarobot-agent
 ```
 
-The QR renderer is an unconditional IDE runtime dependency, so software-only
-Agent startup does not require a special QR extra. A bare `uv run` can still
-remove optional Raspberry Pi drivers while reconciling `.venv`; when using that
-form for real hardware, run `uv run --extra hardware ninjarobot-agent`.
+The installer does not download an Ollama model, start the Agent, move a motor,
+open the camera or microphone, or deploy boot startup. Follow the complete
+[Installation Guide](InstallationGuide.md) for wiring, module initialization,
+calibration, model download, and safe first movement.
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture overview
 
 NinjaRobotPi5 uses a strict **three-layer boundary**:
 
@@ -208,14 +190,15 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 | Document | Purpose |
 |---|---|
 | [Installation Guide](InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
 | [Development Guide](DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
-| [Audit Report](AuditReport_260731.md) | Security, reliability, and documentation audit findings |
-| [Implementation Plan](NinjaRobotPi5V4_ImplementationPlan.md) | Authoritative design and phase decisions |
+| [Documentation Index](docs/README.md) | Public, developer, architecture, history, and validation documents |
+| [Audit Report](docs/project-history/AuditReport_260731.md) | Historical security, reliability, and documentation audit findings |
+| [Implementation Plan](docs/project-history/NinjaRobotPi5V4_ImplementationPlan.md) | Historical phase design and delivery decisions |
 | [Hardware Profile](docs/hardware/hardware-profile.md) | Confirmed wiring and electrical records |
 | [Phase 7 Pi Validation](docs/validation/phase-7-persistent-memory-validation-2026-08-12.md) | Memory, identity, retention, and hardware checklist |
 | [Phase 8.2 Voice Validation](docs/validation/phase-8-2-voice-input-pi-checklist.md) | Wake word, microphone ownership, privacy, soak, and armed-motion checklist |
@@ -226,10 +209,11 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 | [v1.0.0 Release-Candidate Report](docs/validation/v1.0.0-release-candidate-report.md) | Final software, packaging, architecture, privacy/security, residual-risk, and publication status |
 | [Phase 8 Final Interactive Validation](docs/validation/phase-8-final-interactive-pi-validation-2026-08-14.md) | Existing checkout, clean clone, normal-user tools, hardware, remote, boot, power, and soak acceptance |
 | [v1.0.0 Support Matrix](docs/architecture/v1.0.0-support-matrix.md) | Supported platforms/features, compatibility guarantees, known limitations, and open Pi acceptance |
+| [Installation Optimization Validation](docs/validation/v1.0.0-installation-optimization-pi-checklist.md) | Clean-install, device, actuator, regression, boot, and power acceptance |
 
 ---
 
-## 📄 License and Release Assets
+## License and release assets
 
 NinjaRobotPi5 source code is licensed under the [MIT License](LICENSE).
 Third-party dependencies, the optional ngrok service, and model/runtime assets
@@ -244,10 +228,10 @@ the display/web interface and use existing robot behaviors rather than TTS.
 
 ---
 
-## 📊 Current Status
+## Current status
 
-**Version:** Alpha (Phase 7 implemented)
-**Status:** All software gates pass ✅ | Raspberry Pi acceptance pending 🔲
+**Version:** v1.0.0
+**Status:** Public-release implementation and owner hardware validation complete
 
 | Feature Area | Status |
 |---|---|
@@ -269,16 +253,16 @@ the display/web interface and use existing robot behaviors rather than TTS.
 | ✅ Interactive/scriptable memory management | Complete |
 | ✅ Phase 8 release configuration, dependency, secret, and status foundations | Complete |
 | ✅ IDE-owned Hey Ninja voice input, four transcription locales, shared safety path | Software complete |
-| ✅ Optional ngrok lifecycle and passwordless, short-lived remote pairing | Software complete; live account validation pending |
-| ✅ Four-locale responsive web menu and safe power-off boundary | Software complete; Pi power-risk validation waits for Phase 8.6 helper installation |
-| ✅ QR onboarding and connection-triggered Greeting | Software complete; Pi display/Greeting validation pending |
-| ✅ Opt-in boot service and narrow power-off deployment | Software complete; Pi boot/power acceptance pending |
-| ✅ v1.0.0 software/package release candidate | Complete; public tag waits for signed Pi acceptance and owner approval |
-| 🔲 Full Raspberry Pi acceptance (benchmark, live hardware) | Pending operator validation |
+| ✅ Optional ngrok lifecycle and passwordless, short-lived remote pairing | Complete |
+| ✅ Four-locale responsive web menu and safe power-off boundary | Complete |
+| ✅ QR onboarding and connection-triggered Greeting | Complete |
+| ✅ Opt-in boot service and narrow power-off deployment | Complete |
+| ✅ v1.0.0 software/package release | Complete |
+| ✅ Full Raspberry Pi Phase 8 acceptance | Completed by the project owner |
 
 ---
 
-## 🛡️ Safety Notes
+## Safety notes
 
 - **Never expose port 8443 to the internet** or configure router port forwarding. The HTTPS controller is for your local network only.
 - **Raise the wheels** before any software movement test.

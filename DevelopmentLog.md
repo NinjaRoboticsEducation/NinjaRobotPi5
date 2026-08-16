@@ -1,5 +1,57 @@
 # NinjaRobotPi5V4 Development Log
 
+## 2026-08-16 — Public installation and documentation optimization
+
+### Scope and implementation
+
+- added a confirmed, rerunnable Raspberry Pi 5 installer with `--dry-run`,
+  `--check`, and non-interactive `--yes` modes; pinned uv, Ollama, and
+  whisper.cpp inputs; exact GPIO12/GPIO13 PWM rendering; boot-file backup;
+  private-directory creation; locked hardware dependency installation; camera
+  bridge setup; and driver provenance checks
+- kept Ollama model selection, all hardware initialization, Agent startup,
+  automatic-startup deployment, media capture, and actuator movement outside
+  the installer so each remains an explicit operator action
+- aligned fresh standalone defaults with the validated NinjaRobotPi5 profile:
+  buzzer GPIO27, display GPIO4/GPIO5/GPIO6 at 75%, fixed-focus camera, bundled
+  Hey Ninja model, local `~/whisper.cpp` detection, 15-second maximum command
+  capture, and responsive VAD/silence/cooldown values; existing saved settings
+  continue to take precedence
+- hardened buzzer cancellation so the cancellation result is returned only
+  after the output-off path completes, preventing an asynchronous tone from
+  outliving its reported operation
+- replaced the unusable formatter sample with a project documentation style
+  guide and index, moved historical plans/audits into `docs/project-history/`,
+  removed and ignored the private checkout-root `mic.json`, and added public
+  link/location governance tests
+- updated `README.md`, `InstallationGuide.md`, `DevelopmentGuide.md`,
+  `THIRD_PARTY_NOTICES.md`, and `AGENTS.md` for the v1.0.0 beginner installation
+  path, current status, dependency provenance, and future AI-agent guardrails
+
+### Validation
+
+- immutable verification passed for 222 managed files and 55 authorized
+  repairs; all six editable driver sources resolve directly to this checkout
+- the isolated managed-driver suites passed 457 tests: buzzer 68, camera 27,
+  display 65, microphone 92, servo 134, and distance sensor 71
+- the complete root gate passed compileall, Ruff lint, Ruff format, strict MyPy
+  over 81 source files, JavaScript syntax, Bash syntax, installer dry-run,
+  `git diff --check`, documentation governance, and 566 tests
+- the root tests retained one upstream Starlette/httpx deprecation warning;
+  ShellCheck and markdownlint were not installed, so Bash validation used
+  `bash -n` plus six dedicated installer/boot-renderer tests and documentation
+  structure used repository link tests
+
+### Compatibility and Raspberry Pi follow-up
+
+No Agent, model provider, MCP, memory, web, deployment, device-control, or
+behavior contract was intentionally changed. Existing private configuration
+overrides new first-run defaults. Automated validation did not run apt, download
+tools, edit `/boot`, start services, capture media, energize an actuator,
+reboot, or power off the Pi. A clean Raspberry Pi install must complete
+`docs/validation/v1.0.0-installation-optimization-pi-checklist.md` before the
+installer optimization is accepted for publication.
+
 ## 2026-08-16 — Power-off helper staging and X1208 shutdown repair
 
 ### Root cause and implementation
