@@ -1267,7 +1267,9 @@ re-executes the robot action.
 
 ### Adding a New MCP Server
 
-See the [Installation Guide](InstallationGuide.md#-set-up-tavily-web-search-optional) for operator setup. For development:
+See the [MCP and Agent Skills Tutorial](NinjaRobot_MCP_Skill.md) for the
+operator-facing Tavily setup, strict external-server configuration schema,
+read-only Google Calendar example, and custom MCP walkthrough. For development:
 
 1. Never pass raw GPIO fields or hardware-library objects through the MCP surface.
 2. Sandbox the server — a failed server must degrade only its own tools.
@@ -1275,7 +1277,9 @@ See the [Installation Guide](InstallationGuide.md#-set-up-tavily-web-search-opti
 
 ### Adding a New Agent Skill
 
-See the [Installation Guide](InstallationGuide.md) Agent Skills section. For development:
+See the [MCP and Agent Skills Tutorial](NinjaRobot_MCP_Skill.md) for the exact
+Skill package format and a complete validation, simulation, installation, and
+invocation example. For development:
 
 - Do not add SDK calls or provider credentials to a Skill
 - Skills are declarative Markdown plus strict JSON metadata

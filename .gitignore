@@ -3,6 +3,7 @@
 /reachy_mini/
 /reachy_mini_conversation_app/
 /templates/
+/transcript/
 
 # Local tooling and environments
 /.serena/

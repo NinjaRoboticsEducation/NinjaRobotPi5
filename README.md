@@ -195,6 +195,7 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 | Document | Purpose |
 |---|---|
 | [Installation Guide](InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
+| [MCP and Agent Skills Tutorial](NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
 | [Development Guide](DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
 | [Documentation Index](docs/README.md) | Public, developer, architecture, history, and validation documents |
 | [Audit Report](docs/project-history/AuditReport_260731.md) | Historical security, reliability, and documentation audit findings |

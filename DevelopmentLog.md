@@ -3370,3 +3370,29 @@ intentionally blocked until valid samples are observed.
 With Pi power disconnected, inspect the sensor window for film or obstruction,
 verify target alignment and the `3.3V/GND/SDA/SCL` path through DFR0566, then
 cold-power-cycle and rerun `pi5vl53l0x status` and `pi5vl53l0x test`.
+
+## 2026-08-19 — MCP and Agent Skills tutorial
+
+### Summary
+
+- Added a beginner-facing guide for NinjaRobotAgent's actual MCP configuration,
+  allowlisting, secret handling, lifecycle, testing, and troubleshooting.
+- Documented the supported Tavily preset and a compatible local read-only Google
+  Calendar server using Google's official Calendar API and OAuth read-only scope.
+- Added a confined custom MCP example that reads a Bluetooth speaker setup record
+  without contacting or controlling hardware.
+- Documented the strict Agent Skill package format and a complete read-only
+  calendar-summary Skill workflow.
+
+### Compatibility and safety
+
+This was a documentation-only change. Agent, IDE, driver, MCP, Skill, hardware,
+configuration, database, IPC, web, and deployment behavior remain unchanged.
+The guide explicitly excludes write-capable external tools, direct external MCP
+hardware control, hosted MCP OAuth claims unsupported by the current client,
+and text-to-speech claims unsupported by NinjaRobotPi5 v1.0.0.
+
+### Validation
+
+The tutorial examples were checked against the repository's strict MCP and
+Skill schemas. Repository validation results are recorded in the task handoff.

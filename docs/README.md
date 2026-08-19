@@ -7,6 +7,7 @@ supporting architecture, hardware, historical, and validation records.
 
 - [Project overview](../README.md)
 - [Installation guide](../InstallationGuide.md)
+- [MCP and Agent Skills tutorial](../NinjaRobot_MCP_Skill.md)
 - [Development guide](../DevelopmentGuide.md)
 - [Development log](../DevelopmentLog.md)
 - [Third-party notices](../THIRD_PARTY_NOTICES.md)
