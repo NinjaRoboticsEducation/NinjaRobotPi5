@@ -16,6 +16,8 @@ from ninjarobot_pi5_ide import (
     BehaviorRunner,
     BuzzerDevice,
     DisplayDevice,
+    IDEError,
+    MotionSafetyError,
     RobotAssembly,
     load_robot_config,
 )
@@ -72,6 +74,24 @@ class SlowDisplayDriver(FakeDisplayDriver):
         finally:
             with self._write_lock:
                 self.active_writes -= 1
+
+
+class CloseAwareDisplayDriver(FakeDisplayDriver):
+    def __init__(self) -> None:
+        super().__init__()
+        self.write_started = threading.Event()
+        self.write_finished = threading.Event()
+        self.closed_while_writing = False
+
+    def display(self, image: Any) -> None:
+        self.write_started.set()
+        time.sleep(0.03)
+        super().display(image)
+        self.write_finished.set()
+
+    def close(self) -> None:
+        self.closed_while_writing = not self.write_finished.is_set()
+        super().close()
 
 
 class FakeBuzzerDriver:
@@ -163,6 +183,220 @@ def build_runner(
         melody_provider=lambda _name: ((440, 0.01), (None, 0.01), (660, 0.01)),
     )
     return runner, display_driver, buzzer_driver
+
+
+def test_obstacle_interrupt_cancels_sibling_operations_and_later_stages() -> None:
+    async def exercise() -> None:
+        runner, display, buzzer = build_runner()
+
+        async def obstacle(_operation: Any, _behavior_name: str) -> dict[str, Any]:
+            await asyncio.sleep(0.01)
+            return {
+                "kind": "drive",
+                "stop_reason": "front_obstacle",
+                "warnings": [],
+                "simulated": True,
+            }
+
+        runner.set_drive_handler(obstacle)
+        definition = BehaviorDefinition.model_validate(
+            {
+                "schema_version": 1,
+                "name": "guarded_move",
+                "description": "Stop the complete behavior when an obstacle is detected.",
+                "category": "movement",
+                "stages": [
+                    {
+                        "name": "move_with_face",
+                        "operations": [
+                            {
+                                "kind": "face",
+                                "expression": "exciting",
+                                "hold_seconds": 5.0,
+                            },
+                            {
+                                "kind": "drive",
+                                "targets": {"left_motor": 45.0, "right_motor": -45.0},
+                                "hold_seconds": 5.0,
+                            },
+                        ],
+                    },
+                    {
+                        "name": "must_not_run",
+                        "operations": [
+                            {"kind": "tone", "frequency_hz": 880, "duration_seconds": 0.1}
+                        ],
+                    },
+                ],
+            }
+        )
+        await runner.start()
+        started = time.monotonic()
+
+        result = await runner.run(definition)
+
+        assert time.monotonic() - started < 1.0
+        assert result["completed"] is False
+        assert result["interrupted"] is True
+        assert result["interruption"]["stop_reason"] == "front_obstacle"
+        assert result["stages"] == []
+        assert buzzer.play_calls == []
+        assert len(display.frames) < 12
+        await runner.close()
+
+    asyncio.run(exercise())
+
+
+def test_persistent_motion_preflight_returns_chat_visible_recovery_error() -> None:
+    async def exercise() -> None:
+        runner, _display, _buzzer = build_runner()
+
+        async def blocked(_operation: Any, _behavior_name: str) -> dict[str, Any]:
+            raise MotionSafetyError(
+                "The Raspberry Pi reported undervoltage. Recovery: check power, then run "
+                "/resume in chat."
+            )
+
+        runner.set_drive_handler(blocked)
+        definition = BehaviorDefinition.model_validate(
+            {
+                "schema_version": 1,
+                "name": "blocked_move",
+                "description": "Exercise a persistent motion preflight block.",
+                "category": "movement",
+                "stages": [
+                    {
+                        "name": "move",
+                        "operations": [
+                            {
+                                "kind": "drive",
+                                "targets": {"left_motor": 45.0, "right_motor": -45.0},
+                                "hold_seconds": 1.0,
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        await runner.start()
+
+        with pytest.raises(IDEError) as raised:
+            await runner.run(definition)
+
+        assert raised.value.details.code == "MOTION_STOPPED"
+        assert "undervoltage" in raised.value.details.message
+        assert "Recovery:" in raised.value.details.message
+        assert raised.value.details.definitely_not_executed is False
+        await runner.close()
+
+    asyncio.run(exercise())
+
+
+def test_close_waits_for_active_display_write_and_leaves_no_face_task() -> None:
+    async def exercise() -> None:
+        display = CloseAwareDisplayDriver()
+        runner, _display, _buzzer = build_runner(display_driver=display)
+        definition = BehaviorDefinition.model_validate(
+            {
+                "schema_version": 1,
+                "name": "infinite_face",
+                "description": "Exercise shutdown while a frame is being written.",
+                "category": "expression",
+                "stages": [
+                    {
+                        "name": "face",
+                        "operations": [
+                            {"kind": "face", "expression": "idle", "hold_seconds": None}
+                        ],
+                    }
+                ],
+            }
+        )
+        await runner.start()
+        task = asyncio.create_task(runner.run(definition))
+        while not display.write_started.is_set():
+            await asyncio.sleep(0.001)
+
+        await runner.close()
+
+        assert display.write_finished.is_set()
+        assert display.closed_while_writing is False
+        assert display.closed == 1
+        assert task.done()
+        assert task.cancelled()
+
+    asyncio.run(exercise())
+
+
+def test_robot_shows_obstacle_warning_then_returns_to_idle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def exercise() -> None:
+        display = FakeDisplayDriver()
+        config = load_robot_config(EXAMPLE).model_copy(
+            update={
+                "behaviors": BehaviorConfig(
+                    user_directory=str(tmp_path / "behaviors"),
+                    safety_state_file=str(tmp_path / "safety.json"),
+                    system_stopped_display_seconds=0.0,
+                )
+            }
+        )
+        robot = RobotAssembly(
+            config=config,
+            display_factory=lambda **_settings: display,
+            buzzer_factory=lambda _pin, _volume: FakeBuzzerDriver(),
+            simulated=True,
+        )
+
+        async def obstacle(_operation: Any, _behavior_name: str) -> dict[str, Any]:
+            return {
+                "kind": "drive",
+                "stop_reason": "front_obstacle",
+                "warnings": [],
+                "simulated": True,
+            }
+
+        robot.behaviors.set_drive_handler(obstacle)
+        robot._liveliness_enabled = True  # type: ignore[attr-defined]
+        monkeypatch.setattr("ninjarobot_pi5_ide.robot.OBSTACLE_WARNING_SECONDS", 0.02)
+        definition = BehaviorDefinition.model_validate(
+            {
+                "schema_version": 1,
+                "name": "guarded_move",
+                "description": "Exercise the complete obstacle user flow.",
+                "category": "movement",
+                "stages": [
+                    {
+                        "name": "move",
+                        "operations": [
+                            {
+                                "kind": "drive",
+                                "targets": {"left_motor": 45.0, "right_motor": -45.0},
+                                "hold_seconds": 1.0,
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        await robot.start()
+
+        result = await robot.run_definition(definition)
+        await asyncio.sleep(0.01)
+
+        assert result["interrupted"] is True
+        assert result["requires_resume"] is False
+        assert result["next_state"] == "idle"
+        assert "No safety resume is required" in result["recovery_instruction"]
+        assert robot.safety_state.read().motion_latched is False
+        assert robot.status()["liveliness"]["state"] == "running"
+        assert robot.status()["liveliness"]["ambient_face"] == "idle"
+        assert len(display.frames) >= 2
+        await robot.close()
+
+    asyncio.run(exercise())
 
 
 @pytest.mark.parametrize(

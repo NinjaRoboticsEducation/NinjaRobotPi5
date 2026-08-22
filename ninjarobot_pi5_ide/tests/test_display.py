@@ -117,6 +117,19 @@ class BlockingDisplayDriver(FakeDisplayDriver):
         super().set_brightness(percent)
 
 
+class PeriodicFailureDisplayDriver(FakeDisplayDriver):
+    def __init__(self, *, fail_at: int = 20) -> None:
+        super().__init__()
+        self.fail_at = fail_at
+        self.display_calls = 0
+
+    def display(self, image: Any) -> None:
+        self.display_calls += 1
+        if self.display_calls == self.fail_at:
+            raise OSError("injected periodic SPI transfer failure")
+        super().display(image)
+
+
 def request(
     action_id: str,
     capability: str,
@@ -364,6 +377,63 @@ def test_repeated_recovery_closes_every_replaced_display_driver() -> None:
         assert len(drivers) == 21
         assert all(driver.close_calls == 1 for driver in drivers[:-1])
         assert all(driver.clear_calls == [(0, 0, 0)] for driver in drivers[1:])
+        assert await device.health() is ResourceHealth.READY
+        await device.close()
+        assert drivers[-1].close_calls == 1
+
+    asyncio.run(exercise())
+
+
+def test_transient_frame_failure_reconstructs_retries_and_restores_brightness() -> None:
+    async def exercise() -> None:
+        failed = FakeDisplayDriver(fail_write=True)
+        recovered = FakeDisplayDriver()
+        drivers = iter((failed, recovered))
+        device = DisplayDevice(driver_factory=lambda **_settings: next(drivers))
+        await device.start()
+        await device.set_brightness(percent=25)
+
+        result = await device.show_text(
+            text="Recovered",
+            font_size=24,
+            foreground="#FFFFFF",
+            background="#000000",
+        )
+
+        assert result["brightness"] == 25
+        assert failed.close_calls == 1
+        assert recovered.brightness_calls == [25]
+        assert recovered.clear_calls == [(0, 0, 0)]
+        assert recovered.frames == [("RGB", (320, 240))]
+        assert await device.health() is ResourceHealth.READY
+        await device.close()
+
+    asyncio.run(exercise())
+
+
+def test_long_frame_sequence_recovers_repeated_transient_driver_failures() -> None:
+    async def exercise() -> None:
+        drivers: list[PeriodicFailureDisplayDriver] = []
+
+        def factory(**_settings: Any) -> PeriodicFailureDisplayDriver:
+            driver = PeriodicFailureDisplayDriver()
+            drivers.append(driver)
+            return driver
+
+        device = DisplayDevice(driver_factory=factory)
+        await device.start()
+
+        for index in range(300):
+            await device.show_text(
+                text=f"Frame {index}",
+                font_size=20,
+                foreground="#FFFFFF",
+                background="#000000",
+            )
+
+        assert len(drivers) > 10
+        assert all(driver.close_calls == 1 for driver in drivers[:-1])
+        assert drivers[-1].close_calls == 0
         assert await device.health() is ResourceHealth.READY
         await device.close()
         assert drivers[-1].close_calls == 1

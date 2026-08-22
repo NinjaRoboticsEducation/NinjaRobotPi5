@@ -123,8 +123,11 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 - **Motion arming** — wheel movement requires your explicit per-session confirmation
 - **Privacy confirmation** — camera and microphone require separate consent
 - **Hardware lock** — only one process can own the robot at a time (OS file lock)
-- **Two-level stop** — Level 1 halts motors only; Level 2 (Emergency Stop) closes all devices
-- **Obstacle detection** — three consecutive forward readings below 50 mm automatically stop forward movement
+- **Two-level stop** — genuine motion and system faults stop safely and explain
+  both their cause and confirmed recovery step
+- **Obstacle interruption** — three consecutive guarded readings at or below
+  50 mm stop only the current behavior, show a scary face, and return to Idle
+  without creating an Emergency Stop latch
 - **Watchdog** — a background thread stops the motors if the main loop freezes
 - **AI is sandboxed** — the AI model proposes actions; the IDE safety layer executes or refuses them
 
@@ -212,6 +215,7 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 | [v1.0.0 Support Matrix](docs/architecture/v1.0.0-support-matrix.md) | Supported platforms/features, compatibility guarantees, known limitations, and open Pi acceptance |
 | [Installation Optimization Validation](docs/validation/v1.0.0-installation-optimization-pi-checklist.md) | Clean-install, device, actuator, regression, boot, and power acceptance |
 | [Boot QR Runtime Validation](docs/validation/boot-autostart-lgpio-runtime-pi-checklist.md) | Fresh-clone deployment repair, reboot ownership, display QR, Greeting, Idle, and rollback |
+| [Obstacle and Display Stability Validation](docs/validation/obstacle-display-stability-pi-checklist.md) | Non-latching obstacle interruption, persistent-stop guidance, display endurance, manual Emergency Stop, and rollback |
 
 ---
 

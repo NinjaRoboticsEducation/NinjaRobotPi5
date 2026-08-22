@@ -508,8 +508,12 @@ wheels raised and test in this order:
 2. A face expression — confirm the display updates
 3. **Greeting** — confirm the face and sound sequence
 4. A short wheel movement — confirm both raised wheels respond and stop
-5. **Emergency Stop** — confirm outputs stop and the red stop icon remains
-6. **Resume Robot Movement** — confirm devices are reinitialized and Idle returns
+5. While a short guarded movement runs, place a flat target within 50 mm of the
+   front sensor—confirm the wheels stop, the scary face appears, Idle returns,
+   and a different movement works without Resume
+6. **Emergency Stop** — confirm outputs stop, the red stop icon remains, and the
+   result identifies the operator stop plus the Resume instruction
+7. **Resume Robot Movement** — confirm devices are reinitialized and Idle returns
 
 If you want a no-hardware preview, choose **Simulation** in this same tool; a
 separate long command is not necessary.
@@ -951,7 +955,19 @@ the exact quoted label is retained while the catalog identifier is normalized.
 
 ### Recovering from emergency stop
 
-If the Emergency Stop is triggered (Level 2), enter `/resume` in the terminal or web chat box and type `RESUME` when asked. The agent runs all-module health checks directly — it does not ask the AI model. On success, the Emergency Stop clears and Idle returns. AI motion stays disarmed; use `/arm` separately before asking for another servo movement.
+If a persistent safety stop occurs, the Agent chat and service log identify the
+reason, explain the likely cause, and give the recovery step. Correct the
+reported power, hardware, or service condition first. Then enter
+`/resume` in terminal or web chat and type `RESUME` when asked. The Agent runs
+all-module health checks directly—it does not ask the AI model. On success, the
+Emergency Stop clears and Idle returns. AI motion stays disarmed; use `/arm`
+separately before asking for another servo movement.
+
+An ordinary obstacle interruption is different. Three consecutive guarded
+distance readings at or below 50 mm stop only the current behavior. The robot
+shows a scary face for two seconds, reports that the path must be checked, and
+returns to Idle. Do not enter `/resume`: clear the path and issue a new command.
+The interrupted behavior never restarts automatically.
 
 ### Enabling an AI-controlled photo
 
@@ -1211,6 +1227,19 @@ ls -l /dev/spidev0.0
 
 Then confirm DC GPIO4, RST GPIO5, and BL GPIO6 are connected correctly. Never rewire while powered. Reopen `pi5disp display-tool` using `PI5DISP_CONFIG` and review its saved settings.
 
+When the Agent owns the hardware, do not open the standalone display tool.
+Instead, inspect the recovery log:
+
+```bash
+ninjarobot-agent deployment logs --lines 200
+```
+
+Expected result after a transient fault: the log reports ST7789V reconstruction
+and a successful frame retry, and Idle continues without restarting the Agent.
+If it reports that automatic recovery and the single retry both failed, stop
+the Agent, power the robot off, inspect the SPI and DC/RST/BL wiring, and then
+cold-start it. Do not repeatedly restart against loose or shorted wiring.
+
 ---
 
 #### 📡 Distance Sensor Always Returns `8191`
@@ -1240,6 +1269,11 @@ ninjarobot-ide-tool hardware status --real
 ```
 
 Both calibrations must exist, both motion flags must be `true`, and no safety latch must be active.
+
+If chat says an obstacle interrupted the behavior and `requires_resume` is
+`false`, the safety state is intentionally clear. Move the obstacle, verify the
+front sensor is unobstructed, and issue a new command. Do not run a resume
+command for this normal interruption.
 
 If a Level 1 motion latch is active:
 

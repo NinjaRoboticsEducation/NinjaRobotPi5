@@ -124,12 +124,13 @@ class AgentRuntime:
         self._identity_states: dict[str, str] = {}
         self._pending_confirmation_prompts: set[str] = set()
         self._automatic_memory_notices: dict[str, set[str]] = {}
+        self._execution_notices: dict[str, list[str]] = {}
         self._voice_input: VoiceInputServiceProtocol | None = None
         self.loop.set_active_user_provider(self._active_users.get)
         self.loop.set_memory_context_provider(
             self._memory_context_for_session if memory is not None else None
         )
-        self.loop.set_tool_result_observer(self._record_tool_result if memory is not None else None)
+        self.loop.set_tool_result_observer(self._record_tool_result)
 
     def begin_startup_liveliness(self) -> None:
         """Mark Greeting/Idle startup as pending before the IPC socket is bound."""
@@ -261,6 +262,7 @@ class AgentRuntime:
                         notices.append("Memory saved: preference.")
                 for kind in sorted(self._automatic_memory_notices.pop(session_id, set())):
                     notices.append(f"Memory saved: {kind.replace('_', ' ')}.")
+                notices.extend(self._execution_notices.pop(session_id, []))
                 if session_id in self._pending_confirmation_prompts:
                     self._pending_confirmation_prompts.discard(session_id)
                     notices.append(
@@ -871,6 +873,27 @@ class AgentRuntime:
         invocation: ToolInvocation,
         result: ToolExecutionResult,
     ) -> None:
+        notice: str | None = None
+        if isinstance(result.data, dict):
+            user_message = result.data.get("user_message")
+            if isinstance(user_message, str) and user_message.strip():
+                notice = " ".join(user_message.split())[:1000]
+        if notice is None and result.error and "Recovery:" in result.error:
+            notice = " ".join(result.error.split())[:1000]
+        if notice is not None:
+            pending = self._execution_notices.setdefault(invocation.session_id, [])
+            if notice not in pending:
+                pending.append(notice)
+            await self.events.publish(
+                AgentEventType.ERROR,
+                notice,
+                session_id=invocation.session_id,
+                correlation_id=invocation.call.call_id,
+                data={
+                    "kind": "robot_stop_guidance",
+                    "tool": invocation.call.name,
+                },
+            )
         if self._memory_capture is None:
             return
         user_id = self._active_users.get(invocation.session_id)
@@ -911,7 +934,7 @@ class AgentRuntime:
             session_id,
             ModelMessage(role=MessageRole.ASSISTANT, content=notice),
             message_id=f"message-{uuid.uuid4().hex}",
-            user_id=self._active_users[session_id],
+            user_id=self._active_users.get(session_id),
             metadata={"workflow": "memory-notice"},
         )
         if on_text_delta is not None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import subprocess
 import tempfile
@@ -19,6 +20,8 @@ from .behavior_models import DriveOperation
 from .config import BehaviorConfig
 from .errors import IDEError
 from .servo import ServoDevice
+
+LOGGER = logging.getLogger(__name__)
 
 
 class DistanceReader(Protocol):
@@ -43,6 +46,38 @@ class AsyncSuspendable(Protocol):
 
 class MotionSafetyError(RuntimeError):
     """A policy or preflight block that is not a hardware-driver failure."""
+
+
+@dataclass(frozen=True)
+class StopGuidance:
+    """Bounded operator explanation for one deterministic safety stop."""
+
+    cause: str
+    recovery_instruction: str
+
+
+def stop_guidance(reason: str | None, *, fault_detail: str | None = None) -> StopGuidance:
+    """Translate a durable stop reason into consistent user recovery guidance."""
+    causes = {
+        "operator_stop": "The Emergency Stop was requested by an operator.",
+        "undervoltage": "The Raspberry Pi reported undervoltage while the robot was moving.",
+        "software_watchdog": "The motion-control watchdog stopped receiving timely updates.",
+        "driver_interrupted": "The servo driver reported that movement was interrupted.",
+        "driver_failure": "A robot hardware driver failed during behavior execution.",
+        "invalid_safety_state": "The saved safety-state file was invalid or unreadable.",
+    }
+    cause = causes.get(reason or "", f"The robot entered a safety stop ({reason or 'unknown'}).")
+    if fault_detail:
+        cause = f"{cause} Hardware detail: {fault_detail[:500]}"
+    return StopGuidance(
+        cause=cause,
+        recovery_instruction=(
+            "Remove any hazard and correct the reported power, hardware, or service problem. "
+            "Then click Resume Robot Movement in the web controller or run /resume in chat. "
+            "The interrupted behavior will not restart automatically; issue a new command "
+            "after recovery."
+        ),
+    )
 
 
 @dataclass(frozen=True)
@@ -274,12 +309,17 @@ class MotionController:
         async with self._motion_lock:
             snapshot = self._state.read()
             if snapshot.system_latched:
+                guidance = stop_guidance(
+                    snapshot.reason,
+                    fault_detail=snapshot.fault_detail,
+                )
                 raise MotionSafetyError(
-                    f"system is latched ({snapshot.reason}); run system resume --confirm"
+                    f"{guidance.cause} Recovery: {guidance.recovery_instruction}"
                 )
             if snapshot.motion_latched:
+                guidance = stop_guidance(snapshot.reason)
                 raise MotionSafetyError(
-                    f"motion is latched ({snapshot.reason}); run motion resume --confirm"
+                    f"{guidance.cause} Recovery: {guidance.recovery_instruction}"
                 )
             targets = self._resolve_targets(operation)
             await asyncio.gather(self._servo.start(), self._distance.start())
@@ -333,7 +373,7 @@ class MotionController:
                 await asyncio.gather(*monitor_tasks, return_exceptions=True)
                 await self._servo.stop()
                 self._active = False
-            return {
+            result = {
                 "kind": "drive",
                 "targets": operation.targets,
                 "resolved_endpoints": targets,
@@ -342,11 +382,34 @@ class MotionController:
                 "warnings": list(self._warnings),
                 "simulated": self._servo.simulated,
             }
+            snapshot = self._state.read()
+            if snapshot.motion_latched:
+                guidance = stop_guidance(
+                    snapshot.reason,
+                    fault_detail=snapshot.fault_detail,
+                )
+                result.update(
+                    {
+                        "latched": True,
+                        "cause": guidance.cause,
+                        "recovery_instruction": guidance.recovery_instruction,
+                    }
+                )
+            else:
+                result["latched"] = False
+            return result
 
     async def stop_motion(self, reason: str, *, latch: bool) -> dict[str, Any]:
         """Stop both motors and optionally persist a Level 1 restart gate."""
+        guidance = stop_guidance(reason)
         if latch:
             self._state.latch_motion(reason)
+            LOGGER.error(
+                "Persistent motion stop activated: reason=%s cause=%s recovery=%s",
+                reason,
+                guidance.cause,
+                guidance.recovery_instruction,
+            )
         self._stop_reason = reason
         self._stop_event.set()
         servo_result = await self._servo.stop()
@@ -354,6 +417,10 @@ class MotionController:
             "level": 1,
             "reason": reason,
             "latched": latch,
+            "cause": guidance.cause,
+            "recovery_instruction": (
+                guidance.recovery_instruction if latch else "No safety resume is required."
+            ),
             "servo": servo_result,
         }
 
@@ -387,7 +454,14 @@ class MotionController:
                         operation.obstacle_policy == "front_guarded"
                         and below_count >= self._config.obstacle_consecutive_readings
                     ):
-                        await self.stop_motion("front_obstacle", latch=True)
+                        LOGGER.warning(
+                            "Obstacle interrupted behavior movement: distance_mm=%s "
+                            "threshold_mm=%s consecutive_readings=%s; no safety latch was set.",
+                            reading["distance_mm"],
+                            self._config.obstacle_threshold_mm,
+                            below_count,
+                        )
+                        await self.stop_motion("front_obstacle", latch=False)
                         return
                 else:
                     below_count = 0
@@ -488,6 +562,7 @@ class SystemSafetyController:
     ) -> dict[str, Any]:
         """Stop motion, ranging/capture devices, and sound; preserve the display."""
         async with self._stop_lock:
+            guidance = stop_guidance(reason, fault_detail=fault_detail)
             if latch:
                 snapshot = self._state.latch_system(reason, fault_detail=fault_detail)
             else:
@@ -495,6 +570,13 @@ class SystemSafetyController:
             # Close the presentation gate before cleanup starts.  Without this,
             # an idle/face task can win the display race after the stop request.
             self._locally_stopped = True
+            LOGGER.error(
+                "System safety stop activated: reason=%s persistent=%s cause=%s recovery=%s",
+                reason,
+                latch,
+                guidance.cause,
+                guidance.recovery_instruction,
+            )
             results = await asyncio.gather(
                 self._motion.stop_motion(reason, latch=False),
                 self._silence_buzzer(),
@@ -520,6 +602,9 @@ class SystemSafetyController:
                 "level": 2,
                 "reason": reason,
                 "latched": latch,
+                "cause": guidance.cause,
+                "recovery_instruction": guidance.recovery_instruction,
+                "user_message": f"{guidance.cause} Recovery: {guidance.recovery_instruction}",
                 "persistent_state": asdict(snapshot),
                 "cleanup_errors": cleanup_errors,
             }

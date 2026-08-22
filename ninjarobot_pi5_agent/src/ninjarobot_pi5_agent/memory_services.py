@@ -71,6 +71,8 @@ class MemoryCaptureService:
             failure_class=_failure_class(result),
         )
         if result.status is ToolExecutionStatus.SUCCEEDED:
+            if _normal_behavior_interruption(result):
+                return MemoryCaptureOutcome()
             if invocation.call.name in NEW_BEHAVIOR_TOOLS:
                 await self._store.set_pending_behavior_confirmation(
                     user_id,
@@ -268,6 +270,17 @@ class MemoryRetrievalService:
 
 def _attempt_status(status: ToolExecutionStatus) -> BehaviorAttemptStatus:
     return BehaviorAttemptStatus(status.value)
+
+
+def _normal_behavior_interruption(result: ToolExecutionResult) -> bool:
+    """Exclude an obstacle-controlled stop from success and failure learning."""
+    data = result.data
+    return bool(
+        isinstance(data, dict)
+        and data.get("interrupted") is True
+        and isinstance(data.get("interruption"), dict)
+        and data["interruption"].get("stop_reason") == "front_obstacle"
+    )
 
 
 def _failure_class(result: ToolExecutionResult) -> str | None:

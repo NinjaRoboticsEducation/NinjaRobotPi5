@@ -20,11 +20,11 @@ from .camera import CameraDevice, CameraFactory
 from .config import RobotConfig
 from .display import DisplayDevice, DisplayFactory
 from .distance import SensorFactory, VL53L0XDistanceAdapter
-from .errors import describe_hardware_driver_error, is_hardware_driver_error
+from .errors import IDEError, describe_hardware_driver_error, is_hardware_driver_error
 from .face_renderer import render_emergency_stop
 from .hardware_ownership import HardwareOwnership
 from .microphone import MicrophoneBackendFactory, MicrophoneDevice
-from .models import ResourceHealth
+from .models import ErrorDetails, ResourceHealth, RetrySafety
 from .qr_display import render_pairing_qr
 from .safety import (
     MotionController,
@@ -34,6 +34,7 @@ from .safety import (
     SystemSafetyController,
     UndervoltageProvider,
     raspberry_pi_undervoltage_active,
+    stop_guidance,
 )
 from .servo import ServoDevice, ServoFactory
 from .simulation import (
@@ -45,6 +46,7 @@ from .simulation import (
 )
 
 CAMERA_COUNTDOWN_INTERVAL_SECONDS = 1.0
+OBSTACLE_WARNING_SECONDS = 2.0
 LOGGER = logging.getLogger(__name__)
 
 
@@ -188,6 +190,8 @@ class RobotAssembly:
         self._idle_lock = asyncio.Lock()
         self._idle_error: str | None = None
         self._closing = False
+        self._closed = False
+        self._close_lock = asyncio.Lock()
         self._hardware_ownership = HardwareOwnership()
         if not simulated:
             self._hardware_ownership.acquire()
@@ -242,13 +246,77 @@ class RobotAssembly:
         """Run one already-validated definition through the same safety boundary."""
         if self.system_safety.stopped:
             snapshot = self.safety_state.read()
-            raise RuntimeError(
-                f"system is stopped ({snapshot.reason or 'local_stop'}); "
-                "resume or launch a fresh tool process"
+            guidance = stop_guidance(
+                snapshot.reason or "operator_stop",
+                fault_detail=snapshot.fault_detail,
+            )
+            raise IDEError(
+                ErrorDetails(
+                    code="SYSTEM_STOPPED",
+                    message=f"{guidance.cause} Recovery: {guidance.recovery_instruction}",
+                    technical_detail=snapshot.fault_detail,
+                    definitely_not_executed=True,
+                    retry_safety=RetrySafety.SAFE,
+                    capability="behavior.run",
+                )
             )
         await self._begin_foreground_behavior()
         try:
             result = await self.behaviors.run(definition)
+            interruption = result.get("interruption")
+            if (
+                result.get("interrupted") is True
+                and isinstance(interruption, dict)
+                and interruption.get("stop_reason") == "front_obstacle"
+            ):
+                message = (
+                    "An obstacle was detected inside the configured safety distance, so "
+                    "the current movement was stopped."
+                )
+                recovery = (
+                    "No safety resume is required. Check and clear the robot's path, then "
+                    "issue a new command. The interrupted behavior will not restart "
+                    "automatically."
+                )
+                LOGGER.warning(
+                    "Behavior interrupted by obstacle: behavior=%s cause=%s recovery=%s",
+                    definition.name,
+                    message,
+                    recovery,
+                )
+                await self.behaviors.run(self._obstacle_warning_definition())
+                result = {
+                    **result,
+                    "cause": message,
+                    "recovery_instruction": recovery,
+                    "user_message": f"{message} {recovery}",
+                    "requires_resume": False,
+                    "next_state": "idle",
+                }
+            elif result.get("interrupted") is True and isinstance(interruption, dict):
+                persistent_cause = interruption.get("cause")
+                persistent_recovery = interruption.get("recovery_instruction")
+                if not isinstance(persistent_cause, str) or not isinstance(
+                    persistent_recovery, str
+                ):
+                    guidance = stop_guidance(str(interruption.get("stop_reason") or "unknown"))
+                    persistent_cause = guidance.cause
+                    persistent_recovery = guidance.recovery_instruction
+                LOGGER.error(
+                    "Behavior interrupted by persistent safety stop: behavior=%s "
+                    "cause=%s recovery=%s",
+                    definition.name,
+                    persistent_cause,
+                    persistent_recovery,
+                )
+                result = {
+                    **result,
+                    "cause": persistent_cause,
+                    "recovery_instruction": persistent_recovery,
+                    "user_message": (f"{persistent_cause} Recovery: {persistent_recovery}"),
+                    "requires_resume": True,
+                    "next_state": "safety_stopped",
+                }
         finally:
             await self._end_foreground_behavior()
         return result
@@ -364,29 +432,39 @@ class RobotAssembly:
 
     async def close(self) -> None:
         """Release all assembly-owned devices."""
-        self._closing = True
-        self._idle_suppressed = True
-        try:
-            await self._stop_idle()
-            await self.behaviors.stop()
-            await asyncio.gather(
-                self.servo.close(),
-                self.distance.close(),
-                self.camera.close(),
-                self.microphone.close(),
-                return_exceptions=True,
-            )
-            await self.behaviors.close()
-        finally:
-            self._hardware_ownership.release()
+        async with self._close_lock:
+            if self._closed:
+                return
+            self._closing = True
+            self._idle_suppressed = True
+            try:
+                await self._stop_idle()
+                await self.behaviors.stop()
+                await asyncio.gather(
+                    self.servo.close(),
+                    self.distance.close(),
+                    self.camera.close(),
+                    self.microphone.close(),
+                    return_exceptions=True,
+                )
+                await self.behaviors.close()
+                self._closed = True
+            finally:
+                self._hardware_ownership.release()
 
-    async def _driver_failure(self, error: Exception) -> None:
-        if isinstance(error, MotionSafetyError) or not is_hardware_driver_error(error):
-            return
+    async def _driver_failure(self, error: Exception) -> str | None:
+        if (
+            getattr(self, "_closing", False)
+            or isinstance(error, MotionSafetyError)
+            or not is_hardware_driver_error(error)
+        ):
+            return None
         detail = describe_hardware_driver_error(error)
+        guidance = stop_guidance("driver_failure", fault_detail=detail)
         LOGGER.error(
-            "Hardware driver failure escalated to a persistent Level 2 stop: %s",
+            "Hardware driver failure escalated to a persistent Level 2 stop: %s recovery=%s",
             detail,
+            guidance.recovery_instruction,
             exc_info=(type(error), error, error.__traceback__),
         )
         self._idle_suppressed = True
@@ -399,6 +477,7 @@ class RobotAssembly:
         cleanup_errors = stopped.get("cleanup_errors")
         if cleanup_errors:
             LOGGER.error("Level 2 cleanup reported errors: %s", cleanup_errors)
+        return guidance.recovery_instruction
 
     async def _start_idle_if_safe(self) -> None:
         if (
@@ -493,6 +572,30 @@ class RobotAssembly:
                 BehaviorStage(
                     name=f"silent_{expression}_face",
                     operations=(source.model_copy(update={"hold_seconds": None}),),
+                ),
+            ),
+        )
+
+    def _obstacle_warning_definition(self) -> BehaviorDefinition:
+        """Show one bounded scary face without extending the stopped movement."""
+        configured = self.assets.load("scary")
+        source = next(
+            operation
+            for stage in configured.stages
+            for operation in stage.operations
+            if isinstance(operation, FaceOperation)
+        )
+        return BehaviorDefinition(
+            schema_version=1,
+            name="obstacle_warning",
+            description="Show a bounded silent obstacle warning before returning to Idle.",
+            category="expression",
+            stages=(
+                BehaviorStage(
+                    name="scary_obstacle_face",
+                    operations=(
+                        source.model_copy(update={"hold_seconds": OBSTACLE_WARNING_SECONDS}),
+                    ),
                 ),
             ),
         )

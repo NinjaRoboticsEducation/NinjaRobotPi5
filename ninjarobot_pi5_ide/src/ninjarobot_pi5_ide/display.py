@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import logging
 from collections.abc import Callable
 from typing import Any, Protocol, TypeVar, cast
 
@@ -25,6 +26,7 @@ DEFAULT_FONT_SIZE = 32
 DEFAULT_FOREGROUND = "#FFFFFF"
 DEFAULT_BACKGROUND = "#000000"
 DISPLAY_RESOURCES = ("display", "spi0", "gpio4", "gpio5", "gpio6")
+LOGGER = logging.getLogger(__name__)
 
 
 class DisplayDriver(Protocol):
@@ -122,6 +124,7 @@ class DisplayDevice:
         self._startup_error: str | None = None
         self._lock = asyncio.Lock()
         self._start_attempted = False
+        self._ever_ready = False
         self._closed = False
 
     @property
@@ -142,52 +145,7 @@ class DisplayDevice:
     async def recover(self) -> None:
         """Reconstruct the backend and prove that one real frame write succeeds."""
         async with self._lock:
-            if self._closed:
-                raise RuntimeError("display device is closed")
-            self._start_attempted = True
-            previous = self._driver
-            self._driver = None
-            close_error: str | None = None
-            if previous is not None:
-                try:
-                    await _run_thread_to_completion(previous.close)
-                except Exception as exc:
-                    close_error = f"previous close failed: {type(exc).__name__}: {exc}"
-
-            self._startup_error = None
-            await self._initialize_locked()
-            driver = self._driver
-            if driver is None:
-                detail = self._startup_error or "display reconstruction did not return a driver"
-                if close_error is not None:
-                    detail = f"{close_error}; {detail}"
-                raise _display_error(
-                    code="DISPLAY_RECOVERY_FAILED",
-                    message="The ST7789V display backend could not be reconstructed.",
-                    technical_detail=detail,
-                    definitely_not_executed=True,
-                    capability="system.resume",
-                )
-
-            try:
-                ready = await _run_thread_to_completion(driver.health_check)
-                if not ready:
-                    raise RuntimeError("reconstructed driver reported unhealthy")
-                await _run_thread_to_completion(driver.clear, (0, 0, 0))
-            except Exception as exc:
-                self._driver = None
-                self._startup_error = f"{type(exc).__name__}: {exc}"
-                try:
-                    await _run_thread_to_completion(driver.close)
-                except Exception:
-                    pass
-                raise _display_error(
-                    code="DISPLAY_RECOVERY_FAILED",
-                    message="The reconstructed ST7789V display failed its write probe.",
-                    technical_detail=self._startup_error,
-                    definitely_not_executed=False,
-                    capability="system.resume",
-                ) from exc
+            await self._recover_locked(capability="system.resume")
 
     async def show_text(
         self,
@@ -230,16 +188,12 @@ class DisplayDevice:
                 align="center",
                 font_size=font_size,
             )
-            try:
-                await _run_thread_to_completion(driver.display, image)
-            except Exception as exc:
-                raise _display_error(
-                    code="DISPLAY_WRITE_FAILED",
-                    message="The ST7789V display could not write the text frame.",
-                    technical_detail=f"{type(exc).__name__}: {exc}",
-                    definitely_not_executed=False,
-                    capability="display.show_text",
-                ) from exc
+            driver = await self._execute_with_recovery_locked(
+                lambda active: active.display(image),
+                code="DISPLAY_WRITE_FAILED",
+                message="The ST7789V display could not write the text frame.",
+                capability="display.show_text",
+            )
             return {
                 "text": text,
                 "font_size": font_size,
@@ -264,16 +218,12 @@ class DisplayDevice:
                     capability="display.show_image",
                 )
             frame = image.convert("RGB")
-            try:
-                await _run_thread_to_completion(driver.display, frame)
-            except Exception as exc:
-                raise _display_error(
-                    code="DISPLAY_WRITE_FAILED",
-                    message="The ST7789V display could not write the image frame.",
-                    technical_detail=f"{type(exc).__name__}: {exc}",
-                    definitely_not_executed=False,
-                    capability="display.show_image",
-                ) from exc
+            driver = await self._execute_with_recovery_locked(
+                lambda active: active.display(frame),
+                code="DISPLAY_WRITE_FAILED",
+                message="The ST7789V display could not write the image frame.",
+                capability="display.show_image",
+            )
             return {
                 "source": source,
                 "width": driver.width,
@@ -292,17 +242,12 @@ class DisplayDevice:
     async def clear(self, *, color: str) -> dict[str, Any]:
         """Fill the display with one bounded RGB color."""
         async with self._lock:
-            driver = await self._require_driver_locked("display.clear")
-            try:
-                await _run_thread_to_completion(driver.clear, _rgb(color))
-            except Exception as exc:
-                raise _display_error(
-                    code="DISPLAY_CLEAR_FAILED",
-                    message="The ST7789V display could not clear the frame.",
-                    technical_detail=f"{type(exc).__name__}: {exc}",
-                    definitely_not_executed=False,
-                    capability="display.clear",
-                ) from exc
+            await self._execute_with_recovery_locked(
+                lambda active: active.clear(_rgb(color)),
+                code="DISPLAY_CLEAR_FAILED",
+                message="The ST7789V display could not clear the frame.",
+                capability="display.clear",
+            )
             return {
                 "cleared": True,
                 "color": color,
@@ -312,17 +257,12 @@ class DisplayDevice:
     async def set_brightness(self, *, percent: int) -> dict[str, Any]:
         """Set and remember one bounded backlight brightness."""
         async with self._lock:
-            driver = await self._require_driver_locked("display.set_brightness")
-            try:
-                await _run_thread_to_completion(driver.set_brightness, percent)
-            except Exception as exc:
-                raise _display_error(
-                    code="DISPLAY_BRIGHTNESS_FAILED",
-                    message="The ST7789V backlight brightness could not be changed.",
-                    technical_detail=f"{type(exc).__name__}: {exc}",
-                    definitely_not_executed=False,
-                    capability="display.set_brightness",
-                ) from exc
+            await self._execute_with_recovery_locked(
+                lambda active: active.set_brightness(percent),
+                code="DISPLAY_BRIGHTNESS_FAILED",
+                message="The ST7789V backlight brightness could not be changed.",
+                capability="display.set_brightness",
+            )
             self._brightness = percent
             return {
                 "brightness": percent,
@@ -351,16 +291,18 @@ class DisplayDevice:
             if driver is not None:
                 await _run_thread_to_completion(driver.close)
 
-    async def _initialize_locked(self) -> None:
+    async def _initialize_locked(self, *, brightness: int | None = None) -> None:
         if self._driver is not None:
             return
+        target_brightness = self._initial_brightness if brightness is None else brightness
         driver: DisplayDriver | None = None
         try:
             driver = await _run_thread_to_completion(self._driver_factory, **self._settings)
-            await _run_thread_to_completion(driver.set_brightness, self._initial_brightness)
-            self._brightness = self._initial_brightness
+            await _run_thread_to_completion(driver.set_brightness, target_brightness)
+            self._brightness = target_brightness
             self._driver = driver
             self._startup_error = None
+            self._ever_ready = True
         except Exception as exc:
             if driver is not None:
                 try:
@@ -371,9 +313,13 @@ class DisplayDevice:
             self._startup_error = f"{type(exc).__name__}: {exc}"
 
     async def _require_driver_locked(self, capability: str) -> DisplayDriver:
+        if self._closed:
+            raise RuntimeError("display device is closed")
         if not self._start_attempted:
             self._start_attempted = True
             await self._initialize_locked()
+        elif self._driver is None and self._ever_ready:
+            await self._recover_locked(capability=capability)
         if self._driver is None:
             raise _display_error(
                 code="DISPLAY_UNAVAILABLE",
@@ -383,6 +329,124 @@ class DisplayDevice:
                 capability=capability,
             )
         return self._driver
+
+    async def _recover_locked(self, *, capability: str) -> None:
+        """Replace one failed backend and prove the replacement can write."""
+        if self._closed:
+            raise RuntimeError("display device is closed")
+        self._start_attempted = True
+        previous = self._driver
+        brightness = self._brightness
+        self._driver = None
+        close_error: str | None = None
+        if previous is not None:
+            try:
+                await _run_thread_to_completion(previous.close)
+            except Exception as exc:
+                close_error = f"previous close failed: {type(exc).__name__}: {exc}"
+
+        LOGGER.warning("Reconstructing the ST7789V display backend for %s.", capability)
+        self._startup_error = None
+        await self._initialize_locked(brightness=brightness)
+        driver = self._driver
+        if driver is None:
+            detail = self._startup_error or "display reconstruction did not return a driver"
+            if close_error is not None:
+                detail = f"{close_error}; {detail}"
+            LOGGER.error("ST7789V display reconstruction failed: %s", detail)
+            raise _display_error(
+                code="DISPLAY_RECOVERY_FAILED",
+                message="The ST7789V display backend could not be reconstructed.",
+                technical_detail=detail,
+                definitely_not_executed=True,
+                capability=capability,
+            )
+
+        try:
+            ready = await _run_thread_to_completion(driver.health_check)
+            if not ready:
+                raise RuntimeError("reconstructed driver reported unhealthy")
+            await _run_thread_to_completion(driver.clear, (0, 0, 0))
+        except Exception as exc:
+            detail = f"{type(exc).__name__}: {exc}"
+            await self._invalidate_driver_locked(detail)
+            LOGGER.error("ST7789V display recovery write probe failed: %s", detail)
+            raise _display_error(
+                code="DISPLAY_RECOVERY_FAILED",
+                message="The reconstructed ST7789V display failed its write probe.",
+                technical_detail=detail,
+                definitely_not_executed=False,
+                capability=capability,
+            ) from exc
+        LOGGER.info(
+            "ST7789V display recovery succeeded for %s at brightness=%s%%.",
+            capability,
+            self._brightness,
+        )
+
+    async def _execute_with_recovery_locked(
+        self,
+        operation: Callable[[DisplayDriver], Any],
+        *,
+        code: str,
+        message: str,
+        capability: str,
+    ) -> DisplayDriver:
+        """Run one idempotent display operation with one reconstruction and retry."""
+        driver = await self._require_driver_locked(capability)
+        try:
+            await _run_thread_to_completion(operation, driver)
+            return driver
+        except Exception as first_error:
+            first_detail = f"{type(first_error).__name__}: {first_error}"
+            LOGGER.warning(
+                "ST7789V operation failed; attempting one bounded recovery: capability=%s error=%s",
+                capability,
+                first_detail,
+            )
+            try:
+                await self._recover_locked(capability=capability)
+            except Exception as recovery_error:
+                recovery_detail = f"{type(recovery_error).__name__}: {recovery_error}"
+                raise _display_error(
+                    code=code,
+                    message=f"{message} Automatic display recovery also failed.",
+                    technical_detail=f"first={first_detail}; recovery={recovery_detail}",
+                    definitely_not_executed=False,
+                    capability=capability,
+                ) from recovery_error
+
+        recovered = await self._require_driver_locked(capability)
+        try:
+            await _run_thread_to_completion(operation, recovered)
+        except Exception as retry_error:
+            retry_detail = f"{type(retry_error).__name__}: {retry_error}"
+            await self._invalidate_driver_locked(retry_detail)
+            raise _display_error(
+                code=code,
+                message=f"{message} The single safe retry also failed.",
+                technical_detail=f"first={first_detail}; retry={retry_detail}",
+                definitely_not_executed=False,
+                capability=capability,
+            ) from retry_error
+        LOGGER.info("ST7789V frame retry succeeded for %s.", capability)
+        return recovered
+
+    async def _invalidate_driver_locked(self, detail: str) -> None:
+        """Close and forget one failed backend while retaining its diagnostic."""
+        driver = self._driver
+        self._driver = None
+        self._startup_error = detail
+        if driver is None:
+            return
+        try:
+            await _run_thread_to_completion(driver.close)
+        except Exception as close_error:
+            LOGGER.error(
+                "Failed to close an invalid ST7789V backend: %s: %s",
+                type(close_error).__name__,
+                close_error,
+            )
 
 
 async def _run_thread_to_completion(

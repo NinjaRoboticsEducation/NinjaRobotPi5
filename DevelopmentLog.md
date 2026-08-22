@@ -3396,3 +3396,58 @@ and text-to-speech claims unsupported by NinjaRobotPi5 v1.0.0.
 
 The tutorial examples were checked against the repository's strict MCP and
 Skill schemas. Repository validation results are recorded in the task handoff.
+
+## 2026-08-22 — Obstacle interruption and display lifecycle hardening
+
+### Summary
+
+- Changed a confirmed front obstacle from a persistent Level 1 latch into a
+  normal behavior interruption. It stops the servos, cancels concurrent and
+  later behavior operations, shows a bounded silent scary face, and restores
+  supervised Idle without requiring Resume.
+- Added structured `completed`, `interrupted`, cause, recovery, resume, and next
+  state fields so models cannot confuse an interrupted movement with success.
+- Added deterministic Agent notices so terminal and web chat always display the
+  obstacle or persistent-stop cause and recovery instruction, even when the
+  selected model omits it.
+- Preserved persistent undervoltage, watchdog, servo-interruption, corrupt-state,
+  and unrecoverable-driver fail-safe stops. Their reasons and recovery steps are
+  now emitted in both logs and tool/chat results.
+- Added one bounded ST7789V reconstruction and frame retry for idempotent display
+  output, including remembered-brightness restoration and a real clear-frame
+  probe before retry.
+- Closed behavior admission before shutdown and waited for active threaded frame
+  writes before switching off the backlight and releasing SPI/GPIO.
+
+### Root causes
+
+The distance monitor called `stop_motion("front_obstacle", latch=True)`, so a
+normal obstacle persisted a motion gate and rejected every later command until
+manual Resume. Behavior stages also treated the stopped drive as a successful
+operation, allowing sibling and later operations to continue.
+
+For the display, the service log showed the ST7789V backend closing while a face
+task remained pending; that task then wrote through an unavailable driver and
+created a persistent Level 2 failure. Separately, a transient SPI frame error
+terminated the Idle supervisor because ordinary display writes had no bounded
+reconstruction path. The managed driver correctly turns off its backlight on
+`close()`, which made the lifecycle race appear as a disconnected display.
+
+### Compatibility and safety
+
+Public CLI, configuration, IPC, behavior definitions, MCP tools, memory schema,
+web controls, and managed `pi5*` driver sources remain compatible. Obstacle
+interruption results are additive. Genuine fail-safe latches and manual
+Emergency Stop remain available. Automated tests did not move actuators or
+access the physical display, distance sensor, camera, microphone, network, or
+power controls.
+
+### Validation
+
+- Focused Ruff and MyPy checks passed.
+- Focused IDE/Agent tests passed, including repeated transient display recovery
+  across 300 frames, active-frame shutdown, full-stage obstacle cancellation,
+  scary-face-to-Idle handoff, immediate follow-up movement, memory exclusion,
+  persistent-stop logging, and deterministic chat guidance.
+- Complete repository and separate managed-driver results are recorded in the
+  final task handoff after the remaining gate completes.

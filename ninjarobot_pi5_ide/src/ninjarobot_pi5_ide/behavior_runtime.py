@@ -21,11 +21,14 @@ from .behavior_models import (
 )
 from .buzzer import BuzzerDevice
 from .display import DisplayDevice
+from .errors import IDEError
 from .face_renderer import render_face
+from .models import ErrorDetails, RetrySafety
+from .safety import MotionSafetyError
 
 Melody = tuple[tuple[int | None, float], ...]
 DriveHandler = Callable[[DriveOperation, str], Coroutine[Any, Any, dict[str, Any]]]
-FailureHandler = Callable[[Exception], Coroutine[Any, Any, Any]]
+FailureHandler = Callable[[Exception], Coroutine[Any, Any, str | None]]
 ANIMATION_FRAME_INTERVAL_SECONDS = 1 / 12
 
 
@@ -34,6 +37,14 @@ class MelodyProvider(Protocol):
 
     def __call__(self, name: MelodyName) -> Melody:
         """Return frequency/duration pairs; None represents a silent pause."""
+
+
+class BehaviorInterrupted(Exception):
+    """A normal control interruption that must cancel the remaining behavior."""
+
+    def __init__(self, result: dict[str, Any]) -> None:
+        super().__init__(str(result.get("stop_reason") or "behavior_interrupted"))
+        self.result = result
 
 
 def load_pi5buzzer_melody(name: MelodyName) -> Melody:
@@ -84,6 +95,7 @@ class BehaviorRunner:
         self._drive_handler = drive_handler
         self._failure_handler = failure_handler
         self._run_lock = asyncio.Lock()
+        self._close_lock = asyncio.Lock()
         self._active_task: asyncio.Task[Any] | None = None
         self._closed = False
 
@@ -108,6 +120,8 @@ class BehaviorRunner:
         if self._closed:
             raise RuntimeError("behavior runner is closed")
         async with self._run_lock:
+            if self._closed:
+                raise RuntimeError("behavior runner is closed")
             current = asyncio.current_task()
             if current is None:
                 raise RuntimeError("behavior execution requires an asyncio task")
@@ -124,13 +138,51 @@ class BehaviorRunner:
                     completed.append(
                         StageResult(name=stage.name, operations=tuple(operation_results))
                     )
+            except BehaviorInterrupted as interruption:
+                await self._buzzer.stop()
+                return {
+                    "name": definition.name,
+                    "category": definition.category,
+                    "stages": [
+                        {
+                            "name": stage.name,
+                            "operations": list(stage.operations),
+                        }
+                        for stage in completed
+                    ],
+                    "simulated": self._display.simulated and self._buzzer.simulated,
+                    "completed": False,
+                    "interrupted": True,
+                    "interruption": interruption.result,
+                }
             except asyncio.CancelledError:
                 await self._buzzer.stop()
                 raise
+            except MotionSafetyError as exc:
+                await self._buzzer.stop()
+                raise IDEError(
+                    ErrorDetails(
+                        code="MOTION_STOPPED",
+                        message=str(exc)[:500],
+                        technical_detail=None,
+                        definitely_not_executed=False,
+                        retry_safety=RetrySafety.UNKNOWN,
+                    )
+                ) from exc
             except Exception as exc:
                 await self._buzzer.stop()
+                recovery_instruction: str | None = None
                 if self._failure_handler is not None:
-                    await self._failure_handler(exc)
+                    recovery_instruction = await self._failure_handler(exc)
+                if recovery_instruction is not None and isinstance(exc, IDEError):
+                    details = exc.details.model_copy(
+                        update={
+                            "message": (f"{exc.details.message} Recovery: {recovery_instruction}")[
+                                :500
+                            ]
+                        }
+                    )
+                    raise IDEError(details) from exc
                 raise
             finally:
                 if self._active_task is current:
@@ -172,17 +224,19 @@ class BehaviorRunner:
 
     async def close(self) -> None:
         """Cancel expression work, silence, and release both devices."""
-        if self._closed:
-            return
-        try:
-            await self.stop()
-        finally:
-            await asyncio.gather(
-                self._buzzer.close(),
-                self._display.close(),
-                return_exceptions=True,
-            )
+        async with self._close_lock:
+            if self._closed:
+                return
+            # Close the admission gate before cancelling existing work. A task that
+            # was already waiting for _run_lock rechecks this state inside the lock.
             self._closed = True
+            await self.stop()
+            async with self._run_lock:
+                await asyncio.gather(
+                    self._buzzer.close(),
+                    self._display.close(),
+                    return_exceptions=True,
+                )
 
     async def _run_operation(
         self,
@@ -222,7 +276,10 @@ class BehaviorRunner:
         if isinstance(operation, DriveOperation):
             if self._drive_handler is None:
                 raise ValueError("drive operations require the Phase 4.3 motion controller")
-            return await self._drive_handler(operation, behavior_name)
+            result = await self._drive_handler(operation, behavior_name)
+            if result.get("stop_reason") == "front_obstacle" or result.get("latched") is True:
+                raise BehaviorInterrupted(result)
+            return result
         raise TypeError(f"unsupported behavior operation: {type(operation).__name__}")
 
     async def _show_face(self, operation: FaceOperation) -> dict[str, Any]:

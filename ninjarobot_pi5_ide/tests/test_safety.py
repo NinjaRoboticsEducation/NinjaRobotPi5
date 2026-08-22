@@ -14,7 +14,6 @@ from ninjarobot_pi5_ide.models import ErrorDetails, RetrySafety
 from ninjarobot_pi5_ide import (
     DriveOperation,
     MotionController,
-    MotionSafetyError,
     SafetyStateStore,
     ServoDevice,
     SystemSafetyController,
@@ -189,11 +188,11 @@ def test_guarded_motion_starts_immediately_and_stops_after_three_low_readings(
         assert servo.move_calls == [({"gpio12": 45.0, "gpio13": -45.0}, "M")]
         assert result["stop_reason"] == "front_obstacle"
         assert result["warnings"] == []
-        assert state.read().motion_latched is True
+        assert state.read().motion_latched is False
         assert state.read().system_latched is False
-        with pytest.raises(MotionSafetyError, match="motion is latched"):
-            await motion.drive(drive_operation(), "move_forward")
-        motion.resume(confirmed=True)
+        second = await motion.drive(drive_operation(), "move_forward")
+        assert second["stop_reason"] == "front_obstacle"
+        assert len(servo.move_calls) == 2
         assert state.read().motion_latched is False
 
     asyncio.run(exercise())
@@ -291,6 +290,9 @@ def test_undervoltage_and_watchdog_are_level_one_motion_stops(tmp_path: Path) ->
         )
         result = await motion.drive(drive_operation(), "move_forward")
         assert result["stop_reason"] == "undervoltage"
+        assert result["latched"] is True
+        assert "reported undervoltage" in result["cause"]
+        assert "run /resume in chat" in result["recovery_instruction"]
         assert state.read().motion_latched is True
         assert state.read().system_latched is False
 
@@ -359,6 +361,7 @@ def test_missing_readings_do_not_block_motion_start_or_latch(tmp_path: Path) -> 
 
 def test_full_stop_suspends_sensors_and_driver_failure_latches_system(
     tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     async def exercise() -> None:
         motion, servo, distance, state = controller(
@@ -392,6 +395,8 @@ def test_full_stop_suspends_sensors_and_driver_failure_latches_system(
 
         assert result["level"] == 2
         assert result["cleanup_errors"] == []
+        assert "hardware driver failed" in result["cause"]
+        assert "click Resume Robot Movement" in result["recovery_instruction"]
         assert state.read().system_latched is True
         assert state.read().fault_detail == "DISPLAY_WRITE_FAILED: simulated SPI fault"
         assert servo.stop_calls == 1
@@ -420,6 +425,8 @@ def test_full_stop_suspends_sensors_and_driver_failure_latches_system(
         assert resumed.motion_latched is False
 
     asyncio.run(exercise())
+    assert "reason=driver_failure" in caplog.text
+    assert "recovery=Remove any hazard" in caplog.text
 
 
 def test_full_stop_closes_gate_before_display_and_reports_display_failure(

@@ -445,16 +445,34 @@ Runtime disarm also cancels any in-flight motion tokens and requests `robot.serv
 
 ### Safety Stop Levels
 
-**Level 1** — stops servo movement only and blocks another movement:
+**Normal obstacle interruption** — stops the complete current behavior without
+creating a persistent safety latch:
 
-- Triggers: three consecutive front-obstacle readings ≤ 50 mm, Raspberry Pi undervoltage, software watchdog timeout
+- Trigger: three consecutive valid front readings at or below 50 mm during
+  `move_forward`, `turn_left`, or `turn_right`
+- Result: stop the servos, cancel the behavior's concurrent and later stages,
+  show a bounded silent scary face, report the cause and next step, then return
+  to Idle
+- Recovery: no resume action; clear the path and issue a new command
+
+**Level 1** — stops servo movement and blocks another movement after a genuine
+motion-control fault:
+
+- Triggers: Raspberry Pi undervoltage, software watchdog timeout, or a servo
+  driver interruption
 - Recovery: `ninjarobot-ide-tool motion resume --confirm`
 
 **Level 2 (Emergency Stop)** — stops servos and ranging, suspends the camera and microphone backends, silences the buzzer, and displays a red octagonal Emergency Stop sign. A confirmed resume performs health checks and reconstructs/restarts modules as needed.
 
-- Triggers: explicit emergency-stop behavior, shutdown cleanup, or hardware driver failure. An operator `behavior stop` performs the same immediate cleanup without writing a persistent driver-failure latch.
+- Triggers: explicit emergency-stop behavior or an unrecoverable hardware driver
+  failure. An operator `behavior stop` performs the same immediate cleanup
+  without writing a persistent driver-failure latch.
 - Recovery: `ninjarobot-ide-tool system resume --confirm` (or `/resume` in chat)
 - Recovery checks every configured module by health probe — refuses to clear the latch if any probe fails
+
+Every persistent stop returns and logs its stable reason, plain-language cause,
+and recovery instruction. NinjaRobotAgent appends that guidance to chat output
+deterministically, even if the selected model omits it.
 
 Invalid generated behavior arguments, oversized display text, policy rejections, and configuration mistakes return ordinary action errors and **do not** create a Level 2 latch.
 
@@ -776,6 +794,17 @@ Stores accepted, running, and completed actions in SQLite. Enforces idempotency:
 ### ExecutionEngine
 
 Enforces deadlines, timeouts, cancellation, restart recovery, and normalized error codes. Returns structured failures for timeouts, queue full, cancelled, and unknown outcomes.
+
+### DisplayDevice
+
+Owns the single ST7789V backend and serializes every SPI frame, brightness
+change, recovery, and close operation. An idempotent frame failure receives one
+bounded backend reconstruction and one retry. Reconstruction closes the failed
+instance, restores the remembered brightness, checks the replacement, and
+writes a black probe frame before retrying. An exhausted recovery becomes an
+explicit hardware failure; it never loops indefinitely. Shutdown closes the
+behavior admission gate, drains the active frame thread, and only then turns
+off the backlight and releases SPI/GPIO.
 
 ### BehaviorRuntime
 
@@ -1229,7 +1258,13 @@ Zero (or the calibrated center) represents neutral for these motors. Emergency S
 - Movement starts without waiting for clear-distance readings
 - The exact VL53L0X raw sentinel `8191` = clear space (no target in range)
 - `null`, invalid, missing, and stale samples do not stop movement
-- Three consecutive valid readings ≤ 50 mm → Level 1 stop (forward, turn_left, turn_right only)
+- Three consecutive valid readings ≤ 50 mm → non-latching behavior interruption
+  (forward, turn_left, turn_right only)
+- The current drive, concurrent face/audio operations, and all later stages are
+  cancelled; the behavior is never resumed or replayed automatically
+- A silent scary face appears for two seconds, then supervised Idle resumes
+- The tool result uses `completed=false`, `interrupted=true`, identifies
+  `front_obstacle`, and tells the user that no `/resume` is required
 - Backward movement: warning only (the sensor faces forward)
 - The schema refuses obstacle thresholds below 50 mm
 

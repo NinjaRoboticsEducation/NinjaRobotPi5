@@ -100,6 +100,45 @@ def test_capture_policy_records_failures_and_confirms_new_successes(tmp_path: Pa
     asyncio.run(exercise())
 
 
+def test_obstacle_interruption_is_not_recorded_as_success_or_technical_failure(
+    tmp_path: Path,
+) -> None:
+    async def exercise() -> None:
+        store = MemoryStore(tmp_path / "memory.sqlite3")
+        await store.start()
+        owner = await store.create_profile("Owner")
+        capture = MemoryCaptureService(store)
+        invocation = _invocation(
+            "robot.behavior.execute_movement",
+            {"name": "guarded_move", "description": "Move safely", "stages": []},
+        )
+        result = ToolExecutionResult(
+            call_id="call-1",
+            tool_name=invocation.call.name,
+            status=ToolExecutionStatus.SUCCEEDED,
+            data={
+                "completed": False,
+                "interrupted": True,
+                "interruption": {"stop_reason": "front_obstacle"},
+                "user_message": "An obstacle was detected; issue a new command.",
+            },
+            action_id="action-obstacle",
+            definitely_not_executed=False,
+            retry_safety=RetrySafety.UNKNOWN,
+        )
+
+        outcome = await capture.observe_tool_result(owner.user_id, invocation, result)
+
+        assert outcome.confirmation_needed is False
+        assert outcome.automatically_saved_kind is None
+        assert await store.take_pending_behavior_confirmation(owner.user_id, "session-1") is None
+        assert await store.memories(owner.user_id, kind=MemoryKind.FAILED_BEHAVIOR) == ()
+        assert await store.memories(owner.user_id, kind=MemoryKind.SUCCESSFUL_BEHAVIOR) == ()
+        await store.close()
+
+    asyncio.run(exercise())
+
+
 def test_automatic_preferences_recipes_and_bounded_retrieval(tmp_path: Path) -> None:
     async def exercise() -> None:
         store = MemoryStore(tmp_path / "memory.sqlite3")
@@ -376,6 +415,94 @@ class _BehaviorToolProvider:
 
     async def close(self) -> None:
         return None
+
+
+class _ObstacleToolProvider(_BehaviorToolProvider):
+    async def call(
+        self,
+        invocation: ToolInvocation,
+        cancellation: CancellationToken,
+    ) -> ToolExecutionResult:
+        del cancellation
+        self.requests.append(invocation)
+        return ToolExecutionResult(
+            call_id=invocation.call.call_id,
+            tool_name=invocation.call.name,
+            status=ToolExecutionStatus.SUCCEEDED,
+            data={
+                "completed": False,
+                "interrupted": True,
+                "interruption": {"stop_reason": "front_obstacle"},
+                "user_message": (
+                    "An obstacle was detected and movement was stopped. No safety resume "
+                    "is required; clear the path and issue a new command."
+                ),
+            },
+            action_id="action-obstacle",
+            definitely_not_executed=False,
+            retry_safety=RetrySafety.UNKNOWN,
+        )
+
+
+def test_runtime_always_appends_deterministic_obstacle_guidance(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        next_id = iter(f"id-{index}" for index in range(1, 20))
+        provider = FakeProvider(
+            (
+                ModelTurn(
+                    request_id="id-2",
+                    text="",
+                    finish_reason=FinishReason.TOOL_CALLS,
+                    tool_calls=(
+                        ToolCall(
+                            call_id="behavior-call",
+                            name="robot.behavior.execute_expression",
+                            arguments={"name": "guarded_move"},
+                        ),
+                    ),
+                ),
+                ModelTurn(
+                    request_id="id-5",
+                    text="Movement handled.",
+                    finish_reason=FinishReason.STOP,
+                ),
+            )
+        )
+        tools = ToolRegistry((_ObstacleToolProvider(),))
+        store = ConversationStore(tmp_path / "conversation.sqlite3")
+        arms = MotionArmManager()
+        policy = PolicyEngine(arms)
+        events = EventBroker()
+        loop = AgentLoop(
+            provider=provider,
+            tools=tools,
+            policy=policy,
+            recovery=RecoveryPolicy(),
+            store=store,
+            prompts=PromptComposer(),
+            events=events,
+            id_factory=lambda: next(next_id),
+        )
+        runtime = AgentRuntime(
+            provider=provider,
+            tools=tools,
+            store=store,
+            loop=loop,
+            policy=policy,
+            motion_arms=arms,
+            skills=SkillRepository(tmp_path / "skills"),
+            events=events,
+        )
+        await runtime.start()
+
+        reply = await runtime.chat(session_id="chat", text="Move forward")
+
+        assert "Movement handled." in reply.text
+        assert "An obstacle was detected and movement was stopped." in reply.text
+        assert "clear the path and issue a new command" in reply.text
+        await runtime.close()
+
+    asyncio.run(exercise())
 
 
 def test_runtime_prompts_then_saves_confirmed_successful_behavior(tmp_path: Path) -> None:
