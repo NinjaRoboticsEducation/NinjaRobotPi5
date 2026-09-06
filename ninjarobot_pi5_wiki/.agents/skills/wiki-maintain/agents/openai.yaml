@@ -1,0 +1,4 @@
+interface:
+  display_name: "Wiki Maintain"
+  short_description: "Rename, merge, refresh, and rebuild pages"
+  default_prompt: "Use $wiki-maintain to perform this wiki maintenance task safely."

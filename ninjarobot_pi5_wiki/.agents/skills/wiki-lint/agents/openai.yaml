@@ -1,0 +1,4 @@
+interface:
+  display_name: "Wiki Lint"
+  short_description: "Check and safely repair wiki health"
+  default_prompt: "Use $wiki-lint to check this wiki and report any problems."

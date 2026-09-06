@@ -1,0 +1,4 @@
+interface:
+  display_name: "Wiki Review"
+  short_description: "Verify claims and resolve source conflicts"
+  default_prompt: "Use $wiki-review to verify the selected wiki pages against their sources."

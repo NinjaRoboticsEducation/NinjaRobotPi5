@@ -1,0 +1,33 @@
+version: 2
+id: example-create-concept
+created_at: "2026-08-22T00:00:00Z"
+actor: example-agent/2
+risk: low
+summary: Create an example concept page from one registered source
+sources:
+  - id: src-20260822-example
+    content_hash: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+operations:
+  - op: write
+    path: wiki/concepts/example-concept.md
+    content: |
+      ---
+      type: Concept
+      title: Example Concept
+      description: A disposable example showing the shape of a planned wiki page.
+      status: stable
+      generated:
+        by: example-agent/2
+        at: 2026-08-22T00:00:00Z
+      sources:
+        - id: src-20260822-example
+          resource: /references/example.md
+          title: Example source
+          content_hash: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      ---
+
+      # Example Concept
+
+      This page is an example derived from registered evidence.[^src-20260822-example]
+
+      [^src-20260822-example]: Example source.

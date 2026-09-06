@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/llmwiki/change-plan.schema.json",
+  "title": "LLM Wiki change plan",
+  "type": "object",
+  "required": ["version", "id", "created_at", "actor", "risk", "operations"],
+  "properties": {
+    "version": {"enum": [1, 2]},
+    "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,79}$"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "actor": {"type": "string", "minLength": 1},
+    "risk": {"enum": ["low", "medium", "high"]},
+    "summary": {"type": "string"},
+    "source": {"$ref": "#/$defs/source"},
+    "sources": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/source"}},
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["op", "path"],
+        "properties": {
+          "op": {"enum": ["write", "move", "delete", "copy_asset"]},
+          "path": {"type": "string", "pattern": "^wiki/"},
+          "from": {"type": "string"},
+          "content": {"type": "string"},
+          "source_id": {"type": "string", "pattern": "^src-[a-z0-9][a-z0-9-]*$"},
+          "expected_sha256": {"type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$"},
+          "expected_target_sha256": {"type": ["string", "null"], "pattern": "^sha256:[a-f0-9]{64}$"}
+        },
+        "allOf": [
+          {"if": {"properties": {"op": {"const": "write"}}}, "then": {"required": ["content"]}},
+          {"if": {"properties": {"op": {"const": "move"}}}, "then": {"required": ["from"]}},
+          {"if": {"properties": {"op": {"const": "copy_asset"}}}, "then": {"required": ["from", "source_id", "expected_sha256"]}}
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "allOf": [
+    {"if": {"properties": {"version": {"const": 1}}}, "then": {"not": {"required": ["sources"]}}},
+    {"if": {"properties": {"version": {"const": 2}}}, "then": {"not": {"required": ["source"]}}}
+  ],
+  "$defs": {
+    "source": {
+      "type": "object",
+      "required": ["id", "content_hash"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^src-[a-z0-9][a-z0-9-]*$"},
+        "content_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

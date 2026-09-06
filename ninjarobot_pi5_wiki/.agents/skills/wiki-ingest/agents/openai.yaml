@@ -1,0 +1,4 @@
+interface:
+  display_name: "Wiki Ingest"
+  short_description: "Compile a source into reviewed wiki changes"
+  default_prompt: "Use $wiki-ingest to prepare and validate a source ingestion plan."

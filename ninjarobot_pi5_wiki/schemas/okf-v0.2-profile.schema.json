@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/llmwiki/okf-v0.2-profile.schema.json",
+  "title": "Local LLM Wiki OKF v0.2 profile",
+  "type": "object",
+  "required": ["type"],
+  "properties": {
+    "type": {"type": "string", "minLength": 1},
+    "title": {"type": "string", "minLength": 1},
+    "description": {"type": "string", "minLength": 1},
+    "resource": {"type": "string"},
+    "tags": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "status": {"enum": ["draft", "stable", "deprecated"]},
+    "generated": {
+      "type": "object",
+      "required": ["by"],
+      "properties": {
+        "by": {"type": "string", "minLength": 1},
+        "at": {"type": "string", "format": "date-time"}
+      },
+      "additionalProperties": true
+    },
+    "verified": {
+      "oneOf": [
+        {"$ref": "#/$defs/verification"},
+        {"type": "array", "items": {"$ref": "#/$defs/verification"}, "minItems": 1}
+      ]
+    },
+    "semantic_review": {"$ref": "#/$defs/semantic_review"},
+    "stale_after": {"type": "string", "format": "date-time"},
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["resource"],
+        "properties": {
+          "id": {"type": "string"},
+          "resource": {"type": "string", "minLength": 1},
+          "title": {"type": "string"},
+          "content_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+          "author": {"type": "string"},
+          "usage_count": {"type": "integer", "minimum": 0},
+          "last_modified": {"type": "string", "format": "date-time"}
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "$defs": {
+    "semantic_check": {
+      "enum": ["passed", "concern", "not_applicable"]
+    },
+    "semantic_review": {
+      "type": "object",
+      "required": ["version", "performed_by", "performed_at", "target_hash", "result", "checks"],
+      "properties": {
+        "version": {"const": 1},
+        "performed_by": {"type": "string", "minLength": 1},
+        "performed_at": {"type": "string", "format": "date-time"},
+        "target_hash": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "result": {"enum": ["passed", "concerns", "incomplete"]},
+        "checks": {
+          "type": "object",
+          "required": ["source_support", "contradictions", "limitations", "claim_strength", "visual_evidence"],
+          "properties": {
+            "source_support": {"$ref": "#/$defs/semantic_check"},
+            "contradictions": {"$ref": "#/$defs/semantic_check"},
+            "limitations": {"$ref": "#/$defs/semantic_check"},
+            "claim_strength": {"$ref": "#/$defs/semantic_check"},
+            "visual_evidence": {"enum": ["passed", "concern", "not_applicable", "not_inspected"]}
+          },
+          "additionalProperties": false
+        },
+        "notes": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "maxItems": 10
+        }
+      },
+      "additionalProperties": false
+    },
+    "verification": {
+      "type": "object",
+      "required": ["by", "at"],
+      "properties": {
+        "by": {"type": "string", "minLength": 1},
+        "at": {"type": "string", "format": "date-time"}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

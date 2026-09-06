@@ -1,0 +1,59 @@
+version: 1
+bundle_root: wiki
+raw_root: raw
+catalog_root: raw/_catalog
+derived_root: raw/_derived
+allowed_types:
+  - Concept
+  - Entity
+  - Reference
+  - Analysis
+required_profile_fields:
+  - title
+  - description
+freshness:
+  Concept: null
+  Entity: null
+  Reference: null
+  Analysis: null
+source_limits:
+  max_bytes: 52428800
+  max_image_pixels: 40000000
+  max_image_width: 10000
+  max_image_height: 10000
+  ocr_timeout_seconds: 60
+  max_ocr_characters: 200000
+  allowed_extensions:
+    - .md
+    - .markdown
+    - .txt
+    - .html
+    - .htm
+    - .pdf
+    - .png
+    - .jpg
+    - .jpeg
+lint:
+  broken_links: error
+  broken_anchors: error
+  changed_sources: error
+  source_version_mismatch: error
+  orphan_pages: warning
+  uncited_paragraphs: suggestion
+query:
+  max_results: 20
+  link_depth: 2
+  max_pages: 30
+review:
+  require_approval_for_apply: true
+  require_approval_for:
+    - move
+    - delete
+    - deprecate
+semantic_review:
+  enabled: true
+  strict_for_sourced_pages: true
+  strict_for_status:
+    - stable
+  flag_absolute_language: true
+  require_visual_review: true
