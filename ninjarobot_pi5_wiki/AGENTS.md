@@ -1,5 +1,18 @@
 # Local LLM Wiki — Agent Instructions
 
+## NinjaRobotPi5 integration
+
+Read the parent [project policy](../AGENTS.md) even when this folder is the opened
+workspace. Read [README.md](README.md), [project-knowledge.json](project-knowledge.json),
+and [the maintenance guide](docs/PROJECT_WORKFLOW.md) for current project sources.
+From this folder use `python ../scripts/wiki.py` followed by the CLI arguments.
+The parent launcher keeps the robot and wiki environments separate. If access to
+the parent folder is unavailable, use direct source/page reads and explain that
+current implementation verification is unavailable.
+
+Source originals are versioned: create a new dated file for a changed manual,
+then review and update current pointers; never overwrite a registered source.
+
 ## Role
 
 Maintain the OKF v0.2 knowledge bundle in `wiki/` using evidence from `raw/`. Use the `llmwiki` CLI for deterministic work and use judgment only for meaning, synthesis, and review.
@@ -34,7 +47,7 @@ Use `uv run llmwiki ...`. Run `uv run llmwiki doctor` to inspect setup, `uv run 
 ## Tool adapters
 
 - Codex and Google Antigravity discover the canonical skills in `.agents/skills/`.
-- Antigravity also loads `.agents/rules/llm-wiki.md` and exposes the workflows in `.agents/workflows/` as `/wiki-*` commands.
+- Antigravity uses `.agents/rules/llm-wiki.md` and skills; existing workflows are legacy compatibility entries. Confirm rule activation in the editor.
 - Claude Code uses `CLAUDE.md` and `.claude/skills/` wrappers.
 - Cursor uses `.cursor/rules/llm-wiki.mdc`.
 

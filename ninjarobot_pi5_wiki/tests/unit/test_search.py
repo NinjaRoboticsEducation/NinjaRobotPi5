@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-from llmwiki.search import search_bundle
-
 from conftest import valid_page
+from llmwiki.search import search_bundle
 
 
 def test_search_returns_structured_ranked_results(project) -> None:
     _, config = project
     strong = config.bundle_root / "concepts" / "robotics.md"
     weak = config.bundle_root / "concepts" / "other.md"
-    strong.write_text(valid_page("Robotics", "Robotics combines sensing, planning, and control."), encoding="utf-8")
+    strong.write_text(
+        valid_page("Robotics", "Robotics combines sensing, planning, and control."),
+        encoding="utf-8",
+    )
     weak.write_text(valid_page("Other", "A passing mention of robotics."), encoding="utf-8")
     results = search_bundle(config.bundle_root, "robotics", limit=5)
     assert results[0].concept_id == "concepts/robotics"
@@ -22,9 +24,15 @@ def test_search_uses_exact_terms_and_rejects_partial_topic_matches(project) -> N
     relevant = config.bundle_root / "concepts" / "blockly.md"
     false_positive = config.bundle_root / "references" / "licenses.md"
     substring = config.bundle_root / "concepts" / "provide.md"
-    relevant.write_text(valid_page("Blockly Runtime", "Blockly code generates Python."), encoding="utf-8")
-    false_positive.write_text(valid_page("Licenses", "Third-party source code notices."), encoding="utf-8")
-    substring.write_text(valid_page("Provider", "This page provides unrelated material."), encoding="utf-8")
+    relevant.write_text(
+        valid_page("Blockly Runtime", "Blockly code generates Python."), encoding="utf-8"
+    )
+    false_positive.write_text(
+        valid_page("Licenses", "Third-party source code notices."), encoding="utf-8"
+    )
+    substring.write_text(
+        valid_page("Provider", "This page provides unrelated material."), encoding="utf-8"
+    )
 
     results = search_bundle(config.bundle_root, "Please explain Blockly code", limit=10)
     assert [result.concept_id for result in results] == ["concepts/blockly"], [

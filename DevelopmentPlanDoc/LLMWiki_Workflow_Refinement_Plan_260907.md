@@ -5,9 +5,10 @@ developers and AI coding tools, while keeping every robot function unchanged.
 It also records what the existing wiki actually does and what integration work
 is still needed.
 
-**Date:** 7 September 2026. **Status:** reviewed proposal, awaiting owner approval
-before implementation. The manuals have not been moved and the tool instructions
-have not been changed by this audit.
+**Date:** 7 September 2026. **Status:** implementation approved by the owner.
+The audit findings below describe the pre-implementation checkout. Progress and
+actual results are recorded in [the validation report](../docs/validation/wiki_integration_260907.md).
+Initial semantic page publication has its own concrete preview and approval gate.
 
 **Checkout reviewed:** `8cae65e61401c42f5ce30d03dc8c7e9decb3b765`.
 The checkout was clean before this work. The only intended tracked change in

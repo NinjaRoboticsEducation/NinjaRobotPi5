@@ -1,0 +1,1251 @@
+{
+  "version": 1,
+  "reviewed_checkout": "cd8e22892e07bdfd63f8febfec1373c91925e526",
+  "reviewed_by": "agent:codex",
+  "reviewed_at": "2026-09-06T22:53:22Z",
+  "documents": [
+    {
+      "name": "InstallationGuide.md",
+      "path": "raw/articles/ninjarobotpi5/2026-09-07/InstallationGuide.md",
+      "original_content_hash": "sha256:81247077b55ba3e1c40e0977b309a2ffed7d706c26bb1796ac4a6357a8f9ae6b",
+      "content_hash": "sha256:53f80c60feb139f0de547613bd14b8fcd87a2678ba5bf7dc75b1b2bccb1dc1c4",
+      "previous_path": null,
+      "pages": [
+        "wiki/references/installation-guide.md",
+        "wiki/concepts/installation.md"
+      ],
+      "source_id": "src-20260906-installationguide"
+    },
+    {
+      "name": "DevelopmentGuide.md",
+      "path": "raw/articles/ninjarobotpi5/2026-09-07/DevelopmentGuide.md",
+      "original_content_hash": "sha256:ef1a4d5b81ac2fe67f735ccd0df311fec87d1d13430f47a24c7ef226c2c2e522",
+      "content_hash": "sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e",
+      "previous_path": null,
+      "pages": [
+        "wiki/overview.md",
+        "wiki/references/development-guide.md",
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/development-workflow.md",
+        "wiki/concepts/features-and-tools.md",
+        "wiki/analyses/knowledge-limitations.md"
+      ],
+      "source_id": "src-20260906-developmentguide"
+    },
+    {
+      "name": "NinjaRobot_MCP_Skill.md",
+      "path": "raw/articles/ninjarobotpi5/2026-09-07/NinjaRobot_MCP_Skill.md",
+      "original_content_hash": "sha256:df8076ccc2683b24b6752310558ce4e62828d54cee67f1102aae7196c0ee97bb",
+      "content_hash": "sha256:df8076ccc2683b24b6752310558ce4e62828d54cee67f1102aae7196c0ee97bb",
+      "previous_path": null,
+      "pages": [
+        "wiki/references/mcp-skills-guide.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "source_id": "src-20260906-ninjarobot-mcp-skill"
+    },
+    {
+      "name": "DevelopmentLog.md",
+      "path": "raw/notes/ninjarobotpi5/2026-09-07/DevelopmentLog.md",
+      "original_content_hash": "sha256:acd1d86c260557afc7ab45093950860b80deb1097d052c1428427feba7e0a139",
+      "content_hash": "sha256:9d2f7eb85695c830322023c4efa549e5d178030105a611468b003f4d8e0b1dd4",
+      "previous_path": null,
+      "pages": [
+        "wiki/references/development-log.md",
+        "wiki/concepts/development-history.md"
+      ],
+      "source_id": "src-20260906-developmentlog"
+    }
+  ],
+  "implementation_roots": [
+    "ninjarobot_pi5_agent/src",
+    "ninjarobot_pi5_ide/src"
+  ],
+  "implementation_files": {
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/__init__.py": {
+      "content_hash": "sha256:ffcb207e821733d3f80293486567e8c7a8432d8d08192bb7cb2953ebb91f607e",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/__main__.py": {
+      "content_hash": "sha256:dc4fcb95336ad968a1ef6e843b0d3abd0c2fd3c0948fa478d3b1f56c0e5e0dad",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/agent_cli.py": {
+      "content_hash": "sha256:628dc95cc35533620a51655e380092e19ed357f0274f787c09afdb624f6e3ed7",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/agent_loop.py": {
+      "content_hash": "sha256:0e5fed8ffcfbf141a060be1a8fa4318924376bc442124be98580691c915f725e",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/anthropic_provider.py": {
+      "content_hash": "sha256:72f72e7fc861489a33b89372b89ebe9b42d41e049b9f394e5329960516d97315",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/benchmark.py": {
+      "content_hash": "sha256:a5555800f04b0cae4f6cfe3c048e9e6f9a8e242e98a199b492df7df392aa8943",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/bundled_skills/current-web-answer/examples.json": {
+      "content_hash": "sha256:54603cdf7547dc33f9d142d7d98d1a9179fbd8b70665a63775bfadae94b7f097",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/bundled_skills/current-web-answer/instructions.md": {
+      "content_hash": "sha256:3fa42cbb7bcd7cd417bcbabf49ab898d595536de7f1e256cab1d3b4091bc958d",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/bundled_skills/current-web-answer/skill.json": {
+      "content_hash": "sha256:ec92007058ae56ef42ced5aecb7877eb500621a8d5487cc001efbcad0a2d2908",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/bundled_skills/memory-retrieval/examples.json": {
+      "content_hash": "sha256:7237116be984b8be66d32694530231dda01133f983202c2f5d6b947a03c78df0",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/bundled_skills/memory-retrieval/instructions.md": {
+      "content_hash": "sha256:7d84a5adbbdf3739e0cb42895c1935f01227ef1a62e00207fb0bcb8e2aeff2a8",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/bundled_skills/memory-retrieval/skill.json": {
+      "content_hash": "sha256:222880dcbcf50429682798dcdaf3efbb096ca81acc274fdb3ed87bcf447e9d3c",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/bundled_skills/offline-robot-check/examples.json": {
+      "content_hash": "sha256:77c496a11c7cc454beba755d456bfcb1f06316f47b469642b6f766756560127e",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/bundled_skills/offline-robot-check/instructions.md": {
+      "content_hash": "sha256:d7d6e6af27332c9823d2c22b04d0174a1dac121691ee88c05b211baf5be9cdd9",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/bundled_skills/offline-robot-check/skill.json": {
+      "content_hash": "sha256:2341c305e180d622ab0af0efb2877ed5899d4c880bddbb84cbc9a1a470266370",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/bundled_skills/robot-behavior-generation/examples.json": {
+      "content_hash": "sha256:21d65a1ff044ba351ee0bbf6eccde632f605530c0d90004ccefc6de9b3447ff4",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/bundled_skills/robot-behavior-generation/instructions.md": {
+      "content_hash": "sha256:3c0975aafaeef79394085d0fbd48beb46e7e3f2caa1a3b0f52299f7a35d7bdcf",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/bundled_skills/robot-behavior-generation/skill.json": {
+      "content_hash": "sha256:39bc8f8d4d8d2e76e4636476cd0a76107373be7ced0dbaf772822ecf5a73e95b",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/cli.py": {
+      "content_hash": "sha256:395a92ff6c48ae87624fe68fbca3b012b8885d65a78c202ae2c5d28b6b356cc5",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/cloud_common.py": {
+      "content_hash": "sha256:d55e68b9a0bd0b9f021b6f968bf486265e3faf06c372e208bbb70fd4a1586539",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/cloud_registry.py": {
+      "content_hash": "sha256:359adf817182ea805e8cc761f111ae25d0565c1f706b1c2834474b35aeaaf835",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/deployment/ninjarobot-agent.service.in": {
+      "content_hash": "sha256:96536a4639dbce2060296e02f43321c06de7a98f80847c683b02bc593b326a1e",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/deployment/ninjarobot-poweroff": {
+      "content_hash": "sha256:fec8101f5a53c78c658dd33c880f67674ed0ed2c3e30775253307a366831045e",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/deployment/ninjarobot-poweroff.sudoers.in": {
+      "content_hash": "sha256:e539a3c46ec53c725ae95e24db13b0989cbb3692e2b732a7154d29e9b79adb5a",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/deployment.py": {
+      "content_hash": "sha256:b5b5962691f47decc4a01a4286a82c1602156ca3af5d116d2693713af7be2194",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/events.py": {
+      "content_hash": "sha256:e31095ab611b6c0212ca80a41f51b74a8eae686de8d1b156e9e648771448f17a",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/gemini_provider.py": {
+      "content_hash": "sha256:464cada18e3d602f6f6b5abf75845c5e7e461fd1bae7ddc16eb492e9bf7656d2",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/ipc.py": {
+      "content_hash": "sha256:a1346e7ff6f3ed73f42c241ace8e1d52dc2aa6e2f24f48bff47c2b58210358b6",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/mcp_client.py": {
+      "content_hash": "sha256:4b8b9eeb6ed74c4a52ff237d2448b11d5a60b6fa295857d4b1ecc39052f6d7aa",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/mcp_config.py": {
+      "content_hash": "sha256:8275057f300d474245b7308c64c0c270c6c4711f34ab01802d21e8c89fe3c1c7",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/memory_mcp.py": {
+      "content_hash": "sha256:45a95c7be5d163189a298907d1e34dfa4d338f1de1c692b7307245d8a561285d",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/memory_migrations.py": {
+      "content_hash": "sha256:99671cf1355e9e8fd3a1632ba1d40e72a2ef85da8618c9d2272e6f29c45378a8",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/memory_models.py": {
+      "content_hash": "sha256:6684ba5d0a8fdee8a114c91c8efa341c11dc7d62b6ed7a74444d17a0c5b84e16",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/memory_services.py": {
+      "content_hash": "sha256:498c26c602460075001a896362fdac19656c8951f2a4130e25a800d202968c80",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/memory_store.py": {
+      "content_hash": "sha256:76eaa9b9b42e5cf12fb116c8636f28bc846106193adada57160c164f024dca70",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/model_selection.py": {
+      "content_hash": "sha256:f95f14075defe2495e55191cf654371a2075445ad0edc032fb14ebfc487a9073",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/models.py": {
+      "content_hash": "sha256:4e242e2e9acfbc11a950892266d3845dcc3bad23825e158c5f57bda86aea8eb8",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/ollama.py": {
+      "content_hash": "sha256:7dda7929843f5c9495642f7c8ade2617a9117e2f62b0809f0c75f8634dc6b925",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/onboarding.py": {
+      "content_hash": "sha256:5aa2c46faae0b7a469a6baf09862c1ffad134045e1156aecd988556959d385c7",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/openai_provider.py": {
+      "content_hash": "sha256:811253586bf8780c25a05086833220b850d6c22c7414e0daf40bb220391f81c8",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/pairing.py": {
+      "content_hash": "sha256:3331f023c81b9861ba2f110d9a4166dfb5b76dcd0f4fdc6a3a62d798b739935f",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/persistence.py": {
+      "content_hash": "sha256:a44dd17129461cd6acc66a35280a26ea89845b50cce73f8badd48eb7f7867b12",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/policy.py": {
+      "content_hash": "sha256:12a86f8273075725a4d43b56ef3050fed45cbbe8e3915152398be9d20bee59c5",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/presentation.py": {
+      "content_hash": "sha256:fbebabfcd0130e481b791d80952e89d49661b016572c07e32e02ba1ae841405f",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/prompts.py": {
+      "content_hash": "sha256:df38410a90cc7f4c43dc056b405d7bcae1f1b1c5ae270d93f0f90959f0b23f49",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/provider_auth.py": {
+      "content_hash": "sha256:a7542edbeedf8a7a9477753411186fc7fc392f542ae7efd2f88aaaecaa328c72",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/providers.py": {
+      "content_hash": "sha256:b7d6857270587d8be93117baace6cf8a95dfaf8d1614cc04de746d66c7104bf5",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/recovery.py": {
+      "content_hash": "sha256:c13b1a9284d8121742069b0d204f0adef9535acb1e2f2c58ec98e139c76ec7d4",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/release_foundations.py": {
+      "content_hash": "sha256:b0c59f21eaa4a165aef05a3a99ed870bcf2df9a0d55bfae6dc4917ce045b3de1",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/remote_access.py": {
+      "content_hash": "sha256:8ca69a2059f24c9f1d0bab4713fba3101f9b720850e3328285048bb38a321897",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/robot_control_mcp.py": {
+      "content_hash": "sha256:9af7391fb1593ceb135594b28891f0cc76cf69ddc96d223564716855d625bbba",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/runtime.py": {
+      "content_hash": "sha256:40be0b7dfab7db7e64a878180375910a0ce3c324d46020c5604e40db7b25a004",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/secrets.py": {
+      "content_hash": "sha256:e71625c6099c3691ae25241d28084066dd58f5fe8438db62f3a52ddadcb6fb4e",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/service.py": {
+      "content_hash": "sha256:15d225d250c27bb1ac5c386f475c4d9557805c210dc49ee36837086c49d47b0c",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/service_main.py": {
+      "content_hash": "sha256:0ded09744f863cacf378ac4d7260172bfd32b9577fdf217b215345ecb00530fa",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/shutdown.py": {
+      "content_hash": "sha256:4bb58718dd959a5a2fdd0aa0aa2a6ff8c849415e3a6c266b74511bd6ce82a456",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/skills.py": {
+      "content_hash": "sha256:bbc8d99fe3a8b095b39d2780732fdc5172e0a4793592cfa7596f2ac143b830ae",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/testing.py": {
+      "content_hash": "sha256:7a0d7eecee6f8385aca97991127481acb0e4dbccff89968965598974bbe7b8ab",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/tools.py": {
+      "content_hash": "sha256:ff022ab4337382f410948a1da876661040290a05e791039c93faaeacd5cc790d",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/voice_service.py": {
+      "content_hash": "sha256:2c691d7e1a95f4a181f11cc2e190f676ffc2217be46e19c1f80555202606a061",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_app.py": {
+      "content_hash": "sha256:3e99a8e9df82dff6ee30b8e61b1fab5de789b972faea219c4d716ecd6f79c146",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_control.py": {
+      "content_hash": "sha256:3d41227654a580e7ff577a29d3e9859adf85d6aa99a162332d43aeba2f185c9a",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/app.js": {
+      "content_hash": "sha256:43be97cc1f670b18b624fdb22b42790bfc1b57f4f454d35f8d83f4d7c0942db7",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/i18n/en.json": {
+      "content_hash": "sha256:059fc72ae59a46202869df1a807d6349170f5779885cc9eb9141ee6d20f91f2f",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/i18n/ja.json": {
+      "content_hash": "sha256:291e69443df86c8e27f918d4c5b17fac5d8c0c6a922bacbe0d7934e7bf4443ea",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/i18n/zh-CN.json": {
+      "content_hash": "sha256:b079bb35878619709a265c447663e5749649365fd3ce3caf4160477c006a2a32",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/i18n/zh-TW.json": {
+      "content_hash": "sha256:3d852cc33bf43ab13e94079bced4ebd26145036d6ee4b4b34677bb3d9bbe3875",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/index.html": {
+      "content_hash": "sha256:0e916494e1dc7559320181163c7e8dc04f59963f842d997d9891cd9b62a260fd",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/manifest.webmanifest": {
+      "content_hash": "sha256:4887afdbcd1b947b651c99609c7470dd5a1d800237d2bc06c45b3ccad2eea8bc",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/styles.css": {
+      "content_hash": "sha256:a27af1925b364cfb858f1e0f3b0fadad101a3843543aece13171a6c263966a23",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/__init__.py": {
+      "content_hash": "sha256:add3fd89837d626729e472c9ab821a47036fc66eadeef1385c3e41859bf5319a",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/adapters.py": {
+      "content_hash": "sha256:265ea2d66a68137358f923a987d8a01ba715ed239c31ed9c85ff51e8427aa05f",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/api.py": {
+      "content_hash": "sha256:a5a8c2c6334f91479f26caf63db4552419ee2337a3be675c1ed43ebb1e47a527",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/assets/MODEL_LICENSE.md": {
+      "content_hash": "sha256:374f9e3cab988db5fda733a47a0e77cae6804de37d4c5e1de705ad5d5eed85f4",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/assets/hey_Ninja.onnx": {
+      "content_hash": "sha256:12c87f97ea41b08a356631dc1162af455aa30ac27ff6235963a31d0f5e39016a",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/assets/openwakeword/ASSET_NOTICE": {
+      "content_hash": "sha256:8bcedfa3af352a52cd6c1e2a16c4d4096a59a8f165e45c6b0c2ce8d22b537971",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/assets/openwakeword/embedding_model.onnx": {
+      "content_hash": "sha256:70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/assets/openwakeword/melspectrogram.onnx": {
+      "content_hash": "sha256:ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/assets/openwakeword/silero_vad.onnx": {
+      "content_hash": "sha256:a35ebf52fd3ce5f1469b2a36158dba761bc47b973ea3382b3186ca15b1f5af28",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/angry.json": {
+      "content_hash": "sha256:156dcf033f5343b10b7fad7dc9d44449236e5969b5c9a893efd260db6d836452",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/celebrate.json": {
+      "content_hash": "sha256:3c9a14307cf649311c0d3eec2e2b96ef576785b41de07a692a33f3f903aa3bf4",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/confusing.json": {
+      "content_hash": "sha256:9f8ad40043db9dc607367e063608d27e34818dd5529588ee50612cb1af44bbdf",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/cry.json": {
+      "content_hash": "sha256:e0621815e92df43ad586f5837689d0e07eddccf8f8f4e556a0a45c6f9a5edd8e",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/curious.json": {
+      "content_hash": "sha256:0f68375144bbd2d91ac9d62012cab2bbd577c27c119edceaa0418f45ac7fa9bc",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/error.json": {
+      "content_hash": "sha256:dbda1ca8c64a4d972e9bbf69ff193df0fcac75c02834bd0832dc37efbc7479a0",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/error_warning.json": {
+      "content_hash": "sha256:22f42ed43dfb864e18eae659eea676d0dd4a2c7789561c7f315220621ae28d17",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/exciting.json": {
+      "content_hash": "sha256:07937fd4dad82baf45f74f7e3c7f33fcf9677169f1e39c2b58a04f70f61de4da",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/greeting.json": {
+      "content_hash": "sha256:2b08945c1c710e1f1ea0e15bc02debad74451717bac1dc460a16b93375ceb555",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/happy.json": {
+      "content_hash": "sha256:8c987b815370fc36a08bf94ec64597fff52504afa24c6130519751b048f4be20",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/idle.json": {
+      "content_hash": "sha256:85bf9b7b65dc65ca3e3f434a3c9a306c5d33cf6bd9ec0d63979cf44b26db8e9b",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/laughing.json": {
+      "content_hash": "sha256:ee274e383d3b426c57ea2df9eba776c891e09fe21030177133a974cade601a7a",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/listening.json": {
+      "content_hash": "sha256:7a54a51f18a7ebb212139dd6e5ff236ce119ab8de72ea8a04b6f4541371e84b5",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/move_backward.json": {
+      "content_hash": "sha256:5863eb1b0321a32eab064691caf5c7fcd39f506d73b4df1e382d58dc79f85b24",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/move_forward.json": {
+      "content_hash": "sha256:e45ab69a08685eb2664e41480eb92b7e2bb55b2a59c2073d6518456929b0bd7c",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/sad.json": {
+      "content_hash": "sha256:0af1cd672e8e3baeeee0fb347724ea47be0ac241ae17e44f95b90698bcb4df2a",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/scary.json": {
+      "content_hash": "sha256:a4d5306a7b2013ab13160b9e0cd020ed73e994d452da2cfaef398b73b1b38ffe",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/shy.json": {
+      "content_hash": "sha256:df8894983042ac0ac5854b9ccbc486d48c9e69e37704631104e03defafdfb769",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/sleepy.json": {
+      "content_hash": "sha256:929eb201bf92ee9c446a3b09c5184f2e72f06a8aa13c71d11799ba084a7e5367",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/speaking.json": {
+      "content_hash": "sha256:d634b145b7f76574ce22b657d5b70b6295e191fcb95fd4562787a34a984cfb48",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/success.json": {
+      "content_hash": "sha256:116e9934ba2d0d4d28d56c3e9d0d39bd99c3c7c7212913db73445e49e629f26a",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/surprising.json": {
+      "content_hash": "sha256:c57a5bbcc5f5587540dae831519ce4c8a2eed6c9633ae2b0038d957cc216e960",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/thinking.json": {
+      "content_hash": "sha256:8b571e584fb7cf94658b73a5f1ef5441cc76cd1c8665dc1820cfcde09ecae219",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/turn_left.json": {
+      "content_hash": "sha256:c5363486c34b2816f20d67dc61a7e746b4825129b9ef814d561caee8b6144100",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/turn_right.json": {
+      "content_hash": "sha256:e723512c87cf9a69b29a810f721f873affef31e234e43cc3dc889e78df8b3b57",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets/warning.json": {
+      "content_hash": "sha256:46c7e7b361f091041e074f02bce9e40b929786c772e6bd177de42463d29ce6d7",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_assets.py": {
+      "content_hash": "sha256:ae2ae8092be5d252d793479f0e0055b3ace07a32055c3eb31b10650b81b6096c",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_drafts.py": {
+      "content_hash": "sha256:e0d19635d47529834c91e71e2d6a8fadea89f1b731a0f09a935a1d8b8febbb8a",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_models.py": {
+      "content_hash": "sha256:83d3549d17c4834f4e1bd477f269542ebd1197875aa0ab7349f96f974929ed8d",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_runtime.py": {
+      "content_hash": "sha256:7e6b8a6d3a77e6ec41a65a25373d761d8e9678353e18049c9e41756693e560bc",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/buzzer.py": {
+      "content_hash": "sha256:5a481e444fb63f64e66b038ca04f9ee1758e45ae4aa75cabff9747f71429d942",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/camera.py": {
+      "content_hash": "sha256:832d3152e991db4c43751fe39c64c0755fb4624b6d3e194152b85230d1693ea3",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/cli.py": {
+      "content_hash": "sha256:1638c4bca8a3b5aa0cc38284f8c71824294f23069094dc3cab408b735f7cb64e",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/config.py": {
+      "content_hash": "sha256:97ae6cc9439c25ba1f6b6bf672920ea5afc22a33e8f73b16ed21a8e19f34d7fe",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/config_import.py": {
+      "content_hash": "sha256:16e780d4d5b89936e79ecea6adf91b22f60218f9d01df432cf81da4102aa888c",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/display.py": {
+      "content_hash": "sha256:aa0f06d64869edcdbf3f40bafe10509d5823acb9dd5eaa4bd4b00d67b5ba193b",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/distance.py": {
+      "content_hash": "sha256:226a37d1b5954a8396a8d8f0fa5563bfad450c9c9b45308dbcc5e58525b4ddc1",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/engine.py": {
+      "content_hash": "sha256:68b09a42fcc5a7eb65500943e393c9e1569eb2f769faa653188d0827ef3428b2",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/errors.py": {
+      "content_hash": "sha256:a86885b09b33d33dd9f152316c5b732b7328be7c93c466db126da3941052585a",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/face_renderer.py": {
+      "content_hash": "sha256:a577e8e063767964310f09b0cb009cacda62108b924c57e42681284789d3b1b1",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/hardware_ownership.py": {
+      "content_hash": "sha256:2ed2958c7fa65fecbe67cc267d9267ef90d905eb15faf56f53f6bda58af4f03f",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/identity.py": {
+      "content_hash": "sha256:c7e308a3b2fa96e80ee6f811650b07c06f54069c0b613980822648927762d0b9",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/integrated.py": {
+      "content_hash": "sha256:8d370b5114a2e6d05fc5f89648c629677a89ed6607a61651a29b7f72650a9336",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/interactive_tool.py": {
+      "content_hash": "sha256:53c09dff217bc519641194d95e509bd89eebe56a7e1e303803f16b139f96c9ea",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/ledger.py": {
+      "content_hash": "sha256:8ca863358ae91c4825d7fe91d2f7ba221a7582c89df1d7daebfb969e88e270c7",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/microphone.py": {
+      "content_hash": "sha256:1c9e4a8eae1dd980e99b63fb7e1f75870fa7032dd2852675aad67c54965fdcd3",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/models.py": {
+      "content_hash": "sha256:c660319cd8908ba38b89412b0c525dfca82657832d55bcff37a8203b5be37820",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/qr_display.py": {
+      "content_hash": "sha256:3a5fb55adc5b11c532031a5853a666b6980ccd5a0a4793a15b3b40367000c9bb",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/registry.py": {
+      "content_hash": "sha256:152509fdf7d551716061d7dc1796065eba843db73b140180fd203aa4e7f9960f",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/robot.py": {
+      "content_hash": "sha256:a3f22d49fc6533b452508fde65ce61b77648bbc2ff808f40884999f504deb663",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/runtime_control.py": {
+      "content_hash": "sha256:4d5a129f28cd93249e8e0280e584a1636edec74ceaef48cfeb8918f7e68140a9",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/safety.py": {
+      "content_hash": "sha256:b03849a616a071b1588959e02cced5974f3e6d288968cdb3d74b4f3d9938c128",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/scheduler.py": {
+      "content_hash": "sha256:840b0ee773f2c46b47eac8649ca5a3d15185f9915a91520109a7558333bb0a60",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/servo.py": {
+      "content_hash": "sha256:4717b84858328087c86de7677ed41d5d3c75f5daa6388ff84c4d9de43cde2ef1",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/simulation.py": {
+      "content_hash": "sha256:2c6605a019d0330a2b2ca50c4a4804d432218760aeccd6fdcf9cdc3bcf6a826e",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/testing.py": {
+      "content_hash": "sha256:4e9af8f5e716997f81451f5b4b85318982dac37aa6e5a4fb9a6378a33f109796",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/voice_input.py": {
+      "content_hash": "sha256:741c6e645011dec54ae77afe28a90661470456fd63a62f7e8f3651432d98228a",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    }
+  },
+  "adapters": [
+    {
+      "path": "AGENT.md",
+      "target": "AGENTS.md",
+      "reference": "AGENTS.md"
+    },
+    {
+      "path": "CLAUDE.md",
+      "target": "AGENTS.md",
+      "reference": "@AGENTS.md"
+    },
+    {
+      "path": ".cursor/rules/ninjarobot-wiki.mdc",
+      "target": "AGENTS.md",
+      "reference": "AGENTS.md"
+    },
+    {
+      "path": ".agents/rules/ninjarobot-wiki.md",
+      "target": "AGENTS.md",
+      "reference": "@../../AGENTS.md"
+    },
+    {
+      "path": ".claude/skills/ninjarobot-knowledge/SKILL.md",
+      "target": ".agents/skills/ninjarobot-knowledge/SKILL.md",
+      "reference": "../../../.agents/skills/ninjarobot-knowledge/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/ninja-wiki-query/SKILL.md",
+      "target": ".agents/skills/ninja-wiki-query/SKILL.md",
+      "reference": "../../../.agents/skills/ninja-wiki-query/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/ninja-wiki-ingest/SKILL.md",
+      "target": ".agents/skills/ninja-wiki-ingest/SKILL.md",
+      "reference": "../../../.agents/skills/ninja-wiki-ingest/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/ninja-wiki-lint/SKILL.md",
+      "target": ".agents/skills/ninja-wiki-lint/SKILL.md",
+      "reference": "../../../.agents/skills/ninja-wiki-lint/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/ninja-wiki-review/SKILL.md",
+      "target": ".agents/skills/ninja-wiki-review/SKILL.md",
+      "reference": "../../../.agents/skills/ninja-wiki-review/SKILL.md"
+    },
+    {
+      "path": ".claude/skills/ninja-wiki-maintain/SKILL.md",
+      "target": ".agents/skills/ninja-wiki-maintain/SKILL.md",
+      "reference": "../../../.agents/skills/ninja-wiki-maintain/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/ninja-wiki-query/SKILL.md",
+      "target": "ninjarobot_pi5_wiki/.agents/skills/wiki-query/SKILL.md",
+      "reference": "../../../ninjarobot_pi5_wiki/.agents/skills/wiki-query/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/ninja-wiki-ingest/SKILL.md",
+      "target": "ninjarobot_pi5_wiki/.agents/skills/wiki-ingest/SKILL.md",
+      "reference": "../../../ninjarobot_pi5_wiki/.agents/skills/wiki-ingest/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/ninja-wiki-lint/SKILL.md",
+      "target": "ninjarobot_pi5_wiki/.agents/skills/wiki-lint/SKILL.md",
+      "reference": "../../../ninjarobot_pi5_wiki/.agents/skills/wiki-lint/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/ninja-wiki-review/SKILL.md",
+      "target": "ninjarobot_pi5_wiki/.agents/skills/wiki-review/SKILL.md",
+      "reference": "../../../ninjarobot_pi5_wiki/.agents/skills/wiki-review/SKILL.md"
+    },
+    {
+      "path": ".agents/skills/ninja-wiki-maintain/SKILL.md",
+      "target": "ninjarobot_pi5_wiki/.agents/skills/wiki-maintain/SKILL.md",
+      "reference": "../../../ninjarobot_pi5_wiki/.agents/skills/wiki-maintain/SKILL.md"
+    }
+  ],
+  "link_documents": [
+    "README.md",
+    "AGENTS.md",
+    "AGENT.md",
+    "CLAUDE.md",
+    "docs/README.md",
+    "THIRD_PARTY_NOTICES.md",
+    "ninjarobot_pi5_wiki/README.md",
+    "ninjarobot_pi5_wiki/docs/PROJECT_WORKFLOW.md",
+    "InstallationGuide.md",
+    "DevelopmentGuide.md",
+    "NinjaRobot_MCP_Skill.md",
+    "DevelopmentLog.md",
+    "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/InstallationGuide.md",
+    "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/DevelopmentGuide.md",
+    "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/NinjaRobot_MCP_Skill.md",
+    "ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-07/DevelopmentLog.md"
+  ],
+  "integration_status": "semantic-plan-awaiting-approval",
+  "pending_plan": "DevelopmentPlanDoc/LLMWiki_Initial_Knowledge_260907.yaml"
+}

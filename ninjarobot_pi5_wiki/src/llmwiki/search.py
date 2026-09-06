@@ -9,20 +9,71 @@ from .lint import is_stale, trust_tier
 from .models import SearchResult
 from .paths import concept_id, iter_markdown
 
-
 TOKEN_RE = re.compile(r"[^\W_]+", re.UNICODE)
-STOP_WORDS = frozenset({
-    "a", "an", "and", "are", "as", "at", "be", "by", "can", "could", "do", "does",
-    "explain", "for", "from", "how", "i", "in", "is", "it", "me", "of", "on", "or",
-    "please", "show", "that", "the", "this", "to", "use", "using", "via", "what", "when",
-    "where", "which", "with", "work", "works", "would", "you",
-})
+STOP_WORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "by",
+        "can",
+        "could",
+        "do",
+        "does",
+        "explain",
+        "for",
+        "from",
+        "how",
+        "i",
+        "in",
+        "is",
+        "it",
+        "me",
+        "of",
+        "on",
+        "or",
+        "please",
+        "show",
+        "that",
+        "the",
+        "this",
+        "to",
+        "use",
+        "using",
+        "via",
+        "what",
+        "when",
+        "where",
+        "which",
+        "with",
+        "work",
+        "works",
+        "would",
+        "you",
+    }
+)
 TERM_EQUIVALENCE_GROUPS = (
     frozenset({"electronic", "electronics", "electrical", "hardware", "component", "components"}),
     frozenset({"module", "modules", "component", "components", "subsystem", "subsystems"}),
-    frozenset({"diagram", "diagrams", "schematic", "schematics", "pinout", "pinouts", "table", "tables"}),
+    frozenset(
+        {"diagram", "diagrams", "schematic", "schematics", "pinout", "pinouts", "table", "tables"}
+    ),
     frozenset({"wire", "wires", "wired", "wiring", "connection", "connections"}),
-    frozenset({"connect", "connects", "connected", "connecting", "connection", "connections", "connectivity"}),
+    frozenset(
+        {
+            "connect",
+            "connects",
+            "connected",
+            "connecting",
+            "connection",
+            "connections",
+            "connectivity",
+        }
+    ),
 )
 
 
@@ -97,9 +148,17 @@ def search_bundle(bundle_root: Path, query: str, *, limit: int = 20) -> list[Sea
         if len(matched) == len(terms):
             score += 10
         score += len(matched) * 3
-        lines = [line.strip() for line in document.body.splitlines() if line.strip() and not line.startswith("#")]
+        lines = [
+            line.strip()
+            for line in document.body.splitlines()
+            if line.strip() and not line.startswith("#")
+        ]
         excerpt = next(
-            (line for line in lines if any(_term_matches(term, set(_tokens(line))) for term in terms)),
+            (
+                line
+                for line in lines
+                if any(_term_matches(term, set(_tokens(line))) for term in terms)
+            ),
             description,
         )
         results.append(

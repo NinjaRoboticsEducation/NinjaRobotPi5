@@ -7,8 +7,14 @@ from llmwiki.lint import is_stale, trust_tier
 
 def test_trust_is_derived_from_verification_events() -> None:
     assert trust_tier({}) == "unverified"
-    assert trust_tier({"verified": {"by": "agent:test", "at": "2026-01-01T00:00:00Z"}}) == "machine-confirmed"
-    assert trust_tier({"verified": [{"by": "human:owner", "at": "2026-01-01T00:00:00Z"}]}) == "human-reviewed"
+    assert (
+        trust_tier({"verified": {"by": "agent:test", "at": "2026-01-01T00:00:00Z"}})
+        == "machine-confirmed"
+    )
+    assert (
+        trust_tier({"verified": [{"by": "human:owner", "at": "2026-01-01T00:00:00Z"}]})
+        == "human-reviewed"
+    )
 
 
 def test_freshness_uses_absolute_time() -> None:

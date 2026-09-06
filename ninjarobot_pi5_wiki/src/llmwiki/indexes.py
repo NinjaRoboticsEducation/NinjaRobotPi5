@@ -21,20 +21,20 @@ def render_index(directory: Path, bundle_root: Path) -> str:
     prefix = '---\nokf_version: "0.2"\n---\n\n' if is_root else ""
     lines = [f"# {title}", ""]
 
-    files = [
-        path
-        for path in directory.glob("*.md")
-        if path.name not in {"index.md", "log.md"}
-    ]
+    files = [path for path in directory.glob("*.md") if path.name not in {"index.md", "log.md"}]
     for path in sorted(files, key=lambda item: item.name):
         page_title, description = _description(path)
         lines.append(f"* [{page_title}]({path.name}) - {description}")
 
-    subdirectories = [
-        path
-        for path in directory.iterdir()
-        if path.is_dir() and not path.name.startswith(".") and path.name != "assets"
-    ] if directory.exists() else []
+    subdirectories = (
+        [
+            path
+            for path in directory.iterdir()
+            if path.is_dir() and not path.name.startswith(".") and path.name != "assets"
+        ]
+        if directory.exists()
+        else []
+    )
     for path in sorted(subdirectories, key=lambda item: item.name):
         label = path.name.replace("-", " ").title()
         lines.append(f"* [{label}]({path.name}/) - Browse {label.lower()} in this bundle.")
@@ -46,8 +46,11 @@ def render_index(directory: Path, bundle_root: Path) -> str:
 def build_indexes(bundle_root: Path, *, check: bool = False) -> list[Path]:
     directories = [bundle_root]
     directories.extend(
-        path for path in bundle_root.rglob("*")
-        if path.is_dir() and not path.name.startswith(".") and "assets" not in path.relative_to(bundle_root).parts
+        path
+        for path in bundle_root.rglob("*")
+        if path.is_dir()
+        and not path.name.startswith(".")
+        and "assets" not in path.relative_to(bundle_root).parts
     )
     changed: list[Path] = []
     for directory in sorted(directories, key=lambda item: item.relative_to(bundle_root).as_posix()):

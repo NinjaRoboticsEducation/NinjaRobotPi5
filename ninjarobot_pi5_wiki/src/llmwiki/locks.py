@@ -24,7 +24,11 @@ class ProjectLock:
         try:
             descriptor = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         except FileExistsError as exc:
-            owner = self.path.read_text(encoding="utf-8", errors="replace") if self.path.exists() else "unknown"
+            owner = (
+                self.path.read_text(encoding="utf-8", errors="replace")
+                if self.path.exists()
+                else "unknown"
+            )
             raise LockError(f"Another write operation holds {self.path}: {owner}") from exc
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             json.dump(payload, handle)

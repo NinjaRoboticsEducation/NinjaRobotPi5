@@ -24,7 +24,9 @@ def _append_log(bundle_root: Path, plan: dict[str, Any]) -> None:
     path = bundle_root / "log.md"
     today = datetime.now(timezone.utc).date().isoformat()
     source_ids = [item["id"] for item in source_refs(plan)]
-    source_note = f" Sources: {', '.join(f'`{item}`' for item in source_ids)}." if source_ids else ""
+    source_note = (
+        f" Sources: {', '.join(f'`{item}`' for item in source_ids)}." if source_ids else ""
+    )
     assets = sum(operation["op"] == "copy_asset" for operation in plan["operations"])
     asset_note = f" Assets: {assets}." if assets else ""
     entry = (
@@ -45,7 +47,9 @@ def _append_log(bundle_root: Path, plan: dict[str, Any]) -> None:
 
 def _mark_sources_ingested(config: Config, plan: dict[str, Any], staged_catalog: Path) -> None:
     copied_asset_ids = {
-        operation["source_id"] for operation in plan["operations"] if operation["op"] == "copy_asset"
+        operation["source_id"]
+        for operation in plan["operations"]
+        if operation["op"] == "copy_asset"
     }
     timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     for source_ref in source_refs(plan):
@@ -80,7 +84,9 @@ def apply_plan(config: Config, plan: dict[str, Any], *, approved: bool) -> Path:
     with ProjectLock(config.root):
         validate_plan(config, plan, check_hashes=True)
         if stage.exists() or backup.exists():
-            raise PlanError(f"Runtime state already exists for plan {plan['id']}; inspect it before retrying")
+            raise PlanError(
+                f"Runtime state already exists for plan {plan['id']}; inspect it before retrying"
+            )
         baseline_wiki_hash = sha256_tree(config.bundle_root)
         baseline_catalog_hash = sha256_tree(config.catalog_root)
         stage.mkdir(parents=True)
@@ -118,7 +124,9 @@ def apply_plan(config: Config, plan: dict[str, Any], *, approved: bool) -> Path:
         if sha256_tree(config.bundle_root) != baseline_wiki_hash:
             raise PlanError("The wiki changed while the plan was staged; create a fresh plan")
         if sha256_tree(config.catalog_root) != baseline_catalog_hash:
-            raise PlanError("The source catalog changed while the plan was staged; create a fresh plan")
+            raise PlanError(
+                "The source catalog changed while the plan was staged; create a fresh plan"
+            )
         _mark_sources_ingested(config, plan, stage / "catalog")
 
         backup.mkdir(parents=True)
@@ -159,11 +167,15 @@ def prune_runtime(config: Config, *, keep: int, approved: bool, dry_run: bool) -
     if keep < 1:
         raise PlanError("At least one backup must be retained")
     backup_root = config.root / ".llmwiki/backups"
-    candidates = sorted(
-        (path for path in backup_root.iterdir() if path.is_dir()),
-        key=lambda path: path.stat().st_mtime,
-        reverse=True,
-    ) if backup_root.exists() else []
+    candidates = (
+        sorted(
+            (path for path in backup_root.iterdir() if path.is_dir()),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        if backup_root.exists()
+        else []
+    )
     selected = candidates[keep:]
     if selected and not dry_run and not approved:
         raise PlanError("Pruning backups requires explicit approval")

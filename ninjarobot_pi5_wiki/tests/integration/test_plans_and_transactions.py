@@ -3,13 +3,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import pytest
-
+from conftest import valid_page
 from llmwiki import transactions
 from llmwiki.paths import sha256_file
 from llmwiki.plans import PlanError, plan_diff, validate_plan
 from llmwiki.transactions import apply_plan
-
-from conftest import valid_page
 
 
 def make_plan(plan_id: str = "test-create-page") -> dict:
@@ -109,7 +107,9 @@ def test_unrelated_edit_during_staging_is_not_overwritten(project, monkeypatch) 
     monkeypatch.setattr(transactions, "lint_bundle", edit_live_wiki_then_lint)
     with pytest.raises(PlanError, match="changed while"):
         apply_plan(config, make_plan("test-concurrent-edit"), approved=True)
-    assert "Manual Concurrent Edit" in (config.bundle_root / "overview.md").read_text(encoding="utf-8")
+    assert "Manual Concurrent Edit" in (config.bundle_root / "overview.md").read_text(
+        encoding="utf-8"
+    )
     assert not (config.bundle_root / "concepts" / "planned.md").exists()
 
 

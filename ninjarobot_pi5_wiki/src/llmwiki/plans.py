@@ -45,7 +45,9 @@ def _validate_source_refs(config: Config, plan: dict[str, Any], *, check_hashes:
     for source_ref in refs:
         record = load_record(config, source_ref["id"])
         if record["content_hash"] != source_ref["content_hash"]:
-            raise PlanError(f"Plan source hash no longer matches catalog record: {source_ref['id']}")
+            raise PlanError(
+                f"Plan source hash no longer matches catalog record: {source_ref['id']}"
+            )
         source_path = config.root / record["path"]
         if not source_path.is_file() or sha256_file(source_path) != source_ref["content_hash"]:
             raise PlanError(f"Plan source changed after creation: {source_ref['id']}")
@@ -69,7 +71,9 @@ def _page_source_ids(content: str) -> tuple[set[str], dict[str, str]]:
     return ids, hashes
 
 
-def _validate_asset(config: Config, operation: dict[str, Any], plan_source_ids: set[str], *, check_hashes: bool) -> Path:
+def _validate_asset(
+    config: Config, operation: dict[str, Any], plan_source_ids: set[str], *, check_hashes: bool
+) -> Path:
     if operation.get("source_id") not in plan_source_ids:
         raise PlanError("copy_asset source_id must be listed in the plan sources array")
     try:
@@ -77,7 +81,11 @@ def _validate_asset(config: Config, operation: dict[str, Any], plan_source_ids: 
         target = safe_project_path(config.root, operation["path"], config.bundle_root / "assets")
     except UnsafePathError as exc:
         raise PlanError(str(exc)) from exc
-    if source.suffix.lower() not in {".png", ".jpg", ".jpeg"} or target.suffix.lower() not in {".png", ".jpg", ".jpeg"}:
+    if source.suffix.lower() not in {".png", ".jpg", ".jpeg"} or target.suffix.lower() not in {
+        ".png",
+        ".jpg",
+        ".jpeg",
+    }:
         raise PlanError("copy_asset supports PNG and JPEG files only")
     if source.is_symlink() or target.is_symlink():
         raise PlanError("Asset symlinks are not allowed")
@@ -107,7 +115,9 @@ def _validate_asset(config: Config, operation: dict[str, Any], plan_source_ids: 
 
 
 def validate_plan(config: Config, plan: dict[str, Any], *, check_hashes: bool = True) -> list[str]:
-    schema = json.loads((config.root / "schemas/change-plan.schema.json").read_text(encoding="utf-8"))
+    schema = json.loads(
+        (config.root / "schemas/change-plan.schema.json").read_text(encoding="utf-8")
+    )
     errors = sorted(
         Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(plan),
         key=lambda item: list(item.path),
@@ -123,7 +133,9 @@ def validate_plan(config: Config, plan: dict[str, Any], *, check_hashes: bool = 
     operations = plan["operations"]
     if any(op["op"] == "delete" for op in operations) and plan.get("risk") != "high":
         raise PlanError("Plans containing delete operations require risk: high")
-    if plan.get("risk") == "low" and (len(operations) > 10 or any(op["op"] in {"move", "copy_asset"} for op in operations)):
+    if plan.get("risk") == "low" and (
+        len(operations) > 10 or any(op["op"] in {"move", "copy_asset"} for op in operations)
+    ):
         raise PlanError("This plan is too large or disruptive for risk: low")
     if any(op["op"] == "copy_asset" for op in plan["operations"]) and plan.get("version") != 2:
         raise PlanError("copy_asset requires change-plan version 2")
@@ -153,7 +165,9 @@ def validate_plan(config: Config, plan: dict[str, Any], *, check_hashes: bool = 
         seen.add(key)
         if target.name in {"index.md", "log.md"}:
             raise PlanError("Plans cannot write reserved index.md or log.md files directly")
-        if target.suffix.lower() != ".md" or (source is not None and source.suffix.lower() != ".md"):
+        if target.suffix.lower() != ".md" or (
+            source is not None and source.suffix.lower() != ".md"
+        ):
             raise PlanError("Wiki page operations may touch Markdown concept pages only")
         expected = operation.get("expected_sha256")
         current_path = source if source is not None else target
@@ -164,11 +178,15 @@ def validate_plan(config: Config, plan: dict[str, Any], *, check_hashes: bool = 
                 raise PlanError(f"Expected existing file is missing: {current_path}")
             actual = sha256_file(current_path)
             if actual != expected:
-                raise PlanError(f"Stale plan for {current_path}: expected {expected}, found {actual}")
+                raise PlanError(
+                    f"Stale plan for {current_path}: expected {expected}, found {actual}"
+                )
         if operation["op"] == "write":
             proposed = operation["content"].rstrip() + "\n"
             if target.exists() and expected is None:
-                raise PlanError(f"Writing an existing page requires expected_sha256: {operation['path']}")
+                raise PlanError(
+                    f"Writing an existing page requires expected_sha256: {operation['path']}"
+                )
             if check_hashes and target.exists() and target.read_text(encoding="utf-8") == proposed:
                 raise PlanError(f"No-op write is not allowed: {operation['path']}")
             ids, hashes = _page_source_ids(operation["content"])
@@ -181,7 +199,11 @@ def validate_plan(config: Config, plan: dict[str, Any], *, check_hashes: bool = 
             raise PlanError(f"Operation source does not exist: {current_path}")
         if operation["op"] == "move" and target.exists():
             raise PlanError(f"Move target already exists: {operation['path']}")
-        summaries.append(f"{operation['op']}: {operation.get('from', '')} -> {operation['path']}".replace(":  ->", ":"))
+        summaries.append(
+            f"{operation['op']}: {operation.get('from', '')} -> {operation['path']}".replace(
+                ":  ->", ":"
+            )
+        )
 
     if plan.get("version") == 2 and not page_source_ids.issubset(plan_source_ids):
         missing = ", ".join(sorted(page_source_ids - plan_source_ids))
@@ -203,7 +225,11 @@ def plan_diff(config: Config, plan: dict[str, Any]) -> str:
         else:
             path = safe_project_path(config.root, operation["path"], config.bundle_root)
             if operation["op"] == "write":
-                old = path.read_text(encoding="utf-8").splitlines(keepends=True) if path.exists() else []
+                old = (
+                    path.read_text(encoding="utf-8").splitlines(keepends=True)
+                    if path.exists()
+                    else []
+                )
                 new = (operation["content"].rstrip() + "\n").splitlines(keepends=True)
                 output.extend(difflib.unified_diff(old, new, fromfile=str(path), tofile=str(path)))
             elif operation["op"] == "move":

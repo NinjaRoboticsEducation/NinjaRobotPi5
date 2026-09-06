@@ -1,0 +1,30 @@
+[
+  {
+    "document": "InstallationGuide.md",
+    "original_hash": "sha256:81247077b55ba3e1c40e0977b309a2ffed7d706c26bb1796ac4a6357a8f9ae6b",
+    "migrated_hash": "sha256:53f80c60feb139f0de547613bd14b8fcd87a2678ba5bf7dc75b1b2bccb1dc1c4",
+    "preservation": "PASS: original content retained after mechanical link rebasing; integration appendix/anchor only",
+    "appended_characters": 0
+  },
+  {
+    "document": "DevelopmentGuide.md",
+    "original_hash": "sha256:ef1a4d5b81ac2fe67f735ccd0df311fec87d1d13430f47a24c7ef226c2c2e522",
+    "migrated_hash": "sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e",
+    "preservation": "PASS: original content retained after mechanical link rebasing; integration appendix/anchor only",
+    "appended_characters": 357
+  },
+  {
+    "document": "NinjaRobot_MCP_Skill.md",
+    "original_hash": "sha256:df8076ccc2683b24b6752310558ce4e62828d54cee67f1102aae7196c0ee97bb",
+    "migrated_hash": "sha256:df8076ccc2683b24b6752310558ce4e62828d54cee67f1102aae7196c0ee97bb",
+    "preservation": "PASS: original content retained after mechanical link rebasing; integration appendix/anchor only",
+    "appended_characters": 0
+  },
+  {
+    "document": "DevelopmentLog.md",
+    "original_hash": "sha256:acd1d86c260557afc7ab45093950860b80deb1097d052c1428427feba7e0a139",
+    "migrated_hash": "sha256:9d2f7eb85695c830322023c4efa549e5d178030105a611468b003f4d8e0b1dd4",
+    "preservation": "PASS: original content retained after mechanical link rebasing; integration appendix/anchor only",
+    "appended_characters": 607
+  }
+]

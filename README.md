@@ -22,6 +22,14 @@
 
 ---
 
+## Local developer knowledge base
+
+The [project wiki](ninjarobot_pi5_wiki/README.md) is the primary documentation
+collection for developers and AI coding tools. It contains the complete versioned
+manuals, project knowledge, and [maintenance workflow](ninjarobot_pi5_wiki/docs/PROJECT_WORKFLOW.md).
+Open the project root for coding or the wiki folder for documentation queries.
+The wiki uses a separate environment and does not run or control the robot.
+
 ## What is NinjaRobotPi5?
 
 **NinjaRobotPi5** is an AI-powered robot platform built on the Raspberry Pi 5. It brings a robot's display, buzzer, wheel servos, distance sensor, camera, and microphone together behind one clean software interface — and then adds a fully local AI agent that you can talk to, type to, or control from your phone.

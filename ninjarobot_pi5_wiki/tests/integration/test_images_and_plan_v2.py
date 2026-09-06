@@ -4,14 +4,13 @@ from datetime import datetime, timezone
 
 import pytest
 import yaml
-from PIL import Image
-
+from llmwiki import transactions
 from llmwiki.normalize import normalize_source
 from llmwiki.paths import sha256_file
 from llmwiki.plans import PlanError, plan_diff, validate_plan
 from llmwiki.sources import SourceError, add_source, load_record, update_source
 from llmwiki.transactions import apply_plan, prune_runtime
-from llmwiki import transactions
+from PIL import Image
 
 
 def _now() -> str:
@@ -123,9 +122,16 @@ Evidence two.[^%s]
 
 [^%s]: One.
 [^%s]: Two.
-""" % (
-                    records[0]["id"], records[0]["content_hash"], records[1]["id"], records[1]["content_hash"],
-                    records[0]["id"], records[1]["id"], records[0]["id"], records[1]["id"],
+"""
+                % (
+                    records[0]["id"],
+                    records[0]["content_hash"],
+                    records[1]["id"],
+                    records[1]["content_hash"],
+                    records[0]["id"],
+                    records[1]["id"],
+                    records[0]["id"],
+                    records[1]["id"],
                 ),
             }
         ],
@@ -142,12 +148,14 @@ Evidence two.[^%s]
         "created_at": _now(),
         "actor": "test-suite/2",
         "risk": "low",
-        "operations": [{
-            "op": "write",
-            "path": "wiki/overview.md",
-            "content": overview.read_text(encoding="utf-8"),
-            "expected_sha256": sha256_file(overview),
-        }],
+        "operations": [
+            {
+                "op": "write",
+                "path": "wiki/overview.md",
+                "content": overview.read_text(encoding="utf-8"),
+                "expected_sha256": sha256_file(overview),
+            }
+        ],
     }
     with pytest.raises(PlanError, match="No-op write"):
         validate_plan(config, no_op)
@@ -165,25 +173,25 @@ def test_image_reference_and_asset_apply_as_one_transaction(project) -> None:
 type: Reference
 title: Layout Image
 description: A visual reference used by the test suite.
-resource: urn:llmwiki:source:{record['id']}
+resource: urn:llmwiki:source:{record["id"]}
 status: stable
 generated:
   by: test-suite/2
   at: 2026-08-22T00:00:00Z
 sources:
-  - id: {record['id']}
-    resource: urn:llmwiki:source:{record['id']}
+  - id: {record["id"]}
+    resource: urn:llmwiki:source:{record["id"]}
     title: Layout Image
-    content_hash: {record['content_hash']}
+    content_hash: {record["content_hash"]}
 ---
 
 # Layout Image
 
-The image is a small synthetic layout fixture.[^{record['id']}]
+The image is a small synthetic layout fixture.[^{record["id"]}]
 
-![Synthetic teal layout](/assets/sources/{record['id']}.png)
+![Synthetic teal layout](/assets/sources/{record["id"]}.png)
 
-[^{record['id']}]: Registered image source `{record['id']}`.
+[^{record["id"]}]: Registered image source `{record["id"]}`.
 """
     plan = {
         "version": 2,
@@ -224,16 +232,16 @@ title: Rollback
 description: Transaction rollback evidence.
 status: stable
 sources:
-  - id: {record['id']}
-    resource: urn:llmwiki:source:{record['id']}
-    content_hash: {record['content_hash']}
+  - id: {record["id"]}
+    resource: urn:llmwiki:source:{record["id"]}
+    content_hash: {record["content_hash"]}
 ---
 
 # Rollback
 
-This page uses the rollback fixture.[^{record['id']}]
+This page uses the rollback fixture.[^{record["id"]}]
 
-[^{record['id']}]: Registered rollback source.
+[^{record["id"]}]: Registered rollback source.
 """
     plan = {
         "version": 2,

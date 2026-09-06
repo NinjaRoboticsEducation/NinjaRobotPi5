@@ -7,7 +7,6 @@ from typing import Any
 
 from .frontmatter import Document
 
-
 SEMANTIC_FIELDS = ("type", "title", "description", "resource", "tags", "status", "sources")
 ABSOLUTE_CLAIM_RE = re.compile(
     r"\b(?:always|never|guarantee(?:d|s)?|cannot|completely|exclusively|proven|safe|secure|all)\b",
@@ -17,11 +16,7 @@ ABSOLUTE_CLAIM_RE = re.compile(
 
 def semantic_target_hash(document: Document) -> str:
     """Hash meaning-bearing page content without hashing the review itself."""
-    metadata = {
-        key: document.metadata[key]
-        for key in SEMANTIC_FIELDS
-        if key in document.metadata
-    }
+    metadata = {key: document.metadata[key] for key in SEMANTIC_FIELDS if key in document.metadata}
     payload = {
         "metadata": metadata,
         "body": document.body.replace("\r\n", "\n").strip() + "\n",

@@ -7,7 +7,9 @@ from urllib.parse import unquote, urlparse
 
 from .paths import ensure_within
 
-MARKDOWN_LINK_RE = re.compile(r"(?P<image>!)?\[(?P<label>[^\]]*)\]\((?P<target>[^)\s]+)(?:\s+[\"'][^\"']*[\"'])?\)")
+MARKDOWN_LINK_RE = re.compile(
+    r"(?P<image>!)?\[(?P<label>[^\]]*)\]\((?P<target>[^)\s]+)(?:\s+[\"'][^\"']*[\"'])?\)"
+)
 WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 HEADING_RE = re.compile(r"^#{1,6}\s+(.+?)\s*$", re.MULTILINE)
 

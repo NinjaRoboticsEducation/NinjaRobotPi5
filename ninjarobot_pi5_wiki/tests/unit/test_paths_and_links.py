@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from llmwiki.links import anchors, extract_links, resolve_link
 from llmwiki.paths import UnsafePathError, concept_id, safe_project_path
 

@@ -1,3 +1,54 @@
+# NinjaRobotPi5 local knowledge base
+
+Start here for project documentation, architecture, development history, and
+AI-assisted development. Open this folder in your coding tool for wiki questions,
+or open the parent project for development and implementation verification.
+
+## Current full manuals
+
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-07/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-07/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-07/NinjaRobot_MCP_Skill.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-07/DevelopmentLog.md)
+
+These are the complete documents. The old root filenames remain navigation links.
+Use [the current document map](project-knowledge.json) for source versions and
+[the development workflow](docs/PROJECT_WORKFLOW.md) for setup and updates.
+The [knowledge overview](wiki/overview.md) leads to searchable topic pages.
+Read the [project policy](../AGENTS.md) and [wiki policy](AGENTS.md) before editing.
+
+From this wiki folder, explicit first-time setup is:
+
+```bash
+python ../scripts/wiki.py setup
+python ../scripts/wiki.py prepare
+```
+
+Then ask your coding tool a read-only project question, or search directly:
+
+```bash
+python ../scripts/wiki.py search "hardware architecture"
+python ../scripts/wiki.py source status
+python ../scripts/wiki.py lint
+```
+
+Search returns curated pages, not full raw manuals. Read the pages and citations;
+flag stale, draft, conflicting or unreviewed evidence. If no result matches, use
+the manual links above. Code verification requires access to the parent project.
+
+## Template reference / テンプレート資料 / 範本參考 / 模板参考
+
+The multilingual material below documents the bundled LLMWikiTemplate. For this
+existing robot checkout, use the project setup and paths above; do not create a
+second wiki or follow template initialization as a project migration command.
+Antigravity users should use skills; old workflow entries are compatibility only.
+
+以下はテンプレートの参考資料です。このプロジェクトでは上記の設定とパスを使ってください。
+以下是範本參考資料。本專案請使用上方的設定與路徑；Antigravity 請使用技能。
+以下是模板参考资料。本项目请使用上方的设置与路径；Antigravity 请使用技能。
+
+---
+
 # LLMWikiTemplate
 
 <div align="center">

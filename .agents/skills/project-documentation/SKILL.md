@@ -7,6 +7,17 @@ description: Use when implementation work changes behavior, setup, drivers, arch
 
 Documentation updates are mandatory when implementation changes behavior or developer workflow.
 
+## Wiki maintenance
+
+Read `../ninjarobot-knowledge/SKILL.md` relative to this skill's directory and the
+repository's `ninjarobot_pi5_wiki/docs/PROJECT_WORKFLOW.md`.
+Resolve the current full manuals through `project-knowledge.json`; root manuals
+are compatibility links. Create new source versions for updates and preserve
+registered originals. Review InstallationGuide.md and NinjaRobot_MCP_Skill.md
+when setup or external-tool guidance changes. Update affected wiki pages through
+an approved semantic plan, record honest review status, and run the wiki and
+knowledge checks. Include a specific no-impact reason when applicable.
+
 ## Review targets
 - README.md
 - DevelopmentGuide.md

@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
-
 from llmwiki.normalize import normalize_source
 from llmwiki.sources import SourceError, add_source, load_record, record_status
 
@@ -55,7 +52,8 @@ def test_html_normalization_removes_executable_markup(project) -> None:
     root, config = project
     source = root / "raw" / "articles" / "page.html"
     source.write_text(
-        "<html><style>secret style</style><h1>Title</h1><p>Useful text.</p><script>deleteWiki()</script></html>",
+        "<html><style>secret style</style><h1>Title</h1><p>Useful "
+        "text.</p><script>deleteWiki()</script></html>",
         encoding="utf-8",
     )
     record, _ = add_source(config, source)

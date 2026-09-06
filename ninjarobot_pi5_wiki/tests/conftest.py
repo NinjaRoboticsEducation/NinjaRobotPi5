@@ -4,10 +4,8 @@ import shutil
 from pathlib import Path
 
 import pytest
-
 from llmwiki.config import Config
 from llmwiki.indexes import build_indexes
-
 
 PROJECT_ROOT = Path(__file__).parents[1]
 
@@ -20,8 +18,16 @@ def project(tmp_path: Path) -> tuple[Path, Config]:
     for name in ("schemas", "templates"):
         shutil.copytree(PROJECT_ROOT / name, root / name)
     for path in (
-        "wiki/concepts", "wiki/entities", "wiki/references", "wiki/analyses",
-        "raw/articles", "raw/papers", "raw/notes", "raw/media", "raw/_catalog", "raw/_derived",
+        "wiki/concepts",
+        "wiki/entities",
+        "wiki/references",
+        "wiki/analyses",
+        "raw/articles",
+        "raw/papers",
+        "raw/notes",
+        "raw/media",
+        "raw/_catalog",
+        "raw/_derived",
     ):
         (root / path).mkdir(parents=True, exist_ok=True)
     (root / "wiki/log.md").write_text("# Wiki Update Log\n", encoding="utf-8")
@@ -33,7 +39,7 @@ def project(tmp_path: Path) -> tuple[Path, Config]:
 
 
 def valid_page(title: str = "Test Concept", body: str = "A small test page.") -> str:
-    return f'''---
+    return f"""---
 type: Concept
 title: {title}
 description: A concept used by the automated test suite.
@@ -46,4 +52,4 @@ generated:
 # {title}
 
 {body}
-'''
+"""

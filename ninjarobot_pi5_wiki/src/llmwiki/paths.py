@@ -75,7 +75,10 @@ def sha256_tree(root: Path) -> str:
     symlinks = [item for item in root.rglob("*") if item.is_symlink()]
     if symlinks:
         raise UnsafePathError(f"Symlinks are not allowed in the wiki bundle: {symlinks[0]}")
-    for path in sorted((item for item in root.rglob("*") if item.is_file()), key=lambda item: item.relative_to(root).as_posix()):
+    for path in sorted(
+        (item for item in root.rglob("*") if item.is_file()),
+        key=lambda item: item.relative_to(root).as_posix(),
+    ):
         relative = path.relative_to(root).as_posix().encode("utf-8")
         digest.update(len(relative).to_bytes(8, "big"))
         digest.update(relative)

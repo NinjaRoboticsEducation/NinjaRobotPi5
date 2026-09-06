@@ -1,6 +1,10 @@
 # Using the Wiki with Google Antigravity
 
-Google Antigravity can use the same canonical skills as Codex. The template adds one workspace rule and five optional slash-command workflows so the wiki functions are easy to discover in Antigravity IDE.
+Google Antigravity uses the same canonical skills as Codex. For NinjaRobotPi5,
+follow [the project workflow](PROJECT_WORKFLOW.md) and enable the workspace rule.
+New work uses `.agents/skills/`; the workflow examples below are legacy
+compatibility references. Workflows are scheduled to retire on 1 November 2026.
+See [the official migration guide](https://antigravity.google/docs/migration/workflows-to-skills).
 
 ## Open the project
 
@@ -18,7 +22,13 @@ Google Antigravity can use the same canonical skills as Codex. The template adds
 
 The rule points to `AGENTS.md`, so Antigravity receives the same safety and content rules as the other supported tools. Do not copy those rules into a global `GEMINI.md`; they are specific to this wiki.
 
-## Run a wiki function
+## Run a wiki skill
+
+Select or request the matching `wiki-*` skill when the wiki folder is open,
+or `ninjarobot-knowledge` / `ninja-wiki-*` from the robot root. Confirm the rule
+is active; project files do not silently change editor settings.
+
+## Legacy workflow reference
 
 Type `/` in the Antigravity agent panel and select a workflow:
 

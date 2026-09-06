@@ -25,3 +25,8 @@ supporting architecture, hardware, historical, and validation records.
 - [`project-history/`](project-history/) contains audits and the completed V4
   phase plan. These files explain prior decisions but are not installation
   instructions.
+
+## Current developer knowledge
+
+Use the [local wiki](../ninjarobot_pi5_wiki/README.md) for current full manuals,
+project evidence, and [documentation maintenance](../ninjarobot_pi5_wiki/docs/PROJECT_WORKFLOW.md).

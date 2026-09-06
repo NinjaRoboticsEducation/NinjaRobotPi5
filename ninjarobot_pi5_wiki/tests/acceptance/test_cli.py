@@ -3,12 +3,10 @@ from __future__ import annotations
 import json
 
 import yaml
-from PIL import Image
 from click.testing import CliRunner
-
-from llmwiki.cli import main
-
 from conftest import valid_page
+from llmwiki.cli import main
+from PIL import Image
 
 
 def test_cli_blank_state_and_source_workflow(project, monkeypatch) -> None:
@@ -44,7 +42,9 @@ def test_cli_plan_json_diff(project, monkeypatch) -> None:
         "created_at": "2026-08-22T00:00:00Z",
         "actor": "test-suite/1",
         "risk": "low",
-        "operations": [{"op": "write", "path": "wiki/concepts/cli.md", "content": valid_page("CLI")}],
+        "operations": [
+            {"op": "write", "path": "wiki/concepts/cli.md", "content": valid_page("CLI")}
+        ],
     }
     plan_path = root / "plan.yaml"
     plan_path.write_text(yaml.safe_dump(plan, sort_keys=False), encoding="utf-8")
@@ -81,7 +81,9 @@ def test_cli_semantic_review_prepare_and_strict_gate(project, monkeypatch) -> No
     monkeypatch.chdir(root)
     runner = CliRunner()
     page = config.bundle_root / "concepts" / "science.md"
-    page.write_text(valid_page("Science").replace("status: draft", "status: stable"), encoding="utf-8")
+    page.write_text(
+        valid_page("Science").replace("status: draft", "status: stable"), encoding="utf-8"
+    )
     from llmwiki.indexes import build_indexes
 
     build_indexes(config.bundle_root)
@@ -105,8 +107,8 @@ def test_cli_stats_reports_sourced_page_review_coverage(project, monkeypatch) ->
     monkeypatch.chdir(root)
     source_path = root / "raw/notes/stats-source.md"
     source_path.write_text("Coverage evidence.\n", encoding="utf-8")
-    from llmwiki.sources import add_source
     from llmwiki.indexes import build_indexes
+    from llmwiki.sources import add_source
 
     record, _ = add_source(config, source_path)
     page = config.bundle_root / "concepts/stats-page.md"

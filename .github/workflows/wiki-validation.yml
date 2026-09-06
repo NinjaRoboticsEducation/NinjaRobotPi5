@@ -1,0 +1,46 @@
+name: Project knowledge validation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wiki:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.5"
+          python-version: "3.13"
+          enable-cache: true
+          cache-dependency-glob: ninjarobot_pi5_wiki/uv.lock
+      - name: Install only the locked wiki environment
+        run: python scripts/wiki.py setup
+      - name: Restore generated text evidence
+        run: python scripts/wiki.py prepare
+      - name: Check current manuals, implementation evidence and adapters
+        run: python scripts/wiki.py check
+      - name: Check source support and knowledge structure
+        run: python scripts/wiki.py lint --strict
+      - name: Check knowledge links
+        run: python scripts/wiki.py link check
+      - name: Check generated indexes
+        run: python scripts/wiki.py index check
+      - name: Run independent wiki tests
+        run: uv run --directory ninjarobot_pi5_wiki --frozen --no-sync pytest -q
+      - name: Run isolated knowledge regression tests
+        run: uv run --directory ninjarobot_pi5_wiki --frozen --no-sync pytest -q ../tests/test_project_knowledge.py
+      - name: Confirm preparation and queries did not rewrite tracked files
+        run: git diff --exit-code

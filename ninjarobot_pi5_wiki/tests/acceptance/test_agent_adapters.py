@@ -3,11 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-
 from llmwiki.config import Config
 from llmwiki.indexes import build_indexes
 from llmwiki.lint import lint_project
-
 
 ROOT = Path(__file__).parents[2]
 SKILLS = ("wiki-ingest", "wiki-query", "wiki-lint", "wiki-review", "wiki-maintain")
@@ -25,7 +23,11 @@ def test_every_adapter_points_to_a_canonical_skill() -> None:
         wrapper = ROOT / ".claude" / "skills" / name / "SKILL.md"
         assert canonical.is_file()
         assert wrapper.is_file()
-        pointer = next(line for line in wrapper.read_text(encoding="utf-8").splitlines() if line.startswith("Read and follow"))
+        pointer = next(
+            line
+            for line in wrapper.read_text(encoding="utf-8").splitlines()
+            if line.startswith("Read and follow")
+        )
         relative = pointer.split("`", 2)[1]
         assert (wrapper.parent / relative).resolve() == canonical.resolve()
 
@@ -38,7 +40,9 @@ def test_adapters_share_the_same_operating_manual() -> None:
 def test_antigravity_rule_points_to_the_operating_manual() -> None:
     rule = ROOT / ".agents" / "rules" / "llm-wiki.md"
     text = rule.read_text(encoding="utf-8")
-    pointer = next(part for part in text.split() if part.startswith("@") and part.endswith("AGENTS.md"))
+    pointer = next(
+        part for part in text.split() if part.startswith("@") and part.endswith("AGENTS.md")
+    )
     assert (rule.parent / pointer[1:]).resolve() == (ROOT / "AGENTS.md").resolve()
     assert len(text) < 12_000
 

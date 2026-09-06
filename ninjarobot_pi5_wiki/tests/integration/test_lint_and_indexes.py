@@ -1,10 +1,9 @@
 from __future__ import annotations
 
+from conftest import valid_page
 from llmwiki.indexes import build_indexes
 from llmwiki.lint import lint_project
 from llmwiki.sources import add_source
-
-from conftest import valid_page
 
 
 def test_blank_template_has_no_lint_errors(project) -> None:
@@ -16,7 +15,9 @@ def test_lint_finds_broken_link_wikilink_and_secret(project) -> None:
     _, config = project
     page = config.bundle_root / "concepts" / "unsafe.md"
     page.write_text(
-        valid_page("Unsafe", "See [missing](missing.md) and [[legacy]].\n\napi_key = 'abcdefghijklmnop'"),
+        valid_page(
+            "Unsafe", "See [missing](missing.md) and [[legacy]].\n\napi_key = 'abcdefghijklmnop'"
+        ),
         encoding="utf-8",
     )
     build_indexes(config.bundle_root)
@@ -36,7 +37,9 @@ def test_minimal_okf_page_is_valid_with_local_profile_warnings(project) -> None:
     page = config.bundle_root / "concepts" / "minimal.md"
     page.write_text("---\ntype: FutureType\n---\n\n# Minimal\n", encoding="utf-8")
     build_indexes(config.bundle_root)
-    page_issues = [issue for issue in lint_project(config) if issue.path == "wiki/concepts/minimal.md"]
+    page_issues = [
+        issue for issue in lint_project(config) if issue.path == "wiki/concepts/minimal.md"
+    ]
     assert not [issue for issue in page_issues if issue.severity == "error"]
     assert {issue.code for issue in page_issues} >= {"profile-field", "unknown-type"}
 
@@ -54,16 +57,16 @@ title: Versioned
 description: A stable but unverified page.
 status: stable
 sources:
-  - id: {record['id']}
-    resource: urn:llmwiki:source:{record['id']}
-    content_hash: {record['content_hash']}
+  - id: {record["id"]}
+    resource: urn:llmwiki:source:{record["id"]}
+    content_hash: {record["content_hash"]}
 ---
 
 # Versioned
 
-The local evidence contains version one.[^{record['id']}]
+The local evidence contains version one.[^{record["id"]}]
 
-[^{record['id']}]: Registered source.
+[^{record["id"]}]: Registered source.
 """,
         encoding="utf-8",
     )

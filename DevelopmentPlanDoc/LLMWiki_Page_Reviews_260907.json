@@ -1,0 +1,284 @@
+[
+  {
+    "version": 2,
+    "id": "ninjarobot-page-review-260907-01",
+    "created_at": "2026-09-06T22:54:05Z",
+    "actor": "agent:codex",
+    "risk": "low",
+    "summary": "Record the machine evidence review for NinjaRobotPi5 project overview.",
+    "sources": [
+      {
+        "id": "src-20260906-knowledgeintegration",
+        "content_hash": "sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f"
+      },
+      {
+        "id": "src-20260906-developmentguide",
+        "content_hash": "sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e"
+      }
+    ],
+    "operations": [
+      {
+        "op": "write",
+        "path": "wiki/overview.md",
+        "expected_sha256": "sha256:4c37a0c902e578d4561336d099341ba2c66cbc5f5f07e8591f1d16ea5a590ba3",
+        "content": "---\ntype: Concept\ntitle: NinjaRobotPi5 project overview\ndescription: Start here for architecture, setup, features, development history, and\n  current evidence.\nstatus: draft\ntags:\n- ninjarobotpi5\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n  title: Local knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\n- id: src-20260906-developmentguide\n  resource: urn:llmwiki:source:src-20260906-developmentguide\n  title: DevelopmentGuide.md\n  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e\nsemantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-06T22:54:05Z'\n  target_hash: sha256:82b4b2b09b867f0a069e05e4f7cf3bdee6bfcceaf4d79ec854857a8c998ebd69\n  result: passed\n  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength: passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its listed manual sections and integration evidence.\n  - Claims describe documented contracts and knowledge workflow; current hardware\n    operation and interactive editor activation are not certified.\n---\n\n# NinjaRobotPi5 project overview\n\nNinjaRobotPi5 documents an Agent layer for user/model interaction, an IDE layer\nfor coordinating devices, and managed Pi5 libraries for individual devices.\nThe development guide describes their permitted ownership boundary.[^src-20260906-developmentguide]\n\nThe local wiki is the primary developer knowledge collection. Full manuals are\nversioned under raw source folders; outer README links and the project knowledge\nmap identify the current versions. Read source records and limitations, then\ncompare important claims with the current checkout before coding.[^src-20260906-knowledgeintegration]\n\n## Browse project knowledge\n\n- [Architecture and hardware ownership](concepts/architecture.md)\n- [Development and documentation workflow](concepts/development-workflow.md)\n- [Installation and hardware checks](concepts/installation.md)\n- [Features, MCP tools, and Agent Skills](concepts/features-and-tools.md)\n- [Development history](concepts/development-history.md)\n- [Known knowledge limitations](analyses/knowledge-limitations.md)\n- [Installation manual](references/installation-guide.md)\n- [Development manual](references/development-guide.md)\n- [Development log](references/development-log.md)\n- [MCP and skills tutorial](references/mcp-skills-guide.md)\n\n\n[^src-20260906-knowledgeintegration]: Local knowledge integration evidence, source version `integration-2026-09-07`; registered source `src-20260906-knowledgeintegration`.\n[^src-20260906-developmentguide]: DevelopmentGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-developmentguide`.\n"
+      }
+    ]
+  },
+  {
+    "version": 2,
+    "id": "ninjarobot-page-review-260907-02",
+    "created_at": "2026-09-06T22:54:05Z",
+    "actor": "agent:codex",
+    "risk": "low",
+    "summary": "Record the machine evidence review for Installation guide.",
+    "sources": [
+      {
+        "id": "src-20260906-installationguide",
+        "content_hash": "sha256:53f80c60feb139f0de547613bd14b8fcd87a2678ba5bf7dc75b1b2bccb1dc1c4"
+      },
+      {
+        "id": "src-20260906-knowledgeintegration",
+        "content_hash": "sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f"
+      }
+    ],
+    "operations": [
+      {
+        "op": "write",
+        "path": "wiki/references/installation-guide.md",
+        "expected_sha256": "sha256:b36e9940fabff1e246ba0d8b7edbe2dad5eac2e97cb4160fc27fccf07758a16d",
+        "content": "---\ntype: Reference\ntitle: Installation guide\ndescription: Find the complete versioned installation guide.\nstatus: draft\ntags:\n- ninjarobotpi5\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-installationguide\n  resource: urn:llmwiki:source:src-20260906-installationguide\n  title: InstallationGuide.md\n  content_hash: sha256:53f80c60feb139f0de547613bd14b8fcd87a2678ba5bf7dc75b1b2bccb1dc1c4\n- id: src-20260906-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n  title: Local knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\nsemantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-06T22:54:05Z'\n  target_hash: sha256:6d71976836ad0e8f100f5d4855e46a9ae345e99c159045e15ddf144ed969aa38\n  result: passed\n  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength: passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its listed manual sections and integration evidence.\n  - Claims describe documented contracts and knowledge workflow; current hardware\n    operation and interactive editor activation are not certified.\n---\n\n# Installation guide\n\nThe full guide covers beginner setup, hardware initialization and calibration, startup, and troubleshooting. Hardware commands require the stated operator precautions.[^src-20260906-installationguide]\n\nUse the source identifier below to resolve the complete manual through the raw\nsource catalog. The outer wiki README also links directly to the current full\nmanual. Root filenames are navigation pages; source updates create new versions.\nRead the relevant full section before acting on an abbreviated explanation.[^src-20260906-knowledgeintegration]\n\n[Return to project overview](/overview.md).\n\n[^src-20260906-installationguide]: InstallationGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-installationguide`.\n[^src-20260906-knowledgeintegration]: Local knowledge integration evidence, source version `integration-2026-09-07`; registered source `src-20260906-knowledgeintegration`.\n"
+      }
+    ]
+  },
+  {
+    "version": 2,
+    "id": "ninjarobot-page-review-260907-03",
+    "created_at": "2026-09-06T22:54:05Z",
+    "actor": "agent:codex",
+    "risk": "low",
+    "summary": "Record the machine evidence review for Development guide.",
+    "sources": [
+      {
+        "id": "src-20260906-developmentguide",
+        "content_hash": "sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e"
+      },
+      {
+        "id": "src-20260906-knowledgeintegration",
+        "content_hash": "sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f"
+      }
+    ],
+    "operations": [
+      {
+        "op": "write",
+        "path": "wiki/references/development-guide.md",
+        "expected_sha256": "sha256:86f84c4b6aa30a9345057d86af6f287c43b79ea2615c3589f8316bd5239aab5a",
+        "content": "---\ntype: Reference\ntitle: Development guide\ndescription: Find the complete versioned development guide.\nstatus: draft\ntags:\n- ninjarobotpi5\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-developmentguide\n  resource: urn:llmwiki:source:src-20260906-developmentguide\n  title: DevelopmentGuide.md\n  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e\n- id: src-20260906-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n  title: Local knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\nsemantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-06T22:54:05Z'\n  target_hash: sha256:5c4426c3c590ca13735e31041528119c09a303e1b84cd8931d6c5286d741f068\n  result: passed\n  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength: passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its listed manual sections and integration evidence.\n  - Claims describe documented contracts and knowledge workflow; current hardware\n    operation and interactive editor activation are not certified.\n---\n\n# Development guide\n\nThe full guide describes architecture, managed drivers, configuration, safety, the behavior system, external tools, memory, web access, and development checks.[^src-20260906-developmentguide]\n\nUse the source identifier below to resolve the complete manual through the raw\nsource catalog. The outer wiki README also links directly to the current full\nmanual. Root filenames are navigation pages; source updates create new versions.\nRead the relevant full section before acting on an abbreviated explanation.[^src-20260906-knowledgeintegration]\n\n[Return to project overview](/overview.md).\n\n[^src-20260906-developmentguide]: DevelopmentGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-developmentguide`.\n[^src-20260906-knowledgeintegration]: Local knowledge integration evidence, source version `integration-2026-09-07`; registered source `src-20260906-knowledgeintegration`.\n"
+      }
+    ]
+  },
+  {
+    "version": 2,
+    "id": "ninjarobot-page-review-260907-04",
+    "created_at": "2026-09-06T22:54:05Z",
+    "actor": "agent:codex",
+    "risk": "low",
+    "summary": "Record the machine evidence review for Development log.",
+    "sources": [
+      {
+        "id": "src-20260906-developmentlog",
+        "content_hash": "sha256:9d2f7eb85695c830322023c4efa549e5d178030105a611468b003f4d8e0b1dd4"
+      },
+      {
+        "id": "src-20260906-knowledgeintegration",
+        "content_hash": "sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f"
+      }
+    ],
+    "operations": [
+      {
+        "op": "write",
+        "path": "wiki/references/development-log.md",
+        "expected_sha256": "sha256:3e1ab4050e7813fd0bd6ef0e5bfc426668ff563f794534c0bf847d618ef3c917",
+        "content": "---\ntype: Reference\ntitle: Development log\ndescription: Find the complete versioned development log.\nstatus: draft\ntags:\n- ninjarobotpi5\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-developmentlog\n  resource: urn:llmwiki:source:src-20260906-developmentlog\n  title: DevelopmentLog.md\n  content_hash: sha256:9d2f7eb85695c830322023c4efa549e5d178030105a611468b003f4d8e0b1dd4\n- id: src-20260906-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n  title: Local knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\nsemantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-06T22:54:05Z'\n  target_hash: sha256:0ccac014213094eb54ed0ec7d0273f05d3a02b5cd7df7fc673cdee4439e4d44c\n  result: passed\n  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength: passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its listed manual sections and integration evidence.\n  - Claims describe documented contracts and knowledge workflow; current hardware\n    operation and interactive editor activation are not certified.\n---\n\n# Development log\n\nThe complete log preserves dated implementation decisions and validation reports. Historical test results describe their recorded checkout and date; they are not fresh verification.[^src-20260906-developmentlog]\n\nUse the source identifier below to resolve the complete manual through the raw\nsource catalog. The outer wiki README also links directly to the current full\nmanual. Root filenames are navigation pages; source updates create new versions.\nRead the relevant full section before acting on an abbreviated explanation.[^src-20260906-knowledgeintegration]\n\n[Return to project overview](/overview.md).\n\n[^src-20260906-developmentlog]: DevelopmentLog.md, source version `migration-2026-09-07`; registered source `src-20260906-developmentlog`.\n[^src-20260906-knowledgeintegration]: Local knowledge integration evidence, source version `integration-2026-09-07`; registered source `src-20260906-knowledgeintegration`.\n"
+      }
+    ]
+  },
+  {
+    "version": 2,
+    "id": "ninjarobot-page-review-260907-05",
+    "created_at": "2026-09-06T22:54:05Z",
+    "actor": "agent:codex",
+    "risk": "low",
+    "summary": "Record the machine evidence review for MCP and Agent Skills tutorial.",
+    "sources": [
+      {
+        "id": "src-20260906-ninjarobot-mcp-skill",
+        "content_hash": "sha256:df8076ccc2683b24b6752310558ce4e62828d54cee67f1102aae7196c0ee97bb"
+      },
+      {
+        "id": "src-20260906-knowledgeintegration",
+        "content_hash": "sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f"
+      }
+    ],
+    "operations": [
+      {
+        "op": "write",
+        "path": "wiki/references/mcp-skills-guide.md",
+        "expected_sha256": "sha256:11d5d1eafd2d3f12f37453967a37ee6945629b536ead811de1f0555ed02ac3a1",
+        "content": "---\ntype: Reference\ntitle: MCP and Agent Skills tutorial\ndescription: Find the complete versioned mcp and agent skills tutorial.\nstatus: draft\ntags:\n- ninjarobotpi5\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-ninjarobot-mcp-skill\n  resource: urn:llmwiki:source:src-20260906-ninjarobot-mcp-skill\n  title: NinjaRobot_MCP_Skill.md\n  content_hash: sha256:df8076ccc2683b24b6752310558ce4e62828d54cee67f1102aae7196c0ee97bb\n- id: src-20260906-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n  title: Local knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\nsemantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-06T22:54:05Z'\n  target_hash: sha256:a8cf576dc3e8de76cb55aff0636c1f5779837950046e3207ede4f555f8ca35a3\n  result: passed\n  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength: passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its listed manual sections and integration evidence.\n  - Claims describe documented contracts and knowledge workflow; current hardware\n    operation and interactive editor activation are not certified.\n---\n\n# MCP and Agent Skills tutorial\n\nThe tutorial explains external tools, configuration, read-only Tavily and Calendar examples, and reusable Agent Skills. It describes restrictions for the robot Agent, not a development wiki server.[^src-20260906-ninjarobot-mcp-skill]\n\nUse the source identifier below to resolve the complete manual through the raw\nsource catalog. The outer wiki README also links directly to the current full\nmanual. Root filenames are navigation pages; source updates create new versions.\nRead the relevant full section before acting on an abbreviated explanation.[^src-20260906-knowledgeintegration]\n\n[Return to project overview](/overview.md).\n\n[^src-20260906-ninjarobot-mcp-skill]: NinjaRobot_MCP_Skill.md, source version `migration-2026-09-07`; registered source `src-20260906-ninjarobot-mcp-skill`.\n[^src-20260906-knowledgeintegration]: Local knowledge integration evidence, source version `integration-2026-09-07`; registered source `src-20260906-knowledgeintegration`.\n"
+      }
+    ]
+  },
+  {
+    "version": 2,
+    "id": "ninjarobot-page-review-260907-06",
+    "created_at": "2026-09-06T22:54:05Z",
+    "actor": "agent:codex",
+    "risk": "low",
+    "summary": "Record the machine evidence review for Architecture and hardware ownership.",
+    "sources": [
+      {
+        "id": "src-20260906-developmentguide",
+        "content_hash": "sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e"
+      }
+    ],
+    "operations": [
+      {
+        "op": "write",
+        "path": "wiki/concepts/architecture.md",
+        "expected_sha256": "sha256:76ad3c014229b352529ed816290d9b21fe8fad98c6e76caca858159b895faf6b",
+        "content": "---\ntype: Concept\ntitle: Architecture and hardware ownership\ndescription: Agent, IDE, device drivers, safety policy, resource ownership, and code\n  boundaries.\nstatus: draft\ntags:\n- architecture\n- hardware\n- ownership\n- agent\n- ide\n- drivers\n- safety\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-developmentguide\n  resource: urn:llmwiki:source:src-20260906-developmentguide\n  title: DevelopmentGuide.md\n  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e\nsemantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-06T22:54:05Z'\n  target_hash: sha256:602559c20e4b41b0189ca08bf989fbfb1d0f80c004719516aed6b420d3b027f3\n  result: passed\n  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength: passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its listed manual sections and integration evidence.\n  - Claims describe documented contracts and knowledge workflow; current hardware\n    operation and interactive editor activation are not certified.\n---\n\n# Architecture and hardware ownership\n\nThe documented hardware path is user or model \u2192 ninjarobot_pi5_agent \u2192\nninjarobot_pi5_ide \u2192 a managed pi5 driver \u2192 its device. The Agent handles user\ninteraction, model-provider translation, policy, sessions, and tool proposals.\nIt should not import a pi5 library or access a device directly.[^src-20260906-developmentguide]\n\nThe IDE (the project's device-coordination layer) owns shared resource scheduling,\naction execution, safety state, behaviors, and hardware ownership. Individual\nmanaged libraries own their device and standalone setup interface. The six\nmanaged libraries cover servo motors, display, buzzer, distance sensing, camera,\nand microphone.[^src-20260906-developmentguide]\n\nThis is the documented architecture contract. Compare affected code and tests\nwith it before implementation; this page does not certify that every failure or\nphysical safety condition has been tested.[^src-20260906-developmentguide]\n\n[Read the development manual](/references/development-guide.md).\n\n\n[^src-20260906-developmentguide]: DevelopmentGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-developmentguide`.\n"
+      }
+    ]
+  },
+  {
+    "version": 2,
+    "id": "ninjarobot-page-review-260907-07",
+    "created_at": "2026-09-06T22:54:06Z",
+    "actor": "agent:codex",
+    "risk": "low",
+    "summary": "Record the machine evidence review for Development and documentation workflow.",
+    "sources": [
+      {
+        "id": "src-20260906-knowledgeintegration",
+        "content_hash": "sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f"
+      },
+      {
+        "id": "src-20260906-developmentguide",
+        "content_hash": "sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e"
+      }
+    ],
+    "operations": [
+      {
+        "op": "write",
+        "path": "wiki/concepts/development-workflow.md",
+        "expected_sha256": "sha256:81cb164b0ac22a97163505be4371449031109d6d3378561393f27c219afe3bd6",
+        "content": "---\ntype: Concept\ntitle: Development and documentation workflow\ndescription: Retrieve evidence, plan, implement, review wiki impact, version manuals,\n  and validate.\nstatus: draft\ntags:\n- development\n- workflow\n- documentation\n- update\n- codex\n- claude\n- cursor\n- antigravity\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n  title: Local knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\n- id: src-20260906-developmentguide\n  resource: urn:llmwiki:source:src-20260906-developmentguide\n  title: DevelopmentGuide.md\n  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e\nsemantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-06T22:54:06Z'\n  target_hash: sha256:c8f0369cc7f1a8c1247792dde4b93da093496772eaae92a5742d617ace70e4be\n  result: passed\n  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength: passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its listed manual sections and integration evidence.\n  - Claims describe documented contracts and knowledge workflow; current hardware\n    operation and interactive editor activation are not certified.\n---\n\n# Development and documentation workflow\n\nBefore significant development, consult the local wiki and the current full\nmanuals, inspect relevant code, and identify missing or conflicting evidence.\nThe root project policy requires an approved phased plan and preservation of\nrobot interfaces and managed-driver rules.[^src-20260906-developmentguide]\n\nFeature completion includes a wiki impact assessment. Update affected manual\nversions, topic pages, specifications and architecture guidance, then record\nthe change and validation in the development log. If no documentation change is\nneeded, record a specific reason. A new source version preserves the old source;\ncurrent navigation and the knowledge map identify the active version.[^src-20260906-knowledgeintegration]\n\nUse the project's maintenance guide outside the knowledge bundle for exact\ncommands. Prepare a semantic page plan, validate it, show the actual diff, and\napply the approved plan with the wiki CLI. Review source support honestly and\ncheck current pointers, file fingerprints, links, indexes and review coverage.\nAI review is distinct from human verification.[^src-20260906-knowledgeintegration]\n\n[Development guide](/references/development-guide.md) \u00b7\n[History](/concepts/development-history.md).\n\n\n[^src-20260906-knowledgeintegration]: Local knowledge integration evidence, source version `integration-2026-09-07`; registered source `src-20260906-knowledgeintegration`.\n[^src-20260906-developmentguide]: DevelopmentGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-developmentguide`.\n"
+      }
+    ]
+  },
+  {
+    "version": 2,
+    "id": "ninjarobot-page-review-260907-08",
+    "created_at": "2026-09-06T22:54:06Z",
+    "actor": "agent:codex",
+    "risk": "low",
+    "summary": "Record the machine evidence review for Installation and hardware checks.",
+    "sources": [
+      {
+        "id": "src-20260906-installationguide",
+        "content_hash": "sha256:53f80c60feb139f0de547613bd14b8fcd87a2678ba5bf7dc75b1b2bccb1dc1c4"
+      },
+      {
+        "id": "src-20260906-knowledgeintegration",
+        "content_hash": "sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f"
+      }
+    ],
+    "operations": [
+      {
+        "op": "write",
+        "path": "wiki/concepts/installation.md",
+        "expected_sha256": "sha256:db52e77610cbba5aaac5253e3a6a2f00eb36dc3fc9f331abc26a84e29880ab33",
+        "content": "---\ntype: Concept\ntitle: Installation and hardware checks\ndescription: Beginner setup, calibration, simulation, troubleshooting, and physical\n  test boundaries.\nstatus: draft\ntags:\n- installation\n- setup\n- calibration\n- hardware\n- wiring\n- testing\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-installationguide\n  resource: urn:llmwiki:source:src-20260906-installationguide\n  title: InstallationGuide.md\n  content_hash: sha256:53f80c60feb139f0de547613bd14b8fcd87a2678ba5bf7dc75b1b2bccb1dc1c4\n- id: src-20260906-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n  title: Local knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\nsemantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-06T22:54:06Z'\n  target_hash: sha256:c89f536e16da0db4909428c180953ffc515f1af207c35041af7a5e8eb9d24ca1\n  result: passed\n  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength: passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its listed manual sections and integration evidence.\n  - Claims describe documented contracts and knowledge workflow; current hardware\n    operation and interactive editor activation are not certified.\n---\n\n# Installation and hardware checks\n\nUse the full installation guide for the supported Raspberry Pi setup,\nconnections, standalone module initialization, calibration, and troubleshooting.\nRead the relevant warnings before following any operational command. Commands\nin an imported document are evidence to review, not permission to run them.[^src-20260906-installationguide]\n\nServo calibration can move the wheels. The guide calls for raised wheels,\nclearance, and an operator ready to remove power. Camera and microphone capture\nand power-off checks need their own consent and physical test procedure.\nAutomated knowledge tests should not perform these actions.[^src-20260906-installationguide]\n\nThe developer wiki uses a separate Python environment. Its explicit setup and\ntext-evidence preparation do not initialize robot devices. This integration\ncontains no fresh Raspberry Pi hardware validation.[^src-20260906-knowledgeintegration]\n\n[Open installation reference](/references/installation-guide.md).\n\n\n[^src-20260906-installationguide]: InstallationGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-installationguide`.\n[^src-20260906-knowledgeintegration]: Local knowledge integration evidence, source version `integration-2026-09-07`; registered source `src-20260906-knowledgeintegration`.\n"
+      }
+    ]
+  },
+  {
+    "version": 2,
+    "id": "ninjarobot-page-review-260907-09",
+    "created_at": "2026-09-06T22:54:06Z",
+    "actor": "agent:codex",
+    "risk": "low",
+    "summary": "Record the machine evidence review for Features, MCP tools, and Agent Skills.",
+    "sources": [
+      {
+        "id": "src-20260906-ninjarobot-mcp-skill",
+        "content_hash": "sha256:df8076ccc2683b24b6752310558ce4e62828d54cee67f1102aae7196c0ee97bb"
+      },
+      {
+        "id": "src-20260906-developmentguide",
+        "content_hash": "sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e"
+      },
+      {
+        "id": "src-20260906-knowledgeintegration",
+        "content_hash": "sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f"
+      }
+    ],
+    "operations": [
+      {
+        "op": "write",
+        "path": "wiki/concepts/features-and-tools.md",
+        "expected_sha256": "sha256:86cbfbe8dd461d646b4aa028860eaec18d6c9c10ce06c8e36e96c212bee28aaa",
+        "content": "---\ntype: Concept\ntitle: Features, MCP tools, and Agent Skills\ndescription: Documented Agent features, external read-only tools, and reusable skills.\nstatus: draft\ntags:\n- features\n- mcp\n- skills\n- calendar\n- tools\n- agent\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-ninjarobot-mcp-skill\n  resource: urn:llmwiki:source:src-20260906-ninjarobot-mcp-skill\n  title: NinjaRobot_MCP_Skill.md\n  content_hash: sha256:df8076ccc2683b24b6752310558ce4e62828d54cee67f1102aae7196c0ee97bb\n- id: src-20260906-developmentguide\n  resource: urn:llmwiki:source:src-20260906-developmentguide\n  title: DevelopmentGuide.md\n  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e\n- id: src-20260906-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n  title: Local knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\nsemantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-06T22:54:06Z'\n  target_hash: sha256:0fd2add29e1e2bb810876e9445514ea215b313c9df2e10dc4aa1e50b70a1b69a\n  result: passed\n  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength: passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its listed manual sections and integration evidence.\n  - Claims describe documented contracts and knowledge workflow; current hardware\n    operation and interactive editor activation are not certified.\n---\n\n# Features, MCP tools, and Agent Skills\n\nThe development guide describes conversational and web interfaces, model\nproviders, behaviors, memory, and device capabilities. These are documented\nimplementation areas; use the current code and tests to verify a specific\nfeature or failure case before changing it.[^src-20260906-developmentguide]\n\nMCP (Model Context Protocol) lets an application discover and call external tools.\nThe robot tutorial describes allowlisted read-only tools, bounded results,\ntimeouts, and untrusted external content. Its examples include Tavily search\nand a read-only Google Calendar server. Agent Skills package reusable workflows;\nthey do not grant extra hardware permissions.[^src-20260906-ninjarobot-mcp-skill]\n\nDevelopment wiki skills are a separate coding-tool workflow. This local knowledge\nintegration does not install a robot MCP provider or change runtime interfaces.\nUse the existing robot tutorial for robot extensions and the wiki maintenance\nguide for developer knowledge updates.[^src-20260906-knowledgeintegration]\n\n[MCP and skills tutorial](/references/mcp-skills-guide.md).\n\n\n[^src-20260906-ninjarobot-mcp-skill]: NinjaRobot_MCP_Skill.md, source version `migration-2026-09-07`; registered source `src-20260906-ninjarobot-mcp-skill`.\n[^src-20260906-developmentguide]: DevelopmentGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-developmentguide`.\n[^src-20260906-knowledgeintegration]: Local knowledge integration evidence, source version `integration-2026-09-07`; registered source `src-20260906-knowledgeintegration`.\n"
+      }
+    ]
+  },
+  {
+    "version": 2,
+    "id": "ninjarobot-page-review-260907-10",
+    "created_at": "2026-09-06T22:54:06Z",
+    "actor": "agent:codex",
+    "risk": "low",
+    "summary": "Record the machine evidence review for Development history and decisions.",
+    "sources": [
+      {
+        "id": "src-20260906-developmentlog",
+        "content_hash": "sha256:9d2f7eb85695c830322023c4efa549e5d178030105a611468b003f4d8e0b1dd4"
+      }
+    ],
+    "operations": [
+      {
+        "op": "write",
+        "path": "wiki/concepts/development-history.md",
+        "expected_sha256": "sha256:0c4130fa48e66592042921ecba690f1ebafc2870b173326989b98662ba56646f",
+        "content": "---\ntype: Concept\ntitle: Development history and decisions\ndescription: Find dated rationale and distinguish historical evidence from current\n  implementation.\nstatus: draft\ntags:\n- history\n- decisions\n- rationale\n- development\n- log\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-developmentlog\n  resource: urn:llmwiki:source:src-20260906-developmentlog\n  title: DevelopmentLog.md\n  content_hash: sha256:9d2f7eb85695c830322023c4efa549e5d178030105a611468b003f4d8e0b1dd4\nsemantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-06T22:54:06Z'\n  target_hash: sha256:533430a40d768b7825f9c5aeeab76f0ffc44eb37617c95eebc0f32548535b94e\n  result: passed\n  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength: passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its listed manual sections and integration evidence.\n  - Claims describe documented contracts and knowledge workflow; current hardware\n    operation and interactive editor activation are not certified.\n---\n\n# Development history and decisions\n\nThe development log retains dated records of implementation work, design\nchoices, repairs, validation, and remaining work. Use a relevant dated entry\nwhen answering why a change was made. Read surrounding entries to determine\nwhether a later decision superseded it.[^src-20260906-developmentlog]\n\nHistorical success reports refer to the recorded work and environment. They do\nnot prove that today's checkout passes the same checks, or that a physical\ndevice was tested during a later documentation task. Cite the entry and state\nwhich current checks were actually run.[^src-20260906-developmentlog]\n\n[Complete development log](/references/development-log.md).\n\n\n[^src-20260906-developmentlog]: DevelopmentLog.md, source version `migration-2026-09-07`; registered source `src-20260906-developmentlog`.\n"
+      }
+    ]
+  },
+  {
+    "version": 2,
+    "id": "ninjarobot-page-review-260907-11",
+    "created_at": "2026-09-06T22:54:06Z",
+    "actor": "agent:codex",
+    "risk": "low",
+    "summary": "Record the machine evidence review for Knowledge limitations and verification.",
+    "sources": [
+      {
+        "id": "src-20260906-knowledgeintegration",
+        "content_hash": "sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f"
+      },
+      {
+        "id": "src-20260906-developmentguide",
+        "content_hash": "sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e"
+      }
+    ],
+    "operations": [
+      {
+        "op": "write",
+        "path": "wiki/analyses/knowledge-limitations.md",
+        "expected_sha256": "sha256:7bcdd602c342e61098a3cc18e8408d8ef23370a8bb90f42b374821f4da8f9170",
+        "content": "---\ntype: Analysis\ntitle: Knowledge limitations and verification\ndescription: Search gaps, stale evidence, source versions, editor access, and review\n  boundaries.\nstatus: draft\ntags:\n- limitations\n- stale\n- verification\n- search\n- known\n- issues\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n  title: Local knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\n- id: src-20260906-developmentguide\n  resource: urn:llmwiki:source:src-20260906-developmentguide\n  title: DevelopmentGuide.md\n  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e\nsemantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-06T22:54:06Z'\n  target_hash: sha256:53ea6fa166dc93d13ecc7fb2c641f402d5f91f421f90d715b1c6959e2cd887fd\n  result: passed\n  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength: passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its listed manual sections and integration evidence.\n  - Claims describe documented contracts and knowledge workflow; current hardware\n    operation and interactive editor activation are not certified.\n---\n\n# Knowledge limitations and verification\n\nKeyword search covers curated pages rather than all raw manual text. It does not\nfollow citations for the caller. Try focused terms, read the overview, and open\nfull sources. Search expiry flags, source fingerprints, and semantic review\nstatus are separate signals and must be checked together.[^src-20260906-knowledgeintegration]\n\nA missing result is an evidence gap, not proof a feature is absent. A page can be\nstructurally valid while its explanation needs review. Current implementation\nfingerprints identify files needing knowledge review but cannot prove that prose\nis correct. AI-reviewed pages are not human-verified or hardware-tested pages.\nEditor adapters need actual session activation checks; a wiki-only workspace may\nnot expose parent robot code.[^src-20260906-knowledgeintegration]\n\nThe development guide's older quality-gate example uses narrower lint paths than\nthe current root policy. Follow the root operating policy for the current full\nchecks, and preserve the source's historical context rather than silently treating\nan older example as the complete current gate.[^src-20260906-developmentguide][^src-20260906-knowledgeintegration]\n\n[Project overview](/overview.md).\n\n\n[^src-20260906-knowledgeintegration]: Local knowledge integration evidence, source version `integration-2026-09-07`; registered source `src-20260906-knowledgeintegration`.\n[^src-20260906-developmentguide]: DevelopmentGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-developmentguide`.\n"
+      }
+    ]
+  }
+]

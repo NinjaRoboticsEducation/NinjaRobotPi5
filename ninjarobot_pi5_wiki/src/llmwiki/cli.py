@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import json
-import os
 import platform
 import shutil
 import subprocess
-import sys
 from collections import Counter
 from pathlib import Path
 
@@ -23,7 +21,14 @@ from .paths import iter_markdown
 from .plans import PlanError, load_plan, plan_diff, validate_plan
 from .search import search_bundle
 from .semantic import review_template, semantic_review_state
-from .sources import SourceError, add_source, list_records, load_record, record_status, update_source
+from .sources import (
+    SourceError,
+    add_source,
+    list_records,
+    load_record,
+    record_status,
+    update_source,
+)
 from .transactions import apply_plan, prune_runtime, runtime_status
 
 console = Console()
@@ -83,11 +88,15 @@ def doctor() -> None:
             version_probe = subprocess.run(
                 [tesseract, "--version"], capture_output=True, text=True, check=False, timeout=10
             )
-            tesseract_version = (version_probe.stdout or version_probe.stderr).splitlines()[0].strip()
+            tesseract_version = (
+                (version_probe.stdout or version_probe.stderr).splitlines()[0].strip()
+            )
             language_probe = subprocess.run(
                 [tesseract, "--list-langs"], capture_output=True, text=True, check=False, timeout=10
             )
-            ocr_languages = [line.strip() for line in language_probe.stdout.splitlines()[1:] if line.strip()]
+            ocr_languages = [
+                line.strip() for line in language_probe.stdout.splitlines()[1:] if line.strip()
+            ]
         except (OSError, subprocess.TimeoutExpired):
             tesseract_version = "unavailable (probe failed)"
     checks = {
@@ -104,7 +113,10 @@ def doctor() -> None:
         "pillow": pillow_version,
         "tesseract": tesseract_version,
         "ocr_languages": ocr_languages,
-        "git_reminder": None if git_repository else "Initialize Git and make a baseline commit before the first real ingestion (recommended, not automatic).",
+        "git_reminder": None
+        if git_repository
+        else "Initialize Git and make a baseline commit before the first real "
+        "ingestion (recommended, not automatic).",
     }
     _json(checks)
     if not all(checks[key] for key in ("bundle_exists", "raw_exists", "schemas_exist", "uv")):
@@ -115,7 +127,12 @@ def doctor() -> None:
 def init_command() -> None:
     """Initialize disposable runtime directories without replacing content."""
     config = _config()
-    for path in (config.catalog_root, config.derived_root, config.root / ".llmwiki/plans", config.root / ".llmwiki/staging"):
+    for path in (
+        config.catalog_root,
+        config.derived_root,
+        config.root / ".llmwiki/plans",
+        config.root / ".llmwiki/staging",
+    ):
         path.mkdir(parents=True, exist_ok=True)
     build_indexes(config.bundle_root)
     click.echo(f"Initialized {config.root}")
@@ -131,7 +148,9 @@ def source() -> None:
 @click.option("--title")
 @click.option("--uri", "original_uri")
 @click.option("--source-version")
-def source_add(path: Path, title: str | None, original_uri: str | None, source_version: str | None) -> None:
+def source_add(
+    path: Path, title: str | None, original_uri: str | None, source_version: str | None
+) -> None:
     config = _config()
     try:
         record, created = add_source(
@@ -154,8 +173,12 @@ def source_list(json_output: bool) -> None:
     table = Table("ID", "Kind", "State", "OCR", "Title", "Path")
     for row in rows:
         table.add_row(
-            row["id"], str(row.get("kind", "text")), row["current_status"],
-            str((row.get("image") or {}).get("ocr_status", "—")), row["title"], row["path"]
+            row["id"],
+            str(row.get("kind", "text")),
+            row["current_status"],
+            str((row.get("image") or {}).get("ocr_status", "—")),
+            row["title"],
+            row["path"],
         )
     console.print(table)
 
@@ -172,17 +195,19 @@ def source_show(source_id: str) -> None:
 @source.command("status")
 def source_status() -> None:
     config = _config()
-    _json([
-        {
-            "id": record["id"],
-            "kind": record.get("kind", "text"),
-            "status": record_status(config, record),
-            "source_version": record.get("source_version"),
-            "ocr_status": (record.get("image") or {}).get("ocr_status"),
-            "asset_status": (record.get("image") or {}).get("asset_status"),
-        }
-        for record in list_records(config)
-    ])
+    _json(
+        [
+            {
+                "id": record["id"],
+                "kind": record.get("kind", "text"),
+                "status": record_status(config, record),
+                "source_version": record.get("source_version"),
+                "ocr_status": (record.get("image") or {}).get("ocr_status"),
+                "asset_status": (record.get("image") or {}).get("asset_status"),
+            }
+            for record in list_records(config)
+        ]
+    )
 
 
 @source.command("update")
@@ -190,10 +215,16 @@ def source_status() -> None:
 @click.option("--title")
 @click.option("--uri", "original_uri")
 @click.option("--source-version")
-def source_update(source_id: str, title: str | None, original_uri: str | None, source_version: str | None) -> None:
+def source_update(
+    source_id: str, title: str | None, original_uri: str | None, source_version: str | None
+) -> None:
     try:
         record = update_source(
-            _config(), source_id, title=title, original_uri=original_uri, source_version=source_version
+            _config(),
+            source_id,
+            title=title,
+            original_uri=original_uri,
+            source_version=source_version,
         )
     except SourceError as exc:
         raise click.ClickException(str(exc)) from exc
@@ -213,8 +244,14 @@ def source_normalize(source_id: str, ocr: str, ocr_languages: str) -> None:
 
 
 @main.command("lint")
-@click.option("--format", "output_format", type=click.Choice(["text", "json", "markdown"]), default="text")
-@click.option("--strict", is_flag=True, help="Treat semantic review gaps on configured stable pages as errors.")
+@click.option(
+    "--format", "output_format", type=click.Choice(["text", "json", "markdown"]), default="text"
+)
+@click.option(
+    "--strict",
+    is_flag=True,
+    help="Treat semantic review gaps on configured stable pages as errors.",
+)
 def lint_command(output_format: str, strict: bool) -> None:
     issues = lint_project(_config(), strict=strict)
     if output_format == "json":
@@ -237,9 +274,14 @@ def lint_command(output_format: str, strict: bool) -> None:
         for issue in issues:
             location = f" {issue.path}" if issue.path else ""
             line = f":{issue.line}" if issue.line else ""
-            click.echo(f"{issue.severity.upper():10} {issue.code:20}{location}{line} {issue.message}")
+            click.echo(
+                f"{issue.severity.upper():10} {issue.code:20}{location}{line} {issue.message}"
+            )
         counts = Counter(issue.severity for issue in issues)
-        click.echo(f"Errors: {counts['error']}; warnings: {counts['warning']}; suggestions: {counts['suggestion']}")
+        click.echo(
+            f"Errors: {counts['error']}; warnings: {counts['warning']}; "
+            f"suggestions: {counts['suggestion']}"
+        )
     if any(issue.severity == "error" for issue in issues):
         raise click.exceptions.Exit(1)
 
@@ -272,7 +314,11 @@ def link() -> None:
 
 @link.command("check")
 def link_check() -> None:
-    issues = [issue for issue in lint_project(_config()) if issue.code in {"broken-link", "broken-anchor", "unsafe-link", "wikilink"}]
+    issues = [
+        issue
+        for issue in lint_project(_config())
+        if issue.code in {"broken-link", "broken-anchor", "unsafe-link", "wikilink"}
+    ]
     for issue in issues:
         click.echo(f"{issue.severity.upper()} {issue.path or ''}: {issue.message}")
     if any(issue.severity == "error" for issue in issues):
@@ -388,36 +434,50 @@ def stats_command() -> None:
     records = list_records(config)
     source_status_counts = Counter(record_status(config, record) for record in records)
     image_records = [record for record in records if record.get("kind") == "image"]
-    asset_files = [
-        path for path in (config.bundle_root / "assets").rglob("*")
-        if path.is_file() and not path.name.startswith(".")
-    ] if (config.bundle_root / "assets").exists() else []
-    _json({
-        "pages": total,
-        "by_type": type_counts,
-        "by_lifecycle": lifecycle_counts,
-        "by_trust": trust_counts,
-        "semantic_reviews": {
-            **semantic_counts,
-            "sourced_pages": sourced_pages,
-            "passed_sourced_pages": reviewed_sourced_pages,
-            "remaining_sourced_pages": sourced_pages - reviewed_sourced_pages,
-            "coverage_percent": (
-                round(reviewed_sourced_pages * 100 / sourced_pages, 1)
-                if sourced_pages else None
-            ),
-        },
-        "sources": len(records),
-        "source_status": source_status_counts,
-        "source_usage": source_usage,
-        "images": {
-            "registered": len(image_records),
-            "ocr": Counter(str((record.get("image") or {}).get("ocr_status", "not-normalized")) for record in image_records),
-            "published": sum((record.get("image") or {}).get("asset_status") == "published" for record in image_records),
-        },
-        "assets": len(asset_files),
-        "runtime": runtime_status(config),
-    })
+    asset_files = (
+        [
+            path
+            for path in (config.bundle_root / "assets").rglob("*")
+            if path.is_file() and not path.name.startswith(".")
+        ]
+        if (config.bundle_root / "assets").exists()
+        else []
+    )
+    _json(
+        {
+            "pages": total,
+            "by_type": type_counts,
+            "by_lifecycle": lifecycle_counts,
+            "by_trust": trust_counts,
+            "semantic_reviews": {
+                **semantic_counts,
+                "sourced_pages": sourced_pages,
+                "passed_sourced_pages": reviewed_sourced_pages,
+                "remaining_sourced_pages": sourced_pages - reviewed_sourced_pages,
+                "coverage_percent": (
+                    round(reviewed_sourced_pages * 100 / sourced_pages, 1)
+                    if sourced_pages
+                    else None
+                ),
+            },
+            "sources": len(records),
+            "source_status": source_status_counts,
+            "source_usage": source_usage,
+            "images": {
+                "registered": len(image_records),
+                "ocr": Counter(
+                    str((record.get("image") or {}).get("ocr_status", "not-normalized"))
+                    for record in image_records
+                ),
+                "published": sum(
+                    (record.get("image") or {}).get("asset_status") == "published"
+                    for record in image_records
+                ),
+            },
+            "assets": len(asset_files),
+            "runtime": runtime_status(config),
+        }
+    )
 
 
 @main.group()
@@ -481,7 +541,9 @@ def plan_diff_command(path: Path, output_format: str) -> None:
 
 @plan.command("apply")
 @click.argument("path", type=click.Path(path_type=Path, exists=True))
-@click.option("--approve", is_flag=True, help="Confirm that a human reviewed this plan and its diff.")
+@click.option(
+    "--approve", is_flag=True, help="Confirm that a human reviewed this plan and its diff."
+)
 def plan_apply(path: Path, approve: bool) -> None:
     try:
         backup = apply_plan(_config(), load_plan(path), approved=approve)

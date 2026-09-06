@@ -59,7 +59,9 @@ def _inspect_image(config: Config, source: Path) -> dict[str, Any]:
     except (UnidentifiedImageError, OSError, SyntaxError) as exc:
         raise SourceError(f"Image cannot be decoded safely: {exc}") from exc
     if actual != expected:
-        raise SourceError(f"Image extension says {expected}, but decoded format is {actual or 'unknown'}")
+        raise SourceError(
+            f"Image extension says {expected}, but decoded format is {actual or 'unknown'}"
+        )
     if frames != 1:
         raise SourceError("Animated or multi-frame images are not supported")
     if width > config.max_image_width or height > config.max_image_height:
@@ -107,7 +109,9 @@ def load_record(config: Config, source_id: str) -> dict[str, Any]:
 
 
 def validate_record(config: Config, record: dict[str, Any]) -> None:
-    schema = json.loads((config.root / "schemas/source-record.schema.json").read_text(encoding="utf-8"))
+    schema = json.loads(
+        (config.root / "schemas/source-record.schema.json").read_text(encoding="utf-8")
+    )
     errors = sorted(
         Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(record),
         key=lambda item: list(item.path),
@@ -174,7 +178,11 @@ def add_source(
     source = ensure_within(source, config.raw_root, must_exist=True)
     if not source.is_file():
         raise SourceError(f"Not a file: {source}")
-    if source.parent in {config.catalog_root, config.derived_root} or config.catalog_root in source.parents or config.derived_root in source.parents:
+    if (
+        source.parent in {config.catalog_root, config.derived_root}
+        or config.catalog_root in source.parents
+        or config.derived_root in source.parents
+    ):
         raise SourceError("Catalog and derived files cannot be registered as source originals")
     suffix = source.suffix.lower()
     if suffix not in config.allowed_extensions:

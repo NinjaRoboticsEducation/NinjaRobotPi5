@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from llmwiki.frontmatter import Document, FrontmatterError, dump_document, parse_text
 
 

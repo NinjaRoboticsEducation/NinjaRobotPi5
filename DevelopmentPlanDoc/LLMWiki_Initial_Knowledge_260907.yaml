@@ -1,0 +1,295 @@
+version: 2
+id: ninjarobot-initial-knowledge-260907
+created_at: '2026-09-06T22:53:22Z'
+actor: agent:codex
+risk: medium
+summary: Create the initial cited NinjaRobotPi5 project knowledge pages from five
+  registered public sources.
+sources:
+- id: src-20260906-installationguide
+  content_hash: sha256:53f80c60feb139f0de547613bd14b8fcd87a2678ba5bf7dc75b1b2bccb1dc1c4
+- id: src-20260906-developmentguide
+  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e
+- id: src-20260906-ninjarobot-mcp-skill
+  content_hash: sha256:df8076ccc2683b24b6752310558ce4e62828d54cee67f1102aae7196c0ee97bb
+- id: src-20260906-developmentlog
+  content_hash: sha256:9d2f7eb85695c830322023c4efa549e5d178030105a611468b003f4d8e0b1dd4
+- id: src-20260906-knowledgeintegration
+  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f
+operations:
+- op: write
+  path: wiki/overview.md
+  content: "---\ntype: Concept\ntitle: NinjaRobotPi5 project overview\ndescription:\
+    \ Start here for architecture, setup, features, development history, and\n  current\
+    \ evidence.\nstatus: draft\ntags:\n- ninjarobotpi5\ngenerated:\n  by: agent:codex\n\
+    \  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-knowledgeintegration\n\
+    \  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n  title: Local\
+    \ knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\n\
+    - id: src-20260906-developmentguide\n  resource: urn:llmwiki:source:src-20260906-developmentguide\n\
+    \  title: DevelopmentGuide.md\n  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e\n\
+    ---\n\n# NinjaRobotPi5 project overview\n\nNinjaRobotPi5 documents an Agent layer\
+    \ for user/model interaction, an IDE layer\nfor coordinating devices, and managed\
+    \ Pi5 libraries for individual devices.\nThe development guide describes their\
+    \ permitted ownership boundary.[^src-20260906-developmentguide]\n\nThe local wiki\
+    \ is the primary developer knowledge collection. Full manuals are\nversioned under\
+    \ raw source folders; outer README links and the project knowledge\nmap identify\
+    \ the current versions. Read source records and limitations, then\ncompare important\
+    \ claims with the current checkout before coding.[^src-20260906-knowledgeintegration]\n\
+    \n## Browse project knowledge\n\n- [Architecture and hardware ownership](concepts/architecture.md)\n\
+    - [Development and documentation workflow](concepts/development-workflow.md)\n\
+    - [Installation and hardware checks](concepts/installation.md)\n- [Features, MCP\
+    \ tools, and Agent Skills](concepts/features-and-tools.md)\n- [Development history](concepts/development-history.md)\n\
+    - [Known knowledge limitations](analyses/knowledge-limitations.md)\n- [Installation\
+    \ manual](references/installation-guide.md)\n- [Development manual](references/development-guide.md)\n\
+    - [Development log](references/development-log.md)\n- [MCP and skills tutorial](references/mcp-skills-guide.md)\n\
+    \n\n[^src-20260906-knowledgeintegration]: Local knowledge integration evidence,\
+    \ source version `integration-2026-09-07`; registered source `src-20260906-knowledgeintegration`.\n\
+    [^src-20260906-developmentguide]: DevelopmentGuide.md, source version `migration-2026-09-07`;\
+    \ registered source `src-20260906-developmentguide`.\n"
+  expected_sha256: sha256:2786d693be09a021d6da69a117987e75163c1314bf215a8a362f164736241214
+- op: write
+  path: wiki/references/installation-guide.md
+  content: "---\ntype: Reference\ntitle: Installation guide\ndescription: Find the\
+    \ complete versioned installation guide.\nstatus: draft\ntags:\n- ninjarobotpi5\n\
+    generated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-installationguide\n\
+    \  resource: urn:llmwiki:source:src-20260906-installationguide\n  title: InstallationGuide.md\n\
+    \  content_hash: sha256:53f80c60feb139f0de547613bd14b8fcd87a2678ba5bf7dc75b1b2bccb1dc1c4\n\
+    - id: src-20260906-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n\
+    \  title: Local knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\n\
+    ---\n\n# Installation guide\n\nThe full guide covers beginner setup, hardware\
+    \ initialization and calibration, startup, and troubleshooting. Hardware commands\
+    \ require the stated operator precautions.[^src-20260906-installationguide]\n\n\
+    Use the source identifier below to resolve the complete manual through the raw\n\
+    source catalog. The outer wiki README also links directly to the current full\n\
+    manual. Root filenames are navigation pages; source updates create new versions.\n\
+    Read the relevant full section before acting on an abbreviated explanation.[^src-20260906-knowledgeintegration]\n\
+    \n[Return to project overview](/overview.md).\n\n[^src-20260906-installationguide]:\
+    \ InstallationGuide.md, source version `migration-2026-09-07`; registered source\
+    \ `src-20260906-installationguide`.\n[^src-20260906-knowledgeintegration]: Local\
+    \ knowledge integration evidence, source version `integration-2026-09-07`; registered\
+    \ source `src-20260906-knowledgeintegration`.\n"
+- op: write
+  path: wiki/references/development-guide.md
+  content: "---\ntype: Reference\ntitle: Development guide\ndescription: Find the\
+    \ complete versioned development guide.\nstatus: draft\ntags:\n- ninjarobotpi5\n\
+    generated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-developmentguide\n\
+    \  resource: urn:llmwiki:source:src-20260906-developmentguide\n  title: DevelopmentGuide.md\n\
+    \  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e\n\
+    - id: src-20260906-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n\
+    \  title: Local knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\n\
+    ---\n\n# Development guide\n\nThe full guide describes architecture, managed drivers,\
+    \ configuration, safety, the behavior system, external tools, memory, web access,\
+    \ and development checks.[^src-20260906-developmentguide]\n\nUse the source identifier\
+    \ below to resolve the complete manual through the raw\nsource catalog. The outer\
+    \ wiki README also links directly to the current full\nmanual. Root filenames\
+    \ are navigation pages; source updates create new versions.\nRead the relevant\
+    \ full section before acting on an abbreviated explanation.[^src-20260906-knowledgeintegration]\n\
+    \n[Return to project overview](/overview.md).\n\n[^src-20260906-developmentguide]:\
+    \ DevelopmentGuide.md, source version `migration-2026-09-07`; registered source\
+    \ `src-20260906-developmentguide`.\n[^src-20260906-knowledgeintegration]: Local\
+    \ knowledge integration evidence, source version `integration-2026-09-07`; registered\
+    \ source `src-20260906-knowledgeintegration`.\n"
+- op: write
+  path: wiki/references/development-log.md
+  content: "---\ntype: Reference\ntitle: Development log\ndescription: Find the complete\
+    \ versioned development log.\nstatus: draft\ntags:\n- ninjarobotpi5\ngenerated:\n\
+    \  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-developmentlog\n\
+    \  resource: urn:llmwiki:source:src-20260906-developmentlog\n  title: DevelopmentLog.md\n\
+    \  content_hash: sha256:9d2f7eb85695c830322023c4efa549e5d178030105a611468b003f4d8e0b1dd4\n\
+    - id: src-20260906-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n\
+    \  title: Local knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\n\
+    ---\n\n# Development log\n\nThe complete log preserves dated implementation decisions\
+    \ and validation reports. Historical test results describe their recorded checkout\
+    \ and date; they are not fresh verification.[^src-20260906-developmentlog]\n\n\
+    Use the source identifier below to resolve the complete manual through the raw\n\
+    source catalog. The outer wiki README also links directly to the current full\n\
+    manual. Root filenames are navigation pages; source updates create new versions.\n\
+    Read the relevant full section before acting on an abbreviated explanation.[^src-20260906-knowledgeintegration]\n\
+    \n[Return to project overview](/overview.md).\n\n[^src-20260906-developmentlog]:\
+    \ DevelopmentLog.md, source version `migration-2026-09-07`; registered source\
+    \ `src-20260906-developmentlog`.\n[^src-20260906-knowledgeintegration]: Local\
+    \ knowledge integration evidence, source version `integration-2026-09-07`; registered\
+    \ source `src-20260906-knowledgeintegration`.\n"
+- op: write
+  path: wiki/references/mcp-skills-guide.md
+  content: "---\ntype: Reference\ntitle: MCP and Agent Skills tutorial\ndescription:\
+    \ Find the complete versioned mcp and agent skills tutorial.\nstatus: draft\n\
+    tags:\n- ninjarobotpi5\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\n\
+    sources:\n- id: src-20260906-ninjarobot-mcp-skill\n  resource: urn:llmwiki:source:src-20260906-ninjarobot-mcp-skill\n\
+    \  title: NinjaRobot_MCP_Skill.md\n  content_hash: sha256:df8076ccc2683b24b6752310558ce4e62828d54cee67f1102aae7196c0ee97bb\n\
+    - id: src-20260906-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n\
+    \  title: Local knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\n\
+    ---\n\n# MCP and Agent Skills tutorial\n\nThe tutorial explains external tools,\
+    \ configuration, read-only Tavily and Calendar examples, and reusable Agent Skills.\
+    \ It describes restrictions for the robot Agent, not a development wiki server.[^src-20260906-ninjarobot-mcp-skill]\n\
+    \nUse the source identifier below to resolve the complete manual through the raw\n\
+    source catalog. The outer wiki README also links directly to the current full\n\
+    manual. Root filenames are navigation pages; source updates create new versions.\n\
+    Read the relevant full section before acting on an abbreviated explanation.[^src-20260906-knowledgeintegration]\n\
+    \n[Return to project overview](/overview.md).\n\n[^src-20260906-ninjarobot-mcp-skill]:\
+    \ NinjaRobot_MCP_Skill.md, source version `migration-2026-09-07`; registered source\
+    \ `src-20260906-ninjarobot-mcp-skill`.\n[^src-20260906-knowledgeintegration]:\
+    \ Local knowledge integration evidence, source version `integration-2026-09-07`;\
+    \ registered source `src-20260906-knowledgeintegration`.\n"
+- op: write
+  path: wiki/concepts/architecture.md
+  content: "---\ntype: Concept\ntitle: Architecture and hardware ownership\ndescription:\
+    \ Agent, IDE, device drivers, safety policy, resource ownership, and code\n  boundaries.\n\
+    status: draft\ntags:\n- architecture\n- hardware\n- ownership\n- agent\n- ide\n\
+    - drivers\n- safety\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\n\
+    sources:\n- id: src-20260906-developmentguide\n  resource: urn:llmwiki:source:src-20260906-developmentguide\n\
+    \  title: DevelopmentGuide.md\n  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e\n\
+    ---\n\n# Architecture and hardware ownership\n\nThe documented hardware path is\
+    \ user or model → ninjarobot_pi5_agent →\nninjarobot_pi5_ide → a managed pi5 driver\
+    \ → its device. The Agent handles user\ninteraction, model-provider translation,\
+    \ policy, sessions, and tool proposals.\nIt should not import a pi5 library or\
+    \ access a device directly.[^src-20260906-developmentguide]\n\nThe IDE (the project's\
+    \ device-coordination layer) owns shared resource scheduling,\naction execution,\
+    \ safety state, behaviors, and hardware ownership. Individual\nmanaged libraries\
+    \ own their device and standalone setup interface. The six\nmanaged libraries\
+    \ cover servo motors, display, buzzer, distance sensing, camera,\nand microphone.[^src-20260906-developmentguide]\n\
+    \nThis is the documented architecture contract. Compare affected code and tests\n\
+    with it before implementation; this page does not certify that every failure or\n\
+    physical safety condition has been tested.[^src-20260906-developmentguide]\n\n\
+    [Read the development manual](/references/development-guide.md).\n\n\n[^src-20260906-developmentguide]:\
+    \ DevelopmentGuide.md, source version `migration-2026-09-07`; registered source\
+    \ `src-20260906-developmentguide`.\n"
+- op: write
+  path: wiki/concepts/development-workflow.md
+  content: "---\ntype: Concept\ntitle: Development and documentation workflow\ndescription:\
+    \ Retrieve evidence, plan, implement, review wiki impact, version manuals,\n \
+    \ and validate.\nstatus: draft\ntags:\n- development\n- workflow\n- documentation\n\
+    - update\n- codex\n- claude\n- cursor\n- antigravity\ngenerated:\n  by: agent:codex\n\
+    \  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-knowledgeintegration\n\
+    \  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n  title: Local\
+    \ knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\n\
+    - id: src-20260906-developmentguide\n  resource: urn:llmwiki:source:src-20260906-developmentguide\n\
+    \  title: DevelopmentGuide.md\n  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e\n\
+    ---\n\n# Development and documentation workflow\n\nBefore significant development,\
+    \ consult the local wiki and the current full\nmanuals, inspect relevant code,\
+    \ and identify missing or conflicting evidence.\nThe root project policy requires\
+    \ an approved phased plan and preservation of\nrobot interfaces and managed-driver\
+    \ rules.[^src-20260906-developmentguide]\n\nFeature completion includes a wiki\
+    \ impact assessment. Update affected manual\nversions, topic pages, specifications\
+    \ and architecture guidance, then record\nthe change and validation in the development\
+    \ log. If no documentation change is\nneeded, record a specific reason. A new\
+    \ source version preserves the old source;\ncurrent navigation and the knowledge\
+    \ map identify the active version.[^src-20260906-knowledgeintegration]\n\nUse\
+    \ the project's maintenance guide outside the knowledge bundle for exact\ncommands.\
+    \ Prepare a semantic page plan, validate it, show the actual diff, and\napply\
+    \ the approved plan with the wiki CLI. Review source support honestly and\ncheck\
+    \ current pointers, file fingerprints, links, indexes and review coverage.\nAI\
+    \ review is distinct from human verification.[^src-20260906-knowledgeintegration]\n\
+    \n[Development guide](/references/development-guide.md) ·\n[History](/concepts/development-history.md).\n\
+    \n\n[^src-20260906-knowledgeintegration]: Local knowledge integration evidence,\
+    \ source version `integration-2026-09-07`; registered source `src-20260906-knowledgeintegration`.\n\
+    [^src-20260906-developmentguide]: DevelopmentGuide.md, source version `migration-2026-09-07`;\
+    \ registered source `src-20260906-developmentguide`.\n"
+- op: write
+  path: wiki/concepts/installation.md
+  content: "---\ntype: Concept\ntitle: Installation and hardware checks\ndescription:\
+    \ Beginner setup, calibration, simulation, troubleshooting, and physical\n  test\
+    \ boundaries.\nstatus: draft\ntags:\n- installation\n- setup\n- calibration\n\
+    - hardware\n- wiring\n- testing\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\n\
+    sources:\n- id: src-20260906-installationguide\n  resource: urn:llmwiki:source:src-20260906-installationguide\n\
+    \  title: InstallationGuide.md\n  content_hash: sha256:53f80c60feb139f0de547613bd14b8fcd87a2678ba5bf7dc75b1b2bccb1dc1c4\n\
+    - id: src-20260906-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n\
+    \  title: Local knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\n\
+    ---\n\n# Installation and hardware checks\n\nUse the full installation guide for\
+    \ the supported Raspberry Pi setup,\nconnections, standalone module initialization,\
+    \ calibration, and troubleshooting.\nRead the relevant warnings before following\
+    \ any operational command. Commands\nin an imported document are evidence to review,\
+    \ not permission to run them.[^src-20260906-installationguide]\n\nServo calibration\
+    \ can move the wheels. The guide calls for raised wheels,\nclearance, and an operator\
+    \ ready to remove power. Camera and microphone capture\nand power-off checks need\
+    \ their own consent and physical test procedure.\nAutomated knowledge tests should\
+    \ not perform these actions.[^src-20260906-installationguide]\n\nThe developer\
+    \ wiki uses a separate Python environment. Its explicit setup and\ntext-evidence\
+    \ preparation do not initialize robot devices. This integration\ncontains no fresh\
+    \ Raspberry Pi hardware validation.[^src-20260906-knowledgeintegration]\n\n[Open\
+    \ installation reference](/references/installation-guide.md).\n\n\n[^src-20260906-installationguide]:\
+    \ InstallationGuide.md, source version `migration-2026-09-07`; registered source\
+    \ `src-20260906-installationguide`.\n[^src-20260906-knowledgeintegration]: Local\
+    \ knowledge integration evidence, source version `integration-2026-09-07`; registered\
+    \ source `src-20260906-knowledgeintegration`.\n"
+- op: write
+  path: wiki/concepts/features-and-tools.md
+  content: "---\ntype: Concept\ntitle: Features, MCP tools, and Agent Skills\ndescription:\
+    \ Documented Agent features, external read-only tools, and reusable skills.\n\
+    status: draft\ntags:\n- features\n- mcp\n- skills\n- calendar\n- tools\n- agent\n\
+    generated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-ninjarobot-mcp-skill\n\
+    \  resource: urn:llmwiki:source:src-20260906-ninjarobot-mcp-skill\n  title: NinjaRobot_MCP_Skill.md\n\
+    \  content_hash: sha256:df8076ccc2683b24b6752310558ce4e62828d54cee67f1102aae7196c0ee97bb\n\
+    - id: src-20260906-developmentguide\n  resource: urn:llmwiki:source:src-20260906-developmentguide\n\
+    \  title: DevelopmentGuide.md\n  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e\n\
+    - id: src-20260906-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n\
+    \  title: Local knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\n\
+    ---\n\n# Features, MCP tools, and Agent Skills\n\nThe development guide describes\
+    \ conversational and web interfaces, model\nproviders, behaviors, memory, and\
+    \ device capabilities. These are documented\nimplementation areas; use the current\
+    \ code and tests to verify a specific\nfeature or failure case before changing\
+    \ it.[^src-20260906-developmentguide]\n\nMCP (Model Context Protocol) lets an\
+    \ application discover and call external tools.\nThe robot tutorial describes\
+    \ allowlisted read-only tools, bounded results,\ntimeouts, and untrusted external\
+    \ content. Its examples include Tavily search\nand a read-only Google Calendar\
+    \ server. Agent Skills package reusable workflows;\nthey do not grant extra hardware\
+    \ permissions.[^src-20260906-ninjarobot-mcp-skill]\n\nDevelopment wiki skills\
+    \ are a separate coding-tool workflow. This local knowledge\nintegration does\
+    \ not install a robot MCP provider or change runtime interfaces.\nUse the existing\
+    \ robot tutorial for robot extensions and the wiki maintenance\nguide for developer\
+    \ knowledge updates.[^src-20260906-knowledgeintegration]\n\n[MCP and skills tutorial](/references/mcp-skills-guide.md).\n\
+    \n\n[^src-20260906-ninjarobot-mcp-skill]: NinjaRobot_MCP_Skill.md, source version\
+    \ `migration-2026-09-07`; registered source `src-20260906-ninjarobot-mcp-skill`.\n\
+    [^src-20260906-developmentguide]: DevelopmentGuide.md, source version `migration-2026-09-07`;\
+    \ registered source `src-20260906-developmentguide`.\n[^src-20260906-knowledgeintegration]:\
+    \ Local knowledge integration evidence, source version `integration-2026-09-07`;\
+    \ registered source `src-20260906-knowledgeintegration`.\n"
+- op: write
+  path: wiki/concepts/development-history.md
+  content: "---\ntype: Concept\ntitle: Development history and decisions\ndescription:\
+    \ Find dated rationale and distinguish historical evidence from current\n  implementation.\n\
+    status: draft\ntags:\n- history\n- decisions\n- rationale\n- development\n- log\n\
+    generated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260906-developmentlog\n\
+    \  resource: urn:llmwiki:source:src-20260906-developmentlog\n  title: DevelopmentLog.md\n\
+    \  content_hash: sha256:9d2f7eb85695c830322023c4efa549e5d178030105a611468b003f4d8e0b1dd4\n\
+    ---\n\n# Development history and decisions\n\nThe development log retains dated\
+    \ records of implementation work, design\nchoices, repairs, validation, and remaining\
+    \ work. Use a relevant dated entry\nwhen answering why a change was made. Read\
+    \ surrounding entries to determine\nwhether a later decision superseded it.[^src-20260906-developmentlog]\n\
+    \nHistorical success reports refer to the recorded work and environment. They\
+    \ do\nnot prove that today's checkout passes the same checks, or that a physical\n\
+    device was tested during a later documentation task. Cite the entry and state\n\
+    which current checks were actually run.[^src-20260906-developmentlog]\n\n[Complete\
+    \ development log](/references/development-log.md).\n\n\n[^src-20260906-developmentlog]:\
+    \ DevelopmentLog.md, source version `migration-2026-09-07`; registered source\
+    \ `src-20260906-developmentlog`.\n"
+- op: write
+  path: wiki/analyses/knowledge-limitations.md
+  content: "---\ntype: Analysis\ntitle: Knowledge limitations and verification\ndescription:\
+    \ Search gaps, stale evidence, source versions, editor access, and review\n  boundaries.\n\
+    status: draft\ntags:\n- limitations\n- stale\n- verification\n- search\n- known\n\
+    - issues\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n\
+    - id: src-20260906-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260906-knowledgeintegration\n\
+    \  title: Local knowledge integration evidence\n  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f\n\
+    - id: src-20260906-developmentguide\n  resource: urn:llmwiki:source:src-20260906-developmentguide\n\
+    \  title: DevelopmentGuide.md\n  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e\n\
+    ---\n\n# Knowledge limitations and verification\n\nKeyword search covers curated\
+    \ pages rather than all raw manual text. It does not\nfollow citations for the\
+    \ caller. Try focused terms, read the overview, and open\nfull sources. Search\
+    \ expiry flags, source fingerprints, and semantic review\nstatus are separate\
+    \ signals and must be checked together.[^src-20260906-knowledgeintegration]\n\n\
+    A missing result is an evidence gap, not proof a feature is absent. A page can\
+    \ be\nstructurally valid while its explanation needs review. Current implementation\n\
+    fingerprints identify files needing knowledge review but cannot prove that prose\n\
+    is correct. AI-reviewed pages are not human-verified or hardware-tested pages.\n\
+    Editor adapters need actual session activation checks; a wiki-only workspace may\n\
+    not expose parent robot code.[^src-20260906-knowledgeintegration]\n\nThe development\
+    \ guide's older quality-gate example uses narrower lint paths than\nthe current\
+    \ root policy. Follow the root operating policy for the current full\nchecks,\
+    \ and preserve the source's historical context rather than silently treating\n\
+    an older example as the complete current gate.[^src-20260906-developmentguide][^src-20260906-knowledgeintegration]\n\
+    \n[Project overview](/overview.md).\n\n\n[^src-20260906-knowledgeintegration]:\
+    \ Local knowledge integration evidence, source version `integration-2026-09-07`;\
+    \ registered source `src-20260906-knowledgeintegration`.\n[^src-20260906-developmentguide]:\
+    \ DevelopmentGuide.md, source version `migration-2026-09-07`; registered source\
+    \ `src-20260906-developmentguide`.\n"

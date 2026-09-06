@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
-import re
 from typing import Any
 
 import yaml
@@ -43,9 +43,19 @@ class Config:
         if raw.get("version") != 1:
             raise ConfigError("llmwiki.yaml must contain version: 1")
         allowed_keys = {
-            "version", "bundle_root", "raw_root", "catalog_root", "derived_root",
-            "allowed_types", "required_profile_fields", "freshness", "source_limits",
-            "lint", "query", "review", "semantic_review",
+            "version",
+            "bundle_root",
+            "raw_root",
+            "catalog_root",
+            "derived_root",
+            "allowed_types",
+            "required_profile_fields",
+            "freshness",
+            "source_limits",
+            "lint",
+            "query",
+            "review",
+            "semantic_review",
         }
         unknown = sorted(set(raw) - allowed_keys)
         if unknown:
@@ -70,7 +80,12 @@ class Config:
         semantic = raw.get("semantic_review") or {}
         if not isinstance(semantic, dict):
             raise ConfigError("semantic_review must be a mapping")
-        for key in ("enabled", "strict_for_sourced_pages", "flag_absolute_language", "require_visual_review"):
+        for key in (
+            "enabled",
+            "strict_for_sourced_pages",
+            "flag_absolute_language",
+            "require_visual_review",
+        ):
             if key in semantic and not isinstance(semantic[key], bool):
                 raise ConfigError(f"semantic_review.{key} must be true or false")
         strict_statuses = semantic.get("strict_for_status", ["stable"])
@@ -79,18 +94,28 @@ class Config:
             or not strict_statuses
             or any(item not in {"draft", "stable", "deprecated"} for item in strict_statuses)
         ):
-            raise ConfigError("semantic_review.strict_for_status must list draft, stable, or deprecated")
-        allowed_extensions = tuple(str(item).lower() for item in limits.get("allowed_extensions", []))
+            raise ConfigError(
+                "semantic_review.strict_for_status must list draft, stable, or deprecated"
+            )
+        allowed_extensions = tuple(
+            str(item).lower() for item in limits.get("allowed_extensions", [])
+        )
         if not allowed_extensions:
             raise ConfigError("source_limits.allowed_extensions cannot be empty")
         if any(not item.startswith(".") for item in allowed_extensions):
             raise ConfigError("Every allowed source extension must start with a dot")
         allowed_types = tuple(raw.get("allowed_types", []))
         required_fields = tuple(raw.get("required_profile_fields", []))
-        if any(not isinstance(item, str) or not item for item in (*allowed_types, *required_fields)):
+        if any(
+            not isinstance(item, str) or not item for item in (*allowed_types, *required_fields)
+        ):
             raise ConfigError("Page types and required profile fields must be non-empty strings")
         freshness = dict(raw.get("freshness", {}))
-        if any(value is not None and (not isinstance(value, str) or not re.fullmatch(r"[1-9][0-9]*[dwm]", value)) for value in freshness.values()):
+        if any(
+            value is not None
+            and (not isinstance(value, str) or not re.fullmatch(r"[1-9][0-9]*[dwm]", value))
+            for value in freshness.values()
+        ):
             raise ConfigError("Freshness values must be null or a duration such as 30d, 2w, or 6m")
         max_bytes = int(limits.get("max_bytes", 52_428_800))
         if max_bytes < 1:
@@ -100,7 +125,16 @@ class Config:
         max_image_height = int(limits.get("max_image_height", 10_000))
         ocr_timeout_seconds = int(limits.get("ocr_timeout_seconds", 60))
         max_ocr_characters = int(limits.get("max_ocr_characters", 200_000))
-        if min(max_image_pixels, max_image_width, max_image_height, ocr_timeout_seconds, max_ocr_characters) < 1:
+        if (
+            min(
+                max_image_pixels,
+                max_image_width,
+                max_image_height,
+                ocr_timeout_seconds,
+                max_ocr_characters,
+            )
+            < 1
+        ):
             raise ConfigError("Image and OCR limits must be positive")
         config = cls(
             root=root,
@@ -121,7 +155,10 @@ class Config:
             query_max_results=int(query.get("max_results", 20)),
             settings=raw,
         )
-        for name, child in (("catalog_root", config.catalog_root), ("derived_root", config.derived_root)):
+        for name, child in (
+            ("catalog_root", config.catalog_root),
+            ("derived_root", config.derived_root),
+        ):
             try:
                 child.relative_to(config.raw_root)
             except ValueError as exc:

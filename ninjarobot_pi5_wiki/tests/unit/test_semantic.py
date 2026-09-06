@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from llmwiki.frontmatter import Document
 from llmwiki.semantic import has_absolute_claims, semantic_review_state, semantic_target_hash
 
@@ -17,7 +16,12 @@ from llmwiki.semantic import has_absolute_claims, semantic_review_state, semanti
 )
 def test_semantic_hash_is_topic_neutral_and_deterministic(title: str, body: str) -> None:
     document = Document(
-        metadata={"type": "Concept", "title": title, "description": "Evidence summary.", "status": "stable"},
+        metadata={
+            "type": "Concept",
+            "title": title,
+            "description": "Evidence summary.",
+            "status": "stable",
+        },
         body=body,
     )
     assert semantic_target_hash(document) == semantic_target_hash(document)
@@ -31,11 +35,13 @@ def test_review_hash_ignores_review_and_verification_but_detects_meaning_changes
             "title": "Example",
             "description": "Evidence summary.",
             "status": "stable",
-            "sources": [{
-                "id": "src-example",
-                "resource": "urn:llmwiki:source:src-example",
-                "content_hash": "sha256:" + "a" * 64,
-            }],
+            "sources": [
+                {
+                    "id": "src-example",
+                    "resource": "urn:llmwiki:source:src-example",
+                    "content_hash": "sha256:" + "a" * 64,
+                }
+            ],
         },
         body="A supported claim.\n",
     )

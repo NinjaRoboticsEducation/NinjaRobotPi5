@@ -74,3 +74,18 @@ The six managed `pi5*` libraries retain the license files in their respective
 root directories. Their immutable import hashes and authorized repairs remain
 governed by `docs/validation/immutable_driver_baseline.json` and
 `docs/validation/authorized_driver_changes.json`.
+
+## Local developer wiki
+
+The bundled [LLMWikiTemplate](ninjarobot_pi5_wiki/README.md), package version
+0.2.1, is distributed under its [MIT license](ninjarobot_pi5_wiki/LICENSE),
+copyright 2026 Ninja Robotics Educations. Its separate dependency inventory and
+locked versions are in `ninjarobot_pi5_wiki/pyproject.toml` and `uv.lock` in that
+folder. These development dependencies are not added to the robot runtime.
+
+The repository knowledge-validation workflow uses the MIT-licensed
+[actions/checkout](https://github.com/actions/checkout) and
+[astral-sh/setup-uv](https://github.com/astral-sh/setup-uv) actions, pinned to
+full source revisions in `.github/workflows/wiki-validation.yml`. The uv executable
+is pinned to 0.12.5, matching the local validation environment. No runtime service
+or robot dependency was added.

@@ -39,7 +39,9 @@ class _TextExtractor(HTMLParser):
         return "\n\n".join(line for line in lines if line)
 
 
-def _run_ocr(config: Config, rendition: Path, mode: str, languages: str) -> tuple[str, dict[str, object]]:
+def _run_ocr(
+    config: Config, rendition: Path, mode: str, languages: str
+) -> tuple[str, dict[str, object]]:
     if mode not in {"auto", "off", "required"}:
         raise SourceError("OCR mode must be auto, off, or required")
     if mode == "off":
@@ -48,7 +50,11 @@ def _run_ocr(config: Config, rendition: Path, mode: str, languages: str) -> tupl
     if not executable:
         if mode == "required":
             raise SourceError("Tesseract OCR is required but is not installed")
-        return "", {"status": "unavailable", "languages": languages, "warning": "Tesseract is not installed"}
+        return "", {
+            "status": "unavailable",
+            "languages": languages,
+            "warning": "Tesseract is not installed",
+        }
     version_run = subprocess.run(
         [executable, "--version"], capture_output=True, text=True, check=False, timeout=10
     )
@@ -63,13 +69,25 @@ def _run_ocr(config: Config, rendition: Path, mode: str, languages: str) -> tupl
         )
     except subprocess.TimeoutExpired as exc:
         if mode == "required":
-            raise SourceError(f"Tesseract exceeded the {config.ocr_timeout_seconds}-second timeout") from exc
-        return "", {"status": "failed", "engine": version, "languages": languages, "warning": "OCR timed out"}
+            raise SourceError(
+                f"Tesseract exceeded the {config.ocr_timeout_seconds}-second timeout"
+            ) from exc
+        return "", {
+            "status": "failed",
+            "engine": version,
+            "languages": languages,
+            "warning": "OCR timed out",
+        }
     if completed.returncode != 0:
         detail = (completed.stderr or "OCR failed").strip().splitlines()[-1]
         if mode == "required":
             raise SourceError(f"Tesseract failed: {detail}")
-        return "", {"status": "failed", "engine": version, "languages": languages, "warning": detail}
+        return "", {
+            "status": "failed",
+            "engine": version,
+            "languages": languages,
+            "warning": detail,
+        }
     text = completed.stdout[: config.max_ocr_characters].strip()
     status = "completed" if text else "empty"
     result: dict[str, object] = {"status": status, "engine": version, "languages": languages}
@@ -87,7 +105,8 @@ def _normalize_image(
     ocr_languages: str,
 ) -> tuple[str, str, dict[str, object], Path]:
     try:
-        from PIL import Image, ImageOps, __version__ as pillow_version
+        from PIL import Image, ImageOps
+        from PIL import __version__ as pillow_version
     except ImportError as exc:  # pragma: no cover - installation contract
         raise SourceError("Image support requires Pillow; run 'uv sync --all-extras'") from exc
 
@@ -101,7 +120,9 @@ def _normalize_image(
         if source_format == "JPEG":
             if image.mode not in {"RGB", "L"}:
                 image = image.convert("RGB")
-            image.save(rendition, format="JPEG", quality=95, optimize=False, progressive=False, exif=b"")
+            image.save(
+                rendition, format="JPEG", quality=95, optimize=False, progressive=False, exif=b""
+            )
         else:
             image.save(rendition, format="PNG", optimize=False)
 
@@ -135,13 +156,15 @@ def _normalize_image(
         "",
         "## Machine-extracted text",
         "",
-        "> OCR is untrusted machine output. Check it against the image before using it as evidence.",
+        "> OCR is untrusted machine output. Check it against the image before "
+        "using it as evidence.",
         "",
         ocr_text or f"No OCR text is available (status: {ocr_manifest['status']}).",
         "",
         "## Visual review",
         "",
-        "A capable coding tool or human must inspect the image before describing layout, color, diagrams, or other visual meaning.",
+        "A capable coding tool or human must inspect the image before "
+        "describing layout, color, diagrams, or other visual meaning.",
     ]
     return "\n".join(lines), f"llmwiki-image/pillow-{pillow_version}", metadata, rendition
 
@@ -158,7 +181,9 @@ def normalize_source(
     if sha256_file(source) != record["content_hash"]:
         record["state"] = "needs-review"
         save_record(config, record)
-        raise SourceError("Source changed after registration; review and register the new hash first")
+        raise SourceError(
+            "Source changed after registration; review and register the new hash first"
+        )
 
     suffix = source.suffix.lower()
     normalizer = "llmwiki-text/0.2"
@@ -183,8 +208,12 @@ def normalize_source(
                 raise SourceError("Encrypted PDFs are not supported")
             text = "\n\n".join((page.extract_text() or "").strip() for page in reader.pages).strip()
             if not text:
-                raise SourceError("PDF contains no extractable text; a PDF OCR normalizer is required")
-            normalizer = f"llmwiki-pdf/pypdf-{getattr(__import__('pypdf'), '__version__', 'unknown')}"
+                raise SourceError(
+                    "PDF contains no extractable text; a PDF OCR normalizer is required"
+                )
+            normalizer = (
+                f"llmwiki-pdf/pypdf-{getattr(__import__('pypdf'), '__version__', 'unknown')}"
+            )
         elif suffix in IMAGE_EXTENSIONS:
             text, normalizer, metadata, _ = _normalize_image(
                 config, source, destination, ocr=ocr, ocr_languages=ocr_languages
