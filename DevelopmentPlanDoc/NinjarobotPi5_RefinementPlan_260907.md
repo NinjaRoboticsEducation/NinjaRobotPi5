@@ -13,19 +13,23 @@ This plan builds on the existing project. It does not replace the robot's
 framework, and it does not authorize implementation, hardware operation, or
 deployment. All checklist items below are proposals, not newly available features.
 
-**Status:** proposed development reference, prepared from source inspection on
-7 September 2026. Implementation phases require the project owner's approval.
+**Status:** revised on 7 September 2026 against the owner's
+[refinement confirmation list](NinjarobotPi5_RefinementConfirmation_260907.md).
+31 items are confirmed, H01 is narrowed to system logs, and seven items are
+deferred. Scope confirmation is recorded; no implementation is marked complete.
 This document is the main planning reference for the next stage. Current behavior
 remains documented in the [local knowledge base][N-wiki] and verified against code.
 
 ## Contents
 
+- [0. Owner decisions and scope](#0-owner-decisions-and-scope)
 - [1. Goals and the experience we want](#1-goals-and-the-experience-we-want)
 - [2. Evidence and current project status](#2-evidence-and-current-project-status)
 - [3. What to learn from the references](#3-what-to-learn-from-the-references)
 - [4. Keep the existing framework](#4-keep-the-existing-framework)
 - [5. Refinement checklist](#5-refinement-checklist)
 - [6. How the important features should work](#6-how-the-important-features-should-work)
+- [Answers to the five confirmation questions](#67-answers-to-the-confirmation-questions)
 - [7. Development phases and acceptance gates](#7-development-phases-and-acceptance-gates)
 - [8. Validation and measures of success](#8-validation-and-measures-of-success)
 - [9. Documentation and future decisions](#9-documentation-and-future-decisions)
@@ -33,6 +37,47 @@ remains documented in the [local knowledge base][N-wiki] and verified against co
 - [Appendix B. Complete Reachy Mini audit](#appendix-b-complete-reachy-mini-audit)
 - [Appendix C. Feature comparison matrix](#appendix-c-feature-comparison-matrix)
 - [Appendix D. Evidence directory and audit limitations](#appendix-d-evidence-directory-and-audit-limitations)
+
+## 0. Owner decisions and scope
+
+The confirmation list is the authority for this revision. Its `Confirmed` labels
+mean selected for development, not completed. Its `[X]` labels mean excluded from
+this development stage, not checked-off work. H01 has an explicit replacement:
+record the additional lifecycle states in system logs only. This revision changes
+the plan and records answers; it does not start robot implementation.
+
+| Decision | Items | Meaning for implementation |
+| --- | --- | --- |
+| Confirmed | F01–F09; H02, H04, H06, H07; T01–T07; M01–M04; B01, B02, B04, B05; X01, X03, X05 | 31 selected refinements, with the concrete boundaries below. |
+| Revised | H01 | Additional lifecycle reporting goes to system logs. Preserve current display/web presentation; add no H01 state animations, badges, or panels. |
+| Deferred | H03, H05, T08, M05, B03, X02, X04 | No real-time spoken interruption, new desktop/quiet-hour profile, unsolicited suggestions, expanded household/privacy-management feature set, camera attention, release-updater project, or separate experience-benchmark program. |
+
+Important boundaries prevent confirmed features from quietly reintroducing deferred work:
+
+- H02 uses **listen-then-speak** operation. It needs bounded playback and temporary
+  microphone coordination, but not H03's simultaneous speaking/listening or echo
+  cancellation. Keep existing opt-in voice input and its privacy indicators.
+- B01/B02 coordinate existing expressions and small variations; B04 may show
+  game-specific reactions. None adds H01's rejected lifecycle presentation.
+- T03 still provides requested task progress, cancellation, and results through
+  existing conversational/controller routes. Those task records are distinct from
+  a new general-purpose lifecycle-status interface.
+- Deferring M05 leaves current user ownership, permissions, retention and deletion
+  behavior in force. New task records must honor those boundaries; do not add a
+  separate guest/profile/export redesign under another item.
+- Deferring X04 removes a separate benchmarking initiative, not the required
+  tests for confirmed work. F08 and the existing root validation gates remain.
+- F05/F06 retain setup diagnosis and backup/restore repair. X02's new staged-update
+  and automatic-update work is deferred.
+- T02 delivers reminders the user explicitly schedules. T06 briefings and M04
+  recipe suggestions are user-requested; no unsolicited T08 prompts are added.
+- B05 confirms evaluation of optional hardware, not installation of every listed
+  device. H02's speaker selection is the immediate hardware decision.
+
+The appendices retain the competitor evidence. Where an appendix describes a
+broader opportunity, this scope table and the updated phase plan determine whether
+it is active. A future implementation proposal should carry forward these recorded
+decisions and resolve only outstanding design, dependency, or hardware choices.
 
 ## 1. Goals and the experience we want
 
@@ -55,13 +100,14 @@ The main problems are:
 2. Conversation is mainly a bounded request-and-response activity. It needs a
    clearer path to durable tasks that survive a restart or a lost connection.
 3. Voice input exists, but a speaking face is not spoken audio. Natural spoken
-   interaction requires an output device, playback ownership, and interruption handling.
+   replies require an output device and controlled playback. Simultaneous real-time
+   voice interaction is outside the selected scope.
 4. Stored preferences and history need to become transparent, correctable help,
    without turning guesses into permanent facts about the user.
 5. Installation and health reporting should distinguish a missing software
    package from an unavailable device, a disabled feature, and a safety stop.
-6. Expressions, reminders, tools, and recovery need to tell one consistent story
-   across chat, the display, and the web controller.
+6. Task results and recovery must remain understandable in conversation, while
+   additional internal lifecycle states are recorded in system logs.
 
 ### 1.2 What success should feel like
 
@@ -72,18 +118,18 @@ These are future acceptance examples, not claims about today's robot:
 | “Remind me to stretch in 25 minutes.” | The robot displays the exact due time, saves the reminder, and delivers it once while the service is running. A restart preserves it; downtime is explained. |
 | “Help me plan tomorrow morning.” | The robot asks only for missing essentials, uses an authorized calendar connection if present, proposes a realistic schedule, and distinguishes a suggestion from a saved calendar event. |
 | “Find three useful articles and save the important points.” | It searches through an approved tool, shows sources and dates, saves a private note, and explains any incomplete part. |
-| “Please be quieter while I work.” | It proposes or applies the permitted preference change, explains its scope, and offers an easy way to reverse it. |
+| “Remember that I prefer shorter answers.” | It records the permitted preference, explains its scope, and offers correction. No new quiet-hour profile is introduced. |
 | The internet disconnects during a task. | It explains what has already happened, keeps local functions usable where safe, and does not repeat an uncertain external action. |
-| The user interrupts a long answer. | Speech stops promptly. The screen shows that the robot is listening. Stopping an answer and cancelling a task remain understandable, separate choices. |
+| The user cancels speech from the controller. | Current and queued playback stop. Cancelling speech is separate from cancelling the task; real-time spoken interruption is deferred. |
 | A hardware package is missing. | A health screen names the package and the active Python environment, gives the correct repair instructions, and keeps movement stopped. |
 
 ### 1.3 Design principles
 
 - **Useful before impressive.** Reliable timers, notes, and schedule assistance
   matter more than a large number of gestures.
-- **Make state visible.** Listening, thinking, waiting for permission, acting,
-  completing, and failing should look and read differently.
-- **Keep the user in control.** Quiet hours, memory inspection, cancellation,
+- **Make outcomes clear.** Explain task outcomes through existing user interfaces
+  and record additional lifecycle transitions in system logs.
+- **Keep the user in control.** Memory inspection, cancellation,
   camera consent, and movement permissions must be easy to find.
 - **Verify outcomes.** “Requested,” “accepted,” and “finished” mean different things.
 - **Adapt gradually.** Learning should initially mean remembering approved
@@ -156,7 +202,7 @@ was performed. New checklist identifiers appear in section 5.
 | A08: external tool effects and inherited environment are too broadly trusted | Direct review confirms read-only/retry assumptions and environment copying. Do not add calendar writes through this shortcut. | F07, T04 |
 | A09: Pi boot configuration conditional sections are mishandled | Boot-renderer source unchanged. Repair using text fixtures before any live boot-file change. | F05 |
 | A10: manuals mix historical and current statements | Navigation and wiki organization improved. Review individual behavior claims during each repair; do not call the whole wiki obsolete. | X03 |
-| A11: installer inputs are not fully reproducible | Retain as an installation review item; examine each remaining downloaded input before pinning it. | F05, X02 |
+| A11: installer inputs are not fully reproducible | Retain as an installation review item; examine each remaining downloaded input before pinning it. The broader updater project is deferred. | F05; X02 deferred |
 | A12: quality gate and hardware-test boundaries | The old formatting result is historical. Wiki checks now pass. Reassess the current full gate and explicit hardware-test exclusion during implementation. | F08 |
 | A13: face-recognition cleanup is incomplete | Source unchanged. Repair at the narrowest ownership boundary; a managed-driver edit needs separate authorization. | F08 |
 | A14: large modules and aging validation evidence | Use focused extraction only when needed for an approved feature. Do not begin with a broad refactor. | X01, X03 |
@@ -260,27 +306,30 @@ must use the existing tool-to-IDE bridge.
 | Health and recovery | Existing service/readiness/deployment paths, IDE health, and diagnostic scripts. | A software diagnostic must work without initializing motors or capturing media. |
 | Developer knowledge | Existing wiki source-version and review workflow. | Planned behavior must remain labelled planned until code and validation support it. |
 
-This is an extension of the current architecture, not a replacement. A new audio
-device adapter is an additive hardware integration requiring approval. A new
-deployment layout or any managed-driver repair is also separately reviewable.
-Neither is a reason to introduce another robot runtime.
+This is an extension of the current architecture, not a replacement. H02 adds an
+IDE audio adapter over an approved operating-system output. It does not require
+a new managed Pi5 speaker library by default. The concrete device/dependency/service
+choices and any managed-driver repair remain separately reviewable. A new deployment
+layout under X02 is deferred. No second robot runtime is planned.
 
-### 4.3 Define a desktop operating profile
+### 4.3 Preserve current operating settings
 
-Propose an opt-in **desktop assistant profile** that keeps wheel movement disabled
-while allowing permitted conversation, display, buzzer, notes, and reminders.
-Preserve the existing operating profile for users who intentionally drive the robot.
+H05's new desktop profile and quiet-hour controls are deferred. Preserve existing
+movement settings and startup behavior. A product described as a desktop assistant
+does not thereby become safe to drive near a desk edge: the forward distance
+sensor does not establish edge protection.
 
-The forward distance sensor does not establish that the edge of a desk is safe.
-NinjaRobotPi5's continuous-rotation servos also do not provide the physical feedback
-needed to copy Reachy's pushable antennas or hand-guided head. Express attention
-with animated eyes first. Any future physical head, touch input, speaker, wheel
-feedback, or desk-edge sensor is a separately approved hardware project.
+B04's game commands only the display, buzzer, and distance sensor. It never enables
+wheel motion and refuses to start while movement is active. Existing stop, privacy,
+and hardware-ownership rules remain in force. New head/touch/edge hardware remains
+an evaluation option under B05, requiring a concrete reviewed design before use.
 
 ## 5. Refinement checklist
 
-Each row is independently reviewable. All boxes begin unchecked. Dependencies and
-acceptance gates follow in sections 6–8.
+Each row is independently reviewable. An unchecked box means implementation has
+not been completed. `Confirmed`, `revised`, and `deferred` describe the owner's
+scope decision. Deferred rows retain the original estimate for reference and are
+excluded from active phases. Dependencies and acceptance gates follow in sections 6–8.
 
 Effort is relative to this codebase, including tests and documentation:
 **Low** means a focused change; **Medium** crosses a few existing components;
@@ -296,60 +345,60 @@ documentation, interface mockups, and tests with simulated devices can proceed.
 
 | Done / ID | Refinement | Why it is needed | Expected user benefit | Effort | Priority |
 | --- | --- | --- | --- | --- | --- |
-| [ ] F01 | Enforce safety state, bounded movement, cancellation, and output cleanup at every IDE movement entry point. | A guarded behavior is insufficient if another public command bypasses it; A01 remains relevant. | Stop means stop regardless of how movement was requested. | High | P0 |
-| [ ] F02 | Give emergency stop an interrupt path that cannot wait behind ordinary queued work. | A full or blocked queue must not delay the command intended to stop it; A02. | Predictable stopping during slow tools or long behaviors. | High | P0 |
-| [ ] F03 | Apply one hardware-ownership contract to the service, interactive tools, and retained real-device commands. | Two clients must not compete for the same device; A03. | Clear “robot already in use” feedback instead of conflicting actions. | Medium | P0 |
-| [ ] F04 | Validate all enabled device pins and consistently enforce disabled-device settings. | A04/A05 can make configuration misleading or electrically conflicting. | A disabled feature stays disabled; wiring errors are explained before startup. | Medium | P0 |
-| [ ] F05 | Add an environment-aware setup doctor (a diagnostic tool) and consistent hardware/development installation profiles; repair Pi boot-text validation. | Missing optional packages can resemble failed hardware; A09/A11 and the recent installation incident. | One diagnosis identifies the active environment, missing dependencies, and the appropriate repair. | Medium | P0 |
-| [ ] F06 | Make backup complete, database-consistent, and restore fully validated before replacement, with recovery from partial failure. | A06 becomes more serious when schedules and personal notes are important. | An upgrade or recovery preserves the user's information. | High | P0 |
-| [ ] F07 | Correct MCP failure status, reviewed effect/retry declarations, minimal subprocess environment, bounded discovery, and schema refresh (keeping expected tool arguments current). | A07/A08 can create false success and expose unrelated credentials. | Honest tool results and clearer limits on external access. | High | P0 |
-| [ ] F08 | Add missing lifecycle/failure tests and enforce explicit opt-in hardware tests; close the audited face-backend cleanup gap. | Existing passing tests do not cover all ownership or failure cases. | Repeated use and updates are less likely to leave devices stuck. | High | P1 |
-| [ ] F09 | Report capability-level health with reason, freshness, dependency, and recovery steps. | A single ready/not-ready answer conceals what is still usable. | Users can continue safe text tasks while understanding why a device is unavailable. | Medium | P1 |
+| [ ] F01 (confirmed) | Enforce safety state, bounded movement, cancellation, and output cleanup at every IDE movement entry point. | A guarded behavior is insufficient if another public command bypasses it; A01 remains relevant. | Stop means stop regardless of how movement was requested. | High | P0 |
+| [ ] F02 (confirmed) | Give emergency stop an interrupt path that cannot wait behind ordinary queued work. | A full or blocked queue must not delay the command intended to stop it; A02. | Predictable stopping during slow tools or long behaviors. | High | P0 |
+| [ ] F03 (confirmed) | Apply one hardware-ownership contract to the service, interactive tools, and retained real-device commands. | Two clients must not compete for the same device; A03. | Clear “robot already in use” feedback instead of conflicting actions. | Medium | P0 |
+| [ ] F04 (confirmed) | Validate all enabled device pins and consistently enforce disabled-device settings. | A04/A05 can make configuration misleading or electrically conflicting. | A disabled feature stays disabled; wiring errors are explained before startup. | Medium | P0 |
+| [ ] F05 (confirmed) | Add an environment-aware setup doctor (a diagnostic tool) and consistent hardware/development installation profiles; repair Pi boot-text validation. | Missing optional packages can resemble failed hardware; A09/A11 and the recent installation incident. | One diagnosis identifies the active environment, missing dependencies, and the appropriate repair. | Medium | P0 |
+| [ ] F06 (confirmed) | Make backup complete, database-consistent, and restore fully validated before replacement, with recovery from partial failure. | A06 becomes more serious when schedules and personal notes are important. | An upgrade or recovery preserves the user's information. | High | P0 |
+| [ ] F07 (confirmed) | Correct MCP failure status, reviewed effect/retry declarations, minimal subprocess environment, bounded discovery, and schema refresh (keeping expected tool arguments current). | A07/A08 can create false success and expose unrelated credentials. | Honest tool results and clearer limits on external access. | High | P0 |
+| [ ] F08 (confirmed) | Add missing lifecycle/failure tests and enforce explicit opt-in hardware tests; close the audited face-backend cleanup gap. | Existing passing tests do not cover all ownership or failure cases. | Repeated use and updates are less likely to leave devices stuck. | High | P1 |
+| [ ] F09 (confirmed) | Report capability-level health with reason, freshness, dependency, and recovery steps. | A single ready/not-ready answer conceals what is still usable. | Users can continue safe text tasks while understanding why a device is unavailable. | Medium | P1 |
 
 ### 5.2 Human-robot interaction and conversation
 
 | Done / ID | Refinement | Why it is needed | Expected user benefit | Effort | Priority |
 | --- | --- | --- | --- | --- | --- |
-| [ ] H01 | Extend current presentation into consistent listening, thinking, approval, acting, done, interrupted, and error states across display and web. | Expressions currently cover only part of the task lifecycle. | Users understand what the robot is doing without reading logs. | Medium | P1 |
-| [ ] H02 | Add optional TTS — text-to-speech, turning an answer into spoken audio — through an approved IDE audio output. | Voice input alone does not provide two-way speech. | Users hear concise replies and reminders, with text as a fallback. | High | P1 |
-| [ ] H03 | Add spoken interruption handling, microphone/playback coordination, and echo control after H02. | The robot must not transcribe its own answer or keep speaking over the user. | More natural turn-taking and immediate control of long answers. | Very High | P1 |
-| [ ] H04 | Make clarification brief and specific; confirm exact consequential actions and explain what remains uncertain. | Fluent guesses about time, identity, or external actions damage trust. | Fewer wrong reminders and clearer permission requests. | Medium | P1 |
-| [ ] H05 | Add a desktop profile, quiet hours, adjustable expression intensity, speech rate, and a visible microphone state. | A robot that is entertaining briefly may become distracting during work. | The assistant fits the user's environment and attention needs. | Medium | P1 |
-| [ ] H06 | Verify multilingual display assets, readable text, captions, keyboard control, and non-color-only status cues. | Browser translations alone do not ensure usable robot display text; A15. | More people can understand and control the robot comfortably. | Medium | P1 |
-| [ ] H07 | Add a short guided onboarding experience with capability checks and optional practice interactions. | Users should not have to discover missing hardware through a failed conversation. | Faster setup and a realistic understanding of available functions. | Medium | P2 |
+| [ ] H01 (revised) | Record additional listening/thinking/approval/action/completion/interruption/error transitions in the existing system log. | Troubleshooting needs correlated events; additional display/web lifecycle presentation was declined. | Operators can understand task flow from logs while current presentation stays unchanged. | Low | P1 |
+| [ ] H02 (confirmed) | Add optional TTS — text-to-speech, turning an answer into audio — and IDE-owned playback to a configured OS audio output, including Bluetooth when supported. | Connecting a speaker alone does not generate or manage spoken answers. | Listen to spoken replies and reminders using sequential input/output. | High | P1 |
+| Deferred H03 (deferred) | Add spoken interruption handling, microphone/playback coordination, and echo control after H02. | The robot must not transcribe its own answer or keep speaking over the user. | More natural turn-taking and immediate control of long answers. | Very High | P1 |
+| [ ] H04 (confirmed) | Make clarification brief and specific; confirm exact consequential actions and explain what remains uncertain. | Fluent guesses about time, identity, or external actions damage trust. | Fewer wrong reminders and clearer permission requests. | Medium | P1 |
+| Deferred H05 (deferred) | Add a desktop profile, quiet hours, adjustable expression intensity, speech rate, and a visible microphone state. | A robot that is entertaining briefly may become distracting during work. | The assistant fits the user's environment and attention needs. | Medium | P1 |
+| [ ] H06 (confirmed) | Verify multilingual display assets, readable text, captions, keyboard control, and non-color-only status cues. | Browser translations alone do not ensure usable robot display text; A15. | More people can understand and control the robot comfortably. | Medium | P1 |
+| [ ] H07 (confirmed) | Add optional guided checks and practice to the existing Agent interactive tool and web controller, sharing F05 diagnostics. | Current startup pairing is not a beginner feature tour; a separate standalone tool would duplicate setup. | Follow one resumable guide without automatic movement, capture, or deployment. | Medium | P2 |
 
 ### 5.3 Agentic tasks and everyday usefulness
 
 | Done / ID | Refinement | Why it is needed | Expected user benefit | Effort | Priority |
 | --- | --- | --- | --- | --- | --- |
-| [ ] T01 | Add a durable task record with plan, current step, owner, approvals, result evidence, and recovery state. | A bounded chat loop is not a restart-safe task manager. | Users can ask “What happened to my request?” and get a dependable answer. | High | P1 |
-| [ ] T02 | Add local timers and reminders with exact due times, repeat rules, snooze, cancellation, and restart recovery. | This is a high-value everyday feature missing from the core task model. | Useful reminders continue without a cloud model once saved. | High | P1 |
-| [ ] T03 | Add task progress, cancellation, outcome summaries, and checks that distinguish queued, completed, failed, and uncertain actions. | Tool acceptance is not proof that the user's goal was met. | Less waiting without explanation and fewer misleading “done” messages. | High | P1 |
-| [ ] T04 | Add schedule planning using authorized calendar reads; introduce calendar writes later with explicit account, scope, preview, and outcome verification. | Calendar examples exist, but reliable writes need a stronger contract. | Users can plan their day and intentionally save approved changes. | High | P1 |
-| [ ] T05 | Make web research a complete workflow: approved search, dated citations, comparison, private note saving, and partial-result reporting. | A search result alone is not a finished information-management task. | Users receive useful, traceable answers they can find again. | Medium | P1 |
-| [ ] T06 | Add simple notes, checklists, and a daily briefing assembled from permitted local tasks and connected sources. | Common assistant tasks should not need a new integration each time. | One place to review priorities and remembered information. | Medium | P2 |
-| [ ] T07 | Add bounded replanning and recovery policies with time, tool-call, and spending limits. | Retrying everything can duplicate actions or loop indefinitely. | The robot can recover from ordinary failures and knows when to ask for help. | High | P1 |
-| [ ] T08 | Add opt-in proactive suggestions with quiet hours, frequency limits, relevance checks, and easy dismissal. | Proactivity is useful only when it respects attention and consent. | Helpful prompts that do not become persistent interruptions. | Medium | P2 |
+| [ ] T01 (confirmed) | Add a durable task record with plan, current step, owner, approvals, result evidence, and recovery state. | A bounded chat loop is not a restart-safe task manager. | Users can ask “What happened to my request?” and get a dependable answer. | High | P1 |
+| [ ] T02 (confirmed) | Add local timers and reminders with exact due times, repeat rules, snooze, cancellation, and restart recovery. | This is a high-value everyday feature missing from the core task model. | Useful reminders continue without a cloud model once saved. | High | P1 |
+| [ ] T03 (confirmed) | Add task progress, cancellation, outcome summaries, and checks that distinguish queued, completed, failed, and uncertain actions. | Tool acceptance is not proof that the user's goal was met. | Less waiting without explanation and fewer misleading “done” messages. | High | P1 |
+| [ ] T04 (confirmed) | Add schedule planning through authorized calendar reads, then reviewed calendar writes with account/scope preview and verification. | External calendar actions need a stronger contract; ordinary alarms belong to T02. | Plan and save schedules; “wake me at 4 pm” works through local reminders without a calendar account. | High | P1 |
+| [ ] T05 (confirmed) | Make web research a complete workflow: approved search, dated citations, comparison, private note saving, and partial-result reporting. | A search result alone is not a finished information-management task. | Users receive useful, traceable answers they can find again. | Medium | P1 |
+| [ ] T06 (confirmed) | Add simple notes, checklists, and a daily briefing assembled from permitted local tasks and connected sources. | Common assistant tasks should not need a new integration each time. | One place to review priorities and remembered information. | Medium | P2 |
+| [ ] T07 (confirmed) | Add bounded replanning and recovery policies with time, tool-call, and spending limits. | Retrying everything can duplicate actions or loop indefinitely. | The robot can recover from ordinary failures and knows when to ask for help. | High | P1 |
+| Deferred T08 (deferred) | Add opt-in proactive suggestions with quiet hours, frequency limits, relevance checks, and easy dismissal. | Proactivity is useful only when it respects attention and consent. | Helpful prompts that do not become persistent interruptions. | Medium | P2 |
 
 ### 5.4 Memory, personalization, and improvement
 
 | Done / ID | Refinement | Why it is needed | Expected user benefit | Effort | Priority |
 | --- | --- | --- | --- | --- | --- |
-| [ ] M01 | Extend memory management to show why an item was saved, its source, confidence, last confirmation, and edit/delete controls. | Existing memory needs understandable provenance — where a claim came from. | Users can correct the assistant instead of repeatedly fighting a wrong assumption. | Medium | P1 |
-| [ ] M02 | Distinguish confirmed preferences, temporary context, task outcomes, and unconfirmed suggestions; handle contradictory preferences explicitly. | Different kinds of information should not all become lasting facts. | More accurate personalization and fewer surprising assumptions. | Medium | P1 |
-| [ ] M03 | Improve retrieval within the current store before considering semantic search — search by meaning rather than exact words. | Relevant context helps; sending all history wastes resources and exposes excess information. | Better continuity across conversations with controlled data use. | Medium | P2 |
-| [ ] M04 | Turn repeated successful workflows into reviewable task recipes, with user feedback, version history, and rollback (restoring a previous version). | “Learning” should improve practical behavior while staying inspectable. | The assistant learns preferred ways to help without rewriting its safety rules. | High | P2 |
-| [ ] M05 | Strengthen active-user selection, guest behavior, export, retention, and deletion verification for new task data. | Face similarity is not authentication, and shared rooms contain multiple people. | Private information is less likely to be shown or attributed to the wrong user. | High | P1 |
+| [ ] M01 (confirmed) | Extend memory management to show why an item was saved, its source, confidence, last confirmation, and edit/delete controls. | Existing memory needs understandable provenance — where a claim came from. | Users can correct the assistant instead of repeatedly fighting a wrong assumption. | Medium | P1 |
+| [ ] M02 (confirmed) | Distinguish confirmed preferences, temporary context, task outcomes, and unconfirmed suggestions; handle contradictory preferences explicitly. | Different kinds of information should not all become lasting facts. | More accurate personalization and fewer surprising assumptions. | Medium | P1 |
+| [ ] M03 (confirmed) | Improve retrieval within the current store before considering semantic search — search by meaning rather than exact words. | Relevant context helps; sending all history wastes resources and exposes excess information. | Better continuity across conversations with controlled data use. | Medium | P2 |
+| [ ] M04 (confirmed) | Turn repeated successful workflows into reviewable task recipes, with user feedback, version history, and rollback (restoring a previous version). | “Learning” should improve practical behavior while staying inspectable. | The assistant learns preferred ways to help without rewriting its safety rules. | High | P2 |
+| Deferred M05 (deferred) | Strengthen active-user selection, guest behavior, export, retention, and deletion verification for new task data. | Face similarity is not authentication, and shared rooms contain multiple people. | Private information is less likely to be shown or attributed to the wrong user. | High | P1 |
 
 ### 5.5 Expressions and sensing
 
 | Done / ID | Refinement | Why it is needed | Expected user benefit | Effort | Priority |
 | --- | --- | --- | --- | --- | --- |
-| [ ] B01 | Coordinate face, buzzer, and future speech on one IDE-owned timeline with interruption and priority rules. | Separate reactions can conflict or appear late. | A coherent robot response that matches the answer or task. | High | P1 |
-| [ ] B02 | Add small bounded variations to existing safe expressions and sound cues, with stable personality settings. | Repetition feels mechanical, while uncontrolled randomness feels unreliable. | A recognizable character that remains calm and predictable. | Medium | P2 |
-| [ ] B03 | Introduce an opt-in attention experience using camera observations and animated eyes, with freshness limits and consent. | Reacting to the person can make interaction easier, but stale detections can mislead. | The robot visibly attends to the interaction without moving its wheels. | High | P2 |
-| [ ] B04 | Offer a distance-controlled sound/display game as an explicit mode, using the existing single-range sensor. | Microduck shows the educational value of a simple sensor-to-feedback loop. | A tangible, beginner-friendly robotics activity. | Low | P3 |
-| [ ] B05 | Treat future speakers, touch controls, movable heads, and desk-edge sensors as separate evaluated hardware options. | Competitor interactions depend on hardware NinjaRobotPi5 does not currently have. | Hardware additions solve a clear need and do not destabilize existing drivers. | Very High | P3 |
+| [ ] B01 (confirmed) | Coordinate face, buzzer, and future speech on one IDE-owned timeline with interruption and priority rules. | Separate reactions can conflict or appear late. | A coherent robot response that matches the answer or task. | High | P1 |
+| [ ] B02 (confirmed) | Add small bounded variations to existing safe expressions and sound cues, with stable personality settings. | Repetition feels mechanical, while uncontrolled randomness feels unreliable. | A recognizable character that remains calm and predictable. | Medium | P2 |
+| Deferred B03 (deferred) | Introduce an opt-in attention experience using camera observations and animated eyes, with freshness limits and consent. | Reacting to the person can make interaction easier, but stale detections can mislead. | The robot visibly attends to the interaction without moving its wheels. | High | P2 |
+| [ ] B04 (confirmed) | Add an explicit distance-controlled buzzer/display game, selectable through conversation, with bounded duration and stop handling. | A simple sensor-to-feedback loop makes robotics tangible. | Ask “let’s play a game,” then move a hand in front of the sensor to change sound and an existing face or simple graphic. | Medium | P3 |
+| [ ] B05 (confirmed) | Treat future speakers, touch controls, movable heads, and desk-edge sensors as separate evaluated hardware options. | Competitor interactions depend on hardware NinjaRobotPi5 does not currently have. | Hardware additions solve a clear need and do not destabilize existing drivers. | Very High | P3 |
 
 H02 can select a modest approved speaker before the broader optional hardware work
 in B05. B05 does not delay the initial software-only assistant or require a new head.
@@ -358,11 +407,11 @@ in B05. B05 does not delay the initial software-only assistant or require a new 
 
 | Done / ID | Refinement | Why it is needed | Expected user benefit | Effort | Priority |
 | --- | --- | --- | --- | --- | --- |
-| [ ] X01 | Extend existing Agent skill packages with clear capability, permission, version, and test requirements; add focused application templates. | New functions should reuse the registry and policy rather than invent another execution route. | Consistent add-ons that are easier to install, understand, and disable. | Medium | P2 |
-| [ ] X02 | Improve release identity, installation checks, staged updates, and rollback evidence before considering automatic updates. | Microduck shows the value of diagnosing installed versus actually running software. | Users can recover from an upgrade without guessing which version is active. | High | P2 |
-| [ ] X03 | Keep this plan, feature specifications, manuals, wiki pages, and validation evidence synchronized during every approved phase. | A knowledge base helps only when it describes the current implementation honestly. | All coding tools work from the same accurate context. | Low | P1 |
-| [ ] X04 | Build repeatable simulated user journeys, fault scenarios, and consent-aware Pi validation records. | Module tests alone do not establish a good assistant experience. | Improvements are measured against real user tasks before release. | Medium | P1 |
-| [ ] X05 | Add an optional runtime project-help tool over selected public wiki content, through the existing read-only tool boundary. | Developer wiki access is not automatically available to the running robot. | Users can ask the robot about supported functions and setup, with cited evidence. | Medium | P2 |
+| [ ] X01 (confirmed) | Extend existing Agent skill packages with clear capability, permission, version, and test requirements; add focused application templates. | New functions should reuse the registry and policy rather than invent another execution route. | Consistent add-ons that are easier to install, understand, and disable. | Medium | P2 |
+| Deferred X02 (deferred) | Improve release identity, installation checks, staged updates, and rollback evidence before considering automatic updates. | Microduck shows the value of diagnosing installed versus actually running software. | Users can recover from an upgrade without guessing which version is active. | High | P2 |
+| [ ] X03 (confirmed) | Keep this plan, feature specifications, manuals, wiki pages, and validation evidence synchronized during every approved phase. | A knowledge base helps only when it describes the current implementation honestly. | All coding tools work from the same accurate context. | Low | P1 |
+| Deferred X04 (deferred) | Build repeatable simulated user journeys, fault scenarios, and consent-aware Pi validation records. | Module tests alone do not establish a good assistant experience. | Improvements are measured against real user tasks before release. | Medium | P1 |
+| [ ] X05 (confirmed) | Add a bounded read-only project-help tool over selected public wiki pages and cited current manuals, through the Agent registry. | Developer wiki skills are not automatically available to the running Agent. | Ask the robot project questions in conversation and receive cited answers with review/version limits. | Medium | P2 |
 
 ## 6. How the important features should work
 
@@ -428,50 +477,94 @@ A powered-off Pi cannot ring an alarm. The initial feature must say this plainly
 Phone delivery, battery guarantees, and waking a powered-off device are separate
 future integrations, not implicit features of a local reminder.
 
-### 6.3 Speech with understandable interruption
+### 6.3 Sequential speech output, including Bluetooth
 
-First establish an approved output device and its health checks. The buzzer can
-signal an event but cannot provide normal spoken answers. Keep speech optional;
-text, existing buzzer functions, and current voice input remain supported.
+H02 is confirmed; H03 is deferred. Keep the existing opt-in wake-word and bounded
+recording/transcription path. Add spoken output after a complete request has been
+transcribed, or in response to typed conversation. Do not add simultaneous audio
+streaming, real-time spoken interruption, or acoustic echo cancellation (filtering
+speaker sound out of microphone input). This is a scope choice based on the owner's
+performance concerns, not a new claim that every Pi configuration is incapable of it.
 
-Start with a simple listen-then-speak flow. Use short spoken answers, synchronized
-captions, volume limits, and a visible mute control. Audio synthesis can run in a
-bounded worker or provider, but playback ownership belongs to the IDE.
+The proposed path is:
 
-Then add full-duplex interaction — listening and speaking at the same time — only
-after measuring AEC, acoustic echo cancellation, which reduces the robot hearing
-its own speaker. VAD, voice activity detection, estimates when someone is speaking.
-Both need testing with the actual microphone, speaker placement, and room noise.
-If these checks fail, retain the simpler turn-taking mode.
+```text
+Agent answer -> bounded text-to-speech generation
+             -> IDE-owned playback -> operating-system audio -> selected speaker
+```
 
-Use separate, clear controls for “stop speaking,” “cancel this task,” and
-“emergency stop.” The last must not depend on speech recognition or model inference.
-Cancel queued speech as well as the currently playing sound, and invalidate stale
-expression callbacks so an interrupted answer cannot later resume its animation.
+The operating system handles the speaker connection. A compatible Bluetooth speaker
+usually uses the standard Bluetooth/audio support rather than a new custom Pi5
+speaker driver. The project still needs text-to-speech generation, an IDE playback
+adapter (the component that starts/stops audio), output selection, and health checks.
+Pairing alone does not add those application functions. H02 should use the existing
+OS audio stack; do not replace it or modify a managed driver merely to play audio.
 
-Evaluate local versus cloud speech using latency (response delay), supported languages, privacy,
-installation size, processor load, and cost. This plan deliberately does not select
-a model or service from a competitor's old example.
+PipeWire (Linux audio routing software) and WirePlumber (its device/session manager)
+provide Bluetooth audio integration. Their documentation also explains that access
+can depend on the active login session. Therefore, a desktop playback test alone
+cannot establish that the deployed Agent service can use the same speaker.
+Validate its actual service user, audio-session access, reconnection after restart,
+and speaker disconnection. No system-wide audio policy change is authorized by this
+plan. [WirePlumber Bluetooth documentation](https://pipewire.pages.freedesktop.org/wireplumber/daemon/configuration/bluetooth.html).
 
-### 6.4 Expressions should communicate real state
+Raspberry Pi documents selecting an audio output device. Confirm the installed OS
+and connected outputs before choosing exact configuration steps; none were changed
+for this review. [Raspberry Pi audio configuration](https://www.raspberrypi.com/documentation/computers/configuration.html#change-audio-output).
 
-Extend the existing presentation controller rather than build another personality
-engine. A small vocabulary is enough: ready, listening, thinking, waiting for the
-user, acting, successful, interrupted, and unavailable.
+Before speaking, the IDE temporarily pauses microphone intake using the existing
+voice-input pause/resume ownership pattern. Do not change the persisted voice-enable
+setting, grant voice-motion permission, or restart a listener the user disabled.
+Resume only the listener that was enabled before playback and is still permitted.
+If the pause cannot be established, keep the text answer and decline playback.
+On completion, timeout, cancellation or disconnect, clean up playback and temporary
+audio in a guaranteed cleanup path. These are minimal H02 lifecycle requirements,
+not the deferred H03 real-time feature. [Existing voice-input ownership][N-voiceinput].
 
-The IDE should resolve conflicts in an explicit order: safety and required privacy
-indicators first, then the active user interaction or approved notification, then
-optional ambient expression. Foreground behavior ownership and quiet hours must
-also be respected. An idle animation must never overwrite a stop indication.
+Handle races explicitly: a user disabling voice while speech is active takes
+precedence over restoration; nested audio/manual-microphone owners must balance
+their pause reservations even after a pause timeout. Test both voice-originated
+replies and typed/background reminders. A background alarm must not cut off a
+recording already in progress: wait within a bounded policy or deliver a permitted
+non-speech notification and record the limitation. The current pause/resume methods
+are a starting pattern, not proof that these new playback paths already exist.
 
-Use a shared playback clock for future speech and face animation, borrowing
-Reachy's timing idea. Use a monotonic clock — a clock that does not jump when the
-wall clock is corrected — for animation duration and timeouts. Use calendar time
-for reminder dates. These are different jobs.
+A controller/terminal cancellation can stop current and queued audio; spoken
+interruption during playback is not promised. Retain text on synthesis/output
+failure and use a permitted existing buzzer notification for a scheduled alarm if
+speech is unavailable. Never report “played” merely because synthesis succeeded.
+Validate device/software readiness separately from an operator hearing the sound.
 
-Borrow Microduck's stable variation: a small set of timing or sound choices
-selected within known limits. Let the user select calmer behavior. Do not let a
-fictional mood increase tool authority, movement speed, spending, or data retention.
+The speech provider, voice languages, dependency versions, output device and service
+configuration remain implementation choices to resolve before H02. A synthesis
+component may generate data on the Agent side, but it may not open audio devices;
+all playback stays behind the IDE boundary.
+
+### 6.4 System logs and existing expression coordination
+
+H01 is reduced to log reporting. Extend the existing event/log path with a task or
+request identifier, timestamp, phase, outcome, and safe reason code. Send these
+records to the existing system logger and service journal (the operating system's
+log collection). The current in-memory event broker alone is not persistent system
+logging. Do not log raw transcripts, prompts, private notes, credentials, or model
+reasoning for this new lifecycle stream. Avoid logging every animation frame.
+[Existing events][N-events], [service logging configuration][N-serviceunit].
+
+Do not add H01 lifecycle faces, badges, panels, or new web/display states. Keep
+current presentation and privacy/safety indications. H06 can repair fonts and
+accessibility; T03 can show explicit task progress in existing interfaces; neither
+requires a replacement presentation system.
+
+B01 coordinates existing face/buzzer behavior and H02 speech on an IDE-owned timeline.
+B02 adds small bounded variations to those existing expressions. B04's explicit
+sound/display game is also confirmed. Safety and privacy indicators retain priority
+and optional output yields or stops when it cannot own the resource safely.
+
+Use playback time for speech/expression coordination and a monotonic clock (a clock
+that does not jump when the calendar clock is corrected) for durations and timeouts.
+Do not add H05's quiet-hour/intensity/profile controls, B03's camera attention, or
+wheel movements to compensate for limited display expression. Small sound/motion
+examples in the competitor appendices do not override these scope decisions.
 
 ### 6.5 Memory that improves through interaction
 
@@ -480,18 +573,22 @@ the user confirmed it. “I am tired today” should ordinarily stay temporary;
 “Please use shorter answers from now on” can become a lasting preference.
 
 Allow the user to ask “What do you remember about me?”, correct an item, remove
-it, or reset a category. Define deletion across search indexes, task summaries,
-exports, and retained backups; do not imply that deleting a live row erases every
-older backup automatically.
+it, or reset a supported category using existing controls. Preserve existing user
+ownership, retention and deletion behavior when adding records. Define how new
+memory/search/task references respond to those existing controls; do not imply
+that deleting a live row erases older backups. M05's separate guest selection,
+export and household-management redesign is deferred.
 
 Track useful feedback such as accepted schedules, corrected names, or repeated
-task recipes. Suggest a recipe after repeated success; show what it will do and
+task recipes. When the user asks to review or improve a routine, suggest a recipe
+based on recorded outcomes; show what it will do and
 obtain the relevant approval before making it a reusable automation. Keep version
 history so a bad adaptation can be reversed.
 
 Do not train models online, automatically install tools, change permissions,
 rewrite source code, or store speculative psychological profiles. These are not
-required to make the assistant noticeably more helpful.
+required to make the assistant noticeably more helpful. T08 proactive suggestions
+remain deferred; do not add unsolicited recipe prompts.
 
 ### 6.6 External tools and project knowledge
 
@@ -511,40 +608,189 @@ not execute installation instructions. An unreviewed or planned page must not be
 presented as verified operating behavior. Keep personal notes and conversation
 databases out of the developer wiki and public repository.
 
+### 6.7 Answers to the confirmation questions
+
+#### H02 — Is connecting a Bluetooth speaker enough?
+
+A compatible, paired speaker can provide the physical output through the OS's
+standard Bluetooth/audio support. It normally does not require a custom Pi5 device
+driver. However, it does not itself turn Agent text into speech: H02 must add a
+text-to-speech generator and a bounded IDE playback adapter. See section 6.3 for
+service-user access, output selection, disconnect recovery and microphone coordination.
+Actual speaker compatibility and the installed audio stack still need checking.
+
+The implementation should therefore separate three checks: synthesis available,
+selected audio output accessible to the Agent service, and sound heard in an
+operator-approved playback test. Pairing success is not proof of all three.
+
+#### H07 — Will onboarding be a separate command-line tool?
+
+No separate application or standalone onboarding CLI is planned. Extend the existing
+`ninjarobot-agent` interactive menu and web controller with an optional guided-checks
+entry, backed by the same F05 diagnostic results. The exact menu label is proposed,
+not an existing command. Keep the existing pairing/startup coordinator intact.
+
+The source already has `OnboardingCoordinator` for pairing and startup, plus
+Agent deployment menus. The existing `deployment setup` command installs/enables
+startup and must not be reused as a harmless tour button. Guided checks must not
+start deployment, run the greeting, move wheels, or capture media as an incidental
+side effect. [Onboarding coordinator][N-onboard], [existing CLI][N-cli].
+
+Proposed guide:
+
+1. Show the chosen configuration, real/simulated mode, environment and F05 results
+   without opening devices unnecessarily. Explain missing/disabled components.
+2. Explain the existing stop/resume controls and how to reach current manuals.
+3. Offer a text-only sample question or X05 project-help question when available.
+4. Explain T02 reminders and optionally let the user create/cancel a short practice
+   reminder, making its sound/display effect explicit before scheduling it.
+5. If H02 is installed, show the selected output and offer a separately initiated
+   speaker test. Camera, microphone, movement and deployment remain explicit choices.
+6. Let the user skip optional steps and return later. Reuse validated configuration
+   rather than overwrite existing settings or start a second hardware owner.
+
+Existing QR pairing and required indications are preserved. The guide appears in
+existing menu/web routes; H01 does not add a new robot-screen onboarding animation.
+
+#### T04 — Can I say “call me up at 4 pm today”?
+
+Yes, the planned conversational experience supports that as a **local alarm** through
+T02, with T01 persistence and H04 time clarification. T04 is needed only if the user
+also wants a connected calendar event. A local alarm does not require a Google
+Calendar account or a new cloud call when it fires.
+
+Accept typed conversation and the existing opt-in wake-word/recorded voice route.
+Resolve “today” and “4 pm” using the configured local time zone; if it is missing,
+ask. State the full date, time and zone after the record has been saved successfully.
+If 4 pm today has passed, ask for another time rather than silently moving it to tomorrow.
+Explain “I will sound an alarm here” so the phrase does not imply a telephone call.
+If context instead suggests calling a person, clarify rather than initiating one.
+
+Delivery can use an approved existing buzzer sound; H02 additionally enables a
+spoken reminder on the selected speaker. Provide stop/dismiss, snooze and cancel
+through the task controls. After a restart, recover the saved record and apply the
+missed-reminder policy from section 6.2. The Pi must be powered on and the Agent
+running to deliver locally; an unavailable speaker must not be reported as audible
+success. No real-time spoken interruption is required for this feature.
+
+#### B04 — Can “let’s play a game” start the distance game, and how is it played?
+
+Yes. Add the game to the existing skill/tool selection route. “Let’s play the distance
+game” selects it directly; a broad request such as “let’s play a game” can offer it
+or ask which game if several exist. Interpret the request through Agent policy and
+start the game through one IDE-owned capability. Do not run source code supplied
+by the model or give the game direct driver access.
+
+The proposed first experience is a short **distance music game**:
+
+1. Explain that it uses the distance sensor, buzzer and display, and ask the user to
+   move a hand in front of the sensor without touching it. Use existing task prompts;
+   no camera or microphone capture is needed just to play.
+2. During an illustrative 30-second session, map valid distance to a few stable sound
+   bands: closer raises pitch, farther lowers it. Show an existing face or simple
+   size/color graphic that changes with the same reading. Color is not the only cue.
+3. Optional prompts can ask the user to find a near/middle/far band; a short sound
+   and existing expression confirm a match. Exact distance thresholds and buzzer
+   limits are implementation settings to validate against this sensor and setup,
+   not calibrated values promised by this document.
+4. Smooth small changes and add hysteresis (different switching thresholds to avoid
+   flicker). Invalid, stale or out-of-range readings produce a neutral/silent state,
+   not a fabricated hand distance. Bound update rate and duration inside the IDE.
+5. Finish when the session times out or the user stops it through existing controls.
+   A spoken stop may use existing voice input when enabled, but a controller stop
+   always remains available and does not depend on recognition. Cleanup silences
+   game sound, releases resources and restores the current permitted presentation.
+
+The game issues no wheel commands and refuses to start during movement or a system
+stop. If an authorized movement request arrives during the game, the IDE must end
+the game and release its resources before allowing that movement; checking only at
+game startup is insufficient. The game also yields/cancels if a safety/privacy
+indication or approved higher-priority output needs the shared display/buzzer.
+A missing sensor produces a useful refusal.
+A missing optional game output may use a clearly announced simpler variant; it must
+not pretend the full game is operating. Resource ownership, cancellation and
+conversational activation raise the estimate from Low to **Medium**; priority stays P3.
+
+#### X05 — Can I ask the running robot questions about NinjaRobotPi5?
+
+Yes, after X05 is implemented. Examples include “What can NinjaRobotPi5 do?”,
+“How do I configure the distance sensor?”, and “Why is movement unavailable?”
+For live status, use the existing health tool alongside documentation; the wiki
+alone cannot establish the actual device state.
+
+The path is conversation → Agent tool registry → a bounded read-only wiki provider
+→ selected topic pages and cited current manuals → an answer with local source links.
+A proposed `project.help` name is illustrative; the final public tool name must be
+checked for compatibility. The model receives data, not permission to execute manual
+commands. The provider is Agent-side because document retrieval operates no device.
+
+Reuse the wiki's existing keyword search in its separate environment through a
+fixed argument list, limited output and a shorter task deadline. Do not import its
+dependencies into the robot environment or expose the launcher's general setup/apply
+commands to the model. The launcher currently supports mutating maintenance actions
+and a 600-second subprocess timeout; a runtime provider must deliberately expose
+only bounded search/read operations. [Wiki launcher][N-wikilauncher].
+
+Constrain source reads to approved public wiki paths and current registered manuals;
+reject traversal and redirected paths, cap linked-page depth/size, and keep private
+configuration, logs, media and user memory out. If the wiki environment is absent,
+use an allowlisted direct-file fallback or return a clear unavailable result; never
+install dependencies during a conversation. A zero-result keyword query can try
+related short terms or consult the overview. Do not invent an answer.
+
+Return source title, path, version, review status and any detected freshness concern.
+Draft/AI-reviewed information remains labelled as such. Task-time retrieval must not
+run global maintenance or rewrite review records. After a source update, invalidate
+cached results by reviewed version/hash so new answers use current evidence. Current
+installed behavior takes precedence over historical or proposed features.
+
+The developer wiki already supports questions from coding tools, but the running
+robot does not gain X05 merely because these files exist. No X05 runtime provider
+has been implemented in this document revision.
+
 ## 7. Development phases and acceptance gates
 
-Each phase should become a smaller implementation proposal with exact changes,
-tests, and documentation impact. Approval of this planning document does not
-approve all hardware, dependency, or account changes listed here.
+The phases below include only the 31 confirmed items and revised H01. Carry forward
+the recorded approvals; prepare concrete patches and resolve remaining choices under
+the root workflow before implementation. Hardware modifications, managed-driver edits,
+account access and live deployment still need their specific reviewed scope.
 
-In this table, Agent filenames are under `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/`;
-IDE filenames are under `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/`. New filenames
-are suggestions to keep responsibilities focused, not existing modules.
+Agent filenames below are under `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/`;
+IDE filenames are under `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/`. New module names
+are suggestions, not claims that those modules already exist.
 
 | Phase | Objective and likely files | Compatibility contract | Validation gate | Documentation and risk |
 | --- | --- | --- | --- | --- |
-| 0 — Establish the release baseline | F01–F08: IDE `engine.py`, `scheduler.py`, `integrated.py`, `robot.py`, `servo.py`, `config.py`, identity ownership; Agent `cli.py`, `mcp_client.py`, `mcp_config.py`, `deployment.py`; setup scripts and tests. Split into small repair patches. | Keep public names and data; repair unsafe or misleading execution. Any managed-driver edit receives separate authorization. | Reproduce relevant audit failures with fakes, repair them, run the required root gate and relevant independent driver suites. | Update current manuals and audit disposition. High movement/data/boot relevance; automated work remains hardware-free. |
-| 1 — Make the existing robot understandable | F09, H01, H04–H06, X04: Agent `presentation.py`, `events.py`, `web_app.py`, `web_static/`, onboarding; IDE health and display paths. | Preserve current operation; desktop profile is opt-in; fallback states do not bypass stop conditions. | Simulated missing dependencies, disabled devices, mixed health, crowded queues, and interrupted interactions show accurate status. | Update feature and operating guidance; document font approval if needed. Low for interface work, higher for approved device repairs. |
-| 2 — Deliver the first useful assistant | T01–T03, initial T05, T07, M01/M02/M05: Agent proposed `task_service.py`, `reminders.py`, `task_models.py`, existing migrations/store/runtime/tools; web task view. | Additive database migration; existing conversations and skills still work. Initial reminders use available permitted outputs. | Synthetic-clock reminder tests, restart/duplicate-delivery cases, task cancellation, truthful outcomes, user isolation and backup restore. | Add task/reminder specification, missed-delivery rules, retention and recovery instructions. Personal-data relevance; no unapproved media or motion. |
-| 3 — Add spoken interaction | H02/H03 and B01: Agent voice/presentation/provider interfaces; proposed IDE audio adapter and current behavior coordination. | Speech optional; existing input and text remain usable. New audio hardware/dependencies explicitly selected and approved. | Fake audio first; then consented microphone/speaker tests, self-echo, interruption, playback failure, and processor-load checks. | Document hardware, privacy, language/cost choices and fallback. Audio/media risk. |
-| 4 — Complete connected assistance | T04–T08, M03/M04, X01/X05: reviewed Agent tool providers, skill manifests, task evidence, memory retrieval and project-help adapter. | Existing read-only MCP contract remains intact; writes use separately reviewed permissions. | Fake accounts and failure injection; read-after-write checks; source injection tests; permission expiry; recipe rollback. | Update MCP tutorial, memory guidance, wiki feature pages and service notices. Account/network/privacy risk. |
-| 5 — Polish and expand selectively | B02–B05, H07, X02: bounded expression assets, optional perception, installation/release tooling, education examples. | No unsolicited wheel motion or replacement architecture. Hardware additions separately scoped. | Usability sessions, idle-load/thermal checks, compatibility tests, staged-update recovery using temporary releases. | Document supported hardware and measured limits. Risk depends on the approved option; motion/power work remains manual. |
+| 0A — Stop and ownership | F01–F04: IDE `engine.py`, `scheduler.py`, `integrated.py`, `robot.py`, `servo.py`, `config.py`; Agent legacy `cli.py`; corresponding tests. | Preserve public commands and ordinary behavior; consistently enforce stop, disabled-device settings and ownership. | Fake-device reproductions for every movement entry, blocked/full queues, competing owners and pin collisions; root gates. | Installation/development manuals, safety evidence and log. High movement relevance; no automated live motion. |
+| 0B — Installation and persistence | F05/F06: setup/boot-renderer scripts, Agent `deployment.py`, environment verification and backup tests. | Preserve private configuration, all required stored data and existing install entry points. No X02 updater project. | Temporary boot text, isolated dependency-profile checks, consistent database snapshots and interrupted restore tests. | Installation/recovery manuals and log. Boot/deployment/data risk; no live OS writes in tests. |
+| 0C — External tools and lifecycle | F07/F08: Agent `mcp_client.py`, `mcp_config.py`; IDE identity/cleanup boundary; test configuration and focused failure tests. | Preserve read-only external-tool boundary; managed-driver repairs separately authorized. | Error/status normalization, environment minimization, discovery limits, cleanup and explicit hardware-test exclusion; relevant driver suite separately. | MCP tutorial, containment guidance, tests and log. Privacy/media relevance. |
+| 1 — Diagnosis and guided setup | F09, revised H01, H04/H06/H07: Agent `events.py`, logging/runtime, `onboarding.py`, existing interactive CLI/web routes; IDE health and approved font repair. | New lifecycle states go to logs only. Preserve display/web presentation and startup pairing. Guided checks do not reuse privileged deployment setup. | Fake missing/disabled devices, correlation/redaction checks, actionable errors, skip/re-enter guide, no incidental device actions, required accessibility checks. | Guides and wiki pages for diagnostics/onboarding; log. Mostly software/UI work; any font/driver change follows approval policy. |
+| 2 — Local task assistant | T01/T02/T03/T07, M01/M02: proposed Agent `task_service.py`, `task_models.py`, `reminders.py`; existing runtime, tool registry, migrations/store and task management routes. | Additive data changes; preserve existing user isolation/retention. No M05 redesign, quiet-hour profile or unsolicited suggestions. | Fake clocks, persistence/restart, duplicate claims, uncertainty, snooze/cancel, stored scope and result evidence; F06 recovery coverage. | Task/reminder and memory specifications, manuals, wiki and log. Personal-data relevance; notification tests use fakes first. |
+| 3 — Spoken replies and coordinated output | H02/B01: Agent response/synthesis interface; proposed IDE audio adapter, voice pause/resume and behavior coordination; minimal approved audio/service configuration. | Optional listen-then-speak; existing voice-enable state and display behavior preserved. No H03 real-time voice or H05 profile. | Fake playback lifecycle plus consented speaker tests under actual service user, Bluetooth loss/reconnect, no unsolicited microphone enabling, cancellation and cleanup. | Audio installation/operation/privacy notes, dependency notices and log. Speaker/media/service risk. |
+| 4 — Connected information and reusable help | T04/T05/T06, M03/M04, X01/X05: reviewed Agent providers, task receipts, skills, memory retrieval and a bounded wiki-help adapter. | Read-only calendar first, writes explicitly scoped. Briefings and recipe suggestions user-requested. Wiki tooling stays separate from robot dependencies. | Fake accounts, source citation/version checks, allowlisted read paths, prompt-injection and uncertain-write handling, recipe rollback and existing user-boundary checks. | MCP/tutorial, information/task/memory guidance, runtime wiki-help documentation and log. Network/account/privacy relevance. |
+| 5 — Optional interaction and hardware evaluation | B02/B04/B05: existing expression assets; proposed IDE distance-game capability and Agent skill; separate hardware-option specifications. | Bounded variations and explicit game only; no camera-attention feature or new desktop mode. B05 evaluates options before any hardware build. | Fake distance sequences, invalid/stale readings, no servo resources/commands, priority/timeout/stop cleanup; optional consented sensor/game test. | Game guide, capability requirements, hardware evaluation and log. Buzzer/display/sensor relevance; new hardware risk assessed separately. |
 
-The smallest useful milestone is **phases 0–2**: a healthy installation, understandable
-interaction, and dependable local reminders/tasks. It can deliver value before
-voice streaming, camera attention, or new physical hardware.
+X03 applies throughout all phases: update affected manuals, wiki pages and validation
+records when implementation changes. It is not an additional background wiki writer.
 
-Dependencies: T01 precedes durable T02/T03; F06 precedes reliance on expanded stored
-data; F07 precedes T04 writes and wider external tools; H02 precedes H03; F01–F04
-precede expanded physical autonomy. Quiet interaction and interface design can be
-developed with simulated devices while foundation repairs are reviewed.
+Dependencies: 0A precedes expanded physical execution; F06 precedes reliance on durable
+user task data; F07 precedes wider external tools and calendar writes; T01 precedes
+reminder recovery and durable task progress; H02/B01 are developed together for safe
+playback ownership. B04 can be implemented after the foundation using the existing
+buzzer/display, without H02, Bluetooth or camera attention. X05 requires only reviewed
+read-only tooling and the local wiki, not a new robot hardware capability.
+
+The first useful milestone remains phases 0–2: reliable setup, troubleshooting and
+local reminders/tasks. Spoken alarms follow in phase 3. The deferred identifiers
+H03, H05, T08, M05, B03, X02 and X04 have no active phase allocation.
 
 ## 8. Validation and measures of success
 
-### 8.1 Checks performed for this planning document
+### 8.1 Initial audit checks and this revision
 
-This task used read-only inspection and documentation editing. The following
-checks passed during the audit:
+The original audit used read-only inspection and documentation editing. The
+following results describe that original pass; revision validation is recorded
+in section 9.3 rather than reusing the original link counts as current results:
 
 - Wiki search returned relevant architecture, tools, and development pages.
 - `python scripts/wiki.py source status` reported seven registered sources as ingested.
@@ -584,29 +830,29 @@ entry points, including the web, voice, CLI (command-line interface, the command
 run in a terminal), and MCP routes. A successful unit test (an automated check of
 a small component in isolation) does not prove that all routes enforce the same permission.
 
-### 8.3 Proposed product acceptance measures
+### 8.3 Acceptance checks for the confirmed scope
 
-These are initial targets for owner review, not measurements of current performance.
-Record the Pi model, installed components, software commit, provider, room conditions,
-and test procedure with every result.
+These checks belong to the confirmed features and F08. X04's separate broad usability
+benchmark program and its previous 20-task/90-percent target are deferred. No new H01
+visual-response timing target or H03 spoken-interruption target is an active gate.
+Record the software commit and test conditions; distinguish fake results from Pi tests.
 
-| Measure | Proposed acceptance target or required observation |
+| Confirmed behavior | Required observation |
 | --- | --- |
-| Visible acknowledgement | Local display/web acknowledgement within 250 milliseconds for at least 95% of accepted inputs under the documented normal load. |
-| Stop priority | Demonstrate that emergency-stop dispatch never waits for an ordinary action slot. Set and validate a physical stopping deadline before approving live movement; software timing alone is insufficient. |
-| Reminder reliability | All deterministic restart, clock-change, recurrence, cancellation, and duplicate-claim tests pass; online delivery target within two seconds under documented load. Downtime/uncertain-delivery cases are explicitly reported. |
-| Task honesty | No test reports completion without a successful terminal result and the required outcome evidence. |
-| Speech interruption | Initial playback-stop target below 300 milliseconds for 95% of trials after local interruption detection; measure detection delay separately. |
-| Privacy | All denied media/account actions remain unexecuted; zero cross-user retrieval in the controlled test set. |
-| Recovery | Missing optional provider/device tests leave unrelated permitted capabilities usable, with accurate reasons; safety-critical dependency failures still block affected actions. |
-| Personalization | Corrections take effect on the next applicable interaction; deleted live memories disappear from retrieval, with backup limitations clearly stated. |
-| Everyday task success | At least 90% completion on an agreed set of 20 representative bounded tasks before expanding the early user group; report failures by cause, not only a total score. |
-| Resource use | Compare idle and active processor, memory, temperature and response time with the baseline. Set budgets from Pi measurements; avoid unmeasured “always-on vision” promises. |
-| User experience | Observe beginners creating, inspecting, changing and cancelling reminders without coaching; record confusion and unwanted interruptions. |
+| H01 log-only reporting | Correlated transitions appear in the existing system log; no added lifecycle display/web presentation and no raw personal content in new log records. |
+| F01–F04 stopping | Every public movement route respects stop/ownership/configuration; stop dispatch cannot wait for an ordinary action slot. Validate physical timing only in a separately approved test. |
+| T01–T03 reminders/tasks | Synthetic restart, date/time-zone, recurrence, duplicate-claim, uncertainty, snooze/cancel and overdue tests pass. “Call me up at 4 pm today” saves the intended future local alarm or clarifies a past/ambiguous time. |
+| T03/T04/T07 outcomes | Never report completion without the required result evidence; do not duplicate an uncertain external write. Calendar writes require the intended account/action scope. |
+| H02 playback | Bounded synthesis and playback, controller cancellation, selected output accessible by the service, safe listener pause/resume, and honest disconnect/failure reporting. No simultaneous listening/speaking required. |
+| H07 guided checks | Reuses existing menu/web entry points and F05 diagnostics; skips/re-entry work; no implicit deployment, greeting, movement, capture or configuration overwrite. |
+| M01–M04 memory | Correction and retrieval use appropriate source/confidence; new records preserve existing user/retention boundaries. Recipes require user request/review; no M05 product expansion. |
+| B01/B02/B04 outputs | Current presentation semantics preserved; bounded variations and game effects yield to safety/privacy; stale sensor data silences the game; no wheel commands and complete cleanup. |
+| X05 project help | Known questions return cited current public sources; missing/stale/draft evidence is explicit. Traversal, setup/apply commands and private paths are inaccessible; no query-time installation. |
+| F05/F06/X03 integration | Robot environment, user settings and durable data survive relevant changes; documentation reflects actual implemented status and passes wiki checks. |
 
-Cloud reply speed should be reported separately from local acknowledgement. A fast
-animation must not hide a stalled task. Likewise, a command delivered to a wheel
-driver does not prove a specific distance travelled without suitable feedback.
+For new speech processing, measure the actual Pi's processor/memory load as part of
+H02 validation before choosing a provider. This focused integration check does not
+reintroduce always-on vision, real-time voice or the deferred benchmarking initiative.
 
 ### 8.4 Separate manual validation lists
 
@@ -616,14 +862,14 @@ These are future validation steps. They were not performed for this document.
 | --- | --- | --- | --- |
 | Safe smoke — no hardware | Run the software doctor, simulated chat/task journeys, fake reminders, and wiki checks. | Accurate capabilities, persistence and errors without opening devices. | Stop the simulated service and preserve diagnostic evidence; revert only the reviewed change. |
 | Device communication | On the approved Pi setup, inspect device readiness and test display/buzzer deliberately; obtain consent before microphone or camera capture. | Configured devices are recognized and owned once; capture state is visible; temporary media is removed. | Stop the session, release devices, restore the previous approved configuration/environment. |
-| Actuator movement | Only after safety gates pass, raise wheels, clear the area, and keep an operator ready to remove power. Exercise each approved movement route and stop/recovery case. | Bounded movement, prompt stop, no automatic replay after resume, no movement in desktop mode. | Remove actuator power if necessary, stop the service, preserve the fault latch and investigate before resuming. |
+| Actuator movement | Only after safety gates pass, raise wheels, clear the area, and keep an operator ready to remove power. Exercise each approved movement route and stop/recovery case. | Bounded movement, prompt stop, no automatic replay after resume, no unintended movement from audio, guided checks or the distance game. | Remove actuator power if necessary, stop the service, preserve the fault latch and investigate before resuming. |
 | Power and deployment | Separately approve any reboot, boot-file, service, update rollback, or shutdown test; first validate command construction with fakes and verify backups. | Approved service recovery and preservation of configuration/data; no unexpected boot motion. | Use the documented manual recovery route and last known-good release/backup. Never test destructive power paths automatically. |
 
 ## 9. Documentation and future decisions
 
 ### 9.1 Keep plans, facts, and private memory separate
 
-This document belongs in the requested `DevelopmentDoc/` path as an active proposal.
+This document now lives in `DevelopmentPlanDoc/` beside the owner’s confirmation list.
 It does not replace the historical audit or redefine implemented behavior.
 On approval of a phase, link its detailed specification and acceptance evidence
 from this document. Mark checklist items complete only after implementation,
@@ -654,21 +900,71 @@ Coding agents can read it directly from the requested path now.
 
 ### 9.2 Decisions to resolve during phase planning
 
-| Decision | Recommended starting assumption | When an explicit decision is needed |
+| Decision | Recorded direction | Remaining concrete choice |
 | --- | --- | --- |
-| Desk operation | Offer an opt-in stationary assistant profile. | Before changing any current default or enabling new autonomous movement. |
-| Audio output | Choose a modest supported speaker/backend after checking the user's actual hardware. | Before dependencies, wiring, or sound-output implementation. |
-| Speech processing | Compare local and cloud options with the target languages and Pi load. | Before selecting a service, model download, spending policy, or data flow. |
-| Calendar access | Read-only planning first; writes separately approved. | Before storing account credentials or granting write scopes. |
-| Memory and household users | Preserve existing ownership and retention; add explicit guest rules. | Before changing stored personal data, identity selection, or automatic capture. |
-| Reminder downtime | Report missed delivery; do not imply operation while powered off. | Before choosing catch-up, repeat, escalation, or phone-notification behavior. |
-| Update mechanism | Improve existing manual preview/health/rollback first. | Before automatic downloads, service replacement, or a new deployment layout. |
+| Operating settings | H05 deferred; retain current profiles and startup behavior. | No desktop/quiet-hour default change in this stage. |
+| Audio output | H02 confirmed; compatible Bluetooth uses standard OS support plus project playback integration. | Actual speaker, installed OS audio stack, service-user access and fallback output. |
+| Speech processing | Sequential input/output only; H03 deferred. | Synthesis provider, languages, dependency/download size, cost and approved data flow. |
+| Guided setup | H07 confirmed inside existing interactive/web routes; keep startup pairing intact. | Final menu wording and placement, shared diagnostics and optional practice actions. |
+| Calendar access | Read-only planning followed by explicitly scoped writes. Local alarms use T02. | Connected account/calendars and exact approval/verification contract. |
+| Memory | M01–M04 confirmed; preserve current boundaries and defer M05 expansion. | Additive record fields, existing-control behavior and reviewed recipe presentation. |
+| Reminder downtime | Report missed or uncertain delivery and preserve saved records. | Catch-up and snooze details in the T02 specification; no phone call or off-Pi wake promise. |
+| Distance game | B04 confirmed as an explicit bounded buzzer/display experience with no wheel commands. | Valid distance bands, session duration, output limits and resource arbitration. |
+| Project help | X05 confirmed through read-only runtime tools; no maintenance commands exposed. | Final tool names, allowlisted source set, short query deadline and cache invalidation. |
+| Release updates and optional hardware | X02 deferred; B05 evaluation confirmed. | No new updater work. Any hardware option needs a separate concrete design before installation. |
 
-The recommended first implementation proposal is a small foundation repair batch
-covering stop coverage, interrupt priority, ownership, and installation diagnosis.
-Prepare the local task/reminder specification alongside it using simulated devices.
+The recommended first implementation batch is phase 0A, with 0B installation diagnosis
+and backup repair following closely. Existing scope decisions need not be asked again;
+resolve concrete implementation choices where they affect behavior, data or hardware.
+This revision itself performs only documentation work.
+
+### 9.3 Confirmation-review record
+
+Reviewed the owner's 39 entries against this plan and selected current code at
+`939b821d8d426fd3ecf6d87e87c426d1e47eba91`. Serena inspected the existing onboarding
+and voice-service symbols; targeted reads checked voice pause/resume, event logging,
+service deployment and the wiki launcher. The search phrase “voice onboarding”
+returned no curated match, so the review used “installation,” cited current manuals,
+and implementation files. The wiki pages remain AI-reviewed drafts.
+
+Changes in this revision: 31 confirmed items retained, H01 narrowed to logs with
+its estimate reduced to Low, seven items deferred, B04 raised from Low to Medium
+for complete conversational/lifecycle integration, phases and acceptance checks
+aligned, and all five questions answered
+in section 6.7. The owner's original confirmation rows remain unchanged; review
+answers are appended separately to that document. The owner's file move/rename is
+preserved. Current manuals and curated knowledge claims are unaffected because no
+runtime feature has been implemented.
+
+Validation for this revision:
+
+- Compared all 39 decisions with the original confirmation: 31 confirmed, H01
+  revised, seven deferred. All 32 active items have a phase allocation, including
+  X03 throughout the phases; no deferred item is allocated as active work.
+- Checked all five answer sections, table structure, reference definitions and
+  local file/heading links: 186 link occurrences in this plan and eight in the
+  confirmation document passed. External links are not counted as local checks.
+- Verified that the original confirmation remains an unchanged byte-for-byte
+  prefix; only the separate review section was appended.
+- From the repository root, `python scripts/wiki.py check` passed and
+  `python scripts/wiki.py lint --strict` reported zero errors, warnings or
+  suggestions. No wiki source or review record was changed.
+- `uv run --frozen --no-sync python scripts/verify_immutable_drivers.py` passed
+  for 222 tracked files across six drivers, including 55 existing authorized
+  repairs. `uv run --frozen --no-sync python scripts/verify_workspace_driver_sources.py`
+  passed for all six libraries. These checks did not install dependencies.
+- `git diff --check` passed. A separate whitespace check of the renamed,
+  currently untracked plan also reported no whitespace errors.
+
+These are documentation and source-integrity results. The full runtime test suite,
+live service, speaker, sensor and movement tests were not run for this planning-only
+revision. Their required checks remain in sections 7 and 8 for implementation.
 
 ## Appendix A. Complete Microduck audit
+
+The competitor findings below are retained from the original audit. Adoption ideas
+are evidence for design decisions, not an additional work queue; section 0 and the
+revised checklist determine the currently selected scope.
 
 ### A.1 Product character and evidence boundary
 
@@ -789,7 +1085,7 @@ to wait for a cloud answer. The interpretation that this improves perceived
 character is a design inference; this audit did not measure user preference.
 
 **Adaptation:** vary approved Ninja faces, blink timing, and buzzer cues within
-limits, with quiet hours and intensity settings. Its buzzer cannot reproduce
+limits. New quiet-hour/intensity controls are deferred under H05. Its buzzer cannot reproduce
 Microduck's full synthesized voice. Preserve clear error and privacy indications
 instead of making every event a playful reaction.
 
@@ -922,10 +1218,10 @@ from daemon release replacement, so “every update is equally reversible” wou
 be too broad. Some bundled material also carries test-only comments. Do not copy
 assets or deploy its updater as a shortcut.
 
-**Adaptation:** F05/F06/X02 should improve Ninja's current installation and backup
+**Adaptation:** F05/F06 should improve Ninja's current installation and backup
 path first: clear version identity, correct environment, staged validation,
 complete recovery inventory, and simulated failure tests. Automatic updates can
-wait until manual rollback is demonstrated.
+wait until manual rollback is demonstrated; the broader X02 updater project is deferred.
 
 ### A.12 Module coverage and realistic adoption
 
@@ -1137,8 +1433,8 @@ personal data. Gaze accuracy depends on camera geometry and mechanical calibrati
 Tracking also adds camera use and processor load. No tracking-accuracy or multi-user
 experience benchmark was run here.
 
-**Adaptation:** start with consented, low-rate attention cues on Ninja's display,
-with stale-observation expiry. Do not turn the whole wheeled robot to imitate a
+**Possible later adaptation (B03 is deferred):** consented, low-rate attention cues on Ninja's display,
+with stale-observation expiry. This is not active work in this stage. Do not turn the whole wheeled robot to imitate a
 head movement on a desk. Keep identity and authorization separate.
 
 ### B.9 Ownership, stopping, and network recovery
@@ -1260,7 +1556,8 @@ community application supplies dependable assistant memory and task completion.
 “Implemented” means supported by the inspected source, not proven reliable on
 physical robots in this audit. “Not established” means not found in the reviewed
 core paths; external applications may differ. Qualitative observations explain
-design strengths and tradeoffs, not a measured product ranking.
+design strengths and tradeoffs, not a measured product ranking. Adoption suggestions in this historical comparison are
+subject to section 0; deferred items are not implementation commitments.
 
 | Feature or experience | NinjaRobotPi5 baseline | Microduck reference | Reachy Mini reference | Lesson and applicability |
 | --- | --- | --- | --- | --- |
@@ -1415,3 +1712,10 @@ For implementation, begin with the [root workflow][N-policy], consult the
 [R26]: ../DevelopmentReferences/reachy_mini/tests/unit_tests/test_backend_idle_reset.py
 [R27]: ../DevelopmentReferences/reachy_mini/src/reachy_mini/daemon/app/middleware.py
 [R28]: ../DevelopmentReferences/reachy_mini/src/reachy_mini/apps/sources/local_common_venv.py
+
+[N-voiceinput]: ../ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/voice_input.py
+[N-events]: ../ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/events.py
+[N-serviceunit]: ../ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/deployment/ninjarobot-agent.service.in
+[N-onboard]: ../ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/onboarding.py
+[N-cli]: ../ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/agent_cli.py
+[N-wikilauncher]: ../scripts/wiki.py
