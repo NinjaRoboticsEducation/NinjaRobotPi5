@@ -9,9 +9,10 @@ or open the parent project for development and implementation verification.
 - [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-07/InstallationGuide.md)
 - [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-07/DevelopmentGuide.md)
 - [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-07/NinjaRobot_MCP_Skill.md)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-07/DevelopmentLog.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-07-02/DevelopmentLog.md)
 
-These are the complete documents. The old root filenames remain navigation links.
+These are the complete documents. The root README links directly to these sources;
+the former root navigation files have been removed.
 Use [the current document map](project-knowledge.json) for source versions and
 [the development workflow](docs/PROJECT_WORKFLOW.md) for setup and updates.
 The [knowledge overview](wiki/overview.md) leads to searchable topic pages.

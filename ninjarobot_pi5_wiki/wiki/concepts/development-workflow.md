@@ -17,10 +17,10 @@ generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20260906-knowledgeintegration
-  resource: urn:llmwiki:source:src-20260906-knowledgeintegration
+- id: src-20260907-knowledgeintegration
+  resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
-  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f
+  content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
 - id: src-20260906-developmentguide
   resource: urn:llmwiki:source:src-20260906-developmentguide
   title: DevelopmentGuide.md
@@ -28,8 +28,8 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:codex
-  performed_at: '2026-09-06T22:54:06Z'
-  target_hash: sha256:c8f0369cc7f1a8c1247792dde4b93da093496772eaae92a5742d617ace70e4be
+  performed_at: '2026-09-07T00:45:19Z'
+  target_hash: sha256:bd0acfbe3e2dd04f8011e991bed09941a8bde1b6f2d3686aec176e84bf869eb2
   result: passed
   checks:
     source_support: passed
@@ -38,9 +38,9 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against its listed manual sections and integration evidence.
-  - Claims describe documented contracts and knowledge workflow; current hardware
-    operation and interactive editor activation are not certified.
+  - Rechecked the navigation-only correction and updated source versions; other cited
+    explanations are unchanged.
+  - AI evidence review; no human verification or hardware test is claimed.
 ---
 
 # Development and documentation workflow
@@ -54,17 +54,17 @@ Feature completion includes a wiki impact assessment. Update affected manual
 versions, topic pages, specifications and architecture guidance, then record
 the change and validation in the development log. If no documentation change is
 needed, record a specific reason. A new source version preserves the old source;
-current navigation and the knowledge map identify the active version.[^src-20260906-knowledgeintegration]
+current navigation and the knowledge map identify the active version.[^src-20260907-knowledgeintegration]
 
 Use the project's maintenance guide outside the knowledge bundle for exact
 commands. Prepare a semantic page plan, validate it, show the actual diff, and
 apply the approved plan with the wiki CLI. Review source support honestly and
 check current pointers, file fingerprints, links, indexes and review coverage.
-AI review is distinct from human verification.[^src-20260906-knowledgeintegration]
+AI review is distinct from human verification.[^src-20260907-knowledgeintegration]
 
 [Development guide](/references/development-guide.md) ·
 [History](/concepts/development-history.md).
 
 
-[^src-20260906-knowledgeintegration]: Local knowledge integration evidence, source version `integration-2026-09-07`; registered source `src-20260906-knowledgeintegration`.
+[^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
 [^src-20260906-developmentguide]: DevelopmentGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-developmentguide`.

@@ -1,0 +1,16 @@
+id: src-20260907-knowledgeintegration
+path: raw/notes/ninjarobotpi5/2026-09-07-02/KnowledgeIntegration.md
+media_type: text/markdown
+kind: text
+title: Local knowledge integration evidence
+added_at: '2026-09-07T00:45:19Z'
+content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
+state: ingested
+original_uri: urn:llmwiki:source:src-20260907-knowledgeintegration
+source_version: root-manual-cleanup-2026-09-07
+retrieved_at: null
+normalized_at: '2026-09-07T00:45:19Z'
+normalizer: llmwiki-text/0.2
+error: null
+ingested_at: '2026-09-07T00:45:37Z'
+last_plan: root-manual-links-260907

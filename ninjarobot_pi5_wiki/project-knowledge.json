@@ -46,15 +46,15 @@
     },
     {
       "name": "DevelopmentLog.md",
-      "path": "raw/notes/ninjarobotpi5/2026-09-07/DevelopmentLog.md",
+      "path": "raw/notes/ninjarobotpi5/2026-09-07-02/DevelopmentLog.md",
       "original_content_hash": "sha256:acd1d86c260557afc7ab45093950860b80deb1097d052c1428427feba7e0a139",
-      "content_hash": "sha256:9d2f7eb85695c830322023c4efa549e5d178030105a611468b003f4d8e0b1dd4",
-      "previous_path": null,
+      "content_hash": "sha256:da1ff98b3c0a33c61602ceca14e5f481c7f4f1e37e69460c7102e3257beb8f5c",
+      "previous_path": "raw/notes/ninjarobotpi5/2026-09-07/DevelopmentLog.md",
       "pages": [
         "wiki/references/development-log.md",
         "wiki/concepts/development-history.md"
       ],
-      "source_id": "src-20260906-developmentlog"
+      "source_id": "src-20260907-developmentlog"
     }
   ],
   "implementation_roots": [
@@ -1237,14 +1237,10 @@
     "THIRD_PARTY_NOTICES.md",
     "ninjarobot_pi5_wiki/README.md",
     "ninjarobot_pi5_wiki/docs/PROJECT_WORKFLOW.md",
-    "InstallationGuide.md",
-    "DevelopmentGuide.md",
-    "NinjaRobot_MCP_Skill.md",
-    "DevelopmentLog.md",
     "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/InstallationGuide.md",
     "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/DevelopmentGuide.md",
     "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/NinjaRobot_MCP_Skill.md",
-    "ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-07/DevelopmentLog.md"
+    "ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-07-02/DevelopmentLog.md"
   ],
   "integration_status": "ready"
 }

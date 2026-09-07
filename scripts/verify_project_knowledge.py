@@ -64,9 +64,9 @@ def verify(root: Path) -> list[str]:
         source = root / WIKI / item["path"]
         if not source.is_file() or fingerprint(source) != item["content_hash"]:
             errors.append(f"Manual missing or changed: {item['name']}")
-        pointer = root / item["name"]
-        if not pointer.is_file() or f"{WIKI}/{item['path']}" not in pointer.read_text():
-            errors.append(f"Current manual pointer is inconsistent: {item['name']}")
+        readme_text = (root / "README.md").read_text(encoding="utf-8")
+        if f"]({WIKI}/{item['path']})" not in readme_text:
+            errors.append(f"Root README does not link to the current manual: {item['name']}")
         readme = root / WIKI / "README.md"
         if f"]({item['path']})" not in readme.read_text(encoding="utf-8"):
             errors.append(f"Wiki README does not link to the current manual: {item['name']}")

@@ -19,15 +19,15 @@ sources:
   resource: urn:llmwiki:source:src-20260906-installationguide
   title: InstallationGuide.md
   content_hash: sha256:53f80c60feb139f0de547613bd14b8fcd87a2678ba5bf7dc75b1b2bccb1dc1c4
-- id: src-20260906-knowledgeintegration
-  resource: urn:llmwiki:source:src-20260906-knowledgeintegration
+- id: src-20260907-knowledgeintegration
+  resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
-  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f
+  content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
 semantic_review:
   version: 1
   performed_by: agent:codex
-  performed_at: '2026-09-06T22:54:06Z'
-  target_hash: sha256:c89f536e16da0db4909428c180953ffc515f1af207c35041af7a5e8eb9d24ca1
+  performed_at: '2026-09-07T00:45:19Z'
+  target_hash: sha256:9832068b6999b51d7251910c109749108aae7676a465d37a5b6549783d6b53a6
   result: passed
   checks:
     source_support: passed
@@ -36,9 +36,9 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against its listed manual sections and integration evidence.
-  - Claims describe documented contracts and knowledge workflow; current hardware
-    operation and interactive editor activation are not certified.
+  - Rechecked the navigation-only correction and updated source versions; other cited
+    explanations are unchanged.
+  - AI evidence review; no human verification or hardware test is claimed.
 ---
 
 # Installation and hardware checks
@@ -55,10 +55,10 @@ Automated knowledge tests should not perform these actions.[^src-20260906-instal
 
 The developer wiki uses a separate Python environment. Its explicit setup and
 text-evidence preparation do not initialize robot devices. This integration
-contains no fresh Raspberry Pi hardware validation.[^src-20260906-knowledgeintegration]
+contains no fresh Raspberry Pi hardware validation.[^src-20260907-knowledgeintegration]
 
 [Open installation reference](/references/installation-guide.md).
 
 
 [^src-20260906-installationguide]: InstallationGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-installationguide`.
-[^src-20260906-knowledgeintegration]: Local knowledge integration evidence, source version `integration-2026-09-07`; registered source `src-20260906-knowledgeintegration`.
+[^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

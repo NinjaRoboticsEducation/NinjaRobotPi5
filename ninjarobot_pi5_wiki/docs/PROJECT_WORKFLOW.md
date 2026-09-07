@@ -136,11 +136,11 @@ python scripts/wiki.py plan apply PLAN.yaml --approve
    the actual reviewer, date, source support, contradictions, limitations, claim
    strength, and visual evidence where relevant. Apply review records through
    reviewed plans too. Do not mark a page human-verified because an AI checked it.
-7. Update `project-knowledge.json`, root navigation documents, and README links
+7. Update `project-knowledge.json` and both root and wiki README links
    to the current versions. Record `previous_path`, original fingerprint, and
    reviewed checkout. Update page source references to agree with the new map.
-   Root navigation headings must keep their old anchors and point to matching
-   sections in the new manual. Do not maintain duplicate full root manuals.
+   Preserve referenced section anchors in new source versions. The full manuals
+   live only in the wiki; do not recreate root navigation files.
 8. Review affected implementation fingerprints and their topic mappings. A
    changed fingerprint means review is needed, not that documentation is false.
    Add mappings for new files and remove deleted mappings with an explanation.

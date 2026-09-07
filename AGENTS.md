@@ -46,8 +46,8 @@ and explain the limitation. Explicit setup: `python scripts/wiki.py setup`, then
 
 Include a wiki impact decision in each substantial development plan and handoff.
 Update affected sources, pages, architecture guidance, and the development log.
-The four root manuals are navigation pointers: edit a NEW version of the full
-manual under wiki `raw/`, never an already registered original. Use
+The full manuals live only under wiki `raw/`; both READMEs link directly to
+the current versions. Edit a NEW version, never an already registered original. Use
 `project-knowledge.json` to find the current version. Show and obtain approval
 for the specific semantic wiki diff before applying it with `llmwiki plan apply`.
 Existing explicit approval of that exact diff need not be requested again.

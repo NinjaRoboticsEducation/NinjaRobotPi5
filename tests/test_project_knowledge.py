@@ -22,7 +22,7 @@ def knowledge(tmp_path: Path) -> Path:
         "AGENTS.md": "# Policy\n",
         "CLAUDE.md": "@AGENTS.md\n",
         "code/example.py": "VALUE = 1\n",
-        "Guide.md": "[Manual](ninjarobot_pi5_wiki/raw/articles/v1/Guide.md#example)\n",
+        "README.md": "[Manual](ninjarobot_pi5_wiki/raw/articles/v1/Guide.md)\n",
         "ninjarobot_pi5_wiki/raw/articles/v1/Guide.md": "# Example\n\nEvidence.\n",
         "ninjarobot_pi5_wiki/README.md": "[Guide](raw/articles/v1/Guide.md)\n",
     }
@@ -59,7 +59,7 @@ def knowledge(tmp_path: Path) -> Path:
             }
         },
         "adapters": [{"path": "CLAUDE.md", "target": "AGENTS.md", "reference": "@AGENTS.md"}],
-        "link_documents": ["Guide.md"],
+        "link_documents": ["README.md"],
     }
     (wiki / "project-knowledge.json").write_text(json.dumps(data))
     return tmp_path
@@ -81,7 +81,7 @@ def test_changed_and_new_code_require_review(knowledge: Path) -> None:
 
 
 def test_missing_manual_and_broken_heading_are_detected(knowledge: Path) -> None:
-    (knowledge / "Guide.md").write_text(
+    (knowledge / "README.md").write_text(
         "[Manual](ninjarobot_pi5_wiki/raw/articles/v1/Guide.md#missing)\n"
     )
     assert any("missing heading" in issue for issue in verify(knowledge))
@@ -124,6 +124,6 @@ def test_new_manual_version_requires_current_pointers(knowledge: Path) -> None:
     data["documents"][0].update(path="raw/articles/v2/Guide.md", content_hash=fingerprint(new))
     manifest.write_text(json.dumps(data))
     issues = verify(knowledge)
-    assert any("Current manual pointer is inconsistent" in issue for issue in issues)
+    assert any("Root README does not link" in issue for issue in issues)
     assert any("Page needs current source review" in issue for issue in issues)
     assert old.read_bytes() == original

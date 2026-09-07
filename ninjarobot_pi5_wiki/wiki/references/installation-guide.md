@@ -13,15 +13,15 @@ sources:
   resource: urn:llmwiki:source:src-20260906-installationguide
   title: InstallationGuide.md
   content_hash: sha256:53f80c60feb139f0de547613bd14b8fcd87a2678ba5bf7dc75b1b2bccb1dc1c4
-- id: src-20260906-knowledgeintegration
-  resource: urn:llmwiki:source:src-20260906-knowledgeintegration
+- id: src-20260907-knowledgeintegration
+  resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
-  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f
+  content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
 semantic_review:
   version: 1
   performed_by: agent:codex
-  performed_at: '2026-09-06T22:54:05Z'
-  target_hash: sha256:6d71976836ad0e8f100f5d4855e46a9ae345e99c159045e15ddf144ed969aa38
+  performed_at: '2026-09-07T00:45:19Z'
+  target_hash: sha256:3472d55b44cac9a5196a94282d70d6505d3c6e528eddfad9c5731a989f292cef
   result: passed
   checks:
     source_support: passed
@@ -30,9 +30,9 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against its listed manual sections and integration evidence.
-  - Claims describe documented contracts and knowledge workflow; current hardware
-    operation and interactive editor activation are not certified.
+  - Rechecked the navigation-only correction and updated source versions; other cited
+    explanations are unchanged.
+  - AI evidence review; no human verification or hardware test is claimed.
 ---
 
 # Installation guide
@@ -41,10 +41,10 @@ The full guide covers beginner setup, hardware initialization and calibration, s
 
 Use the source identifier below to resolve the complete manual through the raw
 source catalog. The outer wiki README also links directly to the current full
-manual. Root filenames are navigation pages; source updates create new versions.
-Read the relevant full section before acting on an abbreviated explanation.[^src-20260906-knowledgeintegration]
+manual. Both READMEs link directly to full sources; updates create new versions.
+Read the relevant full section before acting on an abbreviated explanation.[^src-20260907-knowledgeintegration]
 
 [Return to project overview](/overview.md).
 
 [^src-20260906-installationguide]: InstallationGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-installationguide`.
-[^src-20260906-knowledgeintegration]: Local knowledge integration evidence, source version `integration-2026-09-07`; registered source `src-20260906-knowledgeintegration`.
+[^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

@@ -17,9 +17,7 @@ MANAGED_DRIVERS = (
 )
 PUBLIC_DOCUMENTS = (
     "README.md",
-    "InstallationGuide.md",
-    "DevelopmentGuide.md",
-    "DevelopmentLog.md",
+    "ninjarobot_pi5_wiki/README.md",
     "THIRD_PARTY_NOTICES.md",
     "AGENTS.md",
     "docs/README.md",
@@ -107,9 +105,8 @@ def test_driver_provenance_ignores_documented_runtime_data() -> None:
 def test_required_project_documents_exist() -> None:
     required = (
         "README.md",
-        "DevelopmentGuide.md",
-        "DevelopmentLog.md",
-        "InstallationGuide.md",
+        "ninjarobot_pi5_wiki/README.md",
+        "ninjarobot_pi5_wiki/project-knowledge.json",
         "THIRD_PARTY_NOTICES.md",
         "docs/README.md",
         "docs/markdown-style-guide.md",
@@ -117,6 +114,8 @@ def test_required_project_documents_exist() -> None:
         "docs/project-history/AuditReport_260731.md",
         "docs/project-history/Pi5LibrariesAudit.md",
     )
+    knowledge = json.loads((ROOT / "ninjarobot_pi5_wiki/project-knowledge.json").read_text())
+    required += tuple("ninjarobot_pi5_wiki/" + item["path"] for item in knowledge["documents"])
     missing = [name for name in required if not (ROOT / name).is_file()]
     assert missing == []
 

@@ -13,15 +13,15 @@ sources:
   resource: urn:llmwiki:source:src-20260906-ninjarobot-mcp-skill
   title: NinjaRobot_MCP_Skill.md
   content_hash: sha256:df8076ccc2683b24b6752310558ce4e62828d54cee67f1102aae7196c0ee97bb
-- id: src-20260906-knowledgeintegration
-  resource: urn:llmwiki:source:src-20260906-knowledgeintegration
+- id: src-20260907-knowledgeintegration
+  resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
-  content_hash: sha256:dabd8421a326cd9a56ad3f4d4f1d902f2e0e146897546a43e37d021e8f27c71f
+  content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
 semantic_review:
   version: 1
   performed_by: agent:codex
-  performed_at: '2026-09-06T22:54:05Z'
-  target_hash: sha256:a8cf576dc3e8de76cb55aff0636c1f5779837950046e3207ede4f555f8ca35a3
+  performed_at: '2026-09-07T00:45:19Z'
+  target_hash: sha256:cbdd4a7d3c84eabd5ccfb03bc1ffa2b38387b8dbc0eb4635220746b4e57ee8a1
   result: passed
   checks:
     source_support: passed
@@ -30,9 +30,9 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against its listed manual sections and integration evidence.
-  - Claims describe documented contracts and knowledge workflow; current hardware
-    operation and interactive editor activation are not certified.
+  - Rechecked the navigation-only correction and updated source versions; other cited
+    explanations are unchanged.
+  - AI evidence review; no human verification or hardware test is claimed.
 ---
 
 # MCP and Agent Skills tutorial
@@ -41,10 +41,10 @@ The tutorial explains external tools, configuration, read-only Tavily and Calend
 
 Use the source identifier below to resolve the complete manual through the raw
 source catalog. The outer wiki README also links directly to the current full
-manual. Root filenames are navigation pages; source updates create new versions.
-Read the relevant full section before acting on an abbreviated explanation.[^src-20260906-knowledgeintegration]
+manual. Both READMEs link directly to full sources; updates create new versions.
+Read the relevant full section before acting on an abbreviated explanation.[^src-20260907-knowledgeintegration]
 
 [Return to project overview](/overview.md).
 
 [^src-20260906-ninjarobot-mcp-skill]: NinjaRobot_MCP_Skill.md, source version `migration-2026-09-07`; registered source `src-20260906-ninjarobot-mcp-skill`.
-[^src-20260906-knowledgeintegration]: Local knowledge integration evidence, source version `integration-2026-09-07`; registered source `src-20260906-knowledgeintegration`.
+[^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

@@ -1,5 +1,5 @@
 version: 2
-generated_at: '2026-09-07T00:21:51Z'
+generated_at: '2026-09-07T00:45:37Z'
 sources:
 - id: src-20260906-developmentguide
   title: DevelopmentGuide.md
@@ -24,5 +24,15 @@ sources:
 - id: src-20260906-ninjarobot-mcp-skill
   title: NinjaRobot_MCP_Skill.md
   path: raw/articles/ninjarobotpi5/2026-09-07/NinjaRobot_MCP_Skill.md
+  kind: text
+  state: ingested
+- id: src-20260907-developmentlog
+  title: DevelopmentLog.md
+  path: raw/notes/ninjarobotpi5/2026-09-07-02/DevelopmentLog.md
+  kind: text
+  state: ingested
+- id: src-20260907-knowledgeintegration
+  title: Local knowledge integration evidence
+  path: raw/notes/ninjarobotpi5/2026-09-07-02/KnowledgeIntegration.md
   kind: text
   state: ingested
