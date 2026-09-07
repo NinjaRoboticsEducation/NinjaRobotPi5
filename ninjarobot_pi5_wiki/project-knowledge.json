@@ -1246,6 +1246,5 @@
     "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/NinjaRobot_MCP_Skill.md",
     "ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-07/DevelopmentLog.md"
   ],
-  "integration_status": "semantic-plan-awaiting-approval",
-  "pending_plan": "DevelopmentPlanDoc/LLMWiki_Initial_Knowledge_260907.yaml"
+  "integration_status": "ready"
 }
