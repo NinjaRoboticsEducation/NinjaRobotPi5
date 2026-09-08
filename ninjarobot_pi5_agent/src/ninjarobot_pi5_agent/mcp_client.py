@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 from collections.abc import Callable
 from contextlib import AsyncExitStack
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol, cast
 
 import httpx
+from jsonschema import Draft202012Validator
 from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp.client.stdio import get_default_environment, stdio_client
 from mcp.client.streamable_http import streamable_http_client
 
 from ninjarobot_pi5_ide import RetrySafety, RiskLevel
@@ -41,6 +41,25 @@ class MCPProtocolError(RuntimeError):
 
 class MCPUnavailableError(RuntimeError):
     """Raised when an MCP connection cannot be initialized."""
+
+
+def _validate_schema(schema: dict[str, Any]) -> None:
+    """Validate locally; server schema references must never trigger network reads."""
+    pending: list[tuple[Any, int]] = [(schema, 0)]
+    while pending:
+        item, depth = pending.pop()
+        if depth > 64:
+            raise MCPProtocolError("MCP schema nesting exceeds the supported limit")
+        if isinstance(item, dict):
+            for key, value in item.items():
+                if key in {"$ref", "$dynamicRef"} and (
+                    not isinstance(value, str) or not value.startswith("#")
+                ):
+                    raise MCPProtocolError("MCP schemas must use only local references")
+                pending.append((value, depth + 1))
+        elif isinstance(item, list):
+            pending.extend((value, depth + 1) for value in item)
+    Draft202012Validator.check_schema(schema)
 
 
 class MCPToolDescription(Protocol):
@@ -103,7 +122,7 @@ class SDKMCPConnection:
         await self._stack.__aenter__()
         try:
             if self._config.transport is MCPTransport.STDIO:
-                environment = os.environ.copy()
+                environment = get_default_environment()
                 for target, source in self._config.environment_variables.items():
                     environment[target] = self._secret_store.require(source)
                 parameters = StdioServerParameters(
@@ -143,6 +162,8 @@ class SDKMCPConnection:
             self._started = True
         except BaseException as exc:
             await self._stack.aclose()
+            if isinstance(exc, asyncio.CancelledError):
+                raise
             raise MCPUnavailableError(
                 f"MCP server '{self._config.id}' could not initialize: {type(exc).__name__}"
             ) from exc
@@ -152,9 +173,18 @@ class SDKMCPConnection:
         session = self._require_session()
         discovered: list[MCPToolDescription] = []
         cursor: str | None = None
-        while True:
+        seen_cursors: set[str] = set()
+        names: set[str] = set()
+        size = 0
+        for _ in range(self._config.max_discovery_pages):
             result = await session.list_tools(cursor=cursor)
             for tool in result.tools:
+                size += len(tool.model_dump_json().encode())
+                if size > 1_048_576 or len(discovered) >= self._config.max_discovery_tools:
+                    raise MCPProtocolError("MCP discovery exceeded its catalog limit")
+                if tool.name in names:
+                    raise MCPProtocolError("MCP discovery returned duplicate tool names")
+                names.add(tool.name)
                 discovered.append(
                     _DiscoveredTool(
                         name=tool.name,
@@ -170,6 +200,10 @@ class SDKMCPConnection:
             cursor = result.nextCursor
             if cursor is None:
                 return tuple(discovered)
+            if cursor in seen_cursors:
+                raise MCPProtocolError("MCP discovery repeated a pagination cursor")
+            seen_cursors.add(cursor)
+        raise MCPProtocolError("MCP discovery exceeded its page limit")
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """Call through the SDK and convert the entire result to JSON data."""
@@ -215,6 +249,7 @@ class MCPToolProvider:
         self._started = False
         self._closed = False
         self._last_error: str | None = None
+        self._catalog_valid = False
 
     @property
     def provider_id(self) -> str:
@@ -230,35 +265,70 @@ class MCPToolProvider:
         if not self._config.enabled:
             raise MCPUnavailableError(f"MCP server '{self._config.id}' is disabled")
         try:
-            await self._connection.start()
-            discovered = {tool.name: tool for tool in await self._connection.list_tools()}
+            async with asyncio.timeout(self._config.timeout_seconds):
+                await self._connection.start()
+                await self._refresh_catalog()
+            self._started = True
+        except BaseException as exc:
+            self._last_error = type(exc).__name__
+            await self._connection.close()
+            raise
+
+    async def _refresh_catalog(self) -> None:
+        """Build the full reviewed catalog before replacing the active schema set."""
+        self._catalog_valid = False
+        try:
+            discovered: dict[str, MCPToolDescription] = {}
+            total_bytes = 0
+            async with asyncio.timeout(self._config.timeout_seconds):
+                catalog = await self._connection.list_tools()
+            for tool in catalog:
+                if tool.name in discovered or len(discovered) >= self._config.max_discovery_tools:
+                    raise MCPProtocolError("MCP catalog contains duplicates or too many tools")
+                total_bytes += len(
+                    json.dumps(
+                        [tool.name, tool.description, tool.input_schema, tool.output_schema]
+                    ).encode()
+                )
+                if total_bytes > 1_048_576:
+                    raise MCPProtocolError("MCP catalog is too large")
+                discovered[tool.name] = tool
             missing = sorted(set(self._config.allowed_tools) - discovered.keys())
             if missing:
                 raise MCPProtocolError(
                     f"MCP server '{self._config.id}' is missing allowed tools: {', '.join(missing)}"
                 )
+            definitions: dict[str, ToolDefinition] = {}
+            raw_names: dict[str, str] = {}
             for raw_name in self._config.allowed_tools:
+                if not self._config.reviewed_read_only(raw_name):
+                    continue
                 tool = discovered[raw_name]
+                for schema in (tool.input_schema, tool.output_schema):
+                    _validate_schema(schema)
                 name = f"mcp.{self._config.id}.{self._public_tool_name(raw_name)}"
-                self._definitions[name] = ToolDefinition(
+                if name in definitions:
+                    raise MCPProtocolError("MCP public tool names collide")
+                definitions[name] = ToolDefinition(
                     name=name,
                     version="1.0.0",
-                    description=tool.description,
+                    description=tool.description[:1000] or "External tool.",
                     input_schema=tool.input_schema,
                     output_schema=tool.output_schema,
                     risk=RiskLevel.READ_ONLY,
                     default_timeout_seconds=self._config.timeout_seconds,
-                    idempotent=True,
+                    idempotent=raw_name in self._config.retry_safe_tools,
                     cancellable=True,
                     confirmation_required=False,
                     source=self.provider_id,
                     trust=ToolTrust.EXTERNAL_UNTRUSTED,
                 )
-                self._raw_names[name] = raw_name
-            self._started = True
-        except BaseException as exc:
-            self._last_error = type(exc).__name__
-            await self._connection.close()
+                raw_names[name] = raw_name
+            self._definitions, self._raw_names = definitions, raw_names
+            self._catalog_valid = True
+        except BaseException:
+            self._definitions.clear()
+            self._raw_names.clear()
             raise
 
     async def list_tools(self) -> tuple[ToolDefinition, ...]:
@@ -269,10 +339,7 @@ class MCPToolProvider:
     async def refresh(self) -> tuple[ToolDefinition, ...]:
         """Rediscover tools without expanding the configured allowlist."""
         self._ensure_started()
-        discovered = {tool.name: tool for tool in await self._connection.list_tools()}
-        missing = sorted(set(self._config.allowed_tools) - discovered.keys())
-        if missing:
-            raise MCPProtocolError(f"MCP allowlisted tools disappeared: {', '.join(missing)}")
+        await self._refresh_catalog()
         return await self.list_tools()
 
     async def call(
@@ -282,18 +349,46 @@ class MCPToolProvider:
     ) -> ToolExecutionResult:
         """Call one allowlisted tool with result-size and cancellation controls."""
         self._ensure_started()
+        if not self._catalog_valid:
+            raise MCPProtocolError("MCP catalog requires a successful refresh")
         try:
             raw_name = self._raw_names[invocation.call.name]
+            definition = self._definitions[invocation.call.name]
         except KeyError as exc:
             raise KeyError(f"unknown MCP tool: {invocation.call.name}") from exc
-        arguments = self._arguments(raw_name, invocation.call.arguments)
+        try:
+            arguments = self._arguments(raw_name, invocation.call.arguments)
+            Draft202012Validator(definition.input_schema).validate(arguments)
+        except Exception:
+            return ToolExecutionResult(
+                call_id=invocation.call.call_id,
+                tool_name=invocation.call.name,
+                status=ToolExecutionStatus.DENIED,
+                error="MCP arguments do not match the current reviewed tool schema.",
+                definitely_not_executed=True,
+                retry_safety=RetrySafety.SAFE,
+            )
+        if cancellation.cancelled:
+            return ToolExecutionResult(
+                call_id=invocation.call.call_id,
+                tool_name=invocation.call.name,
+                status=ToolExecutionStatus.CANCELLED,
+                error="The MCP tool call was cancelled.",
+                definitely_not_executed=True,
+                retry_safety=RetrySafety.SAFE,
+            )
         call_task = asyncio.create_task(self._connection.call_tool(raw_name, arguments))
         cancel_task = asyncio.create_task(cancellation.wait())
         try:
             done, _ = await asyncio.wait(
                 {call_task, cancel_task},
                 return_when=asyncio.FIRST_COMPLETED,
+                timeout=self._config.timeout_seconds,
             )
+            if not done:
+                call_task.cancel()
+                await asyncio.gather(call_task, return_exceptions=True)
+                raise TimeoutError("MCP tool deadline exceeded")
             if cancel_task in done and not call_task.done():
                 call_task.cancel()
                 await asyncio.gather(call_task, return_exceptions=True)
@@ -308,12 +403,33 @@ class MCPToolProvider:
             encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
             if len(encoded) > self._config.max_result_bytes:
                 raise MCPProtocolError(f"MCP result exceeded {self._config.max_result_bytes} bytes")
+            error_flag = payload.get("isError", False)
+            if not isinstance(error_flag, bool):
+                raise MCPProtocolError("MCP isError must be a boolean")
+            if error_flag:
+                self._last_error = "ToolExecutionError"
+                return ToolExecutionResult(
+                    call_id=invocation.call.call_id,
+                    tool_name=invocation.call.name,
+                    status=ToolExecutionStatus.FAILED,
+                    error="The external MCP tool reported an execution error.",
+                    data={"external_untrusted_content": payload},
+                    definitely_not_executed=False,
+                    retry_safety=RetrySafety.UNKNOWN,
+                )
+            structured = payload.get("structuredContent")
+            if structured is not None:
+                Draft202012Validator(definition.output_schema).validate(structured)
             return ToolExecutionResult(
                 call_id=invocation.call.call_id,
                 tool_name=invocation.call.name,
                 status=ToolExecutionStatus.SUCCEEDED,
                 data={"external_untrusted_content": payload},
-                retry_safety=RetrySafety.SAFE,
+                retry_safety=(
+                    RetrySafety.SAFE
+                    if raw_name in self._config.retry_safe_tools
+                    else RetrySafety.UNKNOWN
+                ),
             )
         except asyncio.CancelledError:
             call_task.cancel()
@@ -324,7 +440,11 @@ class MCPToolProvider:
             return ToolExecutionResult(
                 call_id=invocation.call.call_id,
                 tool_name=invocation.call.name,
-                status=ToolExecutionStatus.FAILED,
+                status=(
+                    ToolExecutionStatus.TIMED_OUT
+                    if isinstance(exc, TimeoutError)
+                    else ToolExecutionStatus.FAILED
+                ),
                 error=f"MCP tool failed: {type(exc).__name__}",
                 definitely_not_executed=False,
                 retry_safety=RetrySafety.UNKNOWN,
@@ -337,7 +457,7 @@ class MCPToolProvider:
         """Return connection health without exposing credentials or URLs."""
         status = (
             ProviderHealthStatus.READY
-            if self._started and not self._closed
+            if self._started and not self._closed and self._catalog_valid
             else ProviderHealthStatus.UNAVAILABLE
         )
         detail = (
@@ -365,6 +485,11 @@ class MCPToolProvider:
             "configuration": self._config.redacted_dict(),
             "tools": sorted(self._definitions),
             "status": "ready" if self._started and not self._closed else "unavailable",
+            "unreviewed_tools": [
+                name
+                for name in self._config.allowed_tools
+                if not self._config.reviewed_read_only(name)
+            ],
         }
 
     def _arguments(self, raw_name: str, supplied: dict[str, Any]) -> dict[str, Any]:

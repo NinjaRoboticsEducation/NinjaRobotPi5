@@ -89,6 +89,26 @@ CHAT_HELP_TEXT = """Available chat commands:
   Clear this interface's conversation transcript.
 /status
   Show Agent, model, hardware, memory, and tool status.
+/remind SECONDS MESSAGE
+  Preview a silent local inbox reminder; then confirm its exact task ID.
+/tasks
+  List local reminders, progress and delivery evidence without a model call.
+/tasks confirm ID
+  Schedule the exact reminder preview you reviewed (expires after ten minutes).
+/tasks cancel ID
+  Cancel further delivery; an in-progress notification may already have happened.
+/tasks snooze ID MINUTES
+  Preview a new due time; review and confirm it again.
+/remind-json JSON
+  Preview title, due_at (with UTC offset), timezone, repeat and notification.
+/memory review
+  Inspect saved information, source, confidence and confirmation for the active user.
+/memory confirm ID
+  Confirm the reviewed preference.
+/memory edit ID NEW TEXT
+  Correct and confirm a preference for the active user.
+/memory forget ID
+  Remove that item and its active preference value.
 /resume
   Confirm recovery after an Emergency Stop.
 /camera
@@ -287,7 +307,13 @@ def build_parser() -> argparse.ArgumentParser:
     memory_list.add_argument("user_id")
     memory_list.add_argument(
         "--kind",
-        choices=("successful_behavior", "failed_behavior", "task_recipe"),
+        choices=(
+            "successful_behavior",
+            "failed_behavior",
+            "task_recipe",
+            "preference",
+            "episodic_summary",
+        ),
         default="successful_behavior",
     )
     memory_list.add_argument("--limit", type=int, default=100)
@@ -613,6 +639,7 @@ async def _run(arguments: argparse.Namespace) -> int:
         if command in {"tools", "reload"}:
             if command == "reload":
                 await provider.refresh()
+                await registry.refresh_catalog(provider.provider_id)
             _print_json({"tools": [tool.model_dump(mode="json") for tool in registry.list_tools()]})
             return 0
         if command == "test":
@@ -1768,6 +1795,7 @@ async def _interactive(arguments: argparse.Namespace) -> int:
             "12. Startup Agent Deployment\n"
             "13. Stop Agent Service\n"
             "14. Exit\n"
+            "15. Guided checks (read-only; service must be running)\n"
         )
         choice = (await asyncio.to_thread(input, "Select an option: ")).strip()
         try:
@@ -1838,8 +1866,25 @@ async def _interactive(arguments: argparse.Namespace) -> int:
             elif choice == "14":
                 print("CLI disconnected. Any running agent service continues.")
                 return 0
+            elif choice == "15":
+                while True:
+                    step = (
+                        await asyncio.to_thread(
+                            input,
+                            "Guide: 1 environment, 2 stop/resume, 3 text, 4 reminders, "
+                            "5 help; Enter to leave: ",
+                        )
+                    ).strip()
+                    if not step:
+                        break
+                    if step not in {"1", "2", "3", "4", "5"}:
+                        print("Choose 1 through 5 or press Enter to skip.")
+                        continue
+                    await _service_request(
+                        arguments, {"command": "guided_checks", "step": int(step) - 1}
+                    )
             else:
-                print("Please choose a number from 1 through 14.")
+                print("Please choose a number from 1 through 15.")
         except (
             AgentIPCError,
             CloudProviderError,

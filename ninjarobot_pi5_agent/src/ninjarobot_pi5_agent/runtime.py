@@ -7,12 +7,15 @@ import re
 import unicodedata
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
+from contextlib import nullcontext
+from contextvars import ContextVar
 from typing import Any, Protocol
 
 from ninjarobot_pi5_ide import RiskLevel
 
 from .agent_loop import AgentLoop, AgentReply, TextDeltaHandler
 from .events import AgentEventType, EventBroker
+from .memory_controls import memory_command
 from .memory_models import MemorySettings, UserProfile
 from .memory_services import (
     MemoryCaptureService,
@@ -36,7 +39,12 @@ from .policy import CameraGrantManager, MotionArmManager, PolicyContext, PolicyE
 from .providers import LLMProvider
 from .release_foundations import ReleaseStatusRegistry
 from .skills import SkillRepository
+from .task_controls import TaskControls, task_summary
+from .task_models import LocalTask, TaskStatus, TaskStep
+from .task_service import TaskService
 from .tools import CancellationToken, ToolRegistry
+
+CURRENT_TASK: ContextVar[LocalTask | None] = ContextVar("local_request_task", default=None)
 
 IdentityEnrollment = Callable[[str], Awaitable[dict[str, Any]]]
 IdentityRecognition = Callable[[], Awaitable[dict[str, Any]]]
@@ -85,6 +93,8 @@ class AgentRuntime:
         rollback_identity_reset: IdentityResetRollback | None = None,
         initial_memory_settings: MemorySettings | None = None,
         release_status: Callable[[], Mapping[str, Any]] | None = None,
+        guide_diagnostics: Callable[[], dict[str, Any]] | None = None,
+        tasks: TaskService | None = None,
     ) -> None:
         self.provider = provider
         self.tools = tools
@@ -108,6 +118,14 @@ class AgentRuntime:
         self._rollback_identity_reset = rollback_identity_reset
         self._initial_memory_settings = initial_memory_settings
         self._release_status = release_status or ReleaseStatusRegistry.disabled().status
+        self._guide_diagnostics = guide_diagnostics
+        self.tasks = tasks
+        self.task_controls = (
+            TaskControls(tasks, self.task_scope, self._cancel_request_task)
+            if tasks is not None
+            else None
+        )
+        self._request_tasks: dict[str, str] = {}
         self._startup: dict[str, Any] = {
             "phase": "runtime_ready",
             "complete": True,
@@ -187,6 +205,8 @@ class AgentRuntime:
                     await self.memory.initialize_settings(self._initial_memory_settings)
                 settings = await self.memory.settings()
                 self.store.set_retention_days(settings.conversation_retention_days)
+                if self.tasks is not None:
+                    self.tasks.set_retention_days(settings.conversation_retention_days)
                 await self.memory.prune()
             await self.store.prune()
             await self.tools.start()
@@ -196,6 +216,12 @@ class AgentRuntime:
             await self.store.close()
             raise
         self._started = True
+        if self.tasks is not None:
+            try:
+                await self.tasks.start()
+            except BaseException:
+                await self.close()
+                raise
 
     async def chat(
         self,
@@ -212,6 +238,28 @@ class AgentRuntime:
         self._ensure_started()
         self._begin_operation()
         try:
+            if text.startswith("/memory"):
+                user_id = await self._user_for_existing_session(session_id)
+                memory_reply = (
+                    await memory_command(self.memory, user_id, text)
+                    if self.memory is not None and user_id is not None
+                    else "Select a local profile with memory enabled before reviewing memory."
+                )
+                return await self._identity_reply(
+                    session_id,
+                    memory_reply,
+                    on_text_delta=on_text_delta,
+                    persist=False,
+                )
+            if self.task_controls is not None:
+                task_reply = await self.task_controls.command(session_id, text)
+                if task_reply is not None:
+                    return await self._identity_reply(
+                        session_id,
+                        task_reply,
+                        on_text_delta=on_text_delta,
+                        persist=False,
+                    )
             async with self._chat_lock:
                 identity_reply = await self._handle_identity_chat(
                     session_id,
@@ -240,7 +288,7 @@ class AgentRuntime:
                     if skill_id is not None
                     else None
                 )
-                reply = await self.loop.chat(
+                reply = await self._chat_with_task(
                     session_id=session_id,
                     text=text,
                     skill=skill,
@@ -281,6 +329,140 @@ class AgentRuntime:
         finally:
             self._end_operation()
 
+    def _cancel_request_task(self, task: LocalTask) -> None:
+        session = self._request_tasks.get(task.task_id)
+        if session is not None:
+            self.loop.cancel_session(session)
+
+    async def _chat_with_task(self, *, session_id: str, text: str, **kwargs: Any) -> AgentReply:
+        if self.tasks is None:
+            return await self.loop.chat(session_id=session_id, text=text, **kwargs)
+        scope, user_id = await self.task_scope(session_id)
+        task = await self.tasks.begin_request(
+            scope=scope,
+            user_id=user_id,
+            session_id=session_id,
+            title=text,
+            limits=self.loop.execution_limits(),
+        )
+        token = CURRENT_TASK.set(task)
+        self._request_tasks[task.task_id] = session_id
+        try:
+            reply = await self.loop.chat(session_id=session_id, text=text, **kwargs)
+            await self.tasks.record_request(scope, task.task_id, status=TaskStatus.COMPLETED)
+            return reply
+        except asyncio.CancelledError:
+            await self.tasks.record_request(scope, task.task_id, status=TaskStatus.CANCELLED)
+            raise
+        except Exception:
+            await self.tasks.record_request(scope, task.task_id, status=TaskStatus.UNCERTAIN)
+            raise
+        finally:
+            self._request_tasks.pop(task.task_id, None)
+            CURRENT_TASK.reset(token)
+
+    async def task_action(
+        self,
+        session_id: str,
+        operation: str = "list",
+        task_id: str = "",
+        minutes: int = 5,
+    ) -> dict[str, Any]:
+        """Direct controller access remains available during a long model request."""
+        self._ensure_started()
+        if self.tasks is None or self.task_controls is None:
+            raise ValueError("local tasks are not configured in this runtime")
+        if not isinstance(operation, str) or operation not in {
+            "list",
+            "confirm",
+            "cancel",
+            "snooze",
+        }:
+            raise ValueError("unknown task operation")
+        notice = None
+        if operation != "list":
+            if not isinstance(task_id, str) or not re.fullmatch(r"task-[a-f0-9]{32}", task_id):
+                raise ValueError("invalid task identifier")
+            if isinstance(minutes, bool) or not isinstance(minutes, int):
+                raise ValueError("snooze minutes must be an integer")
+            command = f"/tasks {operation} {task_id}"
+            if operation == "snooze":
+                command += f" {minutes}"
+            notice = await self.task_controls.command(session_id, command)
+        scope, _ = await self.task_scope(session_id)
+        return {
+            "notice": notice,
+            "tasks": [
+                {**item.model_dump(mode="json"), "review": task_summary(item)}
+                for item in await self.tasks.list(scope)
+            ],
+        }
+
+    async def task_scope(self, session_id: str) -> tuple[str, str | None]:
+        """Bind task access to trusted session identity, never a model-supplied owner."""
+        user_id = await self._user_for_existing_session(session_id)
+        if self.memory is not None and user_id is None:
+            raise ValueError("create or select a local user profile before managing reminders")
+        return (f"user:{user_id}" if user_id is not None else f"session:{session_id}"), user_id
+
+    async def notify_task(self, task: LocalTask) -> tuple[bool, str]:
+        """Execute only the reviewed local notification through deterministic policy."""
+        if task.approved_at is None:
+            return False, "Notification has no recorded approval."
+        if task.notification == "text":
+            return (
+                True,
+                "Notice saved in the local task inbox. Reading by the user is not confirmed.",
+            )
+        definition = self.tools.get("robot.behavior.execute_expression")
+        decision = self.policy.evaluate(
+            definition,
+            PolicyContext(
+                session_id=task.source_session_id,
+                confirmed=True,
+            ),
+        )
+        if not decision.allowed:
+            return False, "Notification denied by current policy; no automatic retry."
+        result = await self.tools.call(
+            ToolInvocation(
+                session_id=task.source_session_id,
+                requested_by="local-reminder",
+                call=ToolCall(
+                    call_id=f"{task.task_id}-{task.occurrence}",
+                    name=definition.name,
+                    arguments={
+                        "name": "local_reminder",
+                        "description": "User-reviewed local reminder",
+                        "stages": [
+                            {"text": task.title, "duration_seconds": 2.0},
+                            {"tone": {"frequency_hz": 880, "duration_seconds": 0.3, "volume": 32}},
+                        ],
+                    },
+                ),
+            )
+        )
+        if result.status is not ToolExecutionStatus.SUCCEEDED:
+            if not result.definitely_not_executed:
+                raise RuntimeError("notification outcome uncertain")
+            return (
+                False,
+                "IDE declined the notification before execution. Correct its health first.",
+            )
+        if (result.data or {}).get("completed") is False or (result.data or {}).get("interrupted"):
+            raise RuntimeError("notification interrupted")
+        return (
+            True,
+            f"IDE reported notification success ({result.action_id}). "
+            "Whether the user saw or heard it is not verified.",
+        )
+
+    async def guided_checks(self, step: int = 0) -> dict[str, Any]:
+        """Read a guide step without device or model calls."""
+        from .onboarding import guided_check
+
+        return await asyncio.to_thread(guided_check, step, self._guide_diagnostics)
+
     async def status(self) -> dict[str, Any]:
         """Return service, model, tool, startup, and persistent robot status."""
         self._ensure_started()
@@ -304,6 +486,8 @@ class AgentRuntime:
                     "owner_user_id": owner.user_id if owner is not None else None,
                 },
                 "release": dict(self._release_status()),
+                "local_tasks": self.tasks.status() if self.tasks else {"enabled": False},
+                "execution_limits": self.loop.execution_limits(),
             }
         finally:
             self._end_operation()
@@ -428,8 +612,10 @@ class AgentRuntime:
             MemoryKind.SUCCESSFUL_BEHAVIOR,
             MemoryKind.FAILED_BEHAVIOR,
             MemoryKind.TASK_RECIPE,
+            MemoryKind.PREFERENCE,
+            MemoryKind.EPISODIC_SUMMARY,
         }:
-            raise ValueError("only behavioral memory categories can be managed here")
+            raise ValueError("use a preference, context or behavior memory category")
         memory = self._require_memory()
         await memory.profile(user_id)
         return [
@@ -458,6 +644,8 @@ class AgentRuntime:
                 failed_behavior_cap=failed_behavior_cap,
             )
             self.store.set_retention_days(settings.conversation_retention_days)
+            if self.tasks is not None:
+                self.tasks.set_retention_days(settings.conversation_retention_days)
             pruned_messages = await self.store.prune()
             pruned_memory = await memory.prune()
         return {
@@ -474,7 +662,7 @@ class AgentRuntime:
     async def delete_memory_profile(self, user_id: str) -> None:
         """Delete a non-active member after IDE-owned face data is removed."""
         self._ensure_started()
-        async with self._chat_lock:
+        async with self._chat_lock, self.tasks.paused() if self.tasks else nullcontext():
             memory = self._require_memory()
             profile = await memory.profile(user_id)
             if user_id in set(self._active_users.values()):
@@ -524,7 +712,7 @@ class AgentRuntime:
             or self._rollback_identity_reset is None
         ):
             raise RuntimeError("IDE identity reset is unavailable; robot memory was not changed")
-        async with self._chat_lock:
+        async with self._chat_lock, self.tasks.paused() if self.tasks else nullcontext():
             self._disarm_all_motion()
             self.camera_grants.revoke_all()
             token = await self._prepare_identity_reset()
@@ -547,6 +735,10 @@ class AgentRuntime:
             self._pending_confirmation_prompts.clear()
             self._automatic_memory_notices.clear()
             self.store.set_retention_days(self._initial_memory_settings.conversation_retention_days)
+            if self.tasks is not None:
+                self.tasks.set_retention_days(
+                    self._initial_memory_settings.conversation_retention_days
+                )
             try:
                 face_data_removed = await self._commit_identity_reset(token)
             except BaseException as error:
@@ -873,6 +1065,26 @@ class AgentRuntime:
         invocation: ToolInvocation,
         result: ToolExecutionResult,
     ) -> None:
+        task = CURRENT_TASK.get()
+        if task is not None and self.tasks is not None:
+            status = (
+                TaskStatus.COMPLETED
+                if result.status is ToolExecutionStatus.SUCCEEDED
+                else (TaskStatus.FAILED if result.definitely_not_executed else TaskStatus.UNCERTAIN)
+            )
+            if (result.data or {}).get("completed") is False:
+                status = TaskStatus.FAILED
+            await self.tasks.record_request(
+                task.owner_scope,
+                task.task_id,
+                step=TaskStep(
+                    description=invocation.call.name,
+                    status=status,
+                    evidence=f"status={result.status.value}; action={result.action_id}; "
+                    f"definitely_not_executed={result.definitely_not_executed}; "
+                    f"retry_safety={result.retry_safety.value}",
+                ),
+            )
         notice: str | None = None
         if isinstance(result.data, dict):
             user_message = result.data.get("user_message")
@@ -1516,16 +1728,26 @@ class AgentRuntime:
         if self._closed:
             return
         self._closed = True
+        cleanup: list[Callable[[], Awaitable[object]]] = []
+        if self.tasks is not None:
+            cleanup.append(self.tasks.close)
         if self._voice_input is not None:
-            await self._voice_input.close()
+            cleanup.append(self._voice_input.close)
         self._disarm_all_motion()
         self.camera_grants.revoke_all()
-        await self.tools.close()
-        await self.provider.close()
+        cleanup.extend((self.tools.close, self.provider.close))
         if self.memory is not None:
-            await self.memory.close()
-        await self.store.close()
+            cleanup.append(self.memory.close)
+        cleanup.append(self.store.close)
+        first_error: BaseException | None = None
+        for operation in cleanup:
+            try:
+                await operation()
+            except BaseException as error:
+                first_error = first_error or error
         self._started = False
+        if first_error is not None:
+            raise first_error
 
     async def provider_health(self) -> ProviderHealth:
         """Return model health for lightweight UI checks."""

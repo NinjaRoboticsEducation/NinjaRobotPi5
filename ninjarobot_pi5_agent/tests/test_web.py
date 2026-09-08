@@ -715,7 +715,8 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert 'class="orientation-blocker"' in html
     assert 'rel="manifest"' in html
     assert 'id="startControllerButton"' in html
-    assert "maximum-scale=1, user-scalable=no" in html
+    assert "user-scalable=no" not in html
+    assert "maximum-scale=1" not in html
     assert "Agent Controller" not in html
     assert "AI motion disarmed" not in html
     assert "DIRECT CONTROL" not in html
@@ -772,3 +773,35 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert "trapDialogFocus" in javascript
     assert 'localStorage.setItem("ninjarobotLocale"' in javascript
     assert (static / "manifest.webmanifest").is_file()
+
+
+def test_emergency_stop_revokes_before_dispatch_without_motion_queue() -> None:
+    class StopRuntime(_ResumeRuntime):
+        def revoke_camera(self, session_id: str) -> None:
+            self.disarmed.append(f"camera:{session_id}")
+
+        async def execute_tool(self, **arguments: Any) -> ToolExecutionResult:
+            assert self.disarmed == [
+                "web-control-test",
+                "web-chat-test",
+                "voice:lease-test",
+                "camera:web-chat-test",
+            ]
+            assert arguments["tool_name"] == "robot.behavior.stop"
+            return ToolExecutionResult(
+                call_id="stop",
+                tool_name=arguments["tool_name"],
+                status=ToolExecutionStatus.SUCCEEDED,
+                data={"stopped": True},
+            )
+
+    async def exercise() -> None:
+        controller = WebRobotController(cast(AgentRuntime, StopRuntime()))
+        await controller._motion_command_lock.acquire()
+        try:
+            result = await asyncio.wait_for(controller.emergency_stop("lease-test"), 0.5)
+            assert result["data"]["stopped"]
+        finally:
+            controller._motion_command_lock.release()
+
+    asyncio.run(exercise())

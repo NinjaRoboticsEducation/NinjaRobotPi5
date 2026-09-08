@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import importlib
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Any, Protocol, TypeVar, cast
 
 from .config import SUPPORTED_SERVO_ENDPOINTS
 from .errors import IDEError
@@ -83,6 +83,18 @@ class ServoRuntime:
 
 
 ServoFactory = Callable[[tuple[str, ...], str, int, int], ServoRuntime]
+MoveHandler = Callable[..., Awaitable[dict[str, Any]]]
+ThreadResult = TypeVar("ThreadResult")
+
+
+async def _complete_thread(call: Callable[[], ThreadResult]) -> ThreadResult:
+    """Join a device write before releasing its lock after cancellation."""
+    worker = asyncio.create_task(asyncio.to_thread(call))
+    try:
+        return await asyncio.shield(worker)
+    except asyncio.CancelledError:
+        await worker
+        raise
 
 
 def _load_servo_runtime(
@@ -137,6 +149,7 @@ class ServoDevice:
         group_motion_enabled: bool = False,
         runtime_factory: ServoFactory | None = None,
         simulated: bool = False,
+        enabled: bool = True,
     ) -> None:
         if not endpoints:
             raise ValueError("servo device requires at least one endpoint")
@@ -160,12 +173,49 @@ class ServoDevice:
         self._group_motion_enabled = group_motion_enabled
         self._runtime_factory = runtime_factory or _load_servo_runtime
         self._simulated = simulated
+        self._enabled = enabled
         self._runtime: ServoRuntime | None = None
         self._startup_error: str | None = None
         self._start_attempted = False
         self._movement_task: asyncio.Task[bool] | None = None
         self._state_lock = asyncio.Lock()
         self._closed = False
+        self._motion_guard: Callable[[], None] | None = None
+        self._stop_generation = 0
+
+    def set_motion_guard(self, guard: Callable[[], None]) -> None:
+        """Bind the owning IDE controller's checks before exposing movement."""
+        self._motion_guard = guard
+
+    def _check_motion(self, generation: int | None = None) -> None:
+        if generation is not None and generation != self._stop_generation:
+            raise _servo_error(
+                code="SERVO_INTERRUPTED",
+                message="A stop interrupted servo preparation.",
+                technical_detail=None,
+                definitely_not_executed=False,
+                retry_safety=RetrySafety.UNKNOWN,
+                capability="servo.move",
+            )
+        if self._motion_guard is not None:
+            try:
+                self._motion_guard()
+            except IDEError as exc:
+                if generation is not None:
+                    raise IDEError(
+                        exc.details.model_copy(
+                            update={
+                                "definitely_not_executed": False,
+                                "retry_safety": RetrySafety.UNKNOWN,
+                            }
+                        )
+                    ) from exc
+                raise
+
+    @property
+    def enabled(self) -> bool:
+        """Return the configured device availability switch."""
+        return self._enabled
 
     @property
     def simulated(self) -> bool:
@@ -206,6 +256,8 @@ class ServoDevice:
         """Center and move one explicitly calibrated endpoint."""
         async with self._state_lock:
             runtime = self._require_runtime_locked("servo.move")
+            self._check_motion()
+            generation = self._stop_generation
             if not self._motion_enabled:
                 raise _servo_error(
                     code="SERVO_MOTION_DISABLED",
@@ -230,7 +282,7 @@ class ServoDevice:
                     retry_safety=RetrySafety.SAFE,
                     capability="servo.move",
                 )
-            if self._movement_task is not None and not self._movement_task.done():
+            if self._movement_task is not None:
                 raise _servo_error(
                     code="SERVO_BUSY",
                     message="Another servo movement is already running.",
@@ -264,8 +316,15 @@ class ServoDevice:
                 )
 
             try:
-                await asyncio.to_thread(servo.move_to_center)
+                await _complete_thread(servo.move_to_center)
+                self._check_motion(generation)
+            except asyncio.CancelledError:
+                await _complete_thread(runtime.group.off)
+                raise
             except Exception as exc:
+                await _complete_thread(runtime.group.off)
+                if isinstance(exc, IDEError):
+                    raise
                 raise _servo_error(
                     code="SERVO_CENTER_FAILED",
                     message=f"Servo endpoint {endpoint} could not reach its calibrated center.",
@@ -278,9 +337,12 @@ class ServoDevice:
             targets: list[float | None] = [
                 target_angle if item == endpoint else None for item in self._endpoints
             ]
-            movement_task = asyncio.create_task(
-                runtime.group.move_all_async(targets, speed_mode=speed_mode)
-            )
+
+            async def move_prepared() -> bool:
+                self._check_motion(generation)
+                return await runtime.group.move_all_async(targets, speed_mode=speed_mode)
+
+            movement_task = asyncio.create_task(move_prepared())
             self._movement_task = movement_task
 
         interrupted = False
@@ -291,6 +353,8 @@ class ServoDevice:
             await self.stop()
             raise
         except Exception as exc:
+            if isinstance(exc, IDEError):
+                raise
             raise _servo_error(
                 code="SERVO_MOVE_FAILED",
                 message=f"Servo endpoint {endpoint} could not complete its movement.",
@@ -301,8 +365,11 @@ class ServoDevice:
             ) from exc
         finally:
             async with self._state_lock:
-                if self._movement_task is movement_task:
-                    self._movement_task = None
+                try:
+                    await _complete_thread(runtime.group.off)
+                finally:
+                    if self._movement_task is movement_task:
+                        self._movement_task = None
 
         return {
             "endpoint": endpoint,
@@ -321,6 +388,8 @@ class ServoDevice:
         """Center and command multiple calibrated endpoints as one drive action."""
         async with self._state_lock:
             runtime = self._require_runtime_locked("servo.move_group")
+            self._check_motion()
+            generation = self._stop_generation
             if not self._motion_enabled:
                 raise _servo_error(
                     code="SERVO_MOTION_DISABLED",
@@ -370,7 +439,7 @@ class ServoDevice:
                     retry_safety=RetrySafety.SAFE,
                     capability="servo.move_group",
                 )
-            if self._movement_task is not None and not self._movement_task.done():
+            if self._movement_task is not None:
                 raise _servo_error(
                     code="SERVO_BUSY",
                     message="Another servo movement is already running.",
@@ -404,12 +473,22 @@ class ServoDevice:
                         capability="servo.move_group",
                     )
                 servos.append((endpoint, servo))
+
+            def center_group() -> None:
+                for _endpoint, servo in servos:
+                    self._check_motion(generation)
+                    servo.move_to_center()
+
             try:
-                await asyncio.gather(
-                    *(asyncio.to_thread(servo.move_to_center) for _endpoint, servo in servos)
-                )
+                await _complete_thread(center_group)
+                self._check_motion(generation)
+            except asyncio.CancelledError:
+                await _complete_thread(runtime.group.off)
+                raise
             except Exception as exc:
-                await asyncio.to_thread(runtime.group.off)
+                await _complete_thread(runtime.group.off)
+                if isinstance(exc, IDEError):
+                    raise
                 raise _servo_error(
                     code="SERVO_CENTER_FAILED",
                     message="The drive servos could not reach their calibrated stop values.",
@@ -419,9 +498,12 @@ class ServoDevice:
                     capability="servo.move_group",
                 ) from exc
             ordered_targets = [targets.get(endpoint) for endpoint in self._endpoints]
-            movement_task = asyncio.create_task(
-                runtime.group.move_all_async(ordered_targets, speed_mode=speed_mode)
-            )
+
+            async def move_prepared_group() -> bool:
+                self._check_motion(generation)
+                return await runtime.group.move_all_async(ordered_targets, speed_mode=speed_mode)
+
+            movement_task = asyncio.create_task(move_prepared_group())
             self._movement_task = movement_task
 
         try:
@@ -431,6 +513,8 @@ class ServoDevice:
             raise
         except Exception as exc:
             await self.stop()
+            if isinstance(exc, IDEError):
+                raise
             raise _servo_error(
                 code="SERVO_MOVE_FAILED",
                 message="The coordinated servo movement failed.",
@@ -454,6 +538,7 @@ class ServoDevice:
 
     def emergency_stop_sync(self) -> bool:
         """Best-effort direct zero pulse for a watchdog thread."""
+        self._stop_generation += 1
         runtime = self._runtime
         if runtime is None:
             return False
@@ -463,37 +548,44 @@ class ServoDevice:
 
     async def stop(self) -> dict[str, Any]:
         """Abort movement and set every configured servo output to zero."""
+        self._stop_generation += 1
         async with self._state_lock:
             runtime = self._runtime
             movement_task = self._movement_task
             if runtime is not None:
                 runtime.group.abort()
 
-        if (
-            movement_task is not None
-            and movement_task is not asyncio.current_task()
-            and not movement_task.done()
-        ):
-            try:
-                await asyncio.wait_for(
-                    asyncio.shield(movement_task),
-                    timeout=MOVE_STOP_TIMEOUT_SECONDS,
-                )
-            except Exception:
-                pass
-
-        if runtime is not None:
-            try:
-                await asyncio.to_thread(runtime.group.off)
-            except Exception as exc:
-                raise _servo_error(
-                    code="SERVO_STOP_FAILED",
-                    message="The servo backends could not confirm zero pulse on every endpoint.",
-                    technical_detail=f"{type(exc).__name__}: {exc}",
-                    definitely_not_executed=False,
-                    retry_safety=RetrySafety.SAFE,
-                    capability="servo.stop",
-                ) from exc
+        try:
+            if (
+                movement_task is not None
+                and movement_task is not asyncio.current_task()
+                and not movement_task.done()
+            ):
+                try:
+                    await asyncio.wait_for(asyncio.shield(movement_task), MOVE_STOP_TIMEOUT_SECONDS)
+                except TimeoutError:
+                    pass
+                except asyncio.CancelledError:
+                    current = asyncio.current_task()
+                    if current is not None and current.cancelling():
+                        raise
+                except Exception:
+                    pass
+        finally:
+            if runtime is not None:
+                try:
+                    await _complete_thread(runtime.group.off)
+                except Exception as exc:
+                    raise _servo_error(
+                        code="SERVO_STOP_FAILED",
+                        message=(
+                            "The servo backends could not confirm zero pulse on every endpoint."
+                        ),
+                        technical_detail=f"{type(exc).__name__}: {exc}",
+                        definitely_not_executed=False,
+                        retry_safety=RetrySafety.SAFE,
+                        capability="servo.stop",
+                    ) from exc
         return {
             "stopped": True,
             "driver_available": runtime is not None,
@@ -521,6 +613,8 @@ class ServoDevice:
                 await asyncio.to_thread(runtime.group.close)
 
     async def _initialize_locked(self) -> None:
+        if not self._enabled:
+            return
         try:
             self._runtime = await asyncio.to_thread(
                 self._runtime_factory,
@@ -535,6 +629,15 @@ class ServoDevice:
             self._startup_error = f"{type(exc).__name__}: {exc}"
 
     def _require_runtime_locked(self, capability: str) -> ServoRuntime:
+        if not self._enabled:
+            raise _servo_error(
+                code="SERVO_DISABLED",
+                message="The servo device is disabled by configuration.",
+                technical_detail=None,
+                definitely_not_executed=True,
+                retry_safety=RetrySafety.SAFE,
+                capability=capability,
+            )
         if self._runtime is None:
             raise _servo_error(
                 code="SERVO_UNAVAILABLE",
@@ -668,8 +771,9 @@ class ServoMoveAdapter:
         confirmation_required=True,
     )
 
-    def __init__(self, device: ServoDevice) -> None:
+    def __init__(self, device: ServoDevice, *, move_handler: MoveHandler | None = None) -> None:
         self._device = device
+        self._move = move_handler or device.move
 
     async def start(self) -> None:
         await self._device.start()
@@ -703,7 +807,7 @@ class ServoMoveAdapter:
                 "speed_mode must be S, M, or F",
                 capability="servo.move",
             )
-        return await self._device.move(
+        return await self._move(
             endpoint=endpoint,
             target_angle=float(target_angle),
             speed_mode=speed_mode,
@@ -739,7 +843,7 @@ class ServoStopAdapter:
             "additionalProperties": False,
         },
         risk=RiskLevel.EMERGENCY,
-        resources=(),
+        resources=SERVO_RESOURCES,
         default_timeout_seconds=2.0,
         idempotent=True,
         cancellable=False,

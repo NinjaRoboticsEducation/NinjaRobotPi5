@@ -20,6 +20,7 @@ from .display import (
     DisplayClearAdapter,
     DisplayShowTextAdapter,
 )
+from .distance import VL53L0XDistanceAdapter
 from .engine import ExecutionEngine
 from .errors import IDEError
 from .identity import FaceIdentityDevice
@@ -46,7 +47,8 @@ from .models import (
 )
 from .registry import CapabilityRegistry
 from .robot import RobotAssembly
-from .servo import ServoMoveAdapter, ServoStatusAdapter, ServoStopAdapter
+from .safety import MotionController, SafetyStateStore
+from .servo import ServoDevice, ServoMoveAdapter, ServoStatusAdapter, ServoStopAdapter
 from .voice_input import (
     TranscriptHandler,
     VoiceInputController,
@@ -668,7 +670,7 @@ class RobotIDEClient:
         return await self._engine.cancel(action_id)
 
     async def health(self) -> HealthReport:
-        return await self._engine.health()
+        return self.robot.annotate_health(await self._engine.health())
 
     def status(self) -> dict[str, Any]:
         """Return non-invasive robot state for agent readiness reporting."""
@@ -678,11 +680,54 @@ class RobotIDEClient:
         if self._closed:
             return
         self._closed = True
+        operations: list[Callable[[], Awaitable[object]]] = []
         if self._voice_input is not None:
-            await self._voice_input.stop()
-        await self._identity.close()
-        await self._engine.close()
-        await self.robot.close()
+            operations.append(self._voice_input.stop)
+        operations.extend((self._identity.close, self._engine.close, self.robot.close))
+        first_error: BaseException | None = None
+        for operation in operations:
+            try:
+                await operation()
+            except BaseException as exc:
+                first_error = first_error or exc
+        if first_error is not None:
+            raise first_error
+
+
+def build_guarded_servo_engine(config: RobotConfig, *, ledger_path: str | Path) -> ExecutionEngine:
+    """Keep retained real servo commands inside the IDE owner and motion guard.
+
+    Only servo and distance devices are initialized; this maintenance route does
+    not start camera, microphone, greetings, web services or the Agent runtime.
+    """
+    settings = config.hardware.servos
+    i2c = config.hardware.i2c
+    servo = ServoDevice(
+        enabled=settings.enabled,
+        endpoints=settings.endpoints,
+        calibration_file=settings.calibration_file,
+        i2c_bus=i2c.bus,
+        dfr0566_address=i2c.dfr0566_address,
+        motion_enabled=settings.motion_enabled,
+        group_motion_enabled=settings.group_motion_enabled,
+    )
+    distance = VL53L0XDistanceAdapter(i2c_bus=i2c.bus, i2c_address=i2c.vl53l0x_address)
+    motion = MotionController(
+        servo=servo,
+        distance=distance,
+        config=config.behaviors,
+        state=SafetyStateStore(config.behaviors.safety_state_file),
+    )
+    servo.set_motion_guard(motion.require_motion_context)
+    registry = CapabilityRegistry(
+        [
+            ServoMoveAdapter(servo, move_handler=motion.move_endpoint),
+            ServoStatusAdapter(servo),
+            ServoStopAdapter(servo),
+            distance,
+        ]
+    )
+    return ExecutionEngine(registry, ActionLedger(ledger_path), owns_hardware=True)
 
 
 def build_robot_ide_client(
@@ -734,7 +779,7 @@ def build_robot_ide_client(
         BuzzerToneAdapter(robot.buzzer),
         BuzzerStopAdapter(robot.buzzer),
         ServoStatusAdapter(robot.servo),
-        ServoMoveAdapter(robot.servo),
+        ServoMoveAdapter(robot.servo, move_handler=robot.move_servo_endpoint),
         ServoStopAdapter(robot.servo),
         CameraStatusAdapter(robot.camera),
         CameraCaptureAdapter(robot.camera),
@@ -744,7 +789,11 @@ def build_robot_ide_client(
         MicrophoneTranscribeAdapter(robot.microphone, transcriber),
     ):
         registry.register(adapter)
-    engine = ExecutionEngine(registry, ActionLedger(ledger_path))
+    engine = ExecutionEngine(
+        registry,
+        ActionLedger(ledger_path),
+        execution_guard=lambda request: robot.ensure_action_allowed(request.capability),
+    )
     identity = FaceIdentityDevice(
         robot.camera,
         data_directory=config.memory.face_data_directory,

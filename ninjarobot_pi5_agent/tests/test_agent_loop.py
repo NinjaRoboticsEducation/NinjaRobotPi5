@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import logging
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from ninjarobot_pi5_agent.agent_loop import _is_camera_preview_request
+from ninjarobot_pi5_agent.events import CURRENT_LIFECYCLE
 from ninjarobot_pi5_agent.testing import FakeProvider
 from ninjarobot_pi5_ide.testing import FakeIDEClient
 
@@ -223,6 +226,105 @@ async def build_loop(
         id_factory=_IDs(),
     )
     return loop, store, registry, ide
+
+
+def test_lifecycle_logs_correlate_request_without_user_content(tmp_path, caplog) -> None:
+    caplog.set_level(logging.INFO, logger="ninjarobot.lifecycle")
+
+    async def exercise() -> None:
+        loop, store, registry, _ = await build_loop(
+            tmp_path,
+            [ModelTurn(request_id="id-2", text="private answer", finish_reason=FinishReason.STOP)],
+        )
+        await loop.chat(session_id="private-user-session", text="private question")
+        assert CURRENT_LIFECYCLE.get() is None
+        records = [
+            json.loads(r.message) for r in caplog.records if r.name == "ninjarobot.lifecycle"
+        ]
+        assert [r["phase"] for r in records] == ["thinking", "thinking", "completed"]
+        assert len({r["request_id"] for r in records}) == 1
+        assert all("timestamp" in r and "reason" in r and "outcome" in r for r in records)
+        assert "private question" not in caplog.text
+        assert "private answer" not in caplog.text
+        assert "private-user-session" not in caplog.text
+        await registry.close()
+        await store.close()
+
+    asyncio.run(exercise())
+
+
+def test_safe_retries_share_the_request_execution_budget(tmp_path):
+    from unittest.mock import AsyncMock
+
+    from ninjarobot_pi5_agent.agent_loop import TOOL_BUDGET
+    from ninjarobot_pi5_agent.models import ToolExecutionResult, ToolExecutionStatus
+    from ninjarobot_pi5_agent.tools import CancellationToken
+
+    async def exercise():
+        loop, store, registry, _ = await build_loop(tmp_path, [])
+        registry.call = AsyncMock(
+            return_value=ToolExecutionResult(
+                call_id="retry-check",
+                tool_name="robot.distance.read",
+                status=ToolExecutionStatus.FAILED,
+                error="Unavailable before execution",
+                definitely_not_executed=True,
+                retry_safety=RetrySafety.SAFE,
+            )
+        )
+        token = TOOL_BUDGET.set([1])
+        try:
+            call = ToolCall(call_id="retry-check", name="robot.distance.read", arguments={})
+            result = await loop._execute_call(
+                call,
+                session_id="budget",
+                lease_id=None,
+                confirmed=False,
+                duplicate=False,
+                cancellation=CancellationToken(),
+            )
+            assert result.status is ToolExecutionStatus.FAILED
+            assert registry.call.await_count == 1
+            assert TOOL_BUDGET.get() == [0]
+            with pytest.raises(AgentLoopError, match="budget exhausted"):
+                await loop._execute_call(
+                    call,
+                    session_id="budget",
+                    lease_id=None,
+                    confirmed=False,
+                    duplicate=False,
+                    cancellation=CancellationToken(),
+                )
+            assert registry.call.await_count == 1
+        finally:
+            TOOL_BUDGET.reset(token)
+            await registry.close()
+            await store.close()
+
+    asyncio.run(exercise())
+
+
+def test_lifecycle_logs_cancellation_and_clears_trace(tmp_path, caplog) -> None:
+    caplog.set_level(logging.INFO, logger="ninjarobot.lifecycle")
+
+    async def exercise() -> None:
+        from ninjarobot_pi5_agent import CancellationToken
+
+        loop, store, registry, _ = await build_loop(tmp_path, [])
+        token = CancellationToken()
+        token.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await loop.chat(session_id="session", text="private question", cancellation=token)
+        assert CURRENT_LIFECYCLE.get() is None
+        records = [
+            json.loads(r.message) for r in caplog.records if r.name == "ninjarobot.lifecycle"
+        ]
+        assert records[-1]["phase"] == "interrupted"
+        assert records[-1]["reason"] == "cancelled"
+        await registry.close()
+        await store.close()
+
+    asyncio.run(exercise())
 
 
 async def build_streaming_loop(
@@ -1210,5 +1312,22 @@ def test_agent_loop_stops_at_model_turn_limit(tmp_path) -> None:
             await loop.chat(session_id="session-1", text="Keep checking")
         await registry.close()
         await store.close()
+
+    asyncio.run(exercise())
+
+
+def test_input_budget_rejects_before_provider_or_tool_calls(tmp_path) -> None:
+    async def exercise():
+        loop, store, registry, ide = await build_loop(
+            tmp_path, [], config=AgentLoopConfig(max_prompt_characters=4096)
+        )
+        try:
+            with pytest.raises(AgentLoopError, match="model-input budget"):
+                await loop.chat(session_id="budget", text="x" * 5000)
+            assert loop._provider.requests == []
+            assert ide.requests == []
+        finally:
+            await registry.close()
+            await store.close()
 
     asyncio.run(exercise())

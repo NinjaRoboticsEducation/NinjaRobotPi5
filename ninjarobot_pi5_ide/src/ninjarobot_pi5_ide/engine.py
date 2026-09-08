@@ -7,6 +7,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 
 from .errors import IDEError
+from .hardware_ownership import HardwareOwnership
 from .ledger import ActionLedger
 from .models import (
     ActionRecord,
@@ -19,11 +20,13 @@ from .models import (
     LifecycleState,
     ResourceHealth,
     RetrySafety,
+    RiskLevel,
 )
 from .registry import CapabilityRegistry
-from .scheduler import QueueCapacityError, ResourceScheduler
+from .scheduler import QueueCapacityError, ResourceScheduler, StopInProgressError
 
 Clock = Callable[[], datetime]
+INTERRUPT_CAPABILITIES = frozenset({"behavior.stop", "servo.stop", "buzzer.stop"})
 
 
 class ExecutionEngine:
@@ -36,6 +39,8 @@ class ExecutionEngine:
         *,
         scheduler: ResourceScheduler | None = None,
         clock: Clock | None = None,
+        owns_hardware: bool = False,
+        execution_guard: Callable[[ActionRequest], None] | None = None,
     ) -> None:
         self._registry = registry
         self._ledger = ledger
@@ -44,6 +49,8 @@ class ExecutionEngine:
         self._state = LifecycleState.CREATED
         self._start_lock = asyncio.Lock()
         self._tasks: dict[str, asyncio.Task[ActionResult]] = {}
+        self._hardware_ownership = HardwareOwnership() if owns_hardware else None
+        self._execution_guard = execution_guard
 
     @property
     def state(self) -> LifecycleState:
@@ -59,13 +66,19 @@ class ExecutionEngine:
                 raise RuntimeError(f"engine cannot start from state {self._state}")
             self._state = LifecycleState.STARTING
             try:
+                if self._hardware_ownership is not None:
+                    self._hardware_ownership.acquire()
                 await self._registry.start()
                 await self._scheduler.start()
                 self._recover_unfinished_actions()
             except BaseException:
                 self._state = LifecycleState.FAILED
-                await self._scheduler.close()
-                await self._registry.close()
+                try:
+                    await self._scheduler.close()
+                    await self._registry.close()
+                finally:
+                    if self._hardware_ownership is not None:
+                        self._hardware_ownership.release()
                 raise
             self._state = LifecycleState.RUNNING
 
@@ -141,7 +154,8 @@ class ExecutionEngine:
     async def health(self) -> HealthReport:
         """Return adapter, scheduler, and ledger health without executing actions."""
         await self._ensure_running()
-        components = await self._registry.health()
+        capabilities = await self._registry.capability_health()
+        components = {name: item.status for name, item in capabilities.items()}
         components["scheduler"] = ResourceHealth.READY
         components["action_ledger"] = ResourceHealth.READY
         overall = (
@@ -157,7 +171,9 @@ class ExecutionEngine:
             status=overall,
             components=components,
             checked_at=self._now(),
-            detail="Health checks do not execute capability actions.",
+            detail="Software status only; not a physical device test or execution permission. "
+            "Refresh after five seconds or any configuration or safety change.",
+            capabilities=capabilities,
         )
 
     async def close(self) -> None:
@@ -180,7 +196,11 @@ class ExecutionEngine:
             await self._registry.close()
         except BaseException as exc:
             first_error = first_error or exc
-        self._ledger.close()
+        try:
+            self._ledger.close()
+        finally:
+            if self._hardware_ownership is not None:
+                self._hardware_ownership.release()
         self._state = LifecycleState.CLOSED if first_error is None else LifecycleState.FAILED
         if first_error is not None:
             raise first_error
@@ -240,6 +260,8 @@ class ExecutionEngine:
                         raise TimeoutError("deadline expired immediately before adapter execution")
                     timeout = min(timeout, remaining)
                 try:
+                    if self._execution_guard is not None:
+                        self._execution_guard(request)
                     data = await asyncio.wait_for(adapter.execute(request.arguments), timeout)
                 except TimeoutError as exc:
                     retry = RetrySafety.SAFE if descriptor.idempotent else RetrySafety.UNKNOWN
@@ -294,7 +316,25 @@ class ExecutionEngine:
                 )
 
             try:
-                result = await self._scheduler.run(descriptor.resources, invoke)
+                if (
+                    descriptor.name in INTERRUPT_CAPABILITIES
+                    and descriptor.risk is RiskLevel.EMERGENCY
+                    and not request.arguments
+                ):
+                    result = await self._scheduler.interrupt(descriptor.resources, invoke)
+                else:
+                    result = await self._scheduler.run(descriptor.resources, invoke)
+            except StopInProgressError as exc:
+                result = self._failed_result(
+                    request,
+                    code="ACTION_STOP_IN_PROGRESS",
+                    message="The requested resources are being stopped. Issue a new request later.",
+                    technical_detail=str(exc),
+                    started_at=started_at,
+                    definitely_not_executed=True,
+                    retry_safety=RetrySafety.SAFE,
+                    status=ActionStatus.REJECTED,
+                )
             except QueueCapacityError as exc:
                 result = self._failed_result(
                     request,

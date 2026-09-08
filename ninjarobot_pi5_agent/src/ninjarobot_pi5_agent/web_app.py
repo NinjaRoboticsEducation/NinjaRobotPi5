@@ -629,6 +629,15 @@ async def _dispatch_web_message(
     poweroff_authorized: bool = False,
 ) -> dict[str, Any]:
     kind = _required_string(message, "type")
+    if kind == "guided_checks":
+        return await controller.guided_checks(message.get("step", 0))
+    if kind == "tasks":
+        return await controller.task_action(
+            lease_id,
+            message.get("operation", "list"),
+            message.get("task_id", ""),
+            message.get("minutes", 5),
+        )
     if kind == "move_start":
         return await controller.start_movement(
             lease_id,

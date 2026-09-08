@@ -20,6 +20,18 @@ deferred. Scope confirmation is recorded; no implementation is marked complete.
 This document is the main planning reference for the next stage. Current behavior
 remains documented in the [local knowledge base][N-wiki] and verified against code.
 
+**Implementation progress — 9 September 2026:** Phase 2 core code is implemented
+and the combined software gate passes 734 tests. Development pauses here for owner
+manual testing; phases 3–5 have not started. The managed face cleanup was approved and implemented on 9 September; the font
+repair still awaits separate approval. T07 has bounded usage/retries/time, but strict
+currency-denominated spending enforcement remains an explicit requirement gap.
+Physical validation is outstanding. The latest owner instruction consolidates
+manual/wiki updates once at this checkpoint, replacing the earlier all-phases
+deferral. See the [progress record](../docs/validation/refinement_progress_260907.md)
+and [walkthrough](../docs/validation/refinement_phase2_walkthrough_260909.md).
+The original planning checklist and evidence below are retained as historical
+scope; they are not a claim that every approved refinement has shipped.
+
 ## Contents
 
 - [0. Owner decisions and scope](#0-owner-decisions-and-scope)

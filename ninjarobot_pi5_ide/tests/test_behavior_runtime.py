@@ -854,3 +854,45 @@ class _LifecycleAssets:
 
     def load(self, name: str) -> BehaviorDefinition:
         return self._definitions[name]
+
+
+def test_full_stop_dispatches_motor_cleanup_before_blocked_expression_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def exercise() -> None:
+        config = load_robot_config(EXAMPLE).model_copy(
+            update={
+                "behaviors": BehaviorConfig(
+                    user_directory=str(tmp_path / "behaviors"),
+                    safety_state_file=str(tmp_path / "safety.json"),
+                    system_stopped_display_seconds=0,
+                ),
+            }
+        )
+        robot = RobotAssembly(config=config, simulated=True)
+        stopped = asyncio.Event()
+        release = asyncio.Event()
+        original = robot.servo.stop
+
+        async def record_stop() -> dict[str, Any]:
+            stopped.set()
+            return await original()
+
+        async def blocked() -> None:
+            await release.wait()
+
+        monkeypatch.setattr(robot.servo, "stop", record_stop)
+        monkeypatch.setattr(robot, "_stop_idle", blocked)
+        task = asyncio.create_task(robot.stop())
+        try:
+            await asyncio.wait_for(stopped.wait(), 0.5)
+            assert robot.system_safety.stopped
+            assert not task.done()
+        finally:
+            release.set()
+            result = await task
+            assert result["level"] == 2
+            await robot.close()
+
+    asyncio.run(exercise())

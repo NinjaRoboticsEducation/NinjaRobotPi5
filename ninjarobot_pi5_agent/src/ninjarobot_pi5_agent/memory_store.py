@@ -289,6 +289,69 @@ class MemoryStore:
     async def memory(self, user_id: str, memory_id: str) -> MemoryItem:
         return await asyncio.to_thread(self._memory_sync, user_id, memory_id)
 
+    async def correct_preference(
+        self,
+        user_id: str,
+        memory_id: str,
+        text: str | None = None,
+    ) -> MemoryItem:
+        """Record direct user confirmation/correction without altering technical outcomes."""
+        return await asyncio.to_thread(self._correct_preference_sync, user_id, memory_id, text)
+
+    def _correct_preference_sync(
+        self,
+        user_id: str,
+        memory_id: str,
+        text: str | None,
+    ) -> MemoryItem:
+        with self._lock, self._require_connection() as connection:
+            item = _memory_from_row(self._memory_row(connection, user_id, memory_id))
+            if item.kind is not MemoryKind.PREFERENCE:
+                raise ValueError(
+                    "only preferences can be confirmed or edited; technical evidence is preserved"
+                )
+            if text is not None and not 1 <= len(text.strip()) <= 2000:
+                raise ValueError("corrected preference must contain 1 through 2000 characters")
+            now = datetime.now(UTC)
+            key = item.payload.get("preference_key") or item.payload.get("suggested_preference_key")
+            if isinstance(key, str):
+                row = self._upsert_preference_row(
+                    connection,
+                    user_id=user_id,
+                    key=key,
+                    value=text.strip() if text is not None else item.payload["value"],
+                    source="direct user correction or confirmation",
+                    confidence=1.0,
+                    inferred=False,
+                    actor="local-user-review",
+                    now=now,
+                )
+                if item.payload.get("suggested_preference_key"):
+                    connection.execute("DELETE FROM memory_items WHERE memory_id=?", (memory_id,))
+                    connection.execute("DELETE FROM memory_fts WHERE memory_id=?", (memory_id,))
+                return _memory_from_row(row)
+            payload = {
+                **item.payload,
+                "inferred": False,
+                "last_confirmed_at": _utc(now),
+                "review_reason": "direct user correction or confirmation",
+            }
+            content = text.strip() if text is not None else item.content
+            connection.execute(
+                "UPDATE memory_items SET content=?, payload_json=?, confidence=1, updated_at=? "
+                "WHERE user_id=? AND memory_id=?",
+                (content, json.dumps(payload, ensure_ascii=False), _utc(now), user_id, memory_id),
+            )
+            self._sync_fts(connection, memory_id, user_id, item.kind, content)
+            self._audit(
+                connection,
+                "correct_preference",
+                "local-user-review",
+                target_user_id=user_id,
+                target_memory_id=memory_id,
+            )
+            return _memory_from_row(self._memory_row(connection, user_id, memory_id))
+
     async def memories(
         self,
         user_id: str,
@@ -503,6 +566,7 @@ class MemoryStore:
 
     def _reset_all_sync(self, defaults: MemorySettings) -> dict[str, int]:
         table_names = (
+            "local_tasks",
             "users",
             "face_profiles",
             "preferences",
@@ -520,6 +584,7 @@ class MemoryStore:
                 for table in table_names
             }
             connection.execute("DELETE FROM memory_fts")
+            connection.execute("DELETE FROM local_tasks")
             connection.execute("DELETE FROM sessions")
             connection.execute("DELETE FROM users")
             connection.execute("DELETE FROM memory_audit_events")
@@ -891,6 +956,61 @@ class MemoryStore:
         timestamp = _utc(now)
         preference_id = f"preference:{user_id}:{normalized_key}"
         content = f"{normalized_key}: {json.dumps(value, ensure_ascii=False, sort_keys=True)}"
+        current = connection.execute(
+            "SELECT value_json, inferred FROM preferences WHERE user_id=? AND preference_key=?",
+            (user_id, normalized_key),
+        ).fetchone()
+        if (
+            inferred
+            and current is not None
+            and not current["inferred"]
+            and (json.loads(current["value_json"]) == value)
+        ):
+            confirmed = connection.execute(
+                "SELECT * FROM memory_items WHERE user_id=? AND kind='preference' "
+                "AND json_extract(payload_json, '$.preference_key')=?",
+                (user_id, normalized_key),
+            ).fetchone()
+            if confirmed is not None:
+                assert isinstance(confirmed, sqlite3.Row)
+                return confirmed
+        if (
+            inferred
+            and current is not None
+            and not current["inferred"]
+            and (json.loads(current["value_json"]) != value)
+        ):
+            # An inference cannot silently overwrite the user's confirmed preference.
+            proposal_id = _id("memory")
+            payload = {
+                "suggested_preference_key": normalized_key,
+                "value": value,
+                "inferred": True,
+                "source": source,
+                "review_reason": "conflicts with a confirmed preference; needs user review",
+            }
+            connection.execute(
+                "INSERT INTO memory_items(memory_id,user_id,kind,content,payload_json,"
+                "confidence,sensitive,created_at,updated_at) VALUES (?,?,'preference',?,?,?,0,?,?)",
+                (
+                    proposal_id,
+                    user_id,
+                    content,
+                    json.dumps(payload, ensure_ascii=False),
+                    confidence,
+                    timestamp,
+                    timestamp,
+                ),
+            )
+            self._sync_fts(connection, proposal_id, user_id, MemoryKind.PREFERENCE, content)
+            self._audit(
+                connection,
+                "preference_conflict",
+                actor,
+                target_user_id=user_id,
+                target_memory_id=proposal_id,
+            )
+            return self._memory_row(connection, user_id, proposal_id)
         connection.execute(
             """
             INSERT INTO preferences(
@@ -944,6 +1064,10 @@ class MemoryStore:
                         "value": value,
                         "source": source,
                         "inferred": inferred,
+                        "last_confirmed_at": timestamp if not inferred else None,
+                        "review_reason": "explicit preference"
+                        if not inferred
+                        else "unconfirmed inference",
                     },
                     ensure_ascii=False,
                     sort_keys=True,
@@ -1109,6 +1233,18 @@ class MemoryStore:
         actor: str,
     ) -> bool:
         with self._lock, self._require_connection() as connection:
+            existing = connection.execute(
+                "SELECT payload_json FROM memory_items WHERE user_id=? AND memory_id=? "
+                "AND kind='preference'",
+                (user_id, memory_id),
+            ).fetchone()
+            if existing is not None:
+                key = json.loads(existing["payload_json"]).get("preference_key")
+                if isinstance(key, str):
+                    connection.execute(
+                        "DELETE FROM preferences WHERE user_id=? AND preference_key=?",
+                        (user_id, key),
+                    )
             cursor = connection.execute(
                 "DELETE FROM memory_items WHERE user_id = ? AND memory_id = ?",
                 (user_id, memory_id),

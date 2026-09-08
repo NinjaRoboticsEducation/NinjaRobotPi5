@@ -140,6 +140,8 @@ def test_cancelled_identity_waits_for_worker_before_deleting_full_frame(tmp_path
         assert await asyncio.to_thread(started.wait, 1)
         task.cancel()
         await asyncio.sleep(0.01)
+        task.cancel()
+        await asyncio.sleep(0.01)
         assert not task.done()
         assert len(list(camera_directory.glob("identity-*.jpg"))) == 1
         release.set()
@@ -147,6 +149,34 @@ def test_cancelled_identity_waits_for_worker_before_deleting_full_frame(tmp_path
             await task
         assert list(camera_directory.glob("identity-*.jpg")) == []
         await identity.close()
+        await camera.close()
+
+    asyncio.run(exercise())
+
+
+def test_identity_close_waits_for_active_worker_and_prevents_new_capture(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        started, release = threading.Event(), threading.Event()
+        camera = CameraDevice(
+            media_directory=tmp_path / "camera", camera_factory=_Capture, simulated=True
+        )
+        identity = FaceIdentityDevice(
+            camera,
+            data_directory=tmp_path / "faces",
+            backend=_BlockingFaceBackend(started, release),
+        )
+        await camera.start()
+        work = asyncio.create_task(identity.identify())
+        assert await asyncio.to_thread(started.wait, 1)
+        close = asyncio.create_task(identity.close())
+        await asyncio.sleep(0)
+        assert not close.done()
+        release.set()
+        await work
+        await close
+        with pytest.raises(RuntimeError, match="closed"):
+            await identity.identify()
+        assert not list((tmp_path / "camera").glob("identity-*"))
         await camera.close()
 
     asyncio.run(exercise())

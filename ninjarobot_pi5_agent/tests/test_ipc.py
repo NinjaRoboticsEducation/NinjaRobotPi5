@@ -251,6 +251,88 @@ def test_runtime_status_exposes_startup_safety_and_recovery(tmp_path) -> None:
     asyncio.run(exercise())
 
 
+def test_local_reminder_chat_controls_work_without_a_model(tmp_path) -> None:
+    from datetime import timedelta
+    from unittest.mock import AsyncMock
+
+    from ninjarobot_pi5_agent.task_controls import TaskControls
+    from ninjarobot_pi5_agent.task_models import TaskStatus
+    from ninjarobot_pi5_agent.task_service import TaskService
+
+    async def exercise():
+        runtime = build_runtime(tmp_path)
+        now = [datetime.now(UTC)]
+        tasks = TaskService(runtime.store.path, runtime.notify_task, clock=lambda: now[0])
+        runtime.tasks = tasks
+        runtime.task_controls = TaskControls(tasks, runtime.task_scope)
+        runtime.loop.chat = AsyncMock(side_effect=AssertionError("local controls called the model"))
+        await runtime.start()
+        try:
+            reply = await runtime.chat(session_id="reminder-user", text="/remind 60 Tea")
+            assert "Not scheduled yet" in reply.text
+            assert reply.model_turns == 0
+            task = (await tasks.list("session:reminder-user"))[0]
+            reply = await runtime.chat(
+                session_id="other-user", text=f"/tasks confirm {task.task_id}"
+            )
+            assert "not found" in reply.text
+            reply = await runtime.chat(
+                session_id="reminder-user", text=f"/tasks confirm {task.task_id}"
+            )
+            assert "queued" in reply.text
+            now[0] += timedelta(seconds=61)
+            await tasks.tick()
+            assert (await tasks.list("session:reminder-user"))[0].status is TaskStatus.COMPLETED
+            reply = await runtime.chat(session_id="reminder-user", text="/tasks")
+            assert "Reading by the user is not confirmed" in reply.text
+            assert runtime.loop.chat.await_count == 0
+        finally:
+            await runtime.close()
+        assert not tasks.status()["running"]
+
+    asyncio.run(exercise())
+
+
+def test_task_progress_and_cancel_do_not_wait_for_busy_chat(tmp_path) -> None:
+    from ninjarobot_pi5_agent.task_controls import TaskControls
+    from ninjarobot_pi5_agent.task_models import TaskStatus
+    from ninjarobot_pi5_agent.task_service import TaskService
+
+    async def exercise():
+        runtime = build_runtime(tmp_path)
+        entered = asyncio.Event()
+
+        async def blocked(request):
+            entered.set()
+            await asyncio.Event().wait()
+
+        runtime.provider.generate = blocked
+        tasks = TaskService(runtime.store.path, runtime.notify_task)
+        runtime.tasks = tasks
+        runtime.task_controls = TaskControls(
+            tasks, runtime.task_scope, runtime._cancel_request_task
+        )
+        await runtime.start()
+        request = asyncio.create_task(runtime.chat(session_id="busy", text="Explain robots"))
+        try:
+            await asyncio.wait_for(entered.wait(), 2)
+            async with asyncio.timeout(2):
+                progress = await runtime.task_action("busy")
+                task = progress["tasks"][0]
+                assert task["status"] == "running"
+                assert task["kind"] == "request"
+                await runtime.task_action("busy", "cancel", task["task_id"])
+                with pytest.raises(asyncio.CancelledError):
+                    await request
+            assert (await tasks.list("session:busy"))[0].status is TaskStatus.CANCELLED
+        finally:
+            request.cancel()
+            await asyncio.gather(request, return_exceptions=True)
+            await runtime.close()
+
+    asyncio.run(exercise())
+
+
 def test_runtime_status_failure_is_degraded_instead_of_hiding_status(tmp_path) -> None:
     def unavailable_status() -> Mapping[str, Any]:
         raise OSError("safety state cannot be read")
@@ -434,6 +516,9 @@ def test_ipc_allows_reconnect_stream_history_clear_arm_and_stop(tmp_path) -> Non
         serve_task = asyncio.create_task(server.serve())
 
         first_client = AgentIPCClient(socket_path)
+        guide = await first_client.request({"command": "guided_checks", "step": 1})
+        assert guide["data"]["title"] == "Stop and resume"
+        assert connected == 0
         acknowledged = await first_client.request({"command": "controller_connected"})
         assert acknowledged["data"] == {"controller_connected": True}
         assert connected == 1
@@ -814,5 +899,91 @@ def test_ipc_client_read_reset_becomes_controlled_agent_error(tmp_path, monkeypa
             match="agent service connection closed unexpectedly",
         ):
             await AgentIPCClient(tmp_path / "agent.sock").request({"command": "startup_status"})
+
+    asyncio.run(exercise())
+
+
+def test_runtime_cleanup_attempts_every_resource_after_failure(tmp_path):
+    async def exercise():
+        runtime = build_runtime(tmp_path, with_memory=True)
+        await runtime.start()
+        runtime.tasks = AsyncMock()
+        runtime.tasks.close.side_effect = RuntimeError("synthetic task close failure")
+        for resource in (runtime.tools, runtime.provider, runtime.memory, runtime.store):
+            resource.close = AsyncMock(wraps=resource.close)
+        with pytest.raises(RuntimeError, match="synthetic task close failure"):
+            await runtime.close()
+        for resource in (runtime.tools, runtime.provider, runtime.memory, runtime.store):
+            resource.close.assert_awaited_once()
+        await runtime.close()
+        runtime.tasks.close.assert_awaited_once()
+
+    asyncio.run(exercise())
+
+
+def test_reviewed_reminder_uses_valid_nonmoving_ide_draft(tmp_path):
+    from datetime import timedelta
+    from unittest.mock import Mock
+
+    from ninjarobot_pi5_agent.models import ToolDefinition
+    from ninjarobot_pi5_agent.task_models import LocalTask
+    from ninjarobot_pi5_ide.behavior_assets import BehaviorAssetRepository
+    from ninjarobot_pi5_ide.behavior_drafts import BehaviorDraftCompiler
+
+    from ninjarobot_pi5_ide import RiskLevel
+
+    async def exercise():
+        runtime = build_runtime(tmp_path)
+        compiler = BehaviorDraftCompiler(
+            assets=BehaviorAssetRepository(tmp_path / "behaviors"), servo_roles=()
+        )
+        definition = ToolDefinition(
+            name="robot.behavior.execute_expression",
+            version="1",
+            description="Expression",
+            input_schema=compiler.input_schema(motion=False),
+            output_schema={"type": "object"},
+            risk=RiskLevel.LOW,
+            default_timeout_seconds=10,
+            idempotent=False,
+            cancellable=True,
+            confirmation_required=True,
+        )
+        runtime.tools.get = Mock(return_value=definition)
+        runtime.tools.call = AsyncMock(
+            return_value=ToolExecutionResult(
+                call_id="notification",
+                tool_name=definition.name,
+                status=ToolExecutionStatus.SUCCEEDED,
+                data={"completed": True},
+                action_id="ide-notification",
+            )
+        )
+        now = datetime.now(UTC)
+        task = LocalTask(
+            task_id="task-" + "a" * 32,
+            owner_scope="session:test",
+            source_session_id="test",
+            title="Practice",
+            created_at=now,
+            updated_at=now,
+            due_at=now + timedelta(minutes=1),
+            timezone="UTC",
+            notification="display_buzzer",
+        )
+        assert not (await runtime.notify_task(task))[0]
+        runtime.tools.call.assert_not_awaited()
+        task = task.model_copy(update={"approved_at": now})
+        success, evidence = await runtime.notify_task(task)
+        assert success and "ide-notification" in evidence
+        invocation = runtime.tools.call.await_args.args[0]
+        compiled = compiler.compile(invocation.call.arguments, motion=False)
+        kinds = {op.kind for stage in compiled.stages for op in stage.operations}
+        assert kinds == {"text", "tone"}
+        runtime.tools.call.return_value = runtime.tools.call.return_value.model_copy(
+            update={"data": {"completed": False, "interrupted": True}}
+        )
+        with pytest.raises(RuntimeError, match="interrupted"):
+            await runtime.notify_task(task)
 
     asyncio.run(exercise())

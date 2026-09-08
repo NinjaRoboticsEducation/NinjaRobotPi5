@@ -1,3 +1,15 @@
+:focus-visible {
+  outline: 3px solid #ffffff;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px #07111f;
+}
+
+#guideOutput, #guideDiagnostics, #tasksList pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 1rem;
+}
+
 :root {
   color-scheme: dark;
   --app-height: 100dvh;

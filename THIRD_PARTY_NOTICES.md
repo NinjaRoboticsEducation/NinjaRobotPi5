@@ -36,6 +36,13 @@ in `scripts/install-versions.env`; each project retains its own terms.
 | uv | Python/runtime and locked dependency management | Apache-2.0 OR MIT | <https://github.com/astral-sh/uv> |
 | Ollama | Local model runtime; downloaded models retain their own licenses | MIT for the runtime; model-specific terms | <https://github.com/ollama/ollama> |
 | whisper.cpp | Local speech-to-text runtime | MIT | <https://github.com/ggml-org/whisper.cpp> |
+| Zstandard (zstd) | OS decompression tool required by the pinned Ollama installer | BSD-3-Clause OR GPL-2.0 | <https://github.com/facebook/zstd> |
+
+The F05 refinement records exact installer-script and base speech-model hashes in
+`scripts/install-versions.env`. Source evidence and limits are recorded in
+[the installer provenance review](docs/validation/refinement_installer_provenance_260908.md).
+This is not a claim that all OS packages or downstream binary downloads are pinned
+by this repository.
 
 `uv.lock` is the exact transitive Python dependency inventory for this release.
 Each installed distribution retains its own license metadata and files. The

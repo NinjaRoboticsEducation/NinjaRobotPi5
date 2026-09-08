@@ -219,6 +219,16 @@ class ActionRecord(ContractModel):
         return self
 
 
+class CapabilityHealth(ContractModel):
+    """Advisory software snapshot; never permission to execute an action."""
+
+    status: ResourceHealth
+    reason_code: Identifier
+    dependencies: tuple[Identifier, ...] = ()
+    recovery: Annotated[str, StringConstraints(max_length=1000)]
+    execution_blocked: bool = False
+
+
 class HealthReport(ContractModel):
     """Safe health snapshot that does not invoke device actions."""
 
@@ -226,6 +236,8 @@ class HealthReport(ContractModel):
     components: dict[Identifier, ResourceHealth]
     checked_at: datetime
     detail: Annotated[str, StringConstraints(max_length=1000)] | None = None
+    capabilities: dict[CapabilityName, CapabilityHealth] = Field(default_factory=dict)
+    valid_for_seconds: Annotated[float, Field(gt=0, le=60)] = 5.0
 
     @field_validator("checked_at")
     @classmethod

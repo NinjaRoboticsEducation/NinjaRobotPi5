@@ -374,14 +374,19 @@
     else pending.reject(value);
   }
 
+  let movementGeneration = 0;
+
   function startMovement(button, event) {
     if (state.activeMoveButton) return;
     event.preventDefault();
     state.activeMoveButton = button;
+    const generation = ++movementGeneration;
     button.classList.add("active");
     send("move_start", { direction: button.dataset.direction }).catch((error) => {
-      button.classList.remove("active");
-      state.activeMoveButton = null;
+      if (generation === movementGeneration) {
+        button.classList.remove("active");
+        state.activeMoveButton = null;
+      }
       log(error.message, "error");
     });
   }
@@ -391,11 +396,23 @@
     const button = state.activeMoveButton;
     if (!button) return;
     state.activeMoveButton = null;
+    movementGeneration += 1;
     button.classList.remove("active");
     send("move_stop").catch(() => {});
   }
 
   document.querySelectorAll(".dpad-button").forEach((button) => {
+    button.addEventListener("keydown", (event) => {
+      if (event.key !== " " && event.key !== "Enter") return;
+      event.preventDefault();
+      if (!event.repeat) startMovement(button, event);
+    });
+    button.addEventListener("keyup", (event) => {
+      if (event.key === " " || event.key === "Enter") stopMovement(event);
+    });
+    button.addEventListener("blur", () => {
+      if (state.activeMoveButton === button) stopMovement();
+    });
     button.addEventListener("selectstart", (event) => event.preventDefault());
     button.addEventListener("contextmenu", (event) => event.preventDefault());
     button.addEventListener("dragstart", (event) => event.preventDefault());
@@ -420,6 +437,9 @@
     }
   });
   window.addEventListener("blur", stopMovement);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stopMovement();
+  });
 
   document.querySelector("#emergencyButton").addEventListener("click", () => {
     send("emergency_stop")
@@ -811,6 +831,53 @@
         elements.cancelPowerOff.disabled = false;
         elements.confirmPowerOff.disabled = false;
       });
+  });
+
+  async function refreshTasks(operation = "list", taskId = "") {
+    const notice = document.querySelector("#tasksNotice");
+    try {
+      const result = await send("tasks", {operation, task_id: taskId, minutes: 5});
+      notice.textContent = result.notice || t("tasks.refreshed");
+      const list = document.querySelector("#tasksList");
+      list.replaceChildren();
+      for (const task of result.tasks || []) {
+        const card = document.createElement("section");
+        const review = document.createElement("pre");
+        review.textContent = task.review;
+        card.append(review);
+        const actions = task.kind === "request" ? ["cancel"] : (
+          task.status === "draft" ? ["confirm", "cancel"] : ["cancel", "snooze"]
+        );
+        for (const action of actions) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "small-button";
+          button.textContent = t(`tasks.${action}`);
+          button.addEventListener("click", () => refreshTasks(action, task.task_id));
+          card.append(button);
+        }
+        list.append(card);
+      }
+    } catch (error) {
+      notice.textContent = error.message;
+    }
+  }
+  document.querySelector("#tasksRefresh").addEventListener("click", () => refreshTasks());
+
+  document.querySelector("#guideButton").addEventListener("click", async () => {
+    const output = document.querySelector("#guideOutput");
+    const diagnostics = document.querySelector("#guideDiagnostics");
+    diagnostics.textContent = "";
+    try {
+      const result = await send("guided_checks", {
+        step: Number(document.querySelector("#guideStep").value),
+      });
+      const data = result.data || result;
+      output.textContent = `${data.title}: ${data.text}`;
+      diagnostics.textContent = data.diagnostics ? JSON.stringify(data.diagnostics, null, 2) : "";
+    } catch (error) {
+      output.textContent = error.message;
+    }
   });
 
   document.addEventListener("keydown", (event) => {

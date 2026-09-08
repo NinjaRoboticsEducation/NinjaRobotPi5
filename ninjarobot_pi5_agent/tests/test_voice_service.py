@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from ninjarobot_pi5_agent.events import EventBroker
+from ninjarobot_pi5_agent.events import (
+    CURRENT_LIFECYCLE,
+    EventBroker,
+    begin_lifecycle,
+    log_lifecycle,
+)
 from ninjarobot_pi5_agent.release_foundations import ReleaseStatusRegistry
 from ninjarobot_pi5_agent.voice_service import (
     VOICE_SESSION_ID,
@@ -80,6 +87,37 @@ def build_service(*, configured_enabled: bool = False):
         persist_enabled=persist,
     )
     return service, ide, runtime, events, release, persisted
+
+
+def test_voice_capture_and_chat_share_private_lifecycle_correlation(caplog) -> None:
+    caplog.set_level(logging.INFO, logger="ninjarobot.lifecycle")
+
+    async def exercise() -> None:
+        service, _, runtime, _, _, _ = build_service()
+
+        async def chat(*, session_id, text):
+            token = begin_lifecycle(session_id)
+            try:
+                log_lifecycle("thinking", reason="model_requested")
+                return SimpleNamespace(text="private reply")
+            finally:
+                CURRENT_LIFECYCLE.reset(token)
+
+        runtime.chat = chat
+        await service.handle_status(
+            VoiceInputStatus(enabled=True, state=VoiceInputState.RECORDING, language="ja")
+        )
+        await service.handle_transcript("private transcript", "ja")
+        assert CURRENT_LIFECYCLE.get() is None
+        records = [
+            json.loads(r.message) for r in caplog.records if r.name == "ninjarobot.lifecycle"
+        ]
+        assert [r["phase"] for r in records] == ["listening", "thinking"]
+        assert len({r["request_id"] for r in records}) == 1
+        assert "private transcript" not in caplog.text
+        assert "private reply" not in caplog.text
+
+    asyncio.run(exercise())
 
 
 def test_voice_transcript_uses_independent_owner_session_and_publishes_reply() -> None:

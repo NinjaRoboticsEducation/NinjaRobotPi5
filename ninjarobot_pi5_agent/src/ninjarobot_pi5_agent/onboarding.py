@@ -13,6 +13,62 @@ from .release_foundations import ReleaseFeatureState, ReleaseStatusRegistry
 
 LOGGER = logging.getLogger(__name__)
 
+GUIDED_STEPS = (
+    (
+        "Environment",
+        "Read-only checks use the running service's interpreter and configuration. "
+        "They do not test wiring, move, record, install or repair anything.",
+    ),
+    (
+        "Stop and resume",
+        "Emergency Stop stops current hardware work. Remove the hazard before "
+        "Resume Robot Movement or /resume. Resume checks health; it does not replay interrupted "
+        "commands. This guide does not press either control.",
+    ),
+    (
+        "Try text chat",
+        "Leave AI motion and camera permissions off. Close the guide and type "
+        "'Explain what you can help me with.' Conversation needs a configured model. "
+        "An answer does not prove hardware readiness.",
+    ),
+    (
+        "Local reminders",
+        "Saved reminders need the Pi and Agent service running. Review the "
+        "exact date, time zone, message and notification effect before scheduling. "
+        "In chat, /remind 60 Practice previews a silent inbox reminder. Review its exact time, "
+        "then use /tasks confirm followed by its ID. /tasks shows the result; "
+        "/tasks cancel followed by the ID cancels it. This guide creates no reminder.",
+    ),
+    (
+        "Return whenever needed",
+        "Close or skip the guide whenever you like. Choose any step "
+        "when you return. README links to current manuals in ninjarobot_pi5_wiki/raw. "
+        "Camera, microphone, movement and deployment remain separate explicit choices. "
+        "This guide changes no configuration.",
+    ),
+)
+
+
+def guided_check(step: int, diagnostics: Callable[[], dict[str, Any]] | None) -> dict[str, Any]:
+    """Return a selectable guide step without performing its practice actions."""
+    if isinstance(step, bool) or not isinstance(step, int) or not 0 <= step < len(GUIDED_STEPS):
+        raise ValueError("guide step must be an integer from 0 through 4")
+    title, text = GUIDED_STEPS[step]
+    result: dict[str, Any] = {
+        "step": step,
+        "total": len(GUIDED_STEPS),
+        "title": title,
+        "text": text,
+        "choices": [item[0] for item in GUIDED_STEPS],
+    }
+    if step == 0:
+        result["diagnostics"] = (
+            diagnostics()
+            if diagnostics
+            else {"ok": False, "detail": "Environment diagnostics are unavailable in this runtime."}
+        )
+    return result
+
 
 class OnboardingIDE(Protocol):
     async def show_onboarding_qr(self, url: str) -> dict[str, Any]: ...

@@ -1,0 +1,227 @@
+--- a/ninjarobot_pi5_wiki/project-knowledge.json
++++ b/ninjarobot_pi5_wiki/project-knowledge.json
+@@ -1,27 +1,27 @@
+ {
+   "version": 1,
+-  "reviewed_checkout": "cd8e22892e07bdfd63f8febfec1373c91925e526",
++  "reviewed_checkout": "b4812e06bdbcaf5ce6176cff14e79d5de1c817ee",
+   "reviewed_by": "agent:codex",
+-  "reviewed_at": "2026-09-06T22:53:22Z",
++  "reviewed_at": "2026-09-07T09:34:22Z",
+   "documents": [
+     {
+       "name": "InstallationGuide.md",
+-      "path": "raw/articles/ninjarobotpi5/2026-09-07/InstallationGuide.md",
++      "path": "raw/articles/ninjarobotpi5/2026-09-07-02/InstallationGuide.md",
+       "original_content_hash": "sha256:81247077b55ba3e1c40e0977b309a2ffed7d706c26bb1796ac4a6357a8f9ae6b",
+-      "content_hash": "sha256:53f80c60feb139f0de547613bd14b8fcd87a2678ba5bf7dc75b1b2bccb1dc1c4",
+-      "previous_path": null,
++      "content_hash": "sha256:a3c1be25b1d32808fdac6849e6e669f8d1100c63f7359c5630e3561f7c2a8e4e",
++      "previous_path": "raw/articles/ninjarobotpi5/2026-09-07/InstallationGuide.md",
+       "pages": [
+         "wiki/references/installation-guide.md",
+         "wiki/concepts/installation.md"
+       ],
+-      "source_id": "src-20260906-installationguide"
++      "source_id": "src-20260907-installationguide"
+     },
+     {
+       "name": "DevelopmentGuide.md",
+-      "path": "raw/articles/ninjarobotpi5/2026-09-07/DevelopmentGuide.md",
++      "path": "raw/articles/ninjarobotpi5/2026-09-07-03/DevelopmentGuide.md",
+       "original_content_hash": "sha256:ef1a4d5b81ac2fe67f735ccd0df311fec87d1d13430f47a24c7ef226c2c2e522",
+-      "content_hash": "sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e",
+-      "previous_path": null,
++      "content_hash": "sha256:c68338c5f0772a14528b2c8f50bdbfc843f9338bd7816e50e49710fa57bd0e19",
++      "previous_path": "raw/articles/ninjarobotpi5/2026-09-07/DevelopmentGuide.md",
+       "pages": [
+         "wiki/overview.md",
+         "wiki/references/development-guide.md",
+@@ -30,7 +30,7 @@
+         "wiki/concepts/features-and-tools.md",
+         "wiki/analyses/knowledge-limitations.md"
+       ],
+-      "source_id": "src-20260906-developmentguide"
++      "source_id": "src-20260907-developmentguide-2"
+     },
+     {
+       "name": "NinjaRobot_MCP_Skill.md",
+@@ -46,15 +46,15 @@
+     },
+     {
+       "name": "DevelopmentLog.md",
+-      "path": "raw/notes/ninjarobotpi5/2026-09-07-02/DevelopmentLog.md",
++      "path": "raw/notes/ninjarobotpi5/2026-09-07-03/DevelopmentLog.md",
+       "original_content_hash": "sha256:acd1d86c260557afc7ab45093950860b80deb1097d052c1428427feba7e0a139",
+-      "content_hash": "sha256:da1ff98b3c0a33c61602ceca14e5f481c7f4f1e37e69460c7102e3257beb8f5c",
+-      "previous_path": "raw/notes/ninjarobotpi5/2026-09-07/DevelopmentLog.md",
++      "content_hash": "sha256:08ec9a7c8331266edf4f11512f3c97aa08e826e3ba61ddb4a0f9de9752f29c1e",
++      "previous_path": "raw/notes/ninjarobotpi5/2026-09-07-02/DevelopmentLog.md",
+       "pages": [
+         "wiki/references/development-log.md",
+         "wiki/concepts/development-history.md"
+       ],
+-      "source_id": "src-20260907-developmentlog"
++      "source_id": "src-20260907-developmentlog-2"
+     }
+   ],
+   "implementation_roots": [
+@@ -551,12 +551,12 @@
+       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+     },
+     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_control.py": {
+-      "content_hash": "sha256:3d41227654a580e7ff577a29d3e9859adf85d6aa99a162332d43aeba2f185c9a",
+-      "pages": [
+-        "wiki/concepts/architecture.md",
+-        "wiki/concepts/features-and-tools.md"
+-      ],
+-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
++      "content_hash": "sha256:ea13f411a03e785ffbd81b40fd498d09a3eb6dff01ad005510d486d5b322af3d",
++      "pages": [
++        "wiki/concepts/architecture.md",
++        "wiki/concepts/features-and-tools.md"
++      ],
++      "review_note": "F02 reviewed against stop-dispatch source additions and five simulated regression tests; preserves hardware path. Queue independence only, other foundation repairs unfinished."
+     },
+     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/app.js": {
+       "content_hash": "sha256:43be97cc1f670b18b624fdb22b42790bfc1b57f4f454d35f8d83f4d7c0942db7",
+@@ -927,12 +927,12 @@
+       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+     },
+     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_runtime.py": {
+-      "content_hash": "sha256:7e6b8a6d3a77e6ec41a65a25373d761d8e9678353e18049c9e41756693e560bc",
+-      "pages": [
+-        "wiki/concepts/architecture.md",
+-        "wiki/concepts/features-and-tools.md"
+-      ],
+-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
++      "content_hash": "sha256:d0f0a6b9dfd6a2292a46d08d9d5923e6feb0efff2c2b2ebbcd288ef2f4f3a595",
++      "pages": [
++        "wiki/concepts/architecture.md",
++        "wiki/concepts/features-and-tools.md"
++      ],
++      "review_note": "F02 reviewed against stop-dispatch source additions and five simulated regression tests; preserves hardware path. Queue independence only, other foundation repairs unfinished."
+     },
+     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/buzzer.py": {
+       "content_hash": "sha256:5a481e444fb63f64e66b038ca04f9ee1758e45ae4aa75cabff9747f71429d942",
+@@ -991,12 +991,12 @@
+       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+     },
+     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/engine.py": {
+-      "content_hash": "sha256:68b09a42fcc5a7eb65500943e393c9e1569eb2f769faa653188d0827ef3428b2",
+-      "pages": [
+-        "wiki/concepts/architecture.md",
+-        "wiki/concepts/features-and-tools.md"
+-      ],
+-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
++      "content_hash": "sha256:c0b58e5c5e8765f857e77ab63fae085d0c5b30e6c3808ac34ded1fc0b833f2ea",
++      "pages": [
++        "wiki/concepts/architecture.md",
++        "wiki/concepts/features-and-tools.md"
++      ],
++      "review_note": "F02 reviewed against stop-dispatch source additions and five simulated regression tests; preserves hardware path. Queue independence only, other foundation repairs unfinished."
+     },
+     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/errors.py": {
+       "content_hash": "sha256:a86885b09b33d33dd9f152316c5b732b7328be7c93c466db126da3941052585a",
+@@ -1087,12 +1087,12 @@
+       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+     },
+     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/robot.py": {
+-      "content_hash": "sha256:a3f22d49fc6533b452508fde65ce61b77648bbc2ff808f40884999f504deb663",
+-      "pages": [
+-        "wiki/concepts/architecture.md",
+-        "wiki/concepts/features-and-tools.md"
+-      ],
+-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
++      "content_hash": "sha256:9cb06395c586c84dae834bd6109c9ee69a758b90366664e2ca3ba4c4ce3a0f1f",
++      "pages": [
++        "wiki/concepts/architecture.md",
++        "wiki/concepts/features-and-tools.md"
++      ],
++      "review_note": "F02 reviewed against stop-dispatch source additions and five simulated regression tests; preserves hardware path. Queue independence only, other foundation repairs unfinished."
+     },
+     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/runtime_control.py": {
+       "content_hash": "sha256:4d5a129f28cd93249e8e0280e584a1636edec74ceaef48cfeb8918f7e68140a9",
+@@ -1111,12 +1111,12 @@
+       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+     },
+     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/scheduler.py": {
+-      "content_hash": "sha256:840b0ee773f2c46b47eac8649ca5a3d15185f9915a91520109a7558333bb0a60",
+-      "pages": [
+-        "wiki/concepts/architecture.md",
+-        "wiki/concepts/features-and-tools.md"
+-      ],
+-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
++      "content_hash": "sha256:5d780174bf99d903edb128ecd9940a1ee51592eac3b554f5b35336b1294260d1",
++      "pages": [
++        "wiki/concepts/architecture.md",
++        "wiki/concepts/features-and-tools.md"
++      ],
++      "review_note": "F02 reviewed against stop-dispatch source additions and five simulated regression tests; preserves hardware path. Queue independence only, other foundation repairs unfinished."
+     },
+     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/servo.py": {
+       "content_hash": "sha256:4717b84858328087c86de7677ed41d5d3c75f5daa6388ff84c4d9de43cde2ef1",
+@@ -1237,10 +1237,10 @@
+     "THIRD_PARTY_NOTICES.md",
+     "ninjarobot_pi5_wiki/README.md",
+     "ninjarobot_pi5_wiki/docs/PROJECT_WORKFLOW.md",
+-    "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/InstallationGuide.md",
+-    "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/DevelopmentGuide.md",
++    "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07-02/InstallationGuide.md",
++    "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07-03/DevelopmentGuide.md",
+     "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/NinjaRobot_MCP_Skill.md",
+-    "ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-07-02/DevelopmentLog.md"
++    "ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-07-03/DevelopmentLog.md"
+   ],
+   "integration_status": "ready"
+ }
+--- a/README.md
++++ b/README.md
+@@ -17,7 +17,7 @@
+ > [!NOTE]
+ > **v1.0.0 public release.** The project owner completed the Phase 8 manual
+ > Raspberry Pi validation. New installations must still follow the safety and
+-> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/InstallationGuide.md) because
++> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07-02/InstallationGuide.md) because
+ > wiring and hardware tolerances differ between robots.
+ 
+ ---
+@@ -176,7 +176,7 @@
+ 
+ The installer does not download an Ollama model, start the Agent, move a motor,
+ open the camera or microphone, or deploy boot startup. Follow the complete
+-[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/InstallationGuide.md) for wiring, module initialization,
++[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07-02/InstallationGuide.md) for wiring, module initialization,
+ calibration, model download, and safe first movement.
+ 
+ ---
+@@ -211,10 +211,10 @@
+ 
+ | Document | Purpose |
+ |---|---|
+-| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
++| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07-02/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
+ | [MCP and Agent Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
+-| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
+-| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-07-02/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
++| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07-03/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
++| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-07-03/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
+ | [Documentation Index](docs/README.md) | Public, developer, architecture, history, and validation documents |
+ | [Audit Report](docs/project-history/AuditReport_260731.md) | Historical security, reliability, and documentation audit findings |
+ | [Implementation Plan](docs/project-history/NinjaRobotPi5V4_ImplementationPlan.md) | Historical phase design and delivery decisions |
+--- a/ninjarobot_pi5_wiki/README.md
++++ b/ninjarobot_pi5_wiki/README.md
+@@ -6,10 +6,10 @@
+ 
+ ## Current full manuals
+ 
+-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-07/InstallationGuide.md)
+-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-07/DevelopmentGuide.md)
++- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-07-02/InstallationGuide.md)
++- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-07-03/DevelopmentGuide.md)
+ - [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-07/NinjaRobot_MCP_Skill.md)
+-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-07-02/DevelopmentLog.md)
++- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-07-03/DevelopmentLog.md)
+ 
+ These are the complete documents. The root README links directly to these sources;
+ the former root navigation files have been removed.

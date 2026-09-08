@@ -7,6 +7,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Any
 
+from ninjarobot_pi5_ide.models import CapabilityHealth
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -297,6 +298,8 @@ class ProviderHealth(AgentContractModel):
     status: ProviderHealthStatus
     checked_at: datetime
     detail: Annotated[str, StringConstraints(max_length=1000)] | None = None
+    capabilities: dict[str, CapabilityHealth] = Field(default_factory=dict)
+    valid_for_seconds: Annotated[float, Field(gt=0, le=60)] = 5.0
 
     @field_validator("checked_at")
     @classmethod

@@ -15,39 +15,75 @@ AUDIO_OFF = "dtparam=audio=off"
 def _without_managed_block(lines: list[str]) -> list[str]:
     rendered: list[str] = []
     inside = False
+    finished = False
     for line in lines:
         stripped = line.strip()
         if stripped == BEGIN_MARKER:
-            if inside:
-                raise ValueError("nested NinjaRobotPi5 PWM configuration blocks")
+            if inside or finished:
+                raise ValueError("nested or duplicated NinjaRobotPi5 PWM configuration blocks")
             inside = True
             continue
         if stripped == END_MARKER:
             if not inside:
                 raise ValueError("orphan NinjaRobotPi5 PWM configuration end marker")
             inside = False
+            finished = True
             continue
         if not inside:
+            if finished and stripped and not stripped.startswith("#"):
+                raise ValueError("the managed PWM block must be the final configuration section")
             rendered.append(line)
     if inside:
         raise ValueError("unterminated NinjaRobotPi5 PWM configuration block")
     return rendered
 
 
+def _directives(lines: list[str]) -> list[tuple[str, str]]:
+    """Keep section context; never guess the value of a machine-specific filter."""
+    section = "all"
+    result: list[tuple[str, str]] = []
+    for line in lines:
+        value = line.split("#", 1)[0].strip()
+        if not value:
+            continue
+        if value.startswith("[") and value.endswith("]"):
+            # Filters of different types can accumulate until [all]. A later
+            # model filter must not accidentally clear [none] or a serial filter.
+            if value == "[all]":
+                section = "all"
+            elif value == "[none]" or section == "none":
+                section = "none"
+            else:
+                section = "conditional"
+            continue
+        if value.startswith("include "):
+            raise ValueError("included boot files require manual review before PWM configuration")
+        result.append((section, value))
+    return result
+
+
+def _unconditional_overlays(lines: list[str]) -> list[str]:
+    overlays: list[str] = []
+    for section, value in _directives(lines):
+        if not value.startswith("dtoverlay="):
+            continue
+        name = value.partition("=")[2].partition(",")[0].strip()
+        if name not in {"pwm", "pwm-2chan"} or section == "none":
+            continue
+        if value != PWM_OVERLAY:
+            raise ValueError("an unmanaged PWM overlay already exists with different settings")
+        if section != "all":
+            raise ValueError("move the existing PWM overlay to an unconditional [all] section")
+        overlays.append(value)
+    if len(overlays) > 1:
+        raise ValueError("duplicated active PWM overlays require manual review")
+    return overlays
+
+
 def render_boot_config(source: str) -> str:
     """Return an idempotent config with the approved two-channel PWM setup."""
     lines = _without_managed_block(source.splitlines())
-    active_overlays = [
-        line.strip()
-        for line in lines
-        if line.strip().startswith("dtoverlay=pwm-2chan") and not line.lstrip().startswith("#")
-    ]
-    conflicting = [line for line in active_overlays if line != PWM_OVERLAY]
-    if conflicting:
-        raise ValueError(
-            "an unmanaged pwm-2chan overlay already exists with different settings: "
-            + "; ".join(conflicting)
-        )
+    active_overlays = _unconditional_overlays(lines)
 
     while lines and not lines[-1].strip():
         lines.pop()
@@ -55,18 +91,41 @@ def render_boot_config(source: str) -> str:
     if PWM_OVERLAY not in active_overlays:
         block.append(PWM_OVERLAY)
     block.append(END_MARKER)
-    return "\n".join([*lines, *block]) + "\n"
+    rendered = "\n".join([*lines, *block]) + "\n"
+    valid, detail = validate_boot_config(rendered)
+    if not valid:
+        raise ValueError(detail)
+    return rendered
 
 
 def validate_boot_config(source: str) -> tuple[bool, str]:
     """Check the managed block and approved GPIO12/GPIO13 overlay."""
     lines = source.splitlines()
-    if lines.count(BEGIN_MARKER) != 1 or lines.count(END_MARKER) != 1:
+    stripped = [line.strip() for line in lines]
+    if stripped.count(BEGIN_MARKER) != 1 or stripped.count(END_MARKER) != 1:
         return False, "the NinjaRobotPi5 PWM block is missing or duplicated"
-    active = [line.strip() for line in lines if line.strip() and not line.lstrip().startswith("#")]
-    if AUDIO_OFF not in active:
+    try:
+        _without_managed_block(lines)
+        overlays = _unconditional_overlays(lines)
+        directives = _directives(lines)
+    except ValueError as exc:
+        return False, str(exc)
+    begin = stripped.index(BEGIN_MARKER)
+    end = stripped.index(END_MARKER)
+    managed = [line.split("#", 1)[0].strip() for line in lines[begin + 1 : end]]
+    managed = [line for line in managed if line]
+    if managed not in (["[all]", AUDIO_OFF], ["[all]", AUDIO_OFF, PWM_OVERLAY]):
+        return False, "the managed PWM block must contain the approved unconditional settings"
+    audio = [
+        (section, parameter)
+        for section, value in directives
+        if value.startswith("dtparam=")
+        for parameter in value.removeprefix("dtparam=").split(",")
+        if parameter.strip().startswith("audio=") and section != "none"
+    ]
+    if not audio or audio[-1] != ("all", "audio=off"):
         return False, "onboard analogue audio is not disabled"
-    if PWM_OVERLAY not in active:
+    if len(overlays) != 1:
         return False, "the GPIO12/GPIO13 pwm-2chan overlay is missing"
     return True, "GPIO12/PWM0 and GPIO13/PWM1 are configured"
 

@@ -30,6 +30,19 @@ manuals, project knowledge, and [maintenance workflow](ninjarobot_pi5_wiki/docs/
 Open the project root for coding or the wiki folder for documentation queries.
 The wiki uses a separate environment and does not run or control the robot.
 
+The Phase 2 local task assistant now includes reviewed reminders, task progress
+and cancellation, restart recovery, and preference review/correction. The combined
+software gate passes 734 tests; physical and browser acceptance remains pending.
+Development is paused before Phase 3. Start with the
+[Phase 2 walkthrough and manual tests](docs/validation/refinement_phase2_walkthrough_260909.md)
+and [progress record](docs/validation/refinement_progress_260907.md).
+Default reminders are silent inbox notices; display/buzzer notification needs
+explicit review. The service must be running. Usage limits are not a monetary
+spending cap. The face-recognition cleanup is approved and implemented; the display-font repair
+still requires its specific approval. See the [cleanup tests](docs/validation/refinement_phase2_walkthrough_260909.md#face-recognition-cleanup-tests).
+Consolidated new manuals and a searchable-page update are being prepared; older
+wiki pages do not yet describe this checkpoint.
+
 ## What is NinjaRobotPi5?
 
 **NinjaRobotPi5** is an AI-powered robot platform built on the Raspberry Pi 5. It brings a robot's display, buzzer, wheel servos, distance sensor, camera, and microphone together behind one clean software interface — and then adds a fully local AI agent that you can talk to, type to, or control from your phone.

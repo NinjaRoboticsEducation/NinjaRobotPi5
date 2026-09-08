@@ -154,12 +154,21 @@ async def run_service(arguments: argparse.Namespace) -> None:
         retention_days=config.memory.conversation_retention_days,
     )
     memory = MemoryStore(arguments.database) if config.memory.enabled else None
+    from .task_service import TaskService
+    from .task_tools import TaskToolProvider
+
+    tasks = TaskService(
+        store.path,
+        lambda task: runtime.notify_task(task),
+        retention_days=config.memory.conversation_retention_days,
+    )
     providers: list[ToolProvider] = [
         IDEToolProvider(
             ide,
             excluded_capabilities=ROBOT_CONTROL_DELEGATED_CAPABILITIES,
         ),
         RobotControlMCPProvider(ide),
+        TaskToolProvider(tasks, lambda session: runtime.task_scope(session)),
     ]
     if memory is not None:
         providers.append(MemoryMCPProvider(MemoryRetrievalService(memory), store))
@@ -270,6 +279,8 @@ async def run_service(arguments: argparse.Namespace) -> None:
         runtime_state=runtime_state,
         presentation=RobotPresentationController(ide),
     )
+    from ninjarobot_pi5_ide.diagnostics import diagnose_environment
+
     runtime = AgentRuntime(
         provider=model,
         tools=tools,
@@ -281,6 +292,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
         events=events,
         model_manager=model,
         robot_status=ide.status,
+        tasks=tasks,
         memory=memory,
         enroll_identity=ide.enroll_face_identity if memory is not None else None,
         recognize_identity=ide.identify_face if memory is not None else None,
@@ -300,6 +312,12 @@ async def run_service(arguments: argparse.Namespace) -> None:
             else None
         ),
         release_status=release_status.status,
+        guide_diagnostics=lambda: {
+            **diagnose_environment(
+                profile="hardware" if arguments.real else "development", config=config
+            ),
+            "execution_mode": "real" if arguments.real else "simulation",
+        },
     )
     voice_input = VoiceInputService(
         ide=ide,

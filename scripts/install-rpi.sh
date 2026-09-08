@@ -11,6 +11,7 @@ LOG_FILE="${STATE_DIR}/installer.log"
 ASSUME_YES=0
 CHECK_ONLY=0
 DRY_RUN=0
+PROFILE=hardware
 
 SYSTEM_PACKAGES=(
   alsa-utils
@@ -30,17 +31,19 @@ SYSTEM_PACKAGES=(
   python3-picamera2
   rpicam-apps
   swig
+  zstd
 )
 
 usage() {
   cat <<'EOF'
-Usage: ./install.sh [--yes] [--check] [--dry-run]
+Usage: ./install.sh [--profile hardware|development] [--yes] [--check] [--dry-run]
 
 Install the Raspberry Pi system tools, uv, Ollama, whisper.cpp, locked Python
 dependencies, camera bridge, private configuration directories, and the
 GPIO12/GPIO13 hardware-PWM boot configuration required by NinjaRobotPi5.
 
 Options:
+  --profile   hardware (default), or development in a separate .venv-dev environment.
   --yes       Accept the installation summary without the final prompt.
   --check     Read-only readiness check; do not install or change anything.
   --dry-run   Print the planned high-level operations and exit.
@@ -60,6 +63,18 @@ load_versions() {
   # shellcheck disable=SC1090
   source "${VERSION_FILE}"
   : "${UV_VERSION:?}" "${OLLAMA_VERSION:?}" "${WHISPER_CPP_COMMIT:?}" "${WHISPER_MODEL:?}"
+  : "${UV_INSTALLER_SHA256:?}" "${OLLAMA_INSTALLER_COMMIT:?}" "${OLLAMA_INSTALLER_SHA256:?}"
+  : "${WHISPER_MODEL_REVISION:?}" "${WHISPER_MODEL_SHA256:?}"
+}
+
+verify_sha256() {
+  local actual
+  [[ "$2" =~ ^[a-f0-9]{64}$ ]] || fail "Invalid reviewed SHA-256 in installer manifest"
+  actual="$(sha256sum -- "$1")" || return 1
+  [[ "${actual%% *}" == "$2" ]] || {
+    printf 'FAIL: content hash mismatch: %s; preserve the file and review the installer manifest.\n' "$1" >&2
+    return 1
+  }
 }
 
 check_platform() {
@@ -79,6 +94,10 @@ check_platform() {
 }
 
 show_plan() {
+  if [[ "${PROFILE}" == development ]]; then
+    printf '\nInstall locked development packages in .venv-dev; leave .venv and OS setup untouched.\n'
+    return
+  fi
   cat <<EOF
 
 NinjaRobotPi5 will:
@@ -119,6 +138,7 @@ install_uv() {
   trap 'rm -f -- "${installer:-}"' RETURN
   curl --fail --location --silent --show-error \
     "https://astral.sh/uv/${UV_VERSION}/install.sh" --output "${installer}"
+  verify_sha256 "${installer}" "${UV_INSTALLER_SHA256}" || fail "Unreviewed uv installer refused"
   UV_NO_MODIFY_PATH=1 sh "${installer}"
   export PATH="${HOME}/.local/bin:${PATH}"
   require_command uv
@@ -136,7 +156,9 @@ install_ollama() {
     installer="$(mktemp)"
     trap 'rm -f -- "${installer:-}"' RETURN
     curl --fail --location --silent --show-error \
-      https://ollama.com/install.sh --output "${installer}"
+      "https://raw.githubusercontent.com/ollama/ollama/${OLLAMA_INSTALLER_COMMIT}/scripts/install.sh" \
+      --output "${installer}"
+    verify_sha256 "${installer}" "${OLLAMA_INSTALLER_SHA256}" || fail "Unreviewed Ollama installer refused"
     OLLAMA_VERSION="${OLLAMA_VERSION}" sh "${installer}"
     rm -f -- "${installer}"
     trap - RETURN
@@ -161,8 +183,20 @@ install_whisper_cpp() {
     -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_EXAMPLES=ON
   cmake --build "${WHISPER_DIR}/build" --config Release -j2
   if [[ ! -f "${WHISPER_DIR}/models/ggml-${WHISPER_MODEL}.bin" ]]; then
-    bash "${WHISPER_DIR}/models/download-ggml-model.sh" "${WHISPER_MODEL}"
+    local model_download
+    model_download="$(mktemp "${WHISPER_DIR}/models/.ninja-model-XXXXXX")"
+    trap 'rm -f -- "${model_download:-}"' RETURN
+    curl --fail --location --silent --show-error --connect-timeout 10 --max-time 900 \
+      "https://huggingface.co/ggerganov/whisper.cpp/resolve/${WHISPER_MODEL_REVISION}/ggml-${WHISPER_MODEL}.bin" \
+      --output "${model_download}"
+    verify_sha256 "${model_download}" "${WHISPER_MODEL_SHA256}" || fail "Whisper model hash mismatch"
+    # Refuse a concurrent replacement instead of overwriting the operator's file.
+    ln -- "${model_download}" "${WHISPER_DIR}/models/ggml-${WHISPER_MODEL}.bin"
+    rm -f -- "${model_download}"
+    trap - RETURN
   fi
+  verify_sha256 "${WHISPER_DIR}/models/ggml-${WHISPER_MODEL}.bin" "${WHISPER_MODEL_SHA256}" || \
+    fail "Existing Whisper model does not match the reviewed model"
   [[ -x "${WHISPER_DIR}/build/bin/whisper-cli" ]] || fail "whisper-cli build failed."
   [[ -f "${WHISPER_DIR}/models/ggml-${WHISPER_MODEL}.bin" ]] || fail "Whisper model missing."
 }
@@ -213,7 +247,7 @@ sync_and_verify() {
     uv sync --frozen --extra hardware
     ./scripts/bootstrap-rpi-camera-workspace.sh --skip-apt
     uv run --frozen --extra hardware python scripts/verify_workspace_driver_sources.py
-    uv run --frozen python scripts/verify_immutable_drivers.py
+    uv run --frozen --no-sync python scripts/verify_immutable_drivers.py
   )
 }
 
@@ -255,6 +289,9 @@ readiness_check() {
   done
   [[ -x "${WHISPER_DIR}/build/bin/whisper-cli" ]] || { printf 'FAIL: whisper-cli missing\n'; failed=1; }
   [[ -f "${WHISPER_DIR}/models/ggml-${WHISPER_MODEL}.bin" ]] || { printf 'FAIL: whisper model missing\n'; failed=1; }
+  if [[ -f "${WHISPER_DIR}/models/ggml-${WHISPER_MODEL}.bin" ]]; then
+    verify_sha256 "${WHISPER_DIR}/models/ggml-${WHISPER_MODEL}.bin" "${WHISPER_MODEL_SHA256}" || failed=1
+  fi
   if [[ -d "${WHISPER_DIR}/.git" ]]; then
     actual_commit="$(git -C "${WHISPER_DIR}" rev-parse HEAD 2>/dev/null || true)"
     [[ "${actual_commit}" == "${WHISPER_CPP_COMMIT}" ]] || {
@@ -292,7 +329,8 @@ readiness_check() {
     (
       cd "${PROJECT_ROOT}"
       "${PROJECT_ROOT}/.venv/bin/python" scripts/verify_workspace_driver_sources.py &&
-        "${PROJECT_ROOT}/.venv/bin/python" scripts/verify_immutable_drivers.py
+        "${PROJECT_ROOT}/.venv/bin/python" scripts/verify_immutable_drivers.py &&
+        "${PROJECT_ROOT}/.venv/bin/ninjarobot_pi5_cli" doctor --profile hardware --root "${PROJECT_ROOT}"
     ) || failed=1
   else
     printf 'FAIL: locked project environment is missing\n'
@@ -307,6 +345,12 @@ main() {
       --yes) ASSUME_YES=1 ;;
       --check) CHECK_ONLY=1 ;;
       --dry-run) DRY_RUN=1 ;;
+      --profile)
+        (($# >= 2)) || fail "--profile requires hardware or development"
+        PROFILE="$2"
+        [[ "${PROFILE}" == hardware || "${PROFILE}" == development ]] || fail "Unknown profile"
+        shift
+        ;;
       --help|-h) usage; exit 0 ;;
       *) fail "Unknown argument: $1" ;;
     esac
@@ -317,6 +361,22 @@ main() {
     show_plan
     printf '\nDry run only: no commands were executed and no files were changed.\n'
     exit 0
+  fi
+  if [[ "${PROFILE}" == development ]]; then
+    if ((CHECK_ONLY)); then
+      [[ -x "${PROJECT_ROOT}/.venv-dev/bin/python" ]] || fail "Development environment is missing"
+      "${PROJECT_ROOT}/.venv-dev/bin/ninjarobot_pi5_cli" doctor --profile development
+      exit $?
+    fi
+    require_command uv
+    show_plan
+    confirm_plan
+    (
+      cd "${PROJECT_ROOT}"
+      UV_PROJECT_ENVIRONMENT="${PROJECT_ROOT}/.venv-dev" uv sync --frozen --group dev
+    )
+    "${PROJECT_ROOT}/.venv-dev/bin/ninjarobot_pi5_cli" doctor --profile development
+    exit $?
   fi
   check_platform
   if ((CHECK_ONLY)); then
@@ -339,4 +399,6 @@ main() {
   printf 'The installer did not download an Ollama model. Choose and pull one in the Agent setup.\n'
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

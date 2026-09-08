@@ -1,0 +1,595 @@
+--- wiki/analyses/knowledge-limitations.md
++++ wiki/analyses/knowledge-limitations.md
+@@ -19,15 +19,15 @@
+   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
+   title: Local knowledge integration evidence
+   content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
+-- id: src-20260906-developmentguide
+-  resource: urn:llmwiki:source:src-20260906-developmentguide
++- id: src-20260907-developmentguide-2
++  resource: urn:llmwiki:source:src-20260907-developmentguide-2
+   title: DevelopmentGuide.md
+-  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e
++  content_hash: sha256:c68338c5f0772a14528b2c8f50bdbfc843f9338bd7816e50e49710fa57bd0e19
+ semantic_review:
+   version: 1
+   performed_by: agent:codex
+-  performed_at: '2026-09-07T00:45:19Z'
+-  target_hash: sha256:ea9662e7af60e4072aa16feb5b5414feae51b0b4b69f1dfc4c6e9331c8d1285b
++  performed_at: '2026-09-07T09:34:22Z'
++  target_hash: sha256:34fa283ff574fcf03d3a38ef8e3a7334007401309d8f7d803c2485d204059c70
+   result: passed
+   checks:
+     source_support: passed
+@@ -36,9 +36,11 @@
+     claim_strength: passed
+     visual_evidence: not_applicable
+   notes:
+-  - Rechecked the navigation-only correction and updated source versions; other cited
+-    explanations are unchanged.
+-  - AI evidence review; no human verification or hardware test is claimed.
++  - Compared this page with the unchanged source material carried into the new manual
++    version; reviewed added F02 statements against its new sections and simulated
++    validation.
++  - F02 queue dispatch only; F01/F03/F04 and later refinements remain unfinished.
++    AI review, not human verification or physical Pi validation.
+ ---
+ 
+ # Knowledge limitations and verification
+@@ -58,10 +60,10 @@
+ The development guide's older quality-gate example uses narrower lint paths than
+ the current root policy. Follow the root operating policy for the current full
+ checks, and preserve the source's historical context rather than silently treating
+-an older example as the complete current gate.[^src-20260906-developmentguide][^src-20260907-knowledgeintegration]
++an older example as the complete current gate.[^src-20260907-developmentguide-2][^src-20260907-knowledgeintegration]
+ 
+ [Project overview](/overview.md).
+ 
+ 
+ [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
+-[^src-20260906-developmentguide]: DevelopmentGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-developmentguide`.
++[^src-20260907-developmentguide-2]: DevelopmentGuide.md, source version `refinement-f02-260907`; registered source `src-20260907-developmentguide-2`.
+--- wiki/concepts/architecture.md
++++ wiki/concepts/architecture.md
+@@ -16,15 +16,15 @@
+   by: agent:codex
+   at: '2026-09-06T22:53:22Z'
+ sources:
+-- id: src-20260906-developmentguide
+-  resource: urn:llmwiki:source:src-20260906-developmentguide
++- id: src-20260907-developmentguide-2
++  resource: urn:llmwiki:source:src-20260907-developmentguide-2
+   title: DevelopmentGuide.md
+-  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e
++  content_hash: sha256:c68338c5f0772a14528b2c8f50bdbfc843f9338bd7816e50e49710fa57bd0e19
+ semantic_review:
+   version: 1
+   performed_by: agent:codex
+-  performed_at: '2026-09-06T22:54:05Z'
+-  target_hash: sha256:602559c20e4b41b0189ca08bf989fbfb1d0f80c004719516aed6b420d3b027f3
++  performed_at: '2026-09-07T09:34:22Z'
++  target_hash: sha256:7bcbbf30901b57540bc6cefb2bdbf9247dbc189426a7ff2995f616fddc57035b
+   result: passed
+   checks:
+     source_support: passed
+@@ -33,9 +33,11 @@
+     claim_strength: passed
+     visual_evidence: not_applicable
+   notes:
+-  - Reviewed this page against its listed manual sections and integration evidence.
+-  - Claims describe documented contracts and knowledge workflow; current hardware
+-    operation and interactive editor activation are not certified.
++  - Compared this page with the unchanged source material carried into the new manual
++    version; reviewed added F02 statements against its new sections and simulated
++    validation.
++  - F02 queue dispatch only; F01/F03/F04 and later refinements remain unfinished.
++    AI review, not human verification or physical Pi validation.
+ ---
+ 
+ # Architecture and hardware ownership
+@@ -43,19 +45,28 @@
+ The documented hardware path is user or model → ninjarobot_pi5_agent →
+ ninjarobot_pi5_ide → a managed pi5 driver → its device. The Agent handles user
+ interaction, model-provider translation, policy, sessions, and tool proposals.
+-It should not import a pi5 library or access a device directly.[^src-20260906-developmentguide]
++It should not import a pi5 library or access a device directly.[^src-20260907-developmentguide-2]
+ 
+ The IDE (the project's device-coordination layer) owns shared resource scheduling,
+ action execution, safety state, behaviors, and hardware ownership. Individual
+ managed libraries own their device and standalone setup interface. The six
+ managed libraries cover servo motors, display, buzzer, distance sensing, camera,
+-and microphone.[^src-20260906-developmentguide]
++and microphone.[^src-20260907-developmentguide-2]
+ 
+ This is the documented architecture contract. Compare affected code and tests
+ with it before implementation; this page does not certify that every failure or
+-physical safety condition has been tested.[^src-20260906-developmentguide]
++physical safety condition has been tested.[^src-20260907-developmentguide-2]
+ 
+ [Read the development manual](/references/development-guide.md).
+ 
+ 
+-[^src-20260906-developmentguide]: DevelopmentGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-developmentguide`.
++## Emergency stop dispatch — F02
++
++The three trusted IDE stop commands bypass ordinary queue capacity and resource
++locks. They request cancellation of competing actions without waiting for that
++cleanup; new conflicting work is rejected while stop is executing. Partial lock
++acquisition is cleaned up on cancellation. This establishes queue independence,
++not a measured physical stopping time. F01, F03 and F04 remain unfinished.[^src-20260907-developmentguide-2]
++
++
++[^src-20260907-developmentguide-2]: DevelopmentGuide.md, source version `refinement-f02-260907`; registered source `src-20260907-developmentguide-2`.
+--- wiki/concepts/development-history.md
++++ wiki/concepts/development-history.md
+@@ -14,15 +14,15 @@
+   by: agent:codex
+   at: '2026-09-06T22:53:22Z'
+ sources:
+-- id: src-20260907-developmentlog
+-  resource: urn:llmwiki:source:src-20260907-developmentlog
++- id: src-20260907-developmentlog-2
++  resource: urn:llmwiki:source:src-20260907-developmentlog-2
+   title: DevelopmentLog.md
+-  content_hash: sha256:da1ff98b3c0a33c61602ceca14e5f481c7f4f1e37e69460c7102e3257beb8f5c
++  content_hash: sha256:08ec9a7c8331266edf4f11512f3c97aa08e826e3ba61ddb4a0f9de9752f29c1e
+ semantic_review:
+   version: 1
+   performed_by: agent:codex
+-  performed_at: '2026-09-07T00:45:19Z'
+-  target_hash: sha256:fcbefcb58985d5fc1ec577bd2844efe82037f16868a917efa8668a2cf3cf6fc4
++  performed_at: '2026-09-07T09:34:22Z'
++  target_hash: sha256:197edd54e3626d8a212548f62d2983432180197fb499c4753db628ab00c8e260
+   result: passed
+   checks:
+     source_support: passed
+@@ -31,9 +31,11 @@
+     claim_strength: passed
+     visual_evidence: not_applicable
+   notes:
+-  - Rechecked the navigation-only correction and updated source versions; other cited
+-    explanations are unchanged.
+-  - AI evidence review; no human verification or hardware test is claimed.
++  - Compared this page with the unchanged source material carried into the new manual
++    version; reviewed added F02 statements against its new sections and simulated
++    validation.
++  - F02 queue dispatch only; F01/F03/F04 and later refinements remain unfinished.
++    AI review, not human verification or physical Pi validation.
+ ---
+ 
+ # Development history and decisions
+@@ -41,14 +43,22 @@
+ The development log retains dated records of implementation work, design
+ choices, repairs, validation, and remaining work. Use a relevant dated entry
+ when answering why a change was made. Read surrounding entries to determine
+-whether a later decision superseded it.[^src-20260907-developmentlog]
++whether a later decision superseded it.[^src-20260907-developmentlog-2]
+ 
+ Historical success reports refer to the recorded work and environment. They do
+ not prove that today's checkout passes the same checks, or that a physical
+ device was tested during a later documentation task. Cite the entry and state
+-which current checks were actually run.[^src-20260907-developmentlog]
++which current checks were actually run.[^src-20260907-developmentlog-2]
+ 
+ [Complete development log](/references/development-log.md).
+ 
+ 
+-[^src-20260907-developmentlog]: DevelopmentLog.md, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-developmentlog`.
++## F02 foundation change — 7 September 2026
++
++The F02 entry records stop dispatch independent of ordinary work, cancellation
++lock cleanup, browser permission revocation and concurrent assembly cleanup.
++It records 593 passing root tests and unchanged managed drivers. Physical Pi
++validation and the other refinement features remain outstanding.[^src-20260907-developmentlog-2]
++
++
++[^src-20260907-developmentlog-2]: DevelopmentLog.md, source version `refinement-f02-260907`; registered source `src-20260907-developmentlog-2`.
+--- wiki/concepts/development-workflow.md
++++ wiki/concepts/development-workflow.md
+@@ -21,15 +21,15 @@
+   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
+   title: Local knowledge integration evidence
+   content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
+-- id: src-20260906-developmentguide
+-  resource: urn:llmwiki:source:src-20260906-developmentguide
++- id: src-20260907-developmentguide-2
++  resource: urn:llmwiki:source:src-20260907-developmentguide-2
+   title: DevelopmentGuide.md
+-  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e
++  content_hash: sha256:c68338c5f0772a14528b2c8f50bdbfc843f9338bd7816e50e49710fa57bd0e19
+ semantic_review:
+   version: 1
+   performed_by: agent:codex
+-  performed_at: '2026-09-07T00:45:19Z'
+-  target_hash: sha256:bd0acfbe3e2dd04f8011e991bed09941a8bde1b6f2d3686aec176e84bf869eb2
++  performed_at: '2026-09-07T09:34:22Z'
++  target_hash: sha256:e904313ee518733c6cd159b825ed934c547f7357a2bfcca9e1ea8dc9ddfcc8aa
+   result: passed
+   checks:
+     source_support: passed
+@@ -38,9 +38,11 @@
+     claim_strength: passed
+     visual_evidence: not_applicable
+   notes:
+-  - Rechecked the navigation-only correction and updated source versions; other cited
+-    explanations are unchanged.
+-  - AI evidence review; no human verification or hardware test is claimed.
++  - Compared this page with the unchanged source material carried into the new manual
++    version; reviewed added F02 statements against its new sections and simulated
++    validation.
++  - F02 queue dispatch only; F01/F03/F04 and later refinements remain unfinished.
++    AI review, not human verification or physical Pi validation.
+ ---
+ 
+ # Development and documentation workflow
+@@ -48,7 +50,7 @@
+ Before significant development, consult the local wiki and the current full
+ manuals, inspect relevant code, and identify missing or conflicting evidence.
+ The root project policy requires an approved phased plan and preservation of
+-robot interfaces and managed-driver rules.[^src-20260906-developmentguide]
++robot interfaces and managed-driver rules.[^src-20260907-developmentguide-2]
+ 
+ Feature completion includes a wiki impact assessment. Update affected manual
+ versions, topic pages, specifications and architecture guidance, then record
+@@ -67,4 +69,4 @@
+ 
+ 
+ [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
+-[^src-20260906-developmentguide]: DevelopmentGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-developmentguide`.
++[^src-20260907-developmentguide-2]: DevelopmentGuide.md, source version `refinement-f02-260907`; registered source `src-20260907-developmentguide-2`.
+--- wiki/concepts/features-and-tools.md
++++ wiki/concepts/features-and-tools.md
+@@ -18,10 +18,10 @@
+   resource: urn:llmwiki:source:src-20260906-ninjarobot-mcp-skill
+   title: NinjaRobot_MCP_Skill.md
+   content_hash: sha256:df8076ccc2683b24b6752310558ce4e62828d54cee67f1102aae7196c0ee97bb
+-- id: src-20260906-developmentguide
+-  resource: urn:llmwiki:source:src-20260906-developmentguide
++- id: src-20260907-developmentguide-2
++  resource: urn:llmwiki:source:src-20260907-developmentguide-2
+   title: DevelopmentGuide.md
+-  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e
++  content_hash: sha256:c68338c5f0772a14528b2c8f50bdbfc843f9338bd7816e50e49710fa57bd0e19
+ - id: src-20260907-knowledgeintegration
+   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
+   title: Local knowledge integration evidence
+@@ -29,8 +29,8 @@
+ semantic_review:
+   version: 1
+   performed_by: agent:codex
+-  performed_at: '2026-09-07T00:45:19Z'
+-  target_hash: sha256:2c8bea92e1d46f8376737f38a42fc20c1eececf180b22e43e92925ccbb696cb2
++  performed_at: '2026-09-07T09:34:22Z'
++  target_hash: sha256:6d1128568525a3d174952cb94f4a3c67c23fcbad84b0a44f9f5837c60d19bcb9
+   result: passed
+   checks:
+     source_support: passed
+@@ -39,9 +39,11 @@
+     claim_strength: passed
+     visual_evidence: not_applicable
+   notes:
+-  - Rechecked the navigation-only correction and updated source versions; other cited
+-    explanations are unchanged.
+-  - AI evidence review; no human verification or hardware test is claimed.
++  - Compared this page with the unchanged source material carried into the new manual
++    version; reviewed added F02 statements against its new sections and simulated
++    validation.
++  - F02 queue dispatch only; F01/F03/F04 and later refinements remain unfinished.
++    AI review, not human verification or physical Pi validation.
+ ---
+ 
+ # Features, MCP tools, and Agent Skills
+@@ -49,7 +51,7 @@
+ The development guide describes conversational and web interfaces, model
+ providers, behaviors, memory, and device capabilities. These are documented
+ implementation areas; use the current code and tests to verify a specific
+-feature or failure case before changing it.[^src-20260906-developmentguide]
++feature or failure case before changing it.[^src-20260907-developmentguide-2]
+ 
+ MCP (Model Context Protocol) lets an application discover and call external tools.
+ The robot tutorial describes allowlisted read-only tools, bounded results,
+@@ -65,6 +67,14 @@
+ [MCP and skills tutorial](/references/mcp-skills-guide.md).
+ 
+ 
++## F02 stop behavior
++
++Emergency Stop in the browser revokes motion permissions before dispatch and does
++not wait behind an earlier movement command. A conflicting new action can return
++`ACTION_STOP_IN_PROGRESS`. Stop names, arguments and stored result handling remain
++compatible. Separate raw-servo and ownership repairs are still planned.[^src-20260907-developmentguide-2]
++
++
+ [^src-20260906-ninjarobot-mcp-skill]: NinjaRobot_MCP_Skill.md, source version `migration-2026-09-07`; registered source `src-20260906-ninjarobot-mcp-skill`.
+-[^src-20260906-developmentguide]: DevelopmentGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-developmentguide`.
++[^src-20260907-developmentguide-2]: DevelopmentGuide.md, source version `refinement-f02-260907`; registered source `src-20260907-developmentguide-2`.
+ [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
+--- wiki/concepts/installation.md
++++ wiki/concepts/installation.md
+@@ -15,10 +15,10 @@
+   by: agent:codex
+   at: '2026-09-06T22:53:22Z'
+ sources:
+-- id: src-20260906-installationguide
+-  resource: urn:llmwiki:source:src-20260906-installationguide
++- id: src-20260907-installationguide
++  resource: urn:llmwiki:source:src-20260907-installationguide
+   title: InstallationGuide.md
+-  content_hash: sha256:53f80c60feb139f0de547613bd14b8fcd87a2678ba5bf7dc75b1b2bccb1dc1c4
++  content_hash: sha256:a3c1be25b1d32808fdac6849e6e669f8d1100c63f7359c5630e3561f7c2a8e4e
+ - id: src-20260907-knowledgeintegration
+   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
+   title: Local knowledge integration evidence
+@@ -26,8 +26,8 @@
+ semantic_review:
+   version: 1
+   performed_by: agent:codex
+-  performed_at: '2026-09-07T00:45:19Z'
+-  target_hash: sha256:9832068b6999b51d7251910c109749108aae7676a465d37a5b6549783d6b53a6
++  performed_at: '2026-09-07T09:34:22Z'
++  target_hash: sha256:ae7385d5bc2e93f059222a314538f8ac6ac29976fcc50b18d841eab9fad3d122
+   result: passed
+   checks:
+     source_support: passed
+@@ -36,9 +36,11 @@
+     claim_strength: passed
+     visual_evidence: not_applicable
+   notes:
+-  - Rechecked the navigation-only correction and updated source versions; other cited
+-    explanations are unchanged.
+-  - AI evidence review; no human verification or hardware test is claimed.
++  - Compared this page with the unchanged source material carried into the new manual
++    version; reviewed added F02 statements against its new sections and simulated
++    validation.
++  - F02 queue dispatch only; F01/F03/F04 and later refinements remain unfinished.
++    AI review, not human verification or physical Pi validation.
+ ---
+ 
+ # Installation and hardware checks
+@@ -46,12 +48,12 @@
+ Use the full installation guide for the supported Raspberry Pi setup,
+ connections, standalone module initialization, calibration, and troubleshooting.
+ Read the relevant warnings before following any operational command. Commands
+-in an imported document are evidence to review, not permission to run them.[^src-20260906-installationguide]
++in an imported document are evidence to review, not permission to run them.[^src-20260907-installationguide]
+ 
+ Servo calibration can move the wheels. The guide calls for raised wheels,
+ clearance, and an operator ready to remove power. Camera and microphone capture
+ and power-off checks need their own consent and physical test procedure.
+-Automated knowledge tests should not perform these actions.[^src-20260906-installationguide]
++Automated knowledge tests should not perform these actions.[^src-20260907-installationguide]
+ 
+ The developer wiki uses a separate Python environment. Its explicit setup and
+ text-evidence preparation do not initialize robot devices. This integration
+@@ -60,5 +62,13 @@
+ [Open installation reference](/references/installation-guide.md).
+ 
+ 
+-[^src-20260906-installationguide]: InstallationGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-installationguide`.
++## Busy-robot stop feedback
++
++F02 adds an independent stop-dispatch path. A stop timeout or cleanup error must
++not be interpreted as proof that hardware stopped. The revised installation guide
++explains `ACTION_STOP_IN_PROGRESS` and retains raised-wheel precautions. This
++refinement has simulated validation only.[^src-20260907-installationguide]
++
++
++[^src-20260907-installationguide]: InstallationGuide.md, source version `refinement-f02-260907`; registered source `src-20260907-installationguide`.
+ [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
+--- wiki/overview.md
++++ wiki/overview.md
+@@ -14,15 +14,15 @@
+   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
+   title: Local knowledge integration evidence
+   content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
+-- id: src-20260906-developmentguide
+-  resource: urn:llmwiki:source:src-20260906-developmentguide
++- id: src-20260907-developmentguide-2
++  resource: urn:llmwiki:source:src-20260907-developmentguide-2
+   title: DevelopmentGuide.md
+-  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e
++  content_hash: sha256:c68338c5f0772a14528b2c8f50bdbfc843f9338bd7816e50e49710fa57bd0e19
+ semantic_review:
+   version: 1
+   performed_by: agent:codex
+-  performed_at: '2026-09-07T00:45:19Z'
+-  target_hash: sha256:a0bccc510d1a98ec6fef23caea760829945a7ae7f1a868c445c060dc46afe17d
++  performed_at: '2026-09-07T09:34:22Z'
++  target_hash: sha256:0ee6410719d08a491a2f2edfd338a60bed979be1bfbe0bf268fd7d4aae8606ee
+   result: passed
+   checks:
+     source_support: passed
+@@ -31,16 +31,18 @@
+     claim_strength: passed
+     visual_evidence: not_applicable
+   notes:
+-  - Rechecked the navigation-only correction and updated source versions; other cited
+-    explanations are unchanged.
+-  - AI evidence review; no human verification or hardware test is claimed.
++  - Compared this page with the unchanged source material carried into the new manual
++    version; reviewed added F02 statements against its new sections and simulated
++    validation.
++  - F02 queue dispatch only; F01/F03/F04 and later refinements remain unfinished.
++    AI review, not human verification or physical Pi validation.
+ ---
+ 
+ # NinjaRobotPi5 project overview
+ 
+ NinjaRobotPi5 documents an Agent layer for user/model interaction, an IDE layer
+ for coordinating devices, and managed Pi5 libraries for individual devices.
+-The development guide describes their permitted ownership boundary.[^src-20260906-developmentguide]
++The development guide describes their permitted ownership boundary.[^src-20260907-developmentguide-2]
+ 
+ The local wiki is the primary developer knowledge collection. Full manuals are
+ versioned under raw source folders; outer README links and the project knowledge
+@@ -62,4 +64,4 @@
+ 
+ 
+ [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
+-[^src-20260906-developmentguide]: DevelopmentGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-developmentguide`.
++[^src-20260907-developmentguide-2]: DevelopmentGuide.md, source version `refinement-f02-260907`; registered source `src-20260907-developmentguide-2`.
+--- wiki/references/development-guide.md
++++ wiki/references/development-guide.md
+@@ -9,10 +9,10 @@
+   by: agent:codex
+   at: '2026-09-06T22:53:22Z'
+ sources:
+-- id: src-20260906-developmentguide
+-  resource: urn:llmwiki:source:src-20260906-developmentguide
++- id: src-20260907-developmentguide-2
++  resource: urn:llmwiki:source:src-20260907-developmentguide-2
+   title: DevelopmentGuide.md
+-  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e
++  content_hash: sha256:c68338c5f0772a14528b2c8f50bdbfc843f9338bd7816e50e49710fa57bd0e19
+ - id: src-20260907-knowledgeintegration
+   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
+   title: Local knowledge integration evidence
+@@ -20,8 +20,8 @@
+ semantic_review:
+   version: 1
+   performed_by: agent:codex
+-  performed_at: '2026-09-07T00:45:19Z'
+-  target_hash: sha256:73f6f4be5dc424cbd763be1529534f059d1406da47ac2f1cdabb701a4420e118
++  performed_at: '2026-09-07T09:34:22Z'
++  target_hash: sha256:92f7ce20d0ec15f8b281c4f402580117bbc9ff1abb430d210c39ad731e01fee9
+   result: passed
+   checks:
+     source_support: passed
+@@ -30,14 +30,16 @@
+     claim_strength: passed
+     visual_evidence: not_applicable
+   notes:
+-  - Rechecked the navigation-only correction and updated source versions; other cited
+-    explanations are unchanged.
+-  - AI evidence review; no human verification or hardware test is claimed.
++  - Compared this page with the unchanged source material carried into the new manual
++    version; reviewed added F02 statements against its new sections and simulated
++    validation.
++  - F02 queue dispatch only; F01/F03/F04 and later refinements remain unfinished.
++    AI review, not human verification or physical Pi validation.
+ ---
+ 
+ # Development guide
+ 
+-The full guide describes architecture, managed drivers, configuration, safety, the behavior system, external tools, memory, web access, and development checks.[^src-20260906-developmentguide]
++The full guide describes architecture, managed drivers, configuration, safety, the behavior system, external tools, memory, web access, and development checks.[^src-20260907-developmentguide-2]
+ 
+ Use the source identifier below to resolve the complete manual through the raw
+ source catalog. The outer wiki README also links directly to the current full
+@@ -46,5 +48,5 @@
+ 
+ [Return to project overview](/overview.md).
+ 
+-[^src-20260906-developmentguide]: DevelopmentGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-developmentguide`.
++[^src-20260907-developmentguide-2]: DevelopmentGuide.md, source version `refinement-f02-260907`; registered source `src-20260907-developmentguide-2`.
+ [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
+--- wiki/references/development-log.md
++++ wiki/references/development-log.md
+@@ -9,10 +9,10 @@
+   by: agent:codex
+   at: '2026-09-06T22:53:22Z'
+ sources:
+-- id: src-20260907-developmentlog
+-  resource: urn:llmwiki:source:src-20260907-developmentlog
++- id: src-20260907-developmentlog-2
++  resource: urn:llmwiki:source:src-20260907-developmentlog-2
+   title: DevelopmentLog.md
+-  content_hash: sha256:da1ff98b3c0a33c61602ceca14e5f481c7f4f1e37e69460c7102e3257beb8f5c
++  content_hash: sha256:08ec9a7c8331266edf4f11512f3c97aa08e826e3ba61ddb4a0f9de9752f29c1e
+ - id: src-20260907-knowledgeintegration
+   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
+   title: Local knowledge integration evidence
+@@ -20,8 +20,8 @@
+ semantic_review:
+   version: 1
+   performed_by: agent:codex
+-  performed_at: '2026-09-07T00:45:19Z'
+-  target_hash: sha256:0edf9f4f0731b8cddae438d1c4856004f285e2bb6bfbb9ad96b8b383f7610205
++  performed_at: '2026-09-07T09:34:22Z'
++  target_hash: sha256:afdc93d6faab0de77e1a6e5b9f1d8d34643e11e0ccfca3f9c5cada0f6d514dc4
+   result: passed
+   checks:
+     source_support: passed
+@@ -30,14 +30,16 @@
+     claim_strength: passed
+     visual_evidence: not_applicable
+   notes:
+-  - Rechecked the navigation-only correction and updated source versions; other cited
+-    explanations are unchanged.
+-  - AI evidence review; no human verification or hardware test is claimed.
++  - Compared this page with the unchanged source material carried into the new manual
++    version; reviewed added F02 statements against its new sections and simulated
++    validation.
++  - F02 queue dispatch only; F01/F03/F04 and later refinements remain unfinished.
++    AI review, not human verification or physical Pi validation.
+ ---
+ 
+ # Development log
+ 
+-The complete log preserves dated implementation decisions and validation reports. Historical test results describe their recorded checkout and date; they are not fresh verification.[^src-20260907-developmentlog]
++The complete log preserves dated implementation decisions and validation reports. Historical test results describe their recorded checkout and date; they are not fresh verification.[^src-20260907-developmentlog-2]
+ 
+ Use the source identifier below to resolve the complete manual through the raw
+ source catalog. The outer wiki README also links directly to the current full
+@@ -46,5 +48,5 @@
+ 
+ [Return to project overview](/overview.md).
+ 
+-[^src-20260907-developmentlog]: DevelopmentLog.md, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-developmentlog`.
++[^src-20260907-developmentlog-2]: DevelopmentLog.md, source version `refinement-f02-260907`; registered source `src-20260907-developmentlog-2`.
+ [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
+--- wiki/references/installation-guide.md
++++ wiki/references/installation-guide.md
+@@ -9,10 +9,10 @@
+   by: agent:codex
+   at: '2026-09-06T22:53:22Z'
+ sources:
+-- id: src-20260906-installationguide
+-  resource: urn:llmwiki:source:src-20260906-installationguide
++- id: src-20260907-installationguide
++  resource: urn:llmwiki:source:src-20260907-installationguide
+   title: InstallationGuide.md
+-  content_hash: sha256:53f80c60feb139f0de547613bd14b8fcd87a2678ba5bf7dc75b1b2bccb1dc1c4
++  content_hash: sha256:a3c1be25b1d32808fdac6849e6e669f8d1100c63f7359c5630e3561f7c2a8e4e
+ - id: src-20260907-knowledgeintegration
+   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
+   title: Local knowledge integration evidence
+@@ -20,8 +20,8 @@
+ semantic_review:
+   version: 1
+   performed_by: agent:codex
+-  performed_at: '2026-09-07T00:45:19Z'
+-  target_hash: sha256:3472d55b44cac9a5196a94282d70d6505d3c6e528eddfad9c5731a989f292cef
++  performed_at: '2026-09-07T09:34:22Z'
++  target_hash: sha256:c2545abf1e0c284b2ca4fcaa649b59b8dc579b388032497980416ed0f111996d
+   result: passed
+   checks:
+     source_support: passed
+@@ -30,14 +30,16 @@
+     claim_strength: passed
+     visual_evidence: not_applicable
+   notes:
+-  - Rechecked the navigation-only correction and updated source versions; other cited
+-    explanations are unchanged.
+-  - AI evidence review; no human verification or hardware test is claimed.
++  - Compared this page with the unchanged source material carried into the new manual
++    version; reviewed added F02 statements against its new sections and simulated
++    validation.
++  - F02 queue dispatch only; F01/F03/F04 and later refinements remain unfinished.
++    AI review, not human verification or physical Pi validation.
+ ---
+ 
+ # Installation guide
+ 
+-The full guide covers beginner setup, hardware initialization and calibration, startup, and troubleshooting. Hardware commands require the stated operator precautions.[^src-20260906-installationguide]
++The full guide covers beginner setup, hardware initialization and calibration, startup, and troubleshooting. Hardware commands require the stated operator precautions.[^src-20260907-installationguide]
+ 
+ Use the source identifier below to resolve the complete manual through the raw
+ source catalog. The outer wiki README also links directly to the current full
+@@ -46,5 +48,5 @@
+ 
+ [Return to project overview](/overview.md).
+ 
+-[^src-20260906-installationguide]: InstallationGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-installationguide`.
++[^src-20260907-installationguide]: InstallationGuide.md, source version `refinement-f02-260907`; registered source `src-20260907-installationguide`.
+ [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

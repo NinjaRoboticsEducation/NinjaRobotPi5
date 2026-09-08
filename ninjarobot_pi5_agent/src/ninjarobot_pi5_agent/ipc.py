@@ -165,6 +165,29 @@ class AgentIPCServer:
                 {"type": "result", "data": reply.model_dump(mode="json")},
             )
             return
+        if command == "guided_checks":
+            await _write_message(
+                writer,
+                {
+                    "type": "result",
+                    "data": await self._runtime.guided_checks(payload.get("step", 0)),
+                },
+            )
+            return
+        if command == "tasks":
+            await _write_message(
+                writer,
+                {
+                    "type": "result",
+                    "data": await self._runtime.task_action(
+                        _required_text(payload, "session_id"),
+                        payload.get("operation", "list"),
+                        payload.get("task_id", ""),
+                        payload.get("minutes", 5),
+                    ),
+                },
+            )
+            return
         if command == "status":
             await _write_message(
                 writer,

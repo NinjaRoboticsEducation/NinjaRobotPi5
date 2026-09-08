@@ -12,7 +12,7 @@ from ninjarobot_pi5_ide.voice_input import VoiceInputState, VoiceInputStatus
 from ninjarobot_pi5_ide import RobotIDEClient, load_robot_config, save_robot_config
 
 from .agent_loop import AgentReply, TextDeltaHandler
-from .events import AgentEventType, EventBroker
+from .events import CURRENT_LIFECYCLE, AgentEventType, EventBroker, LifecycleTrace, log_lifecycle
 from .release_foundations import ReleaseFeatureState, ReleaseStatusRegistry
 from .tools import CancellationToken
 
@@ -60,6 +60,7 @@ class VoiceInputService:
         self._dispatch_lock = asyncio.Lock()
         self._closed = False
         self._last_reported: tuple[str, str | None] | None = None
+        self._voice_trace: LifecycleTrace | None = None
         ide.bind_voice_handlers(
             transcript_handler=self.handle_transcript,
             status_handler=self.handle_status,
@@ -132,31 +133,38 @@ class VoiceInputService:
     async def handle_transcript(self, transcript: str, language: str) -> None:
         """Send one finalized transcript exactly once through AgentRuntime.chat."""
         async with self._dispatch_lock:
-            await self._events.publish(
-                AgentEventType.VOICE,
-                "Voice command transcribed.",
-                session_id=VOICE_SESSION_ID,
-                data={
-                    "kind": "voice_transcript",
-                    "transcript": transcript,
-                    "language": language,
-                },
+            trace_token = CURRENT_LIFECYCLE.set(
+                self._voice_trace or LifecycleTrace.create(VOICE_SESSION_ID)
             )
-            reply = await self._runtime.chat(
-                session_id=VOICE_SESSION_ID,
-                text=transcript,
-            )
-            reply_text = str(getattr(reply, "text", ""))
-            await self._events.publish(
-                AgentEventType.VOICE,
-                "Voice command completed.",
-                session_id=VOICE_SESSION_ID,
-                data={
-                    "kind": "voice_reply",
-                    "text": reply_text,
-                    "language": language,
-                },
-            )
+            try:
+                await self._events.publish(
+                    AgentEventType.VOICE,
+                    "Voice command transcribed.",
+                    session_id=VOICE_SESSION_ID,
+                    data={
+                        "kind": "voice_transcript",
+                        "transcript": transcript,
+                        "language": language,
+                    },
+                )
+                reply = await self._runtime.chat(
+                    session_id=VOICE_SESSION_ID,
+                    text=transcript,
+                )
+                reply_text = str(getattr(reply, "text", ""))
+                await self._events.publish(
+                    AgentEventType.VOICE,
+                    "Voice command completed.",
+                    session_id=VOICE_SESSION_ID,
+                    data={
+                        "kind": "voice_reply",
+                        "text": reply_text,
+                        "language": language,
+                    },
+                )
+            finally:
+                CURRENT_LIFECYCLE.reset(trace_token)
+                self._voice_trace = None
 
     async def handle_status(self, status: VoiceInputStatus) -> None:
         """Normalize IDE state and publish changes without raw exception text."""
@@ -175,6 +183,27 @@ class VoiceInputService:
         if marker == self._last_reported:
             return
         self._last_reported = marker
+        if status.state is VoiceInputState.RECORDING:
+            self._voice_trace = LifecycleTrace.create(VOICE_SESSION_ID)
+            token = CURRENT_LIFECYCLE.set(self._voice_trace)
+            try:
+                log_lifecycle("listening", reason="voice_capture")
+            finally:
+                CURRENT_LIFECYCLE.reset(token)
+        elif (
+            status.state in {VoiceInputState.FAILED, VoiceInputState.DISABLED} and self._voice_trace
+        ):
+            token = CURRENT_LIFECYCLE.set(self._voice_trace)
+            try:
+                failed = status.state is VoiceInputState.FAILED
+                log_lifecycle(
+                    "error" if failed else "interrupted",
+                    outcome="failed" if failed else "cancelled",
+                    reason="request_failed" if failed else "cancelled",
+                )
+            finally:
+                CURRENT_LIFECYCLE.reset(token)
+                self._voice_trace = None
         await self._events.publish(
             AgentEventType.VOICE,
             _voice_status_message(status),

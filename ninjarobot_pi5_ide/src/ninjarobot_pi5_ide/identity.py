@@ -13,6 +13,23 @@ from typing import Any, Protocol
 from .camera import CameraDevice
 
 
+async def _await_owned(task: asyncio.Task[Any]) -> Any:
+    """Retain ownership through repeated cancellation until a started worker finishes."""
+    cancelled = False
+    while not task.done():
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            cancelled = True
+        except Exception:
+            break
+    if cancelled:
+        if not task.cancelled():
+            task.exception()
+        raise asyncio.CancelledError
+    return task.result()
+
+
 class FaceIdentityBackend(Protocol):
     """Narrow seam around the existing pi5camera recognition API."""
 
@@ -123,6 +140,7 @@ class FaceIdentityDevice:
         self._backend = backend or Pi5CameraFaceIdentityBackend()
         self._lock = asyncio.Lock()
         self._pending_reset: tuple[str, Path | None] | None = None
+        self._closed = False
 
     async def enroll(self, user_id: str) -> dict[str, Any]:
         """Enroll exactly one face under an opaque profile identifier."""
@@ -207,15 +225,7 @@ class FaceIdentityDevice:
         raw_path = Path(str(capture["path"])).expanduser().resolve()
         task = asyncio.create_task(asyncio.to_thread(operation, raw_path))
         try:
-            try:
-                result = await asyncio.shield(task)
-            except asyncio.CancelledError:
-                try:
-                    await asyncio.shield(task)
-                except BaseException:
-                    pass
-                raise
-            await asyncio.to_thread(self._secure_data_tree)
+            result = await _await_owned(task)
             return {
                 **result,
                 "backend": "pi5camera",
@@ -223,6 +233,7 @@ class FaceIdentityDevice:
             }
         finally:
             raw_path.unlink(missing_ok=True)
+            await _await_owned(asyncio.create_task(asyncio.to_thread(self._secure_data_tree)))
 
     def _config(self) -> dict[str, Any]:
         return {
@@ -253,6 +264,8 @@ class FaceIdentityDevice:
                 continue
 
     def _ensure_reset_not_pending(self) -> None:
+        if self._closed:
+            raise RuntimeError("face identity device is closed")
         if self._pending_reset is not None:
             raise RuntimeError("face identity reset is awaiting completion")
 
@@ -284,8 +297,14 @@ class FaceIdentityDevice:
 
     async def close(self) -> None:
         """Remove incomplete temporary identity data; camera ownership stays with RobotAssembly."""
-        temporary = self._data_directory / "temporary"
-        await asyncio.to_thread(shutil.rmtree, temporary, True)
+        async with self._lock:
+            if self._closed:
+                return
+            temporary = self._data_directory / "temporary"
+            await _await_owned(
+                asyncio.create_task(asyncio.to_thread(shutil.rmtree, temporary, True))
+            )
+            self._closed = True
 
 
 def _face_identity(user_id: str) -> str:

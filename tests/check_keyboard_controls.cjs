@@ -1,0 +1,22 @@
+const fs = require('node:fs');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const code = fs.readFileSync('ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/app.js','utf8');
+function target() { return {events:{},addEventListener(n,f){this.events[n]=f;}}; }
+const button = Object.assign(target(),{dataset:{direction:'forward'},classList:{add(){},remove(){}}});
+const document = Object.assign(target(),{querySelectorAll(){return [button];},hidden:false});
+const window = Object.assign(target(),{PointerEvent:true});
+const calls=[], rejects=[];
+const state={activeMoveButton:null};
+const context={state,window,document,log(){},send(type){calls.push(type);return new Promise((resolve,reject)=>rejects.push(reject));}};
+vm.runInNewContext(code.slice(code.indexOf('  let movementGeneration'),code.indexOf('  document.querySelector("#emergencyButton")')),context);
+const event=(key,repeat=false)=>({key,repeat,preventDefault(){}});
+button.events.keydown(event('x')); assert.equal(calls.length,0);
+button.events.keydown(event(' ')); button.events.keydown(event(' ',true)); assert.deepEqual(calls,['move_start']);
+button.events.keyup(event(' ')); assert.deepEqual(calls,['move_start','move_stop']);
+button.events.keydown(event('Enter')); button.events.blur(); assert.equal(calls.at(-1),'move_stop');
+button.events.keydown(event('Enter')); document.hidden=true; document.events.visibilitychange(); assert.equal(calls.at(-1),'move_stop');
+button.events.keydown(event('Enter')); window.events.blur(); assert.equal(calls.at(-1),'move_stop');
+button.events.keydown(event('Enter')); const count=calls.length;
+rejects[0](new Error('old request failed'));
+setImmediate(()=>{assert.equal(state.activeMoveButton,button);button.events.keyup(event('Enter'));assert.equal(calls.length,count+1);console.log('PASS: keyboard hold/release, focus loss, hidden page and stale failure');});

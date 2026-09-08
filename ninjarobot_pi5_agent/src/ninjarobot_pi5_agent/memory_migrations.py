@@ -241,10 +241,39 @@ def _memory_schema(connection: sqlite3.Connection) -> None:
         )
 
 
+def _local_tasks(connection: sqlite3.Connection) -> None:
+    _execute_script(
+        connection,
+        """
+        CREATE TABLE IF NOT EXISTS local_tasks (
+            task_id TEXT PRIMARY KEY,
+            owner_scope TEXT NOT NULL,
+            user_id TEXT REFERENCES users(user_id) ON DELETE CASCADE,
+            status TEXT NOT NULL,
+            due_at TEXT,
+            updated_at TEXT NOT NULL,
+            record_json TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS local_tasks_due ON local_tasks(status, due_at);
+        CREATE INDEX IF NOT EXISTS local_tasks_owner ON local_tasks(owner_scope, updated_at);
+    """,
+    )
+
+
+def _task_kinds(connection: sqlite3.Connection) -> None:
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(local_tasks)")}
+    if "kind" not in columns:
+        connection.execute(
+            "ALTER TABLE local_tasks ADD COLUMN kind TEXT NOT NULL DEFAULT 'reminder'"
+        )
+
+
 _MIGRATIONS: tuple[Migration, ...] = (
     _core_schema,
     _conversation_user_scope,
     _memory_schema,
+    _local_tasks,
+    _task_kinds,
 )
 
 

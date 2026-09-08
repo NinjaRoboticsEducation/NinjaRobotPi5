@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, cast
 
+from ninjarobot_pi5_ide.integrated import build_guarded_servo_engine
 from ninjarobot_pi5_ide.testing import FakeIDEClient
 from pydantic import ValidationError
 
@@ -64,6 +65,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subcommands = parser.add_subparsers(dest="command", required=True)
+
+    doctor = subcommands.add_parser(
+        "doctor", help="Inspect this environment without opening hardware."
+    )
+    doctor.add_argument("--profile", choices=("hardware", "development"), default="hardware")
+    doctor.add_argument(
+        "--config", type=Path, help="Optional configuration for enabled-device checks."
+    )
+    doctor.add_argument(
+        "--root", type=Path, help="Checkout to check managed-driver source locations."
+    )
 
     config_parser = subcommands.add_parser(
         "config",
@@ -751,6 +763,7 @@ def _build_distance_engine(
     return ExecutionEngine(
         CapabilityRegistry([adapter]),
         ActionLedger(Path(ledger_path)),
+        owns_hardware=real,
     )
 
 
@@ -794,7 +807,9 @@ def _build_buzzer_engine(
 ) -> ExecutionEngine:
     if real:
         config = load_robot_config(config_path)
-        device = BuzzerDevice(pin=config.hardware.buzzer.gpio)
+        device = BuzzerDevice(
+            pin=config.hardware.buzzer.gpio, enabled=config.hardware.buzzer.enabled
+        )
     else:
         simulated_driver = _SimulatedBuzzerDriver()
         device = BuzzerDevice(
@@ -810,6 +825,7 @@ def _build_buzzer_engine(
             ]
         ),
         ActionLedger(Path(ledger_path)),
+        owns_hardware=real,
         scheduler=ResourceScheduler(max_concurrency=2, max_queue_size=4),
     )
 
@@ -824,6 +840,7 @@ def _build_display_engine(
         config = load_robot_config(config_path)
         display_config = config.hardware.display
         device = DisplayDevice(
+            enabled=display_config.enabled,
             spi_bus=display_config.spi_bus,
             spi_device=display_config.spi_device,
             dc_gpio=display_config.dc_gpio,
@@ -849,6 +866,7 @@ def _build_display_engine(
             ]
         ),
         ActionLedger(Path(ledger_path)),
+        owns_hardware=real,
         scheduler=ResourceScheduler(max_concurrency=3, max_queue_size=6),
     )
 
@@ -861,15 +879,7 @@ def _build_servo_engine(
 ) -> ExecutionEngine:
     if real:
         config = load_robot_config(config_path)
-        servo_config = config.hardware.servos
-        device = ServoDevice(
-            endpoints=servo_config.endpoints,
-            calibration_file=servo_config.calibration_file,
-            i2c_bus=config.hardware.i2c.bus,
-            dfr0566_address=config.hardware.i2c.dfr0566_address,
-            motion_enabled=servo_config.motion_enabled,
-            group_motion_enabled=servo_config.group_motion_enabled,
-        )
+        return build_guarded_servo_engine(config, ledger_path=ledger_path)
     else:
         endpoints = (
             "gpio12",
@@ -899,6 +909,7 @@ def _build_servo_engine(
             ]
         ),
         ActionLedger(Path(ledger_path)),
+        owns_hardware=real,
         scheduler=ResourceScheduler(max_concurrency=2, max_queue_size=4),
     )
 
@@ -934,6 +945,7 @@ def _build_camera_engine(
             ]
         ),
         ActionLedger(Path(ledger_path)),
+        owns_hardware=real,
         scheduler=ResourceScheduler(max_concurrency=2, max_queue_size=4),
     )
 
@@ -973,6 +985,7 @@ def _build_microphone_engine(
             ]
         ),
         ActionLedger(Path(ledger_path)),
+        owns_hardware=real,
         scheduler=ResourceScheduler(max_concurrency=2, max_queue_size=4),
     )
 
@@ -1328,6 +1341,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
+        if args.command == "doctor":
+            from ninjarobot_pi5_ide.diagnostics import diagnose_environment
+
+            try:
+                selected = load_robot_config(args.config) if args.config else None
+            except (OSError, ValueError):
+                print("Configuration could not be loaded; validate the selected file locally.")
+                return 1
+            report = diagnose_environment(profile=args.profile, config=selected, root=args.root)
+            print(json.dumps(report, indent=2))
+            return 0 if report["ok"] else 1
         if args.command == "config" and args.config_command == "validate":
             config = load_robot_config(args.config)
             print(

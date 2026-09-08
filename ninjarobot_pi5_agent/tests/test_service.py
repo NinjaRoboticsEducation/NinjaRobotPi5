@@ -39,6 +39,11 @@ def test_service_owns_dependencies_and_rejects_second_owner(tmp_path: Path) -> N
         await service.close()
         assert provider.closed is True
         assert ide.closed is True
-        assert not lock_path.exists()
+        assert lock_path.exists()
+        # The same inode must remain available for the next owner.
+        inode = lock_path.stat().st_ino
+        competing.acquire()
+        assert lock_path.stat().st_ino == inode
+        competing.release()
 
     asyncio.run(exercise())

@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#07111f">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -141,6 +141,27 @@
         <section class="menu-section" aria-labelledby="connectionTitle">
           <h3 id="connectionTitle" data-i18n="menu.connection">Connection</h3>
           <p id="remoteStatus" class="menu-status" data-i18n="remote.local">Local secure controller</p>
+        </section>
+        <section class="menu-section" aria-labelledby="tasksTitle">
+          <h3 id="tasksTitle" data-i18n="tasks.title">Local tasks</h3>
+          <p data-i18n="tasks.help">In chat, use /remind 60 Practice to preview a silent reminder. Review its exact time and effect before confirming.</p>
+          <button id="tasksRefresh" class="small-button" type="button" data-i18n="tasks.refresh">Refresh tasks</button>
+          <p id="tasksNotice" role="status"></p>
+          <div id="tasksList"></div>
+        </section>
+        <section class="menu-section" aria-labelledby="guideTitle">
+          <h3 id="guideTitle" data-i18n="guide.title">Guided checks</h3>
+          <label for="guideStep" data-i18n="guide.step">Choose a step; skip or return at any time</label>
+          <select id="guideStep">
+            <option value="0" data-i18n="guide.environment">Environment</option>
+            <option value="1" data-i18n="guide.safety">Stop and resume</option>
+            <option value="2" data-i18n="guide.text">Text chat</option>
+            <option value="3" data-i18n="guide.reminders">Reminders</option>
+            <option value="4" data-i18n="guide.help">Help</option>
+          </select>
+          <button id="guideButton" class="small-button" type="button" data-i18n="guide.open">Read step</button>
+          <p id="guideOutput" role="status"></p>
+          <details><summary data-i18n="guide.diagnostics">Diagnostic details</summary><pre id="guideDiagnostics"></pre></details>
         </section>
         <section class="menu-section danger-section" aria-labelledby="powerTitle">
           <h3 id="powerTitle" data-i18n="power.title">System power</h3>

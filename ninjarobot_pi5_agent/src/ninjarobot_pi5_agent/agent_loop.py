@@ -8,11 +8,12 @@ import re
 import unicodedata
 import uuid
 from collections.abc import Awaitable, Callable
+from contextvars import ContextVar
 from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from .events import AgentEventType, EventBroker
+from .events import CURRENT_LIFECYCLE, AgentEventType, EventBroker, begin_lifecycle, log_lifecycle
 from .models import (
     FinishReason,
     MessageRole,
@@ -46,6 +47,7 @@ ActiveUserProvider = Callable[[str], str | None]
 MemoryContextProvider = Callable[[str, str], Awaitable[str]]
 ToolResultObserver = Callable[[ToolInvocation, ToolExecutionResult], Awaitable[None]]
 TextDeltaHandler = Callable[[str], Awaitable[None]]
+TOOL_BUDGET: ContextVar[list[int] | None] = ContextVar("request_tool_budget", default=None)
 
 
 class AgentLoopConfig(BaseModel):
@@ -58,6 +60,7 @@ class AgentLoopConfig(BaseModel):
     request_timeout_seconds: Annotated[float, Field(gt=0, le=600)] = 600.0
     model_inactivity_timeout_seconds: Annotated[float, Field(gt=0, le=600)] = 120.0
     max_output_tokens: Annotated[int, Field(ge=32, le=4096)] = 1024
+    max_prompt_characters: Annotated[int, Field(ge=4096, le=1_000_000)] = 128_000
 
 
 class AgentReply(BaseModel):
@@ -126,6 +129,16 @@ class AgentLoop:
         """Bind one final-result observer shared with direct controller execution."""
         self._tool_result_observer = observer
 
+    def execution_limits(self) -> dict[str, int | float]:
+        """Return usage ceilings, not a provider-specific currency estimate."""
+        return {
+            "model_calls": self._config.max_model_turns,
+            "tool_attempts_including_retries": self._config.max_tool_calls,
+            "request_seconds": self._config.request_timeout_seconds,
+            "model_input_characters_per_call": self._config.max_prompt_characters,
+            "requested_output_tokens_per_call": self._config.max_output_tokens,
+        }
+
     async def chat(
         self,
         *,
@@ -143,9 +156,15 @@ class AgentLoop:
             request_timeout = min(request_timeout, skill.manifest.limits.timeout_seconds)
         token = cancellation or CancellationToken()
         self._active_cancellations[session_id] = token
+        trace_token = begin_lifecycle(session_id)
+        call_limit = self._config.max_tool_calls
+        if skill is not None:
+            call_limit = min(call_limit, skill.manifest.limits.max_tool_calls)
+        budget_token = TOOL_BUDGET.set([call_limit])
+        log_lifecycle("thinking", reason="request_received")
         try:
             async with asyncio.timeout(request_timeout):
-                return await self._chat(
+                reply = await self._chat(
                     session_id=session_id,
                     text=text,
                     skill=skill,
@@ -154,20 +173,33 @@ class AgentLoop:
                     cancellation=token,
                     on_text_delta=on_text_delta,
                 )
+            log_lifecycle("completed", outcome="succeeded", reason="reply_ready")
+            return reply
         except TimeoutError as exc:
+            log_lifecycle("error", outcome="timed_out", reason="deadline_exceeded")
             raise AgentLoopError(
                 f"agent request exceeded its {request_timeout:g}-second limit"
             ) from exc
+        except asyncio.CancelledError:
+            log_lifecycle("interrupted", outcome="cancelled", reason="cancelled")
+            raise
+        except Exception:
+            log_lifecycle("error", outcome="failed", reason="request_failed")
+            raise
         finally:
             if self._active_cancellations.get(session_id) is token:
                 self._active_cancellations.pop(session_id, None)
-            await asyncio.shield(
-                self._present(
-                    "idle",
-                    self._presentation.idle,
-                    session_id=session_id,
+            try:
+                await asyncio.shield(
+                    self._present(
+                        "idle",
+                        self._presentation.idle,
+                        session_id=session_id,
+                    )
                 )
-            )
+            finally:
+                CURRENT_LIFECYCLE.reset(trace_token)
+                TOOL_BUDGET.reset(budget_token)
 
     def cancel_session(self, session_id: str) -> None:
         """Cancel active reasoning or tool work for one session."""
@@ -278,6 +310,12 @@ class AgentLoop:
                 timeout_seconds=self._config.model_inactivity_timeout_seconds,
                 allow_provider_fallback=(model_turn_number == 1 and completed_tool_calls == 0),
             )
+            if len(request.model_dump_json()) > self._config.max_prompt_characters:
+                raise AgentLoopError(
+                    "request exceeds the local model-input budget; start a new chat "
+                    "or review and clear this transcript before retrying"
+                )
+            log_lifecycle("thinking", reason="model_requested")
             turn = await self._model_turn(
                 request,
                 on_text_delta=on_text_delta,
@@ -609,6 +647,13 @@ class AgentLoop:
             ),
         )
         if not decision.allowed:
+            log_lifecycle(
+                "approval" if decision.confirmation_required else "error",
+                outcome="denied",
+                reason="confirmation_required"
+                if decision.confirmation_required
+                else "policy_denied",
+            )
             return ToolExecutionResult(
                 call_id=call.call_id,
                 tool_name=call.name,
@@ -650,14 +695,23 @@ class AgentLoop:
             )
         camera_preview_delivered = False
         try:
+            log_lifecycle("action", reason="tool_dispatched")
+            budget = TOOL_BUDGET.get()
+            if budget is not None:
+                if budget[0] <= 0:
+                    raise AgentLoopError("tool execution budget exhausted, including retries")
+                budget[0] -= 1
             result = await self._tools.call(invocation, cancellation)
             recovery = self._recovery.decide(
                 definition,
                 result,
                 attempts_completed=1,
             )
-            if recovery.action is RecoveryAction.RETRY:
+            if recovery.action is RecoveryAction.RETRY and (budget is None or budget[0] > 0):
+                if budget is not None:
+                    budget[0] -= 1
                 result = await self._tools.call(invocation, cancellation)
+            log_lifecycle("action", outcome=result.status.value, reason="tool_result")
             if (
                 call.name == "robot.behavior.stop"
                 and result.status is ToolExecutionStatus.SUCCEEDED

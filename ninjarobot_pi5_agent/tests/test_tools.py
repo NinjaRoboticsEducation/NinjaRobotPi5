@@ -4,6 +4,7 @@ import asyncio
 from datetime import UTC, datetime
 
 import pytest
+from ninjarobot_pi5_ide.models import CapabilityHealth, HealthReport, ResourceHealth
 from ninjarobot_pi5_ide.testing import FakeIDEClient
 
 from ninjarobot_pi5_agent import (
@@ -21,6 +22,35 @@ from ninjarobot_pi5_agent import (
     ToolTrust,
 )
 from ninjarobot_pi5_ide import CapabilityDescriptor, RetrySafety, RiskLevel
+
+
+def test_ide_health_details_reach_agent_status() -> None:
+    async def exercise() -> None:
+        class DiagnosticIDE(FakeIDEClient):
+            async def health(self):
+                return HealthReport(
+                    status=ResourceHealth.UNAVAILABLE,
+                    checked_at=datetime.now(UTC),
+                    components={"distance.read": ResourceHealth.UNAVAILABLE},
+                    capabilities={
+                        "distance.read": CapabilityHealth(
+                            status=ResourceHealth.UNAVAILABLE,
+                            reason_code="probe_failed",
+                            dependencies=("i2c",),
+                            recovery="Check the connection.",
+                        )
+                    },
+                )
+
+        provider = IDEToolProvider(DiagnosticIDE((descriptor(),)))
+        await provider.start()
+        report = await provider.health()
+        assert report.capabilities["distance.read"].reason_code == "probe_failed"
+        assert report.capabilities["distance.read"].dependencies == ("i2c",)
+        assert report.valid_for_seconds == 5.0
+        await provider.close()
+
+    asyncio.run(exercise())
 
 
 def descriptor(

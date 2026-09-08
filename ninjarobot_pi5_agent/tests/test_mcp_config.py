@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import stat
 
 import pytest
@@ -40,6 +41,22 @@ def test_empty_versioned_configuration_round_trips(tmp_path) -> None:
 
     assert path.read_text(encoding="utf-8") == "schema_version = 1\n"
     assert load_mcp_configuration(path) == MCPConfiguration()
+
+
+def test_local_effect_and_retry_review_round_trips(tmp_path) -> None:
+    preset = tavily_server_config().model_copy(
+        update={"read_only_tools": ("tavily_search",), "retry_safe_tools": ("tavily_search",)}
+    )
+    path = tmp_path / "mcp.toml"
+    save_mcp_configuration(MCPConfiguration(servers=(preset,)), path)
+    assert load_mcp_configuration(path).servers == (preset,)
+
+
+def test_retry_review_cannot_grant_unreviewed_effects() -> None:
+    payload = tavily_server_config().model_dump(mode="json")
+    payload["retry_safe_tools"] = ["tavily_search"]
+    with pytest.raises(ValidationError, match="reviewed read_only_tools"):
+        MCPServerConfig.model_validate_json(json.dumps(payload))
 
 
 def test_legacy_configuration_without_schema_version_defaults_to_version_one(tmp_path) -> None:

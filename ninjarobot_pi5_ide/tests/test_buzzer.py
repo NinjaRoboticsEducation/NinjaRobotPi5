@@ -155,8 +155,8 @@ def test_emergency_stop_interrupts_tone_without_waiting_for_play_lock(
         assert stopped.status is ActionStatus.SUCCEEDED
         assert stopped.data == {"stopped": True, "simulated": True}
         assert stopped.retry_safety is RetrySafety.SAFE
-        assert played.status is ActionStatus.SUCCEEDED
-        assert played.data is not None and played.data["interrupted"] is True
+        assert played.status is ActionStatus.CANCELLED
+        assert played.error is not None and played.error.code == "ACTION_CANCELLED"
         assert driver.off_calls >= 1
         await engine.close()
 

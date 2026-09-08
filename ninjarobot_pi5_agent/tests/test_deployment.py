@@ -569,10 +569,14 @@ def test_install_and_enable_rejects_service_that_exits_during_startup(tmp_path: 
     assert ["/usr/bin/sudo", "/usr/bin/systemctl", "disable", "--now", UNIT_NAME] in calls
 
 
-def test_backup_is_private_and_contains_only_user_data(tmp_path: Path) -> None:
+def test_backup_is_private_and_contains_only_user_data(tmp_path: Path, monkeypatch) -> None:
+    import sqlite3
+
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
     spec = _spec(tmp_path)
     spec.database.parent.mkdir(parents=True)
-    spec.database.write_bytes(b"sqlite-data")
+    with sqlite3.connect(spec.database) as database:
+        database.execute("CREATE TABLE example (value TEXT)")
     spec.skill_dir.mkdir()
     (spec.skill_dir / "skill.txt").write_text("safe", encoding="utf-8")
 

@@ -10,12 +10,10 @@ import socket
 import stat
 import subprocess
 import sys
-import tarfile
 import tempfile
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -552,84 +550,17 @@ class DeploymentManager:
 
 
 def create_backup(spec: DeploymentSpec, output: Path) -> Path:
-    """Archive user-owned configuration/state without deleting or following links."""
-    destination = output.expanduser().resolve()
-    destination.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    sources = {
-        path.resolve()
-        for path in (spec.config, spec.mcp_config, spec.secret_file, spec.database, spec.ledger)
-        if path.is_file() and not path.is_symlink()
-    } | {
-        path.resolve()
-        for path in (spec.skill_dir, spec.benchmark_dir)
-        if path.is_dir() and not path.is_symlink()
-    }
-    metadata = {
-        "created_at": datetime.now(UTC).isoformat(),
-        "user": spec.user,
-        "sources": [str(path) for path in sorted(sources)],
-    }
-    with tarfile.open(destination, "w:gz") as archive:
-        for source in sorted(sources):
-            archive.add(source, arcname=f"data/{source.relative_to('/')}", recursive=True)
-        payload = json.dumps(metadata, indent=2).encode("utf-8")
-        with tempfile.NamedTemporaryFile() as handle:
-            handle.write(payload)
-            handle.flush()
-            archive.add(handle.name, arcname="manifest.json")
-    destination.chmod(0o600)
-    return destination
+    """Archive the configured private data through the validated backup layer."""
+    from .backup import create_backup as create
+
+    return create(spec, output)
 
 
 def restore_backup(spec: DeploymentSpec, backup: Path, *, confirmed: bool) -> dict[str, Any]:
-    """Overlay one verified NinjaRobot backup without deleting newer user data."""
-    if not confirmed:
-        raise ValueError("backup rollback requires --confirm")
-    source = backup.expanduser().resolve()
-    if not source.is_file() or source.is_symlink():
-        raise ValueError("backup archive is unavailable")
-    allowed = tuple(
-        path.resolve()
-        for path in (
-            spec.config,
-            spec.mcp_config,
-            spec.secret_file,
-            spec.database,
-            spec.ledger,
-            spec.skill_dir,
-            spec.benchmark_dir,
-        )
-    )
-    restored = 0
-    with tarfile.open(source, "r:gz") as archive:
-        if archive.getmember("manifest.json").isfile() is False:
-            raise ValueError("backup manifest is invalid")
-        for member in archive.getmembers():
-            if member.name == "manifest.json":
-                continue
-            if not member.name.startswith("data/") or member.issym() or member.islnk():
-                raise ValueError("backup contains an unsafe member")
-            target = Path("/") / member.name.removeprefix("data/")
-            resolved = target.resolve()
-            if not any(resolved == base or resolved.is_relative_to(base) for base in allowed):
-                raise ValueError("backup member is outside approved user-data paths")
-            if member.isdir():
-                resolved.mkdir(mode=0o700, parents=True, exist_ok=True)
-                continue
-            if not member.isfile():
-                raise ValueError("backup contains an unsupported member type")
-            content = archive.extractfile(member)
-            if content is None:
-                raise ValueError("backup member could not be read")
-            resolved.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-            with tempfile.NamedTemporaryFile(dir=resolved.parent, delete=False) as temporary:
-                temporary.write(content.read())
-                temporary_path = Path(temporary.name)
-            temporary_path.chmod(member.mode & 0o700 or 0o600)
-            temporary_path.replace(resolved)
-            restored += 1
-    load_robot_config(spec.config)
-    return {"restored_files": restored, "newer_unarchived_data_preserved": True}
+    """Restore a prevalidated archive while retaining the existing CLI contract."""
+    from .backup import restore_backup as restore
+
+    return restore(spec, backup, confirmed=confirmed)
 
 
 def current_spec(arguments: Any) -> DeploymentSpec:

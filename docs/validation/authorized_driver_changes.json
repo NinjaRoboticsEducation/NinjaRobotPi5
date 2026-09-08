@@ -236,6 +236,19 @@
       },
       "reason": "Align fresh-install defaults and documentation with the validated NinjaRobotPi5 v1.0.0 hardware profile; preserve existing saved-configuration precedence."
     },
+    "pi5camera/src/pi5camera/core/recognition.py": {
+      "approved": {
+        "sha256": "a2dfc279a824c489546b8b3dd52b53d71ae029a2886e2c07d553f8b492c71a12",
+        "size": 5705
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-09-09",
+      "baseline": {
+        "sha256": "d9292fc40edd3877b9ed8d5f07c6ae77ee64be4b44607387be50a0ed2ae19c79",
+        "size": 5241
+      },
+      "reason": "Project owner approved the prepared F08 face-recognition cleanup on 2026-09-09: close the successfully constructed recognition backend in finally after success or failure; preserve matching, enrollment and return contracts. Independently validated with 27 camera tests and 8 synthetic cleanup cases; no live capture."
+    },
     "pi5camera/tests/test_camera_backend.py": {
       "approved": {
         "sha256": "2fda5c32471617d47975787430522d8403224e0c082395bdf8f843c2c2328330",

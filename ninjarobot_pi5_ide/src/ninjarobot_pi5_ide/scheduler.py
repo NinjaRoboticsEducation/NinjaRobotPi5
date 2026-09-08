@@ -15,6 +15,10 @@ class QueueCapacityError(RuntimeError):
     """Raised when an action cannot enter the bounded scheduler."""
 
 
+class StopInProgressError(RuntimeError):
+    """Raised when ordinary work would compete with an emergency stop."""
+
+
 class ResourceScheduler:
     """Limit queued work and serialize conflicting resource users."""
 
@@ -29,6 +33,8 @@ class ResourceScheduler:
         self._workers = asyncio.Semaphore(max_concurrency)
         self._resource_locks: dict[str, asyncio.Lock] = {}
         self._state = LifecycleState.CREATED
+        self._operations: dict[asyncio.Task[object], frozenset[str]] = {}
+        self._interrupts: dict[asyncio.Task[object], frozenset[str]] = {}
 
     @property
     def state(self) -> LifecycleState:
@@ -51,24 +57,58 @@ class ResourceScheduler:
         """Run work after reserving bounded capacity and sorted resource locks."""
         if self._state is not LifecycleState.RUNNING:
             raise RuntimeError("scheduler is not running")
+        resource_set = frozenset(resources)
+        if any(resource_set & held for held in self._interrupts.values()):
+            raise StopInProgressError("conflicting resources are being stopped")
         if self._slots.locked():
             raise QueueCapacityError("action queue is full")
         await self._slots.acquire()
+        task = asyncio.current_task()
+        assert task is not None
+        self._operations[task] = resource_set
         try:
             async with self._workers:
                 locks = [
                     self._resource_locks.setdefault(name, asyncio.Lock())
-                    for name in sorted(set(resources))
+                    for name in sorted(resource_set)
                 ]
-                for lock in locks:
-                    await lock.acquire()
+                acquired: list[asyncio.Lock] = []
                 try:
+                    for lock in locks:
+                        await lock.acquire()
+                        acquired.append(lock)
                     return await operation()
                 finally:
-                    for lock in reversed(locks):
+                    for lock in reversed(acquired):
                         lock.release()
         finally:
+            self._operations.pop(task, None)
             self._slots.release()
+
+    async def interrupt(
+        self,
+        resources: Iterable[str],
+        operation: Callable[[], Awaitable[ResultT]],
+    ) -> ResultT:
+        """Dispatch a trusted stop without waiting for ordinary slots or locks.
+
+        Device stop implementations must support concurrent cleanup. Cancellation
+        is requested before dispatch, but a stuck ordinary action cannot delay the
+        stop. Conflicting new actions are rejected until every stop has returned.
+        """
+        if self._state is not LifecycleState.RUNNING:
+            raise RuntimeError("scheduler is not running")
+        task = asyncio.current_task()
+        assert task is not None
+        resource_set = frozenset(resources)
+        self._interrupts[task] = resource_set
+        try:
+            for owner, held in tuple(self._operations.items()):
+                if resource_set & held and not owner.cancelling():
+                    owner.cancel()
+            return await operation()
+        finally:
+            self._interrupts.pop(task, None)
 
     async def close(self) -> None:
         """Prevent new work; already running calls are allowed to finish."""

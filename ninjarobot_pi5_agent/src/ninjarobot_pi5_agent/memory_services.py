@@ -185,7 +185,7 @@ class MemoryRetrievalService:
         preferences = await self._store.memories(
             user_id,
             kind=MemoryKind.PREFERENCE,
-            limit=4,
+            limit=100,
         )
         relevant = await self._store.search(
             user_id,
@@ -219,8 +219,16 @@ class MemoryRetrievalService:
         ]
         if isinstance(preferred_form_of_address, str) and preferred_form_of_address:
             lines.append(f"Preferred form of address: {_single_line(preferred_form_of_address)}.")
+        preferences = tuple(
+            sorted(preferences, key=lambda item: item.payload.get("inferred") is not False)
+        )[:4]
         lines.extend(
-            f"Preference: {_single_line(item.content)}"
+            (
+                "Confirmed preference: "
+                if item.payload.get("inferred") is False
+                else "Unconfirmed suggestion: "
+            )
+            + _single_line(item.content)
             for item in preferences
             if item.payload.get("preference_key") != "preferred_form_of_address"
         )
@@ -389,4 +397,35 @@ def _public_memory(item: MemoryItem) -> dict[str, Any]:
         "content": _single_line(item.content),
         "confidence": item.confidence,
         "created_at": item.created_at.isoformat(),
+        **memory_explanation(item),
+    }
+
+
+def memory_explanation(item: MemoryItem) -> dict[str, Any]:
+    """Explain existing records without inventing historical source or confirmation."""
+    if item.kind is MemoryKind.PREFERENCE:
+        category = (
+            "confirmed_preference"
+            if item.payload.get("inferred") is False
+            else "unconfirmed_suggestion"
+        )
+    elif item.kind in {MemoryKind.SUCCESSFUL_BEHAVIOR, MemoryKind.FAILED_BEHAVIOR}:
+        category = "task_outcome"
+    elif item.expires_at is not None:
+        category = "temporary_context"
+    else:
+        category = "unconfirmed_suggestion" if item.payload.get("inferred") else item.kind.value
+    return {
+        "category": category,
+        "saved_reason": item.payload.get("review_reason")
+        or item.payload.get("source")
+        or "Historical reason was not recorded.",
+        "last_confirmed_at": item.payload.get("last_confirmed_at"),
+        "source": {
+            "session": item.source_session_id,
+            "message": item.source_message_id,
+            "action": item.source_action_id,
+        },
+        "updated_at": item.updated_at.isoformat(),
+        "expires_at": item.expires_at.isoformat() if item.expires_at else None,
     }

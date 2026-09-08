@@ -388,8 +388,8 @@ def test_emergency_stop_interrupts_without_servo_resource_lock(tmp_path: Path) -
             "driver_available": True,
             "simulated": True,
         }
-        assert moved.status is ActionStatus.SUCCEEDED
-        assert moved.data is not None and moved.data["interrupted"] is True
+        assert moved.status is ActionStatus.CANCELLED
+        assert moved.error is not None and moved.error.code == "ACTION_CANCELLED"
         assert group.abort_calls >= 1
         assert group.off_calls >= 1
         await engine.close()
@@ -503,5 +503,61 @@ def test_servo_descriptors_encode_motion_and_emergency_policy() -> None:
         "dfr0566",
     )
     assert ServoStopAdapter.descriptor.risk.value == "emergency"
-    assert ServoStopAdapter.descriptor.resources == ()
+    assert ServoStopAdapter.descriptor.resources == ServoMoveAdapter.descriptor.resources
     assert ServoStopAdapter.descriptor.confirmation_required is False
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+def test_stop_or_cancel_during_center_cannot_leave_a_late_pulse(cancel) -> None:
+    import threading
+
+    async def exercise() -> None:
+        group = FakeServoGroup()
+        entered = threading.Event()
+        release = threading.Event()
+        pulse = []
+
+        class SlowCenter(FakeServo):
+            def move_to_center(self) -> None:
+                entered.set()
+                assert release.wait(2)
+                pulse.append("center")
+
+        group.servos["gpio12"] = SlowCenter()
+        original_off = group.off
+
+        def off():
+            pulse.append("off")
+            original_off()
+
+        group.off = off
+        device = ServoDevice(
+            calibration_file="/tmp/test-servo.json",
+            motion_enabled=True,
+            runtime_factory=runtime_factory(group),
+            simulated=True,
+        )
+        await device.start()
+        moving = asyncio.create_task(
+            device.move(endpoint="gpio12", target_angle=10, speed_mode="S")
+        )
+        assert await asyncio.to_thread(entered.wait, 1)
+        stopping = None
+        try:
+            if cancel:
+                moving.cancel()
+            else:
+                stopping = asyncio.create_task(device.stop())
+            await asyncio.sleep(0)
+            release.set()
+            with pytest.raises(asyncio.CancelledError if cancel else IDEError):
+                await moving
+            if stopping is not None:
+                await stopping
+            assert group.move_calls == []
+            assert pulse[-1] == "off"
+        finally:
+            release.set()
+            await device.close()
+
+    asyncio.run(exercise())

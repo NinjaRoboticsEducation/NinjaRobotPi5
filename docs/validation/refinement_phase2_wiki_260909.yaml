@@ -1,0 +1,380 @@
+version: 2
+id: refinement-phase2-260909
+created_at: '2026-09-08T15:25:18.461989+00:00'
+actor: agent:codex
+risk: medium
+summary: Consolidate Phase 0–2 manuals and eleven existing knowledge pages; preserve explicit spending-cap, managed-driver
+  and hardware-validation gaps.
+sources:
+- id: src-20260907-knowledgeintegration
+  content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
+- id: src-20260908-developmentguide
+  content_hash: sha256:640cb37251c7d9c7d41a23a4998aa0b25dcbfa8bba952435adeda61f821fd6e6
+- id: src-20260908-ninjarobot-mcp-skill
+  content_hash: sha256:f4ad853bb46a8dd3caa961c2e6337ea316a75889e1c6c049d2960b60507603e0
+- id: src-20260908-installationguide
+  content_hash: sha256:a9f68d8828b60ea6e3803749a6f2bf4cbcdfa764c75ca90078fde7796e0cf2ae
+- id: src-20260908-developmentlog
+  content_hash: sha256:9cb2e1830df4a1c0568e65d7ecd22d4ef6aabafc4fce5b3ca4fcbb01b6652656
+operations:
+- op: write
+  path: wiki/overview.md
+  expected_sha256: sha256:a06be28e093a341b6c69d9a7a27e3258feb0d37e15963ae85ad7d7d7eced1eb3
+  content: "---\ntype: Concept\ntitle: NinjaRobotPi5 project overview\ndescription: Start here for architecture,\
+    \ setup, features, development history, and\n  current evidence.\nstatus: draft\ntags:\n- ninjarobotpi5\ngenerated:\n\
+    \  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260907-knowledgeintegration\n  resource:\
+    \ urn:llmwiki:source:src-20260907-knowledgeintegration\n  title: Local knowledge integration evidence\n  content_hash:\
+    \ sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622\n- id: src-20260908-developmentguide\n\
+    \  resource: urn:llmwiki:source:src-20260908-developmentguide\n  title: DevelopmentGuide.md\n  content_hash:\
+    \ sha256:640cb37251c7d9c7d41a23a4998aa0b25dcbfa8bba952435adeda61f821fd6e6\nsemantic_review:\n  version: 1\n\
+    \  performed_by: agent:codex\n  performed_at: '2026-09-08T15:25:18.461989+00:00'\n  target_hash: sha256:872ba8ad84d8801b976e4dbfc5c56ce45440107854fd5bcb7e7f06bfdae1c297\n\
+    \  result: passed\n  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n\
+    \    claim_strength: passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its\
+    \ registered manual checkpoint and retained source\n    text; no human verification is claimed.\n  - New checkpoint\
+    \ claims distinguish software tests from physical acceptance, pending\n    managed changes and the monetary-budget\
+    \ gap; retained navigation claims remain\n    source-supported.\n---\n\n# NinjaRobotPi5 project overview\n\n\
+    NinjaRobotPi5 documents an Agent layer for user/model interaction, an IDE layer\nfor coordinating devices, and\
+    \ managed Pi5 libraries for individual devices.\nThe development guide describes their permitted ownership boundary.[^src-20260908-developmentguide]\n\
+    \nThe local wiki is the primary developer knowledge collection. Full manuals are\nversioned under raw source\
+    \ folders; outer README links and the project knowledge\nmap identify the current versions. Read source records\
+    \ and limitations, then\ncompare important claims with the current checkout before coding.[^src-20260907-knowledgeintegration]\n\
+    \n## Browse project knowledge\n\n- [Architecture and hardware ownership](concepts/architecture.md)\n- [Development\
+    \ and documentation workflow](concepts/development-workflow.md)\n- [Installation and hardware checks](concepts/installation.md)\n\
+    - [Features, MCP tools, and Agent Skills](concepts/features-and-tools.md)\n- [Development history](concepts/development-history.md)\n\
+    - [Known knowledge limitations](analyses/knowledge-limitations.md)\n- [Installation manual](references/installation-guide.md)\n\
+    - [Development manual](references/development-guide.md)\n- [Development log](references/development-log.md)\n\
+    - [MCP and skills tutorial](references/mcp-skills-guide.md)\n\n\n## Phase 2 checkpoint\n\nThe local task assistant\
+    \ now has reviewed reminders, durable request records and\npreference correction. Development pauses before\
+    \ Phase 3 for owner testing.\nThe Agent/IDE/driver boundary remains. Two managed-driver repairs are pending,\n\
+    and bounded model usage is not a currency-denominated spending cap. Read\n[local tasks and memory](concepts/features-and-tools.md)\
+    \ before treating a saved\nrequest as a delivered notification.[^src-20260908-developmentguide]\n\n\n[^src-20260907-knowledgeintegration]:\
+    \ Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.\n\
+    [^src-20260908-developmentguide]: DevelopmentGuide.md, source version `refinement-phase2-260909`; registered\
+    \ source `src-20260908-developmentguide`.\n"
+- op: write
+  path: wiki/concepts/architecture.md
+  expected_sha256: sha256:80698187b1c2599c82d403a712a9f0ab7e64cfc8c657ccc20eec4a3caf617098
+  content: "---\ntype: Concept\ntitle: Architecture and hardware ownership\ndescription: Agent, IDE, device drivers,\
+    \ safety policy, resource ownership, and code\n  boundaries.\nstatus: draft\ntags:\n- architecture\n- hardware\n\
+    - ownership\n- agent\n- ide\n- drivers\n- safety\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\n\
+    sources:\n- id: src-20260908-developmentguide\n  resource: urn:llmwiki:source:src-20260908-developmentguide\n\
+    \  title: DevelopmentGuide.md\n  content_hash: sha256:640cb37251c7d9c7d41a23a4998aa0b25dcbfa8bba952435adeda61f821fd6e6\n\
+    semantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-08T15:25:18.461989+00:00'\n\
+    \  target_hash: sha256:0ea2a69d72f6230216447ff5e95ec0a3244215e7db3378114f37a6f781afd2b2\n  result: passed\n\
+    \  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength:\
+    \ passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its registered manual\
+    \ checkpoint and retained source\n    text; no human verification is claimed.\n  - New checkpoint claims distinguish\
+    \ software tests from physical acceptance, pending\n    managed changes and the monetary-budget gap; retained\
+    \ navigation claims remain\n    source-supported.\n---\n\n# Architecture and hardware ownership\n\nThe documented\
+    \ hardware path is user or model → ninjarobot_pi5_agent →\nninjarobot_pi5_ide → a managed pi5 driver → its device.\
+    \ The Agent handles user\ninteraction, model-provider translation, policy, sessions, and tool proposals.\nIt\
+    \ should not import a pi5 library or access a device directly.[^src-20260908-developmentguide]\n\nThe IDE (the\
+    \ project's device-coordination layer) owns shared resource scheduling,\naction execution, safety state, behaviors,\
+    \ and hardware ownership. Individual\nmanaged libraries own their device and standalone setup interface. The\
+    \ six\nmanaged libraries cover servo motors, display, buzzer, distance sensing, camera,\nand microphone.[^src-20260908-developmentguide]\n\
+    \nThis is the documented architecture contract. Compare affected code and tests\nwith it before implementation;\
+    \ this page does not certify that every failure or\nphysical safety condition has been tested.[^src-20260908-developmentguide]\n\
+    \n[Read the development manual](/references/development-guide.md).\n\n\n## Local task and safety integration\n\
+    \nThe Agent owns reminder scheduling and scoped request records in its existing\nprivate database. Deterministic\
+    \ controls confirm exact notification effects;\nphysical delivery uses the existing IDE expression capability.\
+    \ Models cannot\nconfirm reminders or open drivers. Interrupted work is uncertain rather than\nsilently replayed.[^src-20260908-developmentguide]\n\
+    \nTrusted stop dispatch is independent of the ordinary queue. Retained real-device\nbuilders share IDE ownership,\
+    \ disabled devices skip initialization/recovery, and\nintegrated raw movement uses the existing safety controller\
+    \ and bounded cleanup.\nA blocked native driver call cannot be forcibly ended by Python cancellation;\nphysical\
+    \ stopping time remains a manual validation question.[^src-20260908-developmentguide]\n\n\n[^src-20260908-developmentguide]:\
+    \ DevelopmentGuide.md, source version `refinement-phase2-260909`; registered source `src-20260908-developmentguide`.\n"
+- op: write
+  path: wiki/concepts/features-and-tools.md
+  expected_sha256: sha256:47b3f05749d23fa520ee6b0b32a99e9b8d0452783b72a965a43641dd6624ea1f
+  content: "---\ntype: Concept\ntitle: Features, MCP tools, and Agent Skills\ndescription: Documented Agent features,\
+    \ external read-only tools, and reusable skills.\nstatus: draft\ntags:\n- features\n- mcp\n- skills\n- calendar\n\
+    - tools\n- agent\n- reminders\n- tasks\n- memory\n- phase2\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\n\
+    sources:\n- id: src-20260908-ninjarobot-mcp-skill\n  resource: urn:llmwiki:source:src-20260908-ninjarobot-mcp-skill\n\
+    \  title: NinjaRobot_MCP_Skill.md\n  content_hash: sha256:f4ad853bb46a8dd3caa961c2e6337ea316a75889e1c6c049d2960b60507603e0\n\
+    - id: src-20260908-developmentguide\n  resource: urn:llmwiki:source:src-20260908-developmentguide\n  title:\
+    \ DevelopmentGuide.md\n  content_hash: sha256:640cb37251c7d9c7d41a23a4998aa0b25dcbfa8bba952435adeda61f821fd6e6\n\
+    - id: src-20260907-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260907-knowledgeintegration\n\
+    \  title: Local knowledge integration evidence\n  content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622\n\
+    semantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-08T15:25:18.461989+00:00'\n\
+    \  target_hash: sha256:79e9260a1e363c78e47af7130924231b68d4b1e6532fbce01b288f362d33897f\n  result: passed\n\
+    \  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength:\
+    \ passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its registered manual\
+    \ checkpoint and retained source\n    text; no human verification is claimed.\n  - New checkpoint claims distinguish\
+    \ software tests from physical acceptance, pending\n    managed changes and the monetary-budget gap; retained\
+    \ navigation claims remain\n    source-supported.\n---\n\n# Features, MCP tools, and Agent Skills\n\nThe development\
+    \ guide describes conversational and web interfaces, model\nproviders, behaviors, memory, and device capabilities.\
+    \ These are documented\nimplementation areas; use the current code and tests to verify a specific\nfeature or\
+    \ failure case before changing it.[^src-20260908-developmentguide]\n\nMCP (Model Context Protocol) lets an application\
+    \ discover and call external tools.\nThe robot tutorial describes allowlisted read-only tools, bounded results,\n\
+    timeouts, and untrusted external content. Its examples include Tavily search\nand a read-only Google Calendar\
+    \ server. Agent Skills package reusable workflows;\nthey do not grant extra hardware permissions.[^src-20260908-ninjarobot-mcp-skill]\n\
+    \nDevelopment wiki skills are a separate coding-tool workflow. This local knowledge\nintegration does not install\
+    \ a robot MCP provider or change runtime interfaces.\nUse the existing robot tutorial for robot extensions and\
+    \ the wiki maintenance\nguide for developer knowledge updates.[^src-20260907-knowledgeintegration]\n\n[MCP and\
+    \ skills tutorial](/references/mcp-skills-guide.md).\n\n\n## Local reminders, task progress and memory\n\nIn\
+    \ existing chat, `/remind 120 Practice` creates a silent draft. `/tasks confirm ID`\nexplicitly schedules the\
+    \ reviewed time and effect. `/tasks`, cancel and snooze\ncontrols also appear in the browser Local tasks panel.\
+    \ Snooze needs fresh review.\nExact dated reminders support daily/weekly repeat and optional reviewed display\n\
+    text plus a buzzer tone. They do not request wheel movement.[^src-20260908-developmentguide]\n\nThe Pi and Agent\
+    \ must stay running. Once saved, reminders need no cloud model.\nLate reminders become missed; interrupted delivery\
+    \ becomes uncertain without\nautomatic replay. A silent reminder's completion means its local inbox result was\n\
+    saved, not that the user read it. Request completion means response processing\nended; tool evidence determines\
+    \ what is known about external effects.[^src-20260908-developmentguide]\n\nTask progress requires refresh. General\
+    \ requests do not autonomously resume after\nrestart. Model calls, actual tool attempts including retries, input\
+    \ size, requested\noutput and time are bounded; this is not a currency-denominated spending cap.\n`/memory review`,\
+    \ confirm, edit and forget expose source/confidence and correction.\nConfirmed structured preferences resist\
+    \ contradictory inference; arbitrary\nnatural-language contradiction resolution is not comprehensive.[^src-20260908-developmentguide]\n\
+    \nCustom MCP servers require local read-only and retry-safe allowlists. Discovery,\nschemas and results are\
+    \ bounded and checked; external output remains untrusted.\nThe local task tools can list or preview, but have\
+    \ no model confirmation tool.\nCalendar writes and later refinement phases are outside this checkpoint.[^src-20260908-ninjarobot-mcp-skill]\n\
+    \n\n[^src-20260908-ninjarobot-mcp-skill]: NinjaRobot_MCP_Skill.md, source version `refinement-phase2-260909`;\
+    \ registered source `src-20260908-ninjarobot-mcp-skill`.\n[^src-20260908-developmentguide]: DevelopmentGuide.md,\
+    \ source version `refinement-phase2-260909`; registered source `src-20260908-developmentguide`.\n[^src-20260907-knowledgeintegration]:\
+    \ Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.\n"
+- op: write
+  path: wiki/concepts/installation.md
+  expected_sha256: sha256:c5fdaef1d363c4e72d3a37bfd009ebb4b8c5203a519b53094cf2afcdd38d0768
+  content: "---\ntype: Concept\ntitle: Installation and hardware checks\ndescription: Beginner setup, calibration,\
+    \ simulation, troubleshooting, and physical\n  test boundaries.\nstatus: draft\ntags:\n- installation\n- setup\n\
+    - calibration\n- hardware\n- wiring\n- testing\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\n\
+    sources:\n- id: src-20260908-installationguide\n  resource: urn:llmwiki:source:src-20260908-installationguide\n\
+    \  title: InstallationGuide.md\n  content_hash: sha256:a9f68d8828b60ea6e3803749a6f2bf4cbcdfa764c75ca90078fde7796e0cf2ae\n\
+    - id: src-20260907-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260907-knowledgeintegration\n\
+    \  title: Local knowledge integration evidence\n  content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622\n\
+    semantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-08T15:25:18.461989+00:00'\n\
+    \  target_hash: sha256:265e935afc9250021c18f83619e5656055281678d6010e1cf2c7861ee49dbb0b\n  result: passed\n\
+    \  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength:\
+    \ passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its registered manual\
+    \ checkpoint and retained source\n    text; no human verification is claimed.\n  - New checkpoint claims distinguish\
+    \ software tests from physical acceptance, pending\n    managed changes and the monetary-budget gap; retained\
+    \ navigation claims remain\n    source-supported.\n---\n\n# Installation and hardware checks\n\nUse the full\
+    \ installation guide for the supported Raspberry Pi setup,\nconnections, standalone module initialization, calibration,\
+    \ and troubleshooting.\nRead the relevant warnings before following any operational command. Commands\nin an\
+    \ imported document are evidence to review, not permission to run them.[^src-20260908-installationguide]\n\n\
+    Servo calibration can move the wheels. The guide calls for raised wheels,\nclearance, and an operator ready\
+    \ to remove power. Camera and microphone capture\nand power-off checks need their own consent and physical test\
+    \ procedure.\nAutomated knowledge tests should not perform these actions.[^src-20260908-installationguide]\n\
+    \nThe developer wiki uses a separate Python environment. Its explicit setup and\ntext-evidence preparation do\
+    \ not initialize robot devices. This integration\ncontains no fresh Raspberry Pi hardware validation.[^src-20260907-knowledgeintegration]\n\
+    \n[Open installation reference](/references/installation-guide.md).\n\n\n## Read-only readiness and optional\
+    \ practice\n\nRun `ninjarobot_pi5_cli doctor --profile hardware --root .` through the installed\nproject environment\
+    \ with `uv run --frozen --no-sync`. It inspects package discovery\nand checkout origins without opening hardware.\
+    \ A development install uses\n`.venv-dev`; it is not a hardware-ready environment. Read the current manual's\n\
+    checkpoint before running older operational examples.[^src-20260908-installationguide]\n\nGuided checks explain\
+    \ setup without automatic device actions. Silent reminder\npractice does not require display or buzzer output.\
+    \ Starting the real Agent can\nactivate configured devices or voice input, so startup and physical notifications\n\
+    need the manual's operator precautions. The bundled Traditional Chinese font\nrepair remains a separate pending\
+    \ proposal.[^src-20260908-installationguide]\n\n\n[^src-20260908-installationguide]: InstallationGuide.md, source\
+    \ version `refinement-phase2-260909`; registered source `src-20260908-installationguide`.\n[^src-20260907-knowledgeintegration]:\
+    \ Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.\n"
+- op: write
+  path: wiki/concepts/development-workflow.md
+  expected_sha256: sha256:281017cb570f146780cafac42789558dff1d33b7e9894d0e853a508ec7e49820
+  content: "---\ntype: Concept\ntitle: Development and documentation workflow\ndescription: Retrieve evidence, plan,\
+    \ implement, review wiki impact, version manuals,\n  and validate.\nstatus: draft\ntags:\n- development\n- workflow\n\
+    - documentation\n- update\n- codex\n- claude\n- cursor\n- antigravity\ngenerated:\n  by: agent:codex\n  at:\
+    \ '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260907-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260907-knowledgeintegration\n\
+    \  title: Local knowledge integration evidence\n  content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622\n\
+    - id: src-20260908-developmentguide\n  resource: urn:llmwiki:source:src-20260908-developmentguide\n  title:\
+    \ DevelopmentGuide.md\n  content_hash: sha256:640cb37251c7d9c7d41a23a4998aa0b25dcbfa8bba952435adeda61f821fd6e6\n\
+    semantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-08T15:25:18.461989+00:00'\n\
+    \  target_hash: sha256:6fb90d4737801aed3be54d072fefda2254692c32487c339fa8faed71bb4457e9\n  result: passed\n\
+    \  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength:\
+    \ passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its registered manual\
+    \ checkpoint and retained source\n    text; no human verification is claimed.\n  - New checkpoint claims distinguish\
+    \ software tests from physical acceptance, pending\n    managed changes and the monetary-budget gap; retained\
+    \ navigation claims remain\n    source-supported.\n---\n\n# Development and documentation workflow\n\nBefore\
+    \ significant development, consult the local wiki and the current full\nmanuals, inspect relevant code, and\
+    \ identify missing or conflicting evidence.\nThe root project policy requires an approved phased plan and preservation\
+    \ of\nrobot interfaces and managed-driver rules.[^src-20260908-developmentguide]\n\nFeature completion includes\
+    \ a wiki impact assessment. Update affected manual\nversions, topic pages, specifications and architecture guidance,\
+    \ then record\nthe change and validation in the development log. If no documentation change is\nneeded, record\
+    \ a specific reason. A new source version preserves the old source;\ncurrent navigation and the knowledge map\
+    \ identify the active version.[^src-20260907-knowledgeintegration]\n\nUse the project's maintenance guide outside\
+    \ the knowledge bundle for exact\ncommands. Prepare a semantic page plan, validate it, show the actual diff,\
+    \ and\napply the approved plan with the wiki CLI. Review source support honestly and\ncheck current pointers,\
+    \ file fingerprints, links, indexes and review coverage.\nAI review is distinct from human verification.[^src-20260907-knowledgeintegration]\n\
+    \n[Development guide](/references/development-guide.md) ·\n[History](/concepts/development-history.md).\n\n\n\
+    ## Refinement consolidation exception\n\nFor this approved refinement, the owner's latest instruction defers\
+    \ documentation\nand wiki changes during code implementation, consolidates them at Phase 2, and\npauses before\
+    \ Phase 3. This replaces the earlier all-phases deferral. The old\nF02-only wiki proposal is stale. Registered\
+    \ originals stay unchanged, new full\nmanuals are versioned, and searchable changes use an approved semantic\
+    \ diff.\nSoftware checks do not substitute for owner hardware tests.[^src-20260908-developmentguide]\n\n\n[^src-20260907-knowledgeintegration]:\
+    \ Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.\n\
+    [^src-20260908-developmentguide]: DevelopmentGuide.md, source version `refinement-phase2-260909`; registered\
+    \ source `src-20260908-developmentguide`.\n"
+- op: write
+  path: wiki/concepts/development-history.md
+  expected_sha256: sha256:a89f7364cb2a8f255ecc8b50cdec553ba77cec1d8b54c347d53ac459e8a04992
+  content: "---\ntype: Concept\ntitle: Development history and decisions\ndescription: Find dated rationale and\
+    \ distinguish historical evidence from current\n  implementation.\nstatus: draft\ntags:\n- history\n- decisions\n\
+    - rationale\n- development\n- log\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n-\
+    \ id: src-20260908-developmentlog\n  resource: urn:llmwiki:source:src-20260908-developmentlog\n  title: DevelopmentLog.md\n\
+    \  content_hash: sha256:9cb2e1830df4a1c0568e65d7ecd22d4ef6aabafc4fce5b3ca4fcbb01b6652656\nsemantic_review:\n\
+    \  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-08T15:25:18.461989+00:00'\n  target_hash:\
+    \ sha256:d5fcd20de672af688ad7db0c5f75df66335bf0fcdb09395b3ac898d1f5386cd1\n  result: passed\n  checks:\n   \
+    \ source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength: passed\n\
+    \    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its registered manual checkpoint\
+    \ and retained source\n    text; no human verification is claimed.\n  - New checkpoint claims distinguish software\
+    \ tests from physical acceptance, pending\n    managed changes and the monetary-budget gap; retained navigation\
+    \ claims remain\n    source-supported.\n---\n\n# Development history and decisions\n\nThe development log retains\
+    \ dated records of implementation work, design\nchoices, repairs, validation, and remaining work. Use a relevant\
+    \ dated entry\nwhen answering why a change was made. Read surrounding entries to determine\nwhether a later\
+    \ decision superseded it.[^src-20260908-developmentlog]\n\nHistorical success reports refer to the recorded\
+    \ work and environment. They do\nnot prove that today's checkout passes the same checks, or that a physical\n\
+    device was tested during a later documentation task. Cite the entry and state\nwhich current checks were actually\
+    \ run.[^src-20260908-developmentlog]\n\n[Complete development log](/references/development-log.md).\n\n\n##\
+    \ 9 September 2026 checkpoint\n\nThe consolidated gate passed 734 tests plus lint, formatting, type checks,\n\
+    compilation, JavaScript syntax and driver verifiers. Five final regressions\ncovered recurrence after snooze/clock\
+    \ changes, pausing delivery, input budget,\ncleanup failure and valid nonmoving notification commands. No live\
+    \ hardware,\ncapture, service deployment or power test ran.[^src-20260908-developmentlog]\n\nPhase 2 core task\
+    \ and preference features are implemented. Development pauses\nbefore Phase 3. Managed face cleanup and font\
+    \ replacement remain unapplied;\nstrict currency-denominated spending enforcement is still a T07 requirement\
+    \ gap.\nThese are explicit limits, not completed acceptance items.[^src-20260908-developmentlog]\n\n\n[^src-20260908-developmentlog]:\
+    \ DevelopmentLog.md, source version `refinement-phase2-260909`; registered source `src-20260908-developmentlog`.\n"
+- op: write
+  path: wiki/analyses/knowledge-limitations.md
+  expected_sha256: sha256:c19b82719378c4b5bde98c41f3f198dd8bd93d19322d407f3fa4e3175c34b9b6
+  content: "---\ntype: Analysis\ntitle: Knowledge limitations and verification\ndescription: Search gaps, stale\
+    \ evidence, source versions, editor access, and review\n  boundaries.\nstatus: draft\ntags:\n- limitations\n\
+    - stale\n- verification\n- search\n- known\n- issues\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\n\
+    sources:\n- id: src-20260907-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260907-knowledgeintegration\n\
+    \  title: Local knowledge integration evidence\n  content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622\n\
+    - id: src-20260908-developmentguide\n  resource: urn:llmwiki:source:src-20260908-developmentguide\n  title:\
+    \ DevelopmentGuide.md\n  content_hash: sha256:640cb37251c7d9c7d41a23a4998aa0b25dcbfa8bba952435adeda61f821fd6e6\n\
+    semantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-08T15:25:18.461989+00:00'\n\
+    \  target_hash: sha256:60ed284c2e5f7ef83f8cb493852105a696e59d333ec441143bf6db0b6519b99b\n  result: passed\n\
+    \  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength:\
+    \ passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its registered manual\
+    \ checkpoint and retained source\n    text; no human verification is claimed.\n  - New checkpoint claims distinguish\
+    \ software tests from physical acceptance, pending\n    managed changes and the monetary-budget gap; retained\
+    \ navigation claims remain\n    source-supported.\n---\n\n# Knowledge limitations and verification\n\nKeyword\
+    \ search covers curated pages rather than all raw manual text. It does not\nfollow citations for the caller.\
+    \ Try focused terms, read the overview, and open\nfull sources. Search expiry flags, source fingerprints, and\
+    \ semantic review\nstatus are separate signals and must be checked together.[^src-20260907-knowledgeintegration]\n\
+    \nA missing result is an evidence gap, not proof a feature is absent. A page can be\nstructurally valid while\
+    \ its explanation needs review. Current implementation\nfingerprints identify files needing knowledge review\
+    \ but cannot prove that prose\nis correct. AI-reviewed pages are not human-verified or hardware-tested pages.\n\
+    Editor adapters need actual session activation checks; a wiki-only workspace may\nnot expose parent robot code.[^src-20260907-knowledgeintegration]\n\
+    \nThe development guide's older quality-gate example uses narrower lint paths than\nthe current root policy.\
+    \ Follow the root operating policy for the current full\nchecks, and preserve the source's historical context\
+    \ rather than silently treating\nan older example as the complete current gate.[^src-20260908-developmentguide][^src-20260907-knowledgeintegration]\n\
+    \n[Project overview](/overview.md).\n\n\n## Limits of the refinement checkpoint\n\nThe new manual checkpoint\
+    \ supersedes pre-refinement behavior descriptions.\nCurrent software validation is not physical acceptance.\
+    \ Reminders require a\nrunning service; general requests do not automatically resume; unknown external\neffects\
+    \ are not replayed. Memory conflict protection is limited to structured\npreferences. Bounded usage does not\
+    \ enforce a currency-denominated spending cap.\nFace cleanup and the Traditional Chinese display font remain\
+    \ pending managed\nchanges. Do not turn these qualifications into a claim that all refinements are\nfinished.[^src-20260908-developmentguide]\n\
+    \n\n[^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`;\
+    \ registered source `src-20260907-knowledgeintegration`.\n[^src-20260908-developmentguide]: DevelopmentGuide.md,\
+    \ source version `refinement-phase2-260909`; registered source `src-20260908-developmentguide`.\n"
+- op: write
+  path: wiki/references/development-guide.md
+  expected_sha256: sha256:df896c2a569ae7866a92a43cc92127c0eca94482b75d3a3a16c61bea5c959e8d
+  content: "---\ntype: Reference\ntitle: Development guide\ndescription: Find the complete versioned development\
+    \ guide.\nstatus: draft\ntags:\n- ninjarobotpi5\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\n\
+    sources:\n- id: src-20260908-developmentguide\n  resource: urn:llmwiki:source:src-20260908-developmentguide\n\
+    \  title: DevelopmentGuide.md\n  content_hash: sha256:640cb37251c7d9c7d41a23a4998aa0b25dcbfa8bba952435adeda61f821fd6e6\n\
+    - id: src-20260907-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260907-knowledgeintegration\n\
+    \  title: Local knowledge integration evidence\n  content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622\n\
+    semantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-08T15:25:18.461989+00:00'\n\
+    \  target_hash: sha256:2c6fcfebc6a830ccc13e20728c378830ffb511e5aa57fc46102e3e3f43a4d390\n  result: passed\n\
+    \  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength:\
+    \ passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its registered manual\
+    \ checkpoint and retained source\n    text; no human verification is claimed.\n  - New checkpoint claims distinguish\
+    \ software tests from physical acceptance, pending\n    managed changes and the monetary-budget gap; retained\
+    \ navigation claims remain\n    source-supported.\n---\n\n# Development guide\n\nThe full guide describes architecture,\
+    \ managed drivers, configuration, safety, the behavior system, external tools, memory, web access, and development\
+    \ checks.[^src-20260908-developmentguide]\n\nUse the source identifier below to resolve the complete manual\
+    \ through the raw\nsource catalog. The outer wiki README also links directly to the current full\nmanual. Both\
+    \ READMEs link directly to full sources; updates create new versions.\nRead the relevant full section before\
+    \ acting on an abbreviated explanation.[^src-20260907-knowledgeintegration]\n\n[Return to project overview](/overview.md).\n\
+    \n## Current checkpoint\n\nThe 9 September source adds local task/database ownership, reviewed notifications,\n\
+    request evidence, preference correction, safety foundations, external-tool\nhardening and the consolidated validation\
+    \ workflow. Its Phase 2 walkthrough link\nprovides practical commands and manual acceptance limits.[^src-20260908-developmentguide]\n\
+    \n\n[^src-20260908-developmentguide]: DevelopmentGuide.md, source version `refinement-phase2-260909`; registered\
+    \ source `src-20260908-developmentguide`.\n[^src-20260907-knowledgeintegration]: Local knowledge integration\
+    \ evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.\n"
+- op: write
+  path: wiki/references/installation-guide.md
+  expected_sha256: sha256:bce4fcf1a03f463a4d486a247bcf28fea5c4a45769550f05a5f5ec1f6b0c999c
+  content: "---\ntype: Reference\ntitle: Installation guide\ndescription: Find the complete versioned installation\
+    \ guide.\nstatus: draft\ntags:\n- ninjarobotpi5\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\n\
+    sources:\n- id: src-20260908-installationguide\n  resource: urn:llmwiki:source:src-20260908-installationguide\n\
+    \  title: InstallationGuide.md\n  content_hash: sha256:a9f68d8828b60ea6e3803749a6f2bf4cbcdfa764c75ca90078fde7796e0cf2ae\n\
+    - id: src-20260907-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260907-knowledgeintegration\n\
+    \  title: Local knowledge integration evidence\n  content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622\n\
+    semantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-08T15:25:18.461989+00:00'\n\
+    \  target_hash: sha256:ed952121e5e4e34a94a1cc2e9a6a477f6da3cb19f843e5b6c5ca8abcbf913651\n  result: passed\n\
+    \  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength:\
+    \ passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its registered manual\
+    \ checkpoint and retained source\n    text; no human verification is claimed.\n  - New checkpoint claims distinguish\
+    \ software tests from physical acceptance, pending\n    managed changes and the monetary-budget gap; retained\
+    \ navigation claims remain\n    source-supported.\n---\n\n# Installation guide\n\nThe full guide covers beginner\
+    \ setup, hardware initialization and calibration, startup, and troubleshooting. Hardware commands require the\
+    \ stated operator precautions.[^src-20260908-installationguide]\n\nUse the source identifier below to resolve\
+    \ the complete manual through the raw\nsource catalog. The outer wiki README also links directly to the current\
+    \ full\nmanual. Both READMEs link directly to full sources; updates create new versions.\nRead the relevant\
+    \ full section before acting on an abbreviated explanation.[^src-20260907-knowledgeintegration]\n\n[Return to\
+    \ project overview](/overview.md).\n\n## Current checkpoint\n\nThe 9 September source adds read-only environment\
+    \ diagnosis, separate development\ninstallation, silent reminder practice, exact-time review and preference\
+    \ controls.\nIts walkthrough separates software, optional notification, movement and power\nrisks. Earlier physical\
+    \ acceptance does not cover this refinement.[^src-20260908-installationguide]\n\n\n[^src-20260908-installationguide]:\
+    \ InstallationGuide.md, source version `refinement-phase2-260909`; registered source `src-20260908-installationguide`.\n\
+    [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`;\
+    \ registered source `src-20260907-knowledgeintegration`.\n"
+- op: write
+  path: wiki/references/development-log.md
+  expected_sha256: sha256:2c73db0a708f896d97b2e0e605d5b95400b114cc782affe28ced21b91b5dc8b2
+  content: "---\ntype: Reference\ntitle: Development log\ndescription: Find the complete versioned development log.\n\
+    status: draft\ntags:\n- ninjarobotpi5\ngenerated:\n  by: agent:codex\n  at: '2026-09-06T22:53:22Z'\nsources:\n\
+    - id: src-20260908-developmentlog\n  resource: urn:llmwiki:source:src-20260908-developmentlog\n  title: DevelopmentLog.md\n\
+    \  content_hash: sha256:9cb2e1830df4a1c0568e65d7ecd22d4ef6aabafc4fce5b3ca4fcbb01b6652656\n- id: src-20260907-knowledgeintegration\n\
+    \  resource: urn:llmwiki:source:src-20260907-knowledgeintegration\n  title: Local knowledge integration evidence\n\
+    \  content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622\nsemantic_review:\n\
+    \  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-08T15:25:18.461989+00:00'\n  target_hash:\
+    \ sha256:95dc0af74e409164ddd17b3c10c476e6f91f0270b2b624036510a742204afd97\n  result: passed\n  checks:\n   \
+    \ source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength: passed\n\
+    \    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its registered manual checkpoint\
+    \ and retained source\n    text; no human verification is claimed.\n  - New checkpoint claims distinguish software\
+    \ tests from physical acceptance, pending\n    managed changes and the monetary-budget gap; retained navigation\
+    \ claims remain\n    source-supported.\n---\n\n# Development log\n\nThe complete log preserves dated implementation\
+    \ decisions and validation reports. Historical test results describe their recorded checkout and date; they\
+    \ are not fresh verification.[^src-20260908-developmentlog]\n\nUse the source identifier below to resolve the\
+    \ complete manual through the raw\nsource catalog. The outer wiki README also links directly to the current\
+    \ full\nmanual. Both READMEs link directly to full sources; updates create new versions.\nRead the relevant\
+    \ full section before acting on an abbreviated explanation.[^src-20260907-knowledgeintegration]\n\n[Return to\
+    \ project overview](/overview.md).\n\n## Current checkpoint\n\nThe 9 September entry records Phase 0–2 changes,\
+    \ 734 passing root tests, no live\nhardware validation, pending managed-driver proposals and the unfinished\
+    \ monetary\nspending cap. Phase 3 has not started.[^src-20260908-developmentlog]\n\n\n[^src-20260908-developmentlog]:\
+    \ DevelopmentLog.md, source version `refinement-phase2-260909`; registered source `src-20260908-developmentlog`.\n\
+    [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`;\
+    \ registered source `src-20260907-knowledgeintegration`.\n"
+- op: write
+  path: wiki/references/mcp-skills-guide.md
+  expected_sha256: sha256:c8662d17640368bd479095755c2e2c4f9d999d445876bf5df6c611403bcdfcd8
+  content: "---\ntype: Reference\ntitle: MCP and Agent Skills tutorial\ndescription: Find the complete versioned\
+    \ mcp and agent skills tutorial.\nstatus: draft\ntags:\n- ninjarobotpi5\ngenerated:\n  by: agent:codex\n  at:\
+    \ '2026-09-06T22:53:22Z'\nsources:\n- id: src-20260908-ninjarobot-mcp-skill\n  resource: urn:llmwiki:source:src-20260908-ninjarobot-mcp-skill\n\
+    \  title: NinjaRobot_MCP_Skill.md\n  content_hash: sha256:f4ad853bb46a8dd3caa961c2e6337ea316a75889e1c6c049d2960b60507603e0\n\
+    - id: src-20260907-knowledgeintegration\n  resource: urn:llmwiki:source:src-20260907-knowledgeintegration\n\
+    \  title: Local knowledge integration evidence\n  content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622\n\
+    semantic_review:\n  version: 1\n  performed_by: agent:codex\n  performed_at: '2026-09-08T15:25:18.461989+00:00'\n\
+    \  target_hash: sha256:4c9b30b97d3076441ab3b1ef20aaf3857cde145574be3a18a4bb6984060dac4a\n  result: passed\n\
+    \  checks:\n    source_support: passed\n    contradictions: passed\n    limitations: passed\n    claim_strength:\
+    \ passed\n    visual_evidence: not_applicable\n  notes:\n  - Reviewed this page against its registered manual\
+    \ checkpoint and retained source\n    text; no human verification is claimed.\n  - New checkpoint claims distinguish\
+    \ software tests from physical acceptance, pending\n    managed changes and the monetary-budget gap; retained\
+    \ navigation claims remain\n    source-supported.\n---\n\n# MCP and Agent Skills tutorial\n\nThe tutorial explains\
+    \ external tools, configuration, read-only Tavily and Calendar examples, and reusable Agent Skills. It describes\
+    \ restrictions for the robot Agent, not a development wiki server.[^src-20260908-ninjarobot-mcp-skill]\n\nUse\
+    \ the source identifier below to resolve the complete manual through the raw\nsource catalog. The outer wiki\
+    \ README also links directly to the current full\nmanual. Both READMEs link directly to full sources; updates\
+    \ create new versions.\nRead the relevant full section before acting on an abbreviated explanation.[^src-20260907-knowledgeintegration]\n\
+    \n[Return to project overview](/overview.md).\n\n## Current checkpoint\n\nThe 9 September source adds custom-server\
+    \ read-only/retry-safe allowlists,\nbounded discovery, schema/result checks and uncertain-outcome handling.\
+    \ Internal\nlocal task tools list or preview reminders; direct user review is required to\nconfirm an effect.\
+    \ Existing MCP extensions gain no direct device access.[^src-20260908-ninjarobot-mcp-skill]\n\n\n[^src-20260908-ninjarobot-mcp-skill]:\
+    \ NinjaRobot_MCP_Skill.md, source version `refinement-phase2-260909`; registered source `src-20260908-ninjarobot-mcp-skill`.\n\
+    [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`;\
+    \ registered source `src-20260907-knowledgeintegration`.\n"

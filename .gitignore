@@ -9,6 +9,7 @@
 # Local tooling and environments
 /.serena/
 /.venv/
+/.venv-dev/
 .env
 .env.*
 !.env.example

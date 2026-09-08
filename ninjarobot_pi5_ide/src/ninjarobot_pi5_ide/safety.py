@@ -10,7 +10,9 @@ import subprocess
 import tempfile
 import threading
 import time
-from collections.abc import Callable, Coroutine, Mapping, Sequence
+from collections.abc import AsyncIterator, Callable, Coroutine, Mapping, Sequence
+from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -18,7 +20,8 @@ from typing import Any, Protocol
 
 from .behavior_models import DriveOperation
 from .config import BehaviorConfig
-from .errors import IDEError
+from .errors import IDEError, is_hardware_driver_error
+from .models import ErrorDetails, RetrySafety
 from .servo import ServoDevice
 
 LOGGER = logging.getLogger(__name__)
@@ -285,8 +288,10 @@ class MotionController:
         state: SafetyStateStore,
         undervoltage_provider: UndervoltageProvider = raspberry_pi_undervoltage_active,
         warning_handler: WarningHandler | None = None,
+        system_stopped: Callable[[], bool] | None = None,
     ) -> None:
         self._servo = servo
+        self._system_stopped = system_stopped or (lambda: False)
         self._distance = distance
         self._config = config
         self._state = state
@@ -298,6 +303,9 @@ class MotionController:
         self._warnings: list[str] = []
         self._fatal_error: Exception | None = None
         self._active = False
+        self._stop_generation = 0
+        self._motion_context: ContextVar[object | None] = ContextVar("motion_owner", default=None)
+        self._active_owner: object | None = None
 
     @property
     def active(self) -> bool:
@@ -305,29 +313,111 @@ class MotionController:
         return self._active
 
     async def drive(self, operation: DriveOperation, behavior_name: str) -> dict[str, Any]:
-        """Run one guarded continuous drive until a stop trigger or optional timeout."""
+        """Run one existing guarded drive without changing its hold policy."""
+        targets = self._resolve_targets(operation)
+        async with self._guarded_motion(operation, behavior_name) as watchdog:
+            movement = await self._servo.move_group(
+                targets=targets,
+                speed_mode=operation.speed_mode,
+            )
+            if movement["interrupted"]:
+                await self.stop_motion("driver_interrupted", latch=True)
+            if operation.hold_seconds is None:
+                while not self._stop_event.is_set():
+                    watchdog.beat()
+                    await asyncio.sleep(self._config.distance_poll_interval_seconds)
+            else:
+                try:
+                    async with asyncio.timeout(operation.hold_seconds):
+                        while not self._stop_event.is_set():
+                            watchdog.beat()
+                            await asyncio.sleep(self._config.distance_poll_interval_seconds)
+                except TimeoutError:
+                    await self.stop_motion("movement_duration_complete", latch=False)
+            if self._fatal_error is not None:
+                raise self._fatal_error
+        result = {
+            "kind": "drive",
+            "targets": operation.targets,
+            "resolved_endpoints": targets,
+            "speed_mode": operation.speed_mode,
+            "stop_reason": self._stop_reason,
+            "warnings": list(self._warnings),
+            "simulated": self._servo.simulated,
+        }
+        snapshot = self._state.read()
+        if snapshot.motion_latched:
+            guidance = stop_guidance(
+                snapshot.reason,
+                fault_detail=snapshot.fault_detail,
+            )
+            result.update(
+                {
+                    "latched": True,
+                    "cause": guidance.cause,
+                    "recovery_instruction": guidance.recovery_instruction,
+                }
+            )
+        else:
+            result["latched"] = False
+        return result
+
+    def _check_stop_state(self) -> None:
+        snapshot = self._state.read()
+        system_stopped = snapshot.system_latched or self._system_stopped()
+        if system_stopped or snapshot.motion_latched:
+            guidance = stop_guidance(
+                snapshot.reason or "operator_stop", fault_detail=snapshot.fault_detail
+            )
+            raise IDEError(
+                ErrorDetails(
+                    code="SYSTEM_STOPPED" if system_stopped else "MOTION_STOPPED",
+                    message=f"{guidance.cause} Recovery: {guidance.recovery_instruction}",
+                    technical_detail=None,
+                    definitely_not_executed=True,
+                    retry_safety=RetrySafety.SAFE,
+                )
+            )
+
+    def require_motion_context(self) -> None:
+        """Reject low-level calls outside this controller's guarded lifetime."""
+        self._check_stop_state()
+        if (
+            not self._active
+            or self._stop_event.is_set()
+            or self._active_owner is None
+            or self._motion_context.get() is not self._active_owner
+        ):
+            raise IDEError(
+                ErrorDetails(
+                    code="MOTION_REQUIRES_CONTROLLER",
+                    message="Use the IDE motion controller to execute a new movement.",
+                    technical_detail=None,
+                    definitely_not_executed=True,
+                    retry_safety=RetrySafety.SAFE,
+                )
+            )
+
+    @asynccontextmanager
+    async def _guarded_motion(
+        self,
+        operation: DriveOperation,
+        behavior_name: str,
+    ) -> AsyncIterator[_WatchdogThread]:
         async with self._motion_lock:
-            snapshot = self._state.read()
-            if snapshot.system_latched:
-                guidance = stop_guidance(
-                    snapshot.reason,
-                    fault_detail=snapshot.fault_detail,
-                )
-                raise MotionSafetyError(
-                    f"{guidance.cause} Recovery: {guidance.recovery_instruction}"
-                )
-            if snapshot.motion_latched:
-                guidance = stop_guidance(snapshot.reason)
-                raise MotionSafetyError(
-                    f"{guidance.cause} Recovery: {guidance.recovery_instruction}"
-                )
-            targets = self._resolve_targets(operation)
+            self._check_stop_state()
+            generation = self._stop_generation
             await asyncio.gather(self._servo.start(), self._distance.start())
+            self._check_stop_state()
+            if generation != self._stop_generation:
+                raise MotionSafetyError("Movement was stopped during device preparation.")
             self._warnings = list(_direction_warnings(behavior_name))
             self._stop_event.clear()
             self._stop_reason = None
             self._fatal_error = None
             self._active = True
+            self._active_owner = object()
+            context_token = self._motion_context.set(self._active_owner)
             loop = asyncio.get_running_loop()
             watchdog = _WatchdogThread(
                 self._config.watchdog_timeout_seconds,
@@ -340,67 +430,49 @@ class MotionController:
             ]
             watchdog.start()
             try:
-                movement = await self._servo.move_group(
-                    targets=targets,
-                    speed_mode=operation.speed_mode,
-                )
-                if movement["interrupted"]:
-                    await self.stop_motion("driver_interrupted", latch=True)
-                if operation.hold_seconds is None:
-                    while not self._stop_event.is_set():
-                        watchdog.beat()
-                        await asyncio.sleep(self._config.distance_poll_interval_seconds)
-                else:
-                    try:
-                        async with asyncio.timeout(operation.hold_seconds):
-                            while not self._stop_event.is_set():
-                                watchdog.beat()
-                                await asyncio.sleep(self._config.distance_poll_interval_seconds)
-                    except TimeoutError:
-                        await self.stop_motion("movement_duration_complete", latch=False)
-                if self._fatal_error is not None:
-                    raise self._fatal_error
+                yield watchdog
             except asyncio.CancelledError:
                 await self.stop_motion("cancelled", latch=False)
                 raise
-            except Exception:
-                await self.stop_motion("servo_driver_failure", latch=False)
+            except Exception as exc:
+                await self.stop_motion("driver_failure", latch=is_hardware_driver_error(exc))
                 raise
             finally:
                 watchdog.close()
                 for task in monitor_tasks:
                     task.cancel()
                 await asyncio.gather(*monitor_tasks, return_exceptions=True)
-                await self._servo.stop()
-                self._active = False
-            result = {
-                "kind": "drive",
-                "targets": operation.targets,
-                "resolved_endpoints": targets,
-                "speed_mode": operation.speed_mode,
-                "stop_reason": self._stop_reason,
-                "warnings": list(self._warnings),
-                "simulated": self._servo.simulated,
-            }
-            snapshot = self._state.read()
-            if snapshot.motion_latched:
-                guidance = stop_guidance(
-                    snapshot.reason,
-                    fault_detail=snapshot.fault_detail,
+                try:
+                    await self._servo.stop()
+                finally:
+                    self._active = False
+                    self._active_owner = None
+                    self._motion_context.reset(context_token)
+
+    async def move_endpoint(
+        self,
+        *,
+        endpoint: str,
+        target_angle: float,
+        speed_mode: str,
+    ) -> dict[str, Any]:
+        """Run a bounded single-endpoint ramp with the same safety monitors."""
+        operation = DriveOperation(kind="drive", targets={"direct_servo": target_angle})
+        async with self._guarded_motion(operation, "direct_servo"):
+            async with asyncio.timeout(9.0):
+                result = await self._servo.move(
+                    endpoint=endpoint,
+                    target_angle=target_angle,
+                    speed_mode=speed_mode,
                 )
-                result.update(
-                    {
-                        "latched": True,
-                        "cause": guidance.cause,
-                        "recovery_instruction": guidance.recovery_instruction,
-                    }
-                )
-            else:
-                result["latched"] = False
-            return result
+            if self._fatal_error is not None:
+                raise self._fatal_error
+            result["interrupted"] = result["interrupted"] or self._stop_event.is_set()
+        return result
 
     async def stop_motion(self, reason: str, *, latch: bool) -> dict[str, Any]:
         """Stop both motors and optionally persist a Level 1 restart gate."""
+        self._stop_generation += 1
         guidance = stop_guidance(reason)
         if latch:
             self._state.latch_motion(reason)

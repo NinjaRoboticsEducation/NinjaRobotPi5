@@ -207,6 +207,26 @@ class HardwareConfig(ConfigModel):
         }
         if self.buzzer.enabled and self.display.enabled and self.buzzer.gpio in display_pins:
             raise ValueError("buzzer GPIO must not overlap a display control GPIO")
+        # I2C1 remains enabled for the configured distance sensor. HAT PWM
+        # channels are not native GPIO pins and must not be interpreted as such.
+        owners: dict[int, str] = {2: "I2C1 SDA", 3: "I2C1 SCL"}
+
+        def claim(pin: int, owner: str) -> None:
+            if pin in owners:
+                raise ValueError(f"GPIO{pin} conflict: {owners[pin]} and {owner}")
+            owners[pin] = owner
+
+        if self.display.enabled:
+            for pin in (8, 9, 10, 11):
+                claim(pin, "display SPI0")
+            for pin in display_pins:
+                claim(pin, "display control")
+        if self.servos.enabled:
+            for endpoint in self.servos.endpoints:
+                if endpoint.startswith("gpio"):
+                    claim(int(endpoint[4:]), "servo")
+        if self.buzzer.enabled:
+            claim(self.buzzer.gpio, "buzzer")
         return self
 
 

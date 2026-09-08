@@ -76,6 +76,7 @@ class BuzzerDevice:
         default_volume: int = DEFAULT_VOLUME,
         driver_factory: BuzzerFactory | None = None,
         simulated: bool = False,
+        enabled: bool = True,
     ) -> None:
         if not 0 <= pin <= 27:
             raise ValueError("buzzer pin must be a valid Raspberry Pi BCM GPIO number")
@@ -85,11 +86,17 @@ class BuzzerDevice:
         self._default_volume = default_volume
         self._driver_factory = driver_factory or _load_buzzer
         self._simulated = simulated
+        self._enabled = enabled
         self._driver: BuzzerDriver | None = None
         self._startup_error: str | None = None
         self._lock = asyncio.Lock()
         self._stop_event = asyncio.Event()
         self._closed = False
+
+    @property
+    def enabled(self) -> bool:
+        """Return the configured device availability switch."""
+        return self._enabled
 
     @property
     def simulated(self) -> bool:
@@ -105,6 +112,15 @@ class BuzzerDevice:
 
     async def recover(self) -> None:
         """Silence and reconstruct the backend for an explicit Level 2 resume."""
+        if not self._enabled:
+            raise _buzzer_error(
+                code="BUZZER_DISABLED",
+                message="The buzzer is disabled by configuration.",
+                technical_detail=None,
+                definitely_not_executed=True,
+                retry_safety=RetrySafety.SAFE,
+                capability="buzzer.play_tone",
+            )
         self._stop_event.set()
         async with self._lock:
             if self._closed:
@@ -224,6 +240,8 @@ class BuzzerDevice:
                 self._closed = True
 
     async def _initialize_locked(self) -> None:
+        if not self._enabled:
+            return
         if self._driver is not None and self._driver.is_initialized:
             return
         driver = self._driver
@@ -247,6 +265,15 @@ class BuzzerDevice:
             self._startup_error = f"{type(exc).__name__}: {exc}"
 
     async def _require_driver_locked(self) -> BuzzerDriver:
+        if not self._enabled:
+            raise _buzzer_error(
+                code="BUZZER_DISABLED",
+                message="The buzzer is disabled by configuration.",
+                technical_detail=None,
+                definitely_not_executed=True,
+                retry_safety=RetrySafety.SAFE,
+                capability="buzzer.play_tone",
+            )
         await self._initialize_locked()
         if self._driver is None or not self._driver.is_initialized:
             raise _buzzer_error(
@@ -419,7 +446,7 @@ class BuzzerStopAdapter:
             "additionalProperties": False,
         },
         risk=RiskLevel.EMERGENCY,
-        resources=(),
+        resources=("buzzer", "gpio27"),
         default_timeout_seconds=2.5,
         idempotent=True,
         cancellable=False,

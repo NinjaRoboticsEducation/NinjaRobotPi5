@@ -24,7 +24,7 @@ from .errors import IDEError, describe_hardware_driver_error, is_hardware_driver
 from .face_renderer import render_emergency_stop
 from .hardware_ownership import HardwareOwnership
 from .microphone import MicrophoneBackendFactory, MicrophoneDevice
-from .models import ErrorDetails, ResourceHealth, RetrySafety
+from .models import ErrorDetails, HealthReport, ResourceHealth, RetrySafety
 from .qr_display import render_pairing_qr
 from .safety import (
     MotionController,
@@ -73,8 +73,17 @@ class RobotAssembly:
         i2c_config = config.hardware.i2c
         camera_config = config.hardware.camera
         microphone_config = config.hardware.microphone
+        self._enabled_devices = {
+            "display": display_config.enabled,
+            "buzzer": buzzer_config.enabled,
+            "servo": servo_config.enabled,
+            "distance": True,
+            "camera": camera_config.enabled,
+            "microphone": microphone_config.enabled,
+        }
         self.assets = BehaviorAssetRepository(config.behaviors.user_directory)
         self.display = DisplayDevice(
+            enabled=display_config.enabled,
             spi_bus=display_config.spi_bus,
             spi_device=display_config.spi_device,
             dc_gpio=display_config.dc_gpio,
@@ -95,6 +104,7 @@ class RobotAssembly:
             simulated=simulated,
         )
         self.buzzer = BuzzerDevice(
+            enabled=buzzer_config.enabled,
             pin=buzzer_config.gpio,
             driver_factory=(
                 buzzer_factory
@@ -106,6 +116,7 @@ class RobotAssembly:
             simulated=simulated,
         )
         self.servo = ServoDevice(
+            enabled=servo_config.enabled,
             endpoints=servo_config.endpoints,
             calibration_file=servo_config.calibration_file,
             i2c_bus=i2c_config.bus,
@@ -166,6 +177,7 @@ class RobotAssembly:
             state=self.safety_state,
             undervoltage_provider=undervoltage_provider,
             warning_handler=self._show_motion_warning,
+            system_stopped=lambda: self.system_safety.stopped,
         )
         self.behaviors = BehaviorRunner(
             display=self.display,
@@ -180,6 +192,7 @@ class RobotAssembly:
             sensors=(self.distance, self.camera, self.microphone),
             display_hold_seconds=config.behaviors.system_stopped_display_seconds,
         )
+        self.servo.set_motion_guard(self.motion.require_motion_context)
         self.behaviors.set_drive_handler(self.motion.drive)
         self.behaviors.set_failure_handler(self._driver_failure)
         self._liveliness_enabled = False
@@ -242,8 +255,87 @@ class RobotAssembly:
         """Load and run one validated expression behavior by safe name."""
         return await self.run_definition(self.assets.load(name))
 
+    def ensure_action_allowed(self, capability: str) -> None:
+        """Keep low-level output and sensing calls behind the system stop gate."""
+        if capability in {
+            "behavior.stop",
+            "servo.stop",
+            "buzzer.stop",
+            "system.resume",
+            "motion.resume",
+            "servo.status",
+            "camera.status",
+            "microphone.status",
+            "behavior.list",
+            "behavior.preview",
+            "behavior.save_user",
+        }:
+            return
+        if self.system_safety.stopped:
+            snapshot = self.safety_state.read()
+            guidance = stop_guidance(
+                snapshot.reason or "operator_stop", fault_detail=snapshot.fault_detail
+            )
+            raise IDEError(
+                ErrorDetails(
+                    code="SYSTEM_STOPPED",
+                    message=f"{guidance.cause} Recovery: {guidance.recovery_instruction}",
+                    technical_detail=snapshot.fault_detail,
+                    definitely_not_executed=True,
+                    retry_safety=RetrySafety.SAFE,
+                    capability=capability,
+                )
+            )
+
+    async def move_servo_endpoint(
+        self,
+        *,
+        endpoint: str,
+        target_angle: float,
+        speed_mode: str,
+    ) -> dict[str, Any]:
+        """Coordinate a raw endpoint request with motion safety and presentation."""
+        self.ensure_action_allowed("servo.move")
+        await self._begin_foreground_behavior()
+        try:
+            return await self.motion.move_endpoint(
+                endpoint=endpoint,
+                target_angle=target_angle,
+                speed_mode=speed_mode,
+            )
+        except Exception as exc:
+            await self._driver_failure(exc)
+            raise
+        finally:
+            await self._end_foreground_behavior()
+
     async def run_definition(self, definition: BehaviorDefinition) -> dict[str, Any]:
         """Run one already-validated definition through the same safety boundary."""
+        requirements = {
+            "face": "display",
+            "text": "display",
+            "tone": "buzzer",
+            "melody": "buzzer",
+            "drive": "servo",
+        }
+        disabled = {
+            requirements[operation.kind]
+            for stage in definition.stages
+            for operation in stage.operations
+            if operation.kind in requirements
+            and not self._enabled_devices[requirements[operation.kind]]
+        }
+        if disabled:
+            raise IDEError(
+                ErrorDetails(
+                    code="DEVICE_DISABLED",
+                    message=f"Behavior requires disabled devices: {', '.join(sorted(disabled))}.",
+                    technical_detail=None,
+                    definitely_not_executed=True,
+                    retry_safety=RetrySafety.SAFE,
+                    capability="behavior.run",
+                )
+            )
         if self.system_safety.stopped:
             snapshot = self.safety_state.read()
             guidance = stop_guidance(
@@ -367,6 +459,49 @@ class RobotAssembly:
             health["idle"] = "degraded" if self._idle_error is not None else "ready"
         return health
 
+    def annotate_health(self, report: HealthReport) -> HealthReport:
+        """Explain configured and safety restrictions without touching devices."""
+        capabilities = dict(report.capabilities)
+        snapshot = self.safety_state.read()
+        for name, item in capabilities.items():
+            device = name.split(".", 1)[0]
+            if not self._enabled_devices.get(device, True):
+                item = item.model_copy(
+                    update={
+                        "status": ResourceHealth.NOT_CONFIGURED,
+                        "reason_code": "disabled_in_configuration",
+                        "recovery": "This device is disabled. Leave it disabled if intentional; "
+                        "otherwise review its configuration and restart after correction.",
+                    }
+                )
+            try:
+                self.ensure_action_allowed(name)
+            except IDEError:
+                item = item.model_copy(
+                    update={
+                        "execution_blocked": True,
+                        "reason_code": "system_stopped",
+                        "recovery": "Remove the hazard and correct the fault, then explicitly use "
+                        "Resume Robot Movement. Interrupted actions do not restart automatically.",
+                    }
+                )
+            else:
+                if snapshot.motion_latched and name in {
+                    "servo.move",
+                    "behavior.execute_movement",
+                    "behavior.run",
+                }:
+                    item = item.model_copy(
+                        update={
+                            "execution_blocked": True,
+                            "reason_code": "motion_stopped",
+                            "recovery": "Correct the fault, then explicitly resume movement. "
+                            "A named behavior may still be usable if it contains no movement.",
+                        }
+                    )
+            capabilities[name] = item
+        return report.model_copy(update={"capabilities": capabilities})
+
     def status(self) -> dict[str, Any]:
         """Return non-invasive safety and liveliness supervision state."""
         snapshot = self.safety_state.read()
@@ -402,9 +537,24 @@ class RobotAssembly:
     async def stop(self) -> dict[str, Any]:
         """Perform a non-latching full stop requested by the operator."""
         self._idle_suppressed = True
-        await self._stop_idle()
-        await self.behaviors.stop()
-        return await self.system_safety.full_stop("operator_stop", latch=False)
+        # Dispatch device stop before waiting for expression cancellation. A
+        # blocked display must not postpone the request to de-energize motors.
+        results = await asyncio.gather(
+            self.system_safety.full_stop("operator_stop", latch=False),
+            self._stop_idle(),
+            self.behaviors.stop(),
+            return_exceptions=True,
+        )
+        result = results[0]
+        if isinstance(result, BaseException):
+            raise result
+        assert isinstance(result, dict)
+        result["cleanup_errors"].extend(
+            f"{type(error).__name__}: {error}"
+            for error in results[1:]
+            if isinstance(error, BaseException)
+        )
+        return result
 
     async def resume_motion(self, *, confirmed: bool) -> SafetySnapshot:
         """Clear an explicitly confirmed Level 1 latch."""
@@ -418,12 +568,16 @@ class RobotAssembly:
         snapshot = await self.system_safety.resume_system(
             confirmed=confirmed,
             health_checks={
-                "display": self._display_health,
-                "buzzer": self._buzzer_health,
-                "servo": self._servo_health,
-                "distance": self._distance_health,
-                "camera": self._camera_health,
-                "microphone": self._microphone_health,
+                name: probe
+                for name, probe in {
+                    "display": self._display_health,
+                    "buzzer": self._buzzer_health,
+                    "servo": self._servo_health,
+                    "distance": self._distance_health,
+                    "camera": self._camera_health,
+                    "microphone": self._microphone_health,
+                }.items()
+                if self._enabled_devices[name]
             },
         )
         self._idle_suppressed = False
@@ -507,7 +661,12 @@ class RobotAssembly:
     async def _begin_foreground_behavior(self) -> None:
         async with self._idle_lock:
             self._foreground_behaviors += 1
-        await self._stop_idle()
+        try:
+            await self._stop_idle()
+        except BaseException:
+            async with self._idle_lock:
+                self._foreground_behaviors = max(0, self._foreground_behaviors - 1)
+            raise
 
     async def _end_foreground_behavior(self) -> None:
         async with self._idle_lock:
@@ -541,7 +700,7 @@ class RobotAssembly:
             self._idle_task = None
         if task is None or task is asyncio.current_task():
             return
-        if not task.done():
+        if not task.done() and not task.cancelling():
             task.cancel()
         await asyncio.gather(task, return_exceptions=True)
 
@@ -601,6 +760,8 @@ class RobotAssembly:
         )
 
     async def _show_system_stopped(self) -> dict[str, Any]:
+        if not self.display.enabled:
+            return {"display_skipped": "disabled by configuration"}
         try:
             width, height = await self.display.dimensions()
             image = render_emergency_stop(width=width, height=height)

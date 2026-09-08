@@ -18,6 +18,22 @@ def test_cli_validates_configuration(capsys) -> None:
     assert "display=DC4/RST5/BL6" in output
 
 
+def test_doctor_reports_environment_without_hardware(capsys) -> None:
+    result = main(["doctor", "--profile", "development"])
+    payload = json.loads(capsys.readouterr().out)
+    assert result == 0
+    assert payload["profile"] == "development"
+    assert "python" in payload
+    assert all(not check["name"].startswith("pi5") for check in payload["checks"])
+
+
+def test_doctor_invalid_configuration_does_not_echo_private_values(tmp_path, capsys) -> None:
+    config = tmp_path / "bad.toml"
+    config.write_text('secret = "do-not-print-this"\n', encoding="utf-8")
+    assert main(["doctor", "--config", str(config)]) == 1
+    assert "do-not-print-this" not in capsys.readouterr().out
+
+
 def test_cli_prints_contract_schemas(capsys) -> None:
     result = main(["contracts", "schema"])
 

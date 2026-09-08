@@ -13,6 +13,7 @@ from ninjarobot_pi5_ide import (
     ActionStatus,
     IDEClient,
     RetrySafety,
+    RiskLevel,
 )
 
 from .models import (
@@ -204,6 +205,8 @@ class IDEToolProvider:
             status=status,
             checked_at=report.checked_at,
             detail=report.detail,
+            capabilities=report.capabilities,
+            valid_for_seconds=report.valid_for_seconds,
         )
 
     async def close(self) -> None:
@@ -291,6 +294,29 @@ class ToolRegistry:
             return self._tools[name]
         except KeyError as exc:
             raise KeyError(f"unknown tool: {name}") from exc
+
+    async def refresh_catalog(self, provider_id: str) -> None:
+        """Replace one provider's cached definitions after its successful refresh."""
+        self._ensure_started()
+        provider = next((p for p in self._providers if p.provider_id == provider_id), None)
+        if provider is None:
+            raise KeyError(f"unknown provider: {provider_id}")
+        # Retire old schemas even if loading or validating their replacement fails.
+        for name in [name for name, owner in self._tool_providers.items() if owner is provider]:
+            del self._tool_providers[name]
+            del self._tools[name]
+        replacements: dict[str, ToolDefinition] = {}
+        for definition in await provider.list_tools():
+            if definition.name in self._tools or definition.name in replacements:
+                raise ToolRegistryError(f"duplicate tool name exposed: {definition.name}")
+            if (
+                definition.trust is ToolTrust.EXTERNAL_UNTRUSTED
+                and definition.risk is not RiskLevel.READ_ONLY
+            ):
+                raise ToolRegistryError(f"external tool must be read-only: {definition.name}")
+            replacements[definition.name] = definition
+        self._tools.update(replacements)
+        self._tool_providers.update({name: provider for name in replacements})
 
     async def call(
         self,

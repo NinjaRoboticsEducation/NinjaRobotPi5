@@ -246,6 +246,8 @@ def test_compound_personalization_is_captured_atomically(tmp_path: Path) -> None
             "preference_key": "preferred_form_of_address",
             "source": "explicit-chat-address",
             "value": "Master",
+            "last_confirmed_at": preferences[0].updated_at.isoformat(),
+            "review_reason": "explicit preference",
         }
 
         with_value_too_long = "x" * 81

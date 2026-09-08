@@ -89,6 +89,7 @@ class DisplayDevice:
         initial_brightness: int = 75,
         driver_factory: DisplayFactory | None = None,
         simulated: bool = False,
+        enabled: bool = True,
     ) -> None:
         if spi_bus != 0 or spi_device != 0:
             raise ValueError("the managed ST7789V integration requires SPI bus 0, device 0")
@@ -120,12 +121,18 @@ class DisplayDevice:
         self._brightness = initial_brightness
         self._driver_factory = driver_factory or _load_display
         self._simulated = simulated
+        self._enabled = enabled
         self._driver: DisplayDriver | None = None
         self._startup_error: str | None = None
         self._lock = asyncio.Lock()
         self._start_attempted = False
         self._ever_ready = False
         self._closed = False
+
+    @property
+    def enabled(self) -> bool:
+        """Return the configured device availability switch."""
+        return self._enabled
 
     @property
     def simulated(self) -> bool:
@@ -292,7 +299,7 @@ class DisplayDevice:
                 await _run_thread_to_completion(driver.close)
 
     async def _initialize_locked(self, *, brightness: int | None = None) -> None:
-        if self._driver is not None:
+        if not self._enabled or self._driver is not None:
             return
         target_brightness = self._initial_brightness if brightness is None else brightness
         driver: DisplayDriver | None = None
@@ -313,6 +320,14 @@ class DisplayDevice:
             self._startup_error = f"{type(exc).__name__}: {exc}"
 
     async def _require_driver_locked(self, capability: str) -> DisplayDriver:
+        if not self._enabled:
+            raise _display_error(
+                code="DISPLAY_DISABLED",
+                message="The display is disabled by configuration.",
+                technical_detail=None,
+                definitely_not_executed=True,
+                capability=capability,
+            )
         if self._closed:
             raise RuntimeError("display device is closed")
         if not self._start_attempted:
@@ -332,6 +347,14 @@ class DisplayDevice:
 
     async def _recover_locked(self, *, capability: str) -> None:
         """Replace one failed backend and prove the replacement can write."""
+        if not self._enabled:
+            raise _display_error(
+                code="DISPLAY_DISABLED",
+                message="The display is disabled by configuration.",
+                technical_detail=None,
+                definitely_not_executed=True,
+                capability=capability,
+            )
         if self._closed:
             raise RuntimeError("display device is closed")
         self._start_attempted = True

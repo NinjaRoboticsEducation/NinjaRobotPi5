@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
+import logging
+import uuid
 from collections import deque
+from contextvars import ContextVar, Token
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
@@ -11,6 +17,74 @@ from typing import Any
 from pydantic import Field
 
 from .models import AgentContractModel, Identifier
+
+LIFECYCLE_LOGGER = logging.getLogger("ninjarobot.lifecycle")
+
+
+@dataclass(frozen=True)
+class LifecycleTrace:
+    """Only opaque correlation identifiers, never user content or reasoning."""
+
+    request_id: str
+    session_ref: str
+
+    @classmethod
+    def create(cls, session_id: str) -> LifecycleTrace:
+        return cls(uuid.uuid4().hex, hashlib.sha256(session_id.encode()).hexdigest()[:16])
+
+
+CURRENT_LIFECYCLE: ContextVar[LifecycleTrace | None] = ContextVar("ninja_lifecycle", default=None)
+
+
+def begin_lifecycle(session_id: str) -> Token[LifecycleTrace | None]:
+    return CURRENT_LIFECYCLE.set(CURRENT_LIFECYCLE.get() or LifecycleTrace.create(session_id))
+
+
+def log_lifecycle(phase: str, *, outcome: str = "started", reason: str = "none") -> None:
+    """Write bounded fixed-vocabulary records to system logging, not the UI broker."""
+    if phase not in {
+        "listening",
+        "thinking",
+        "approval",
+        "action",
+        "completed",
+        "interrupted",
+        "error",
+    }:
+        raise ValueError("unsupported lifecycle phase")
+    if outcome not in {"started", "succeeded", "failed", "cancelled", "denied", "timed_out"}:
+        raise ValueError("unsupported lifecycle outcome")
+    if reason not in {
+        "none",
+        "request_received",
+        "model_requested",
+        "confirmation_required",
+        "policy_denied",
+        "tool_dispatched",
+        "tool_result",
+        "deadline_exceeded",
+        "cancelled",
+        "request_failed",
+        "reply_ready",
+        "voice_capture",
+    }:
+        raise ValueError("unsupported lifecycle reason")
+    trace = CURRENT_LIFECYCLE.get()
+    if trace is None:
+        return
+    LIFECYCLE_LOGGER.info(
+        json.dumps(
+            {
+                "timestamp": datetime.now(UTC).isoformat(),
+                "request_id": trace.request_id,
+                "session_ref": trace.session_ref,
+                "phase": phase,
+                "outcome": outcome,
+                "reason": reason,
+            },
+            sort_keys=True,
+        )
+    )
 
 
 class AgentEventType(StrEnum):

@@ -201,6 +201,17 @@ class WebRobotController:
     }
     SPECIAL_BEHAVIORS = {"greeting", "celebrate"}
 
+    async def guided_checks(self, step: int = 0) -> dict[str, Any]:
+        """Share the interactive CLI's optional read-only guide."""
+        return await self._runtime.guided_checks(step)
+
+    async def task_action(
+        self, lease_id: str, operation: str, task_id: str, minutes: int
+    ) -> dict[str, Any]:
+        return await self._runtime.task_action(
+            self.chat_session(lease_id), operation, task_id, minutes
+        )
+
     def __init__(self, runtime: AgentRuntime) -> None:
         self._runtime = runtime
         self._chat_sessions: dict[str, str] = {}
@@ -302,19 +313,24 @@ class WebRobotController:
         return result.model_dump(mode="json")
 
     async def emergency_stop(self, lease_id: str) -> dict[str, Any]:
-        async with self._motion_command_lock:
-            await self._cancel_movement()
-            result = await self._runtime.execute_tool(
-                tool_name="robot.behavior.stop",
-                arguments={},
-                session_id=self.control_session(lease_id),
-                lease_id=lease_id,
-                requested_by="web-controller",
-            )
         self._runtime.disarm_motion(self.control_session(lease_id))
         self._runtime.disarm_motion(self.chat_session(lease_id))
         self._runtime.disarm_voice_motion(lease_id=lease_id)
         self._runtime.revoke_camera(self.chat_session(lease_id))
+        # A previous start/release request may be waiting for device cleanup.
+        # Revoke admission first and dispatch stop without joining that queue.
+        async with self._movement_lock:
+            pending = self._movement
+            self._movement = None
+        if pending is not None:
+            pending[1].cancel()
+        result = await self._runtime.execute_tool(
+            tool_name="robot.behavior.stop",
+            arguments={},
+            session_id=self.control_session(lease_id),
+            lease_id=lease_id,
+            requested_by="web-controller",
+        )
         return result.model_dump(mode="json")
 
     async def resume(self, lease_id: str) -> dict[str, Any]:

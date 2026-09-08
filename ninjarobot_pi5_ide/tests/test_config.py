@@ -277,3 +277,29 @@ def test_fallback_providers_must_be_enabled_and_exclude_the_primary() -> None:
     payload["agent"]["fallback_providers"] = ("ollama",)
     with pytest.raises(ValidationError, match="must not include the default"):
         RobotConfig.model_validate(payload)
+
+
+@pytest.mark.parametrize("pin", [2, 3, 8, 9, 10, 11, 12, 13])
+def test_enabled_buzzer_cannot_claim_bus_or_servo_pin(pin: int) -> None:
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["hardware"]["buzzer"]["gpio"] = pin
+    with pytest.raises(ValidationError, match="GPIO.*conflict"):
+        RobotConfig.model_validate(payload)
+
+
+@pytest.mark.parametrize("pin", [2, 3, 8, 9, 10, 11, 12, 13])
+def test_display_controls_cannot_claim_bus_or_servo_pin(pin: int) -> None:
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["hardware"]["display"]["dc_gpio"] = pin
+    with pytest.raises(ValidationError, match="GPIO.*conflict"):
+        RobotConfig.model_validate(payload)
+
+
+def test_disabled_devices_do_not_reserve_gpio() -> None:
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["hardware"]["servos"]["enabled"] = False
+    payload["hardware"]["buzzer"]["gpio"] = 12
+    assert RobotConfig.model_validate(payload).hardware.buzzer.gpio == 12
+    payload["hardware"]["display"]["enabled"] = False
+    payload["hardware"]["buzzer"]["gpio"] = 10
+    assert RobotConfig.model_validate(payload).hardware.buzzer.gpio == 10

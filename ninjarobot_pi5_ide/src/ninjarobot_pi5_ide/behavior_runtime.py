@@ -204,7 +204,12 @@ class BehaviorRunner:
         """Cancel the active expression and silence the buzzer."""
         active = self._active_task
         current = asyncio.current_task()
-        if active is not None and active is not current and not active.done():
+        if (
+            active is not None
+            and active is not current
+            and not active.done()
+            and not active.cancelling()
+        ):
             active.cancel()
         await self._buzzer.stop()
         if active is not None and active is not current:

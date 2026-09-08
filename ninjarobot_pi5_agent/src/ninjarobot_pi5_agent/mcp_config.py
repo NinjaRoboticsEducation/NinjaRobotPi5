@@ -57,6 +57,10 @@ class MCPServerConfig(BaseModel):
     authentication: MCPAuthentication = MCPAuthentication.NONE
     token_environment: EnvironmentName | None = None
     allowed_tools: tuple[str, ...]
+    read_only_tools: tuple[str, ...] = ()
+    retry_safe_tools: tuple[str, ...] = ()
+    max_discovery_pages: Annotated[int, Field(ge=1, le=64)] = 16
+    max_discovery_tools: Annotated[int, Field(ge=1, le=1024)] = 256
     timeout_seconds: Annotated[float, Field(ge=1, le=120)] = 20.0
     max_result_bytes: Annotated[int, Field(ge=1024, le=1_048_576)] = 131_072
     default_parameters: dict[str, Any] = Field(default_factory=dict)
@@ -80,6 +84,10 @@ class MCPServerConfig(BaseModel):
     @model_validator(mode="after")
     def transport_and_authentication_are_consistent(self) -> MCPServerConfig:
         """Require only the fields meaningful to the selected transport."""
+        if not set(self.read_only_tools) <= set(self.allowed_tools):
+            raise ValueError("read_only_tools must be a subset of allowed_tools")
+        if not set(self.retry_safe_tools) <= set(self.read_only_tools):
+            raise ValueError("retry_safe_tools must be a subset of reviewed read_only_tools")
         if self.transport is MCPTransport.STREAMABLE_HTTP:
             if self.url is None or not self.url.startswith("https://"):
                 raise ValueError("Streamable HTTP MCP servers require an HTTPS URL")
@@ -96,6 +104,15 @@ class MCPServerConfig(BaseModel):
         elif self.token_environment is not None:
             raise ValueError("token_environment requires bearer authentication")
         return self
+
+    def reviewed_read_only(self, name: str) -> bool:
+        """Only local policy or the existing official search preset grants read access."""
+        return name in self.read_only_tools or (
+            self.preset == "tavily"
+            and name == "tavily_search"
+            and self.transport is MCPTransport.STREAMABLE_HTTP
+            and self.url == "https://mcp.tavily.com/mcp"
+        )
 
     def redacted_dict(self) -> dict[str, Any]:
         """Return configuration metadata without resolving any secret."""
@@ -195,6 +212,10 @@ def save_mcp_configuration(configuration: MCPConfiguration, path: str | Path) ->
             "authentication",
             "token_environment",
             "allowed_tools",
+            "read_only_tools",
+            "retry_safe_tools",
+            "max_discovery_pages",
+            "max_discovery_tools",
             "timeout_seconds",
             "max_result_bytes",
             "preset",

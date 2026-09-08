@@ -71,10 +71,8 @@ class ServiceOwnership:
         fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
         handle.close()
         self._handle = None
-        try:
-            self._path.unlink()
-        except FileNotFoundError:
-            pass
+        # Keep the inode: another process may acquire this lock immediately
+        # after unlock. Unlinking it would let a third process lock a new file.
 
 
 class AgentService:

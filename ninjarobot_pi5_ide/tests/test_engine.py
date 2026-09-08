@@ -235,3 +235,165 @@ def test_restart_recovery_distinguishes_accepted_and_running(tmp_path: Path) -> 
         await engine.close()
 
     asyncio.run(exercise())
+
+
+def test_stop_bypasses_full_queue_and_cancels_conflicting_work(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        ordinary = ControlledAdapter(delay=30, timeout=60)
+        stop = ControlledAdapter(delay=0.02)
+        stop._descriptor = stop.descriptor.model_copy(
+            update={"name": "servo.stop", "risk": RiskLevel.EMERGENCY}
+        )
+        engine = ExecutionEngine(
+            CapabilityRegistry([ordinary, stop]),
+            ActionLedger(tmp_path / "ledger.sqlite3"),
+            scheduler=ResourceScheduler(max_concurrency=1, max_queue_size=1),
+        )
+        try:
+            active = asyncio.create_task(engine.execute(request("active")))
+            await ordinary.entered.wait()
+            queued = asyncio.create_task(engine.execute(request("queued")))
+            for _ in range(4):
+                await asyncio.sleep(0)
+            first_stop_request = request("stop").model_copy(
+                update={"capability": "servo.stop", "arguments": {}}
+            )
+            first_stop = asyncio.create_task(engine.execute(first_stop_request))
+            await asyncio.wait_for(stop.entered.wait(), 0.5)
+            blocked = await engine.execute(request("during-stop"))
+            assert blocked.status is ActionStatus.REJECTED
+            assert blocked.error.code == "ACTION_STOP_IN_PROGRESS"
+            second_stop = engine.execute(
+                request("stop-2").model_copy(update={"capability": "servo.stop", "arguments": {}})
+            )
+            stops = await asyncio.wait_for(asyncio.gather(first_stop, second_stop), 0.5)
+            assert all(result.status is ActionStatus.SUCCEEDED for result in stops)
+            assert (await active).status is ActionStatus.CANCELLED
+            queued_result = await queued
+            assert queued_result.status is ActionStatus.CANCELLED
+            assert queued_result.error.definitely_not_executed
+            assert ordinary.calls == 1
+            assert await engine.execute(first_stop_request) == stops[0]
+            assert stop.calls == 2
+        finally:
+            await engine.close()
+
+    asyncio.run(exercise())
+
+
+def test_cancellation_releases_partially_acquired_resource_locks() -> None:
+    async def exercise() -> None:
+        scheduler = ResourceScheduler(max_concurrency=3)
+        await scheduler.start()
+        held = asyncio.Event()
+        release = asyncio.Event()
+
+        async def hold() -> None:
+            held.set()
+            await release.wait()
+
+        async def noop() -> None:
+            return
+
+        holder = asyncio.create_task(scheduler.run(("z",), hold))
+        await held.wait()
+        waiter = asyncio.create_task(scheduler.run(("a", "z"), noop))
+        await asyncio.sleep(0)
+        waiter.cancel()
+        await asyncio.gather(waiter, return_exceptions=True)
+        try:
+            await asyncio.wait_for(scheduler.run(("a",), noop), 0.5)
+        finally:
+            release.set()
+            await holder
+            await scheduler.close()
+
+    asyncio.run(exercise())
+
+
+def test_stop_does_not_join_stuck_action_cleanup(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        cleanup = asyncio.Event()
+        release = asyncio.Event()
+
+        class SlowCleanupAdapter(ControlledAdapter):
+            async def execute(self, arguments: dict[str, Any]) -> dict[str, Any]:
+                self.entered.set()
+                try:
+                    await asyncio.Event().wait()
+                finally:
+                    cleanup.set()
+                    await release.wait()
+                return {}
+
+        ordinary = SlowCleanupAdapter(timeout=60)
+        stop = ControlledAdapter()
+        stop._descriptor = stop.descriptor.model_copy(
+            update={"name": "behavior.stop", "risk": RiskLevel.EMERGENCY}
+        )
+        engine = ExecutionEngine(
+            CapabilityRegistry([ordinary, stop]),
+            ActionLedger(tmp_path / "ledger.sqlite3"),
+            scheduler=ResourceScheduler(max_concurrency=1, max_queue_size=0),
+        )
+        active = asyncio.create_task(engine.execute(request("active")))
+        await ordinary.entered.wait()
+        try:
+            result = await asyncio.wait_for(
+                engine.execute(
+                    request("stop").model_copy(
+                        update={"capability": "behavior.stop", "arguments": {}},
+                    )
+                ),
+                0.5,
+            )
+            assert result.status is ActionStatus.SUCCEEDED
+            await asyncio.wait_for(cleanup.wait(), 0.5)
+            assert not active.done()
+        finally:
+            release.set()
+            await active
+            await engine.close()
+
+    asyncio.run(exercise())
+
+
+def test_hardware_owner_released_after_start_failure_and_normal_close(
+    tmp_path, monkeypatch
+) -> None:
+    import ninjarobot_pi5_ide.engine as engine_module
+    import pytest
+    from ninjarobot_pi5_ide.hardware_ownership import HardwareOwnership, HardwareOwnershipError
+
+    async def exercise() -> None:
+        lock = tmp_path / "owner.lock"
+        monkeypatch.setattr(engine_module, "HardwareOwnership", lambda: HardwareOwnership(lock))
+
+        class FailedAdapter(ControlledAdapter):
+            async def start(self) -> None:
+                raise RuntimeError("fake startup failure")
+
+        failed = ExecutionEngine(
+            CapabilityRegistry([FailedAdapter()]),
+            ActionLedger(tmp_path / "failed.sqlite3"),
+            owns_hardware=True,
+        )
+        with pytest.raises(RuntimeError, match="fake startup failure"):
+            await failed.start()
+        replacement = HardwareOwnership(lock)
+        replacement.acquire()
+        replacement.release()
+        await failed.close()
+        good = ExecutionEngine(
+            CapabilityRegistry([ControlledAdapter()]),
+            ActionLedger(tmp_path / "good.sqlite3"),
+            owns_hardware=True,
+        )
+        await good.start()
+        with pytest.raises(HardwareOwnershipError):
+            replacement.acquire()
+        await good.close()
+        replacement.acquire()
+        replacement.release()
+
+    asyncio.run(exercise())
