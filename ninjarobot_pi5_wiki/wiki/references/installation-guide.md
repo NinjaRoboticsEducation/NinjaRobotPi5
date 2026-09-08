@@ -9,10 +9,10 @@ generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20260906-installationguide
-  resource: urn:llmwiki:source:src-20260906-installationguide
+- id: src-20260908-installationguide
+  resource: urn:llmwiki:source:src-20260908-installationguide
   title: InstallationGuide.md
-  content_hash: sha256:53f80c60feb139f0de547613bd14b8fcd87a2678ba5bf7dc75b1b2bccb1dc1c4
+  content_hash: sha256:a9f68d8828b60ea6e3803749a6f2bf4cbcdfa764c75ca90078fde7796e0cf2ae
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -20,8 +20,8 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:codex
-  performed_at: '2026-09-07T00:45:19Z'
-  target_hash: sha256:3472d55b44cac9a5196a94282d70d6505d3c6e528eddfad9c5731a989f292cef
+  performed_at: '2026-09-08T15:25:18.461989+00:00'
+  target_hash: sha256:ed952121e5e4e34a94a1cc2e9a6a477f6da3cb19f843e5b6c5ca8abcbf913651
   result: passed
   checks:
     source_support: passed
@@ -30,14 +30,16 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Rechecked the navigation-only correction and updated source versions; other cited
-    explanations are unchanged.
-  - AI evidence review; no human verification or hardware test is claimed.
+  - Reviewed this page against its registered manual checkpoint and retained source
+    text; no human verification is claimed.
+  - New checkpoint claims distinguish software tests from physical acceptance, pending
+    managed changes and the monetary-budget gap; retained navigation claims remain
+    source-supported.
 ---
 
 # Installation guide
 
-The full guide covers beginner setup, hardware initialization and calibration, startup, and troubleshooting. Hardware commands require the stated operator precautions.[^src-20260906-installationguide]
+The full guide covers beginner setup, hardware initialization and calibration, startup, and troubleshooting. Hardware commands require the stated operator precautions.[^src-20260908-installationguide]
 
 Use the source identifier below to resolve the complete manual through the raw
 source catalog. The outer wiki README also links directly to the current full
@@ -46,5 +48,13 @@ Read the relevant full section before acting on an abbreviated explanation.[^src
 
 [Return to project overview](/overview.md).
 
-[^src-20260906-installationguide]: InstallationGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-installationguide`.
+## Current checkpoint
+
+The 9 September source adds read-only environment diagnosis, separate development
+installation, silent reminder practice, exact-time review and preference controls.
+Its walkthrough separates software, optional notification, movement and power
+risks. Earlier physical acceptance does not cover this refinement.[^src-20260908-installationguide]
+
+
+[^src-20260908-installationguide]: InstallationGuide.md, source version `refinement-phase2-260909`; registered source `src-20260908-installationguide`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

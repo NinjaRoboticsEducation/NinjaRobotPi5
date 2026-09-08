@@ -21,15 +21,15 @@ sources:
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
   content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
-- id: src-20260906-developmentguide
-  resource: urn:llmwiki:source:src-20260906-developmentguide
+- id: src-20260908-developmentguide
+  resource: urn:llmwiki:source:src-20260908-developmentguide
   title: DevelopmentGuide.md
-  content_hash: sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e
+  content_hash: sha256:640cb37251c7d9c7d41a23a4998aa0b25dcbfa8bba952435adeda61f821fd6e6
 semantic_review:
   version: 1
   performed_by: agent:codex
-  performed_at: '2026-09-07T00:45:19Z'
-  target_hash: sha256:bd0acfbe3e2dd04f8011e991bed09941a8bde1b6f2d3686aec176e84bf869eb2
+  performed_at: '2026-09-08T15:25:18.461989+00:00'
+  target_hash: sha256:6fb90d4737801aed3be54d072fefda2254692c32487c339fa8faed71bb4457e9
   result: passed
   checks:
     source_support: passed
@@ -38,9 +38,11 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Rechecked the navigation-only correction and updated source versions; other cited
-    explanations are unchanged.
-  - AI evidence review; no human verification or hardware test is claimed.
+  - Reviewed this page against its registered manual checkpoint and retained source
+    text; no human verification is claimed.
+  - New checkpoint claims distinguish software tests from physical acceptance, pending
+    managed changes and the monetary-budget gap; retained navigation claims remain
+    source-supported.
 ---
 
 # Development and documentation workflow
@@ -48,7 +50,7 @@ semantic_review:
 Before significant development, consult the local wiki and the current full
 manuals, inspect relevant code, and identify missing or conflicting evidence.
 The root project policy requires an approved phased plan and preservation of
-robot interfaces and managed-driver rules.[^src-20260906-developmentguide]
+robot interfaces and managed-driver rules.[^src-20260908-developmentguide]
 
 Feature completion includes a wiki impact assessment. Update affected manual
 versions, topic pages, specifications and architecture guidance, then record
@@ -66,5 +68,15 @@ AI review is distinct from human verification.[^src-20260907-knowledgeintegratio
 [History](/concepts/development-history.md).
 
 
+## Refinement consolidation exception
+
+For this approved refinement, the owner's latest instruction defers documentation
+and wiki changes during code implementation, consolidates them at Phase 2, and
+pauses before Phase 3. This replaces the earlier all-phases deferral. The old
+F02-only wiki proposal is stale. Registered originals stay unchanged, new full
+manuals are versioned, and searchable changes use an approved semantic diff.
+Software checks do not substitute for owner hardware tests.[^src-20260908-developmentguide]
+
+
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
-[^src-20260906-developmentguide]: DevelopmentGuide.md, source version `migration-2026-09-07`; registered source `src-20260906-developmentguide`.
+[^src-20260908-developmentguide]: DevelopmentGuide.md, source version `refinement-phase2-260909`; registered source `src-20260908-developmentguide`.

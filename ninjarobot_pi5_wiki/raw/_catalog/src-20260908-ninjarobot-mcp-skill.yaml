@@ -5,10 +5,12 @@ kind: text
 title: Ninjarobot Mcp Skill
 added_at: '2026-09-08T15:22:45Z'
 content_hash: sha256:f4ad853bb46a8dd3caa961c2e6337ea316a75889e1c6c049d2960b60507603e0
-state: pending
+state: ingested
 original_uri: urn:llmwiki:source:src-20260908-ninjarobot-mcp-skill
 source_version: refinement-phase2-260909
 retrieved_at: null
 normalized_at: '2026-09-08T15:23:00Z'
 normalizer: llmwiki-text/0.2
 error: null
+ingested_at: '2026-09-08T17:10:49Z'
+last_plan: refinement-phase2-260909

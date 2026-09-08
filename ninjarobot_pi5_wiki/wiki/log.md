@@ -1,5 +1,9 @@
 # Wiki Update Log
 
+## 2026-09-08
+
+* **Update**: Applied plan `refinement-phase2-260909` — Consolidate Phase 0–2 manuals and eleven existing knowledge pages; preserve explicit spending-cap, managed-driver and hardware-validation gaps.. Sources: `src-20260907-knowledgeintegration`, `src-20260908-developmentguide`, `src-20260908-ninjarobot-mcp-skill`, `src-20260908-installationguide`, `src-20260908-developmentlog`.
+
 ## 2026-09-07
 
 * **Update**: Applied plan `root-manual-links-260907` — Owner-requested removal of root manual navigation: update source citations and the statements describing current manual locations.. Sources: `src-20260907-knowledgeintegration`, `src-20260906-developmentguide`, `src-20260907-developmentlog`, `src-20260906-ninjarobot-mcp-skill`, `src-20260906-installationguide`.

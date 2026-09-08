@@ -1,27 +1,27 @@
 {
   "version": 1,
-  "reviewed_checkout": "cd8e22892e07bdfd63f8febfec1373c91925e526",
+  "reviewed_checkout": "b4812e06bdbcaf5ce6176cff14e79d5de1c817ee",
   "reviewed_by": "agent:codex",
-  "reviewed_at": "2026-09-06T22:53:22Z",
+  "reviewed_at": "2026-09-08T15:25:18.461989+00:00",
   "documents": [
     {
       "name": "InstallationGuide.md",
-      "path": "raw/articles/ninjarobotpi5/2026-09-07/InstallationGuide.md",
+      "path": "raw/articles/ninjarobotpi5/2026-09-09/InstallationGuide.md",
       "original_content_hash": "sha256:81247077b55ba3e1c40e0977b309a2ffed7d706c26bb1796ac4a6357a8f9ae6b",
-      "content_hash": "sha256:53f80c60feb139f0de547613bd14b8fcd87a2678ba5bf7dc75b1b2bccb1dc1c4",
-      "previous_path": null,
+      "content_hash": "sha256:a9f68d8828b60ea6e3803749a6f2bf4cbcdfa764c75ca90078fde7796e0cf2ae",
+      "previous_path": "raw/articles/ninjarobotpi5/2026-09-07/InstallationGuide.md",
       "pages": [
         "wiki/references/installation-guide.md",
         "wiki/concepts/installation.md"
       ],
-      "source_id": "src-20260906-installationguide"
+      "source_id": "src-20260908-installationguide"
     },
     {
       "name": "DevelopmentGuide.md",
-      "path": "raw/articles/ninjarobotpi5/2026-09-07/DevelopmentGuide.md",
+      "path": "raw/articles/ninjarobotpi5/2026-09-09/DevelopmentGuide.md",
       "original_content_hash": "sha256:ef1a4d5b81ac2fe67f735ccd0df311fec87d1d13430f47a24c7ef226c2c2e522",
-      "content_hash": "sha256:80e65e182e818957c7938c055a4327b3f4c79a6807b38c7b05580248f77eb38e",
-      "previous_path": null,
+      "content_hash": "sha256:640cb37251c7d9c7d41a23a4998aa0b25dcbfa8bba952435adeda61f821fd6e6",
+      "previous_path": "raw/articles/ninjarobotpi5/2026-09-07/DevelopmentGuide.md",
       "pages": [
         "wiki/overview.md",
         "wiki/references/development-guide.md",
@@ -30,31 +30,31 @@
         "wiki/concepts/features-and-tools.md",
         "wiki/analyses/knowledge-limitations.md"
       ],
-      "source_id": "src-20260906-developmentguide"
+      "source_id": "src-20260908-developmentguide"
     },
     {
       "name": "NinjaRobot_MCP_Skill.md",
-      "path": "raw/articles/ninjarobotpi5/2026-09-07/NinjaRobot_MCP_Skill.md",
+      "path": "raw/articles/ninjarobotpi5/2026-09-09/NinjaRobot_MCP_Skill.md",
       "original_content_hash": "sha256:df8076ccc2683b24b6752310558ce4e62828d54cee67f1102aae7196c0ee97bb",
-      "content_hash": "sha256:df8076ccc2683b24b6752310558ce4e62828d54cee67f1102aae7196c0ee97bb",
-      "previous_path": null,
+      "content_hash": "sha256:f4ad853bb46a8dd3caa961c2e6337ea316a75889e1c6c049d2960b60507603e0",
+      "previous_path": "raw/articles/ninjarobotpi5/2026-09-07/NinjaRobot_MCP_Skill.md",
       "pages": [
         "wiki/references/mcp-skills-guide.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "source_id": "src-20260906-ninjarobot-mcp-skill"
+      "source_id": "src-20260908-ninjarobot-mcp-skill"
     },
     {
       "name": "DevelopmentLog.md",
-      "path": "raw/notes/ninjarobotpi5/2026-09-07-02/DevelopmentLog.md",
+      "path": "raw/notes/ninjarobotpi5/2026-09-09/DevelopmentLog.md",
       "original_content_hash": "sha256:acd1d86c260557afc7ab45093950860b80deb1097d052c1428427feba7e0a139",
-      "content_hash": "sha256:da1ff98b3c0a33c61602ceca14e5f481c7f4f1e37e69460c7102e3257beb8f5c",
-      "previous_path": "raw/notes/ninjarobotpi5/2026-09-07/DevelopmentLog.md",
+      "content_hash": "sha256:9cb2e1830df4a1c0568e65d7ecd22d4ef6aabafc4fce5b3ca4fcbb01b6652656",
+      "previous_path": "raw/notes/ninjarobotpi5/2026-09-07-02/DevelopmentLog.md",
       "pages": [
         "wiki/references/development-log.md",
         "wiki/concepts/development-history.md"
       ],
-      "source_id": "src-20260907-developmentlog"
+      "source_id": "src-20260908-developmentlog"
     }
   ],
   "implementation_roots": [
@@ -79,20 +79,20 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/agent_cli.py": {
-      "content_hash": "sha256:628dc95cc35533620a51655e380092e19ed357f0274f787c09afdb624f6e3ed7",
+      "content_hash": "sha256:35a2ac6bba0cefbeb0849c9f59c84fa398904280bc574b37c82192a46467b407",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/agent_loop.py": {
-      "content_hash": "sha256:0e5fed8ffcfbf141a060be1a8fa4318924376bc442124be98580691c915f725e",
+      "content_hash": "sha256:72247231cd9206ba8f43bf5088aa55b45504de8cd5f6bacfb5dda1c7b0feaadf",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/anthropic_provider.py": {
       "content_hash": "sha256:72f72e7fc861489a33b89372b89ebe9b42d41e049b9f394e5329960516d97315",
@@ -207,12 +207,12 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/cli.py": {
-      "content_hash": "sha256:395a92ff6c48ae87624fe68fbca3b012b8885d65a78c202ae2c5d28b6b356cc5",
+      "content_hash": "sha256:48f05b626a4689bf11f4f204b32922d4b237745812e7acfc50758509d7685a54",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/cloud_common.py": {
       "content_hash": "sha256:d55e68b9a0bd0b9f021b6f968bf486265e3faf06c372e208bbb70fd4a1586539",
@@ -255,20 +255,20 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/deployment.py": {
-      "content_hash": "sha256:b5b5962691f47decc4a01a4286a82c1602156ca3af5d116d2693713af7be2194",
+      "content_hash": "sha256:77d710f7da7596fda3d1773d0a12ca99ebf7b7ffae033ba0c1ddae5f43ad5234",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/events.py": {
-      "content_hash": "sha256:e31095ab611b6c0212ca80a41f51b74a8eae686de8d1b156e9e648771448f17a",
+      "content_hash": "sha256:35e7da0e5807b7bfda690dc2b8bf2d850dce7222b2be5d74a8b0b4fc95b57a23",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/gemini_provider.py": {
       "content_hash": "sha256:464cada18e3d602f6f6b5abf75845c5e7e461fd1bae7ddc16eb492e9bf7656d2",
@@ -279,28 +279,28 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/ipc.py": {
-      "content_hash": "sha256:a1346e7ff6f3ed73f42c241ace8e1d52dc2aa6e2f24f48bff47c2b58210358b6",
+      "content_hash": "sha256:20b7b947419a451247ef3b2d45e040de34d6820acd8979b1d990751a6306bcd9",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/mcp_client.py": {
-      "content_hash": "sha256:4b8b9eeb6ed74c4a52ff237d2448b11d5a60b6fa295857d4b1ecc39052f6d7aa",
+      "content_hash": "sha256:0477ae724f1db2317a2626b38916f825dec25936b6350f17ac55aa6b92e90b53",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/mcp_config.py": {
-      "content_hash": "sha256:8275057f300d474245b7308c64c0c270c6c4711f34ab01802d21e8c89fe3c1c7",
+      "content_hash": "sha256:6c93a7094114743d9f27b546125ca02ffe46df960978f9fed564001c83468130",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/memory_mcp.py": {
       "content_hash": "sha256:45a95c7be5d163189a298907d1e34dfa4d338f1de1c692b7307245d8a561285d",
@@ -311,12 +311,12 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/memory_migrations.py": {
-      "content_hash": "sha256:99671cf1355e9e8fd3a1632ba1d40e72a2ef85da8618c9d2272e6f29c45378a8",
+      "content_hash": "sha256:5b1027a86a9aa16d5788a2407f18d62f7bf94a20b2d7109d78d136942fbec77c",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/memory_models.py": {
       "content_hash": "sha256:6684ba5d0a8fdee8a114c91c8efa341c11dc7d62b6ed7a74444d17a0c5b84e16",
@@ -327,20 +327,20 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/memory_services.py": {
-      "content_hash": "sha256:498c26c602460075001a896362fdac19656c8951f2a4130e25a800d202968c80",
+      "content_hash": "sha256:db3c785ed960830b610f0573e4c23c056a54c8db969a29b5ee91879466d363bf",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/memory_store.py": {
-      "content_hash": "sha256:76eaa9b9b42e5cf12fb116c8636f28bc846106193adada57160c164f024dca70",
+      "content_hash": "sha256:81e22e840add24ab35f5d770abbd08ebeeece9eeac34831af964357da60cd4f2",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/model_selection.py": {
       "content_hash": "sha256:f95f14075defe2495e55191cf654371a2075445ad0edc032fb14ebfc487a9073",
@@ -351,12 +351,12 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/models.py": {
-      "content_hash": "sha256:4e242e2e9acfbc11a950892266d3845dcc3bad23825e158c5f57bda86aea8eb8",
+      "content_hash": "sha256:9d988aa9518d2e9a609dfa51f37faa295cad4b41a2aa572b72bce303ea8eb61d",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/ollama.py": {
       "content_hash": "sha256:7dda7929843f5c9495642f7c8ade2617a9117e2f62b0809f0c75f8634dc6b925",
@@ -367,12 +367,12 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/onboarding.py": {
-      "content_hash": "sha256:5aa2c46faae0b7a469a6baf09862c1ffad134045e1156aecd988556959d385c7",
+      "content_hash": "sha256:9968af77487cfa34ff91de34933ccee4ef65a6870da60e3d07b4a8bced482c27",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/openai_provider.py": {
       "content_hash": "sha256:811253586bf8780c25a05086833220b850d6c22c7414e0daf40bb220391f81c8",
@@ -415,12 +415,12 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/prompts.py": {
-      "content_hash": "sha256:df38410a90cc7f4c43dc056b405d7bcae1f1b1c5ae270d93f0f90959f0b23f49",
+      "content_hash": "sha256:3968fd2ae99dfa6b01f1d8a412904ac28fa719f335b70fcf38ae3087ec9478a9",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/provider_auth.py": {
       "content_hash": "sha256:a7542edbeedf8a7a9477753411186fc7fc392f542ae7efd2f88aaaecaa328c72",
@@ -471,12 +471,12 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/runtime.py": {
-      "content_hash": "sha256:40be0b7dfab7db7e64a878180375910a0ce3c324d46020c5604e40db7b25a004",
+      "content_hash": "sha256:abeb7caee825c053dab1389fdf60e885f518e27afb6b3005ee5506b7a56b54c4",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/secrets.py": {
       "content_hash": "sha256:e71625c6099c3691ae25241d28084066dd58f5fe8438db62f3a52ddadcb6fb4e",
@@ -487,20 +487,20 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/service.py": {
-      "content_hash": "sha256:15d225d250c27bb1ac5c386f475c4d9557805c210dc49ee36837086c49d47b0c",
+      "content_hash": "sha256:5a79fa8a4b6fabe81f399948c730bfc101614fe7e1170e7a7344878010371aa4",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/service_main.py": {
-      "content_hash": "sha256:0ded09744f863cacf378ac4d7260172bfd32b9577fdf217b215345ecb00530fa",
+      "content_hash": "sha256:77a4a233f901b61aff15c0eb127d26be7aaf5ab2d0545b588b5b93d2e8d8c721",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/shutdown.py": {
       "content_hash": "sha256:4bb58718dd959a5a2fdd0aa0aa2a6ff8c849415e3a6c266b74511bd6ce82a456",
@@ -527,84 +527,84 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/tools.py": {
-      "content_hash": "sha256:ff022ab4337382f410948a1da876661040290a05e791039c93faaeacd5cc790d",
+      "content_hash": "sha256:a69809761f86c72de57f0b74800a9f79adc23e91b65c03c9eb8a1f4dd7cfd06c",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/voice_service.py": {
-      "content_hash": "sha256:2c691d7e1a95f4a181f11cc2e190f676ffc2217be46e19c1f80555202606a061",
+      "content_hash": "sha256:b5cab885d19be545122a5cf5eb552b62bd32e2709f2b6aabd8daae1f95c98c32",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_app.py": {
-      "content_hash": "sha256:3e99a8e9df82dff6ee30b8e61b1fab5de789b972faea219c4d716ecd6f79c146",
+      "content_hash": "sha256:1235a71cf94a74ae11c66ca3d55474ef309e129522f45cfb5dcbacc5fd8d79e8",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_control.py": {
-      "content_hash": "sha256:3d41227654a580e7ff577a29d3e9859adf85d6aa99a162332d43aeba2f185c9a",
+      "content_hash": "sha256:ff1a5c8f9f00c2f7bd1ca4b5e062cc44f91253955bc6c02518f120433b9a49ed",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/app.js": {
-      "content_hash": "sha256:43be97cc1f670b18b624fdb22b42790bfc1b57f4f454d35f8d83f4d7c0942db7",
+      "content_hash": "sha256:5590d01ffcb83585585f798e35503dbeca32d40f764a4b8ce6e2bbb4441dc08d",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/i18n/en.json": {
-      "content_hash": "sha256:059fc72ae59a46202869df1a807d6349170f5779885cc9eb9141ee6d20f91f2f",
+      "content_hash": "sha256:31049d55061885aec90fe469e38f0962de858266dd70549aef26210a4543ff9c",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/i18n/ja.json": {
-      "content_hash": "sha256:291e69443df86c8e27f918d4c5b17fac5d8c0c6a922bacbe0d7934e7bf4443ea",
+      "content_hash": "sha256:87ba058be3ede8c39336862d6dc03b0d842ab42914a04aa4657e7040768e8b26",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/i18n/zh-CN.json": {
-      "content_hash": "sha256:b079bb35878619709a265c447663e5749649365fd3ce3caf4160477c006a2a32",
+      "content_hash": "sha256:10895d3855483163532ba155abc7f3957d4008df50d6e43979fa2f3aded5b72c",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/i18n/zh-TW.json": {
-      "content_hash": "sha256:3d852cc33bf43ab13e94079bced4ebd26145036d6ee4b4b34677bb3d9bbe3875",
+      "content_hash": "sha256:2bf1ad0f876987a96db7bbd62108e3cbb6f25eccf77407554d0c250b0e1f54f2",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/index.html": {
-      "content_hash": "sha256:0e916494e1dc7559320181163c7e8dc04f59963f842d997d9891cd9b62a260fd",
+      "content_hash": "sha256:d2ca35b724dcbbb3169c128b86bb6a934c023bfb4e4fe4c47b2ead6f6364fbd4",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/manifest.webmanifest": {
       "content_hash": "sha256:4887afdbcd1b947b651c99609c7470dd5a1d800237d2bc06c45b3ccad2eea8bc",
@@ -615,12 +615,12 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/styles.css": {
-      "content_hash": "sha256:a27af1925b364cfb858f1e0f3b0fadad101a3843543aece13171a6c263966a23",
+      "content_hash": "sha256:328b91e5220c79381e85ad4afb236c35b9cc6f4ec55a32813ac324a691fdee20",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/__init__.py": {
       "content_hash": "sha256:add3fd89837d626729e472c9ab821a47036fc66eadeef1385c3e41859bf5319a",
@@ -927,20 +927,20 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/behavior_runtime.py": {
-      "content_hash": "sha256:7e6b8a6d3a77e6ec41a65a25373d761d8e9678353e18049c9e41756693e560bc",
+      "content_hash": "sha256:d0f0a6b9dfd6a2292a46d08d9d5923e6feb0efff2c2b2ebbcd288ef2f4f3a595",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/buzzer.py": {
-      "content_hash": "sha256:5a481e444fb63f64e66b038ca04f9ee1758e45ae4aa75cabff9747f71429d942",
+      "content_hash": "sha256:0f5ef4851a6cf6d605286643f9abfd2533c902a707f16102ee892562320c453b",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/camera.py": {
       "content_hash": "sha256:832d3152e991db4c43751fe39c64c0755fb4624b6d3e194152b85230d1693ea3",
@@ -959,12 +959,12 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/config.py": {
-      "content_hash": "sha256:97ae6cc9439c25ba1f6b6bf672920ea5afc22a33e8f73b16ed21a8e19f34d7fe",
+      "content_hash": "sha256:96e06f2f8d9d0817a3cba9da2fca21ac5d1e66e96145156ae3218fb0c43b1f2d",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/config_import.py": {
       "content_hash": "sha256:16e780d4d5b89936e79ecea6adf91b22f60218f9d01df432cf81da4102aa888c",
@@ -975,12 +975,12 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/display.py": {
-      "content_hash": "sha256:aa0f06d64869edcdbf3f40bafe10509d5823acb9dd5eaa4bd4b00d67b5ba193b",
+      "content_hash": "sha256:7e191d25b41c87f24ee7842c7a7fc5e2ec777f02507967b8429e71653a80904b",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/distance.py": {
       "content_hash": "sha256:226a37d1b5954a8396a8d8f0fa5563bfad450c9c9b45308dbcc5e58525b4ddc1",
@@ -991,12 +991,12 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/engine.py": {
-      "content_hash": "sha256:68b09a42fcc5a7eb65500943e393c9e1569eb2f769faa653188d0827ef3428b2",
+      "content_hash": "sha256:3d530f9f5174ee86a444a59f959f4966cd9ad46a69b923169a96afcc2f5cdcc1",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/errors.py": {
       "content_hash": "sha256:a86885b09b33d33dd9f152316c5b732b7328be7c93c466db126da3941052585a",
@@ -1023,20 +1023,20 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/identity.py": {
-      "content_hash": "sha256:c7e308a3b2fa96e80ee6f811650b07c06f54069c0b613980822648927762d0b9",
+      "content_hash": "sha256:139b3a59bd3c9bc3c54afba304d1c1d54d7ebacbca5def87d318b413a7aa6b30",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/integrated.py": {
-      "content_hash": "sha256:8d370b5114a2e6d05fc5f89648c629677a89ed6607a61651a29b7f72650a9336",
+      "content_hash": "sha256:1590af3895d784aa38b59683bf153d61a7504788028f4db545d2cd88a0a20e09",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/interactive_tool.py": {
       "content_hash": "sha256:53c09dff217bc519641194d95e509bd89eebe56a7e1e303803f16b139f96c9ea",
@@ -1063,12 +1063,12 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/models.py": {
-      "content_hash": "sha256:c660319cd8908ba38b89412b0c525dfca82657832d55bcff37a8203b5be37820",
+      "content_hash": "sha256:6653e43ecf3344dbeb6e6ab4da1ba6b4e8cf5e8b581afaa40e8546996a202734",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/qr_display.py": {
       "content_hash": "sha256:3a5fb55adc5b11c532031a5853a666b6980ccd5a0a4793a15b3b40367000c9bb",
@@ -1079,20 +1079,20 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/registry.py": {
-      "content_hash": "sha256:152509fdf7d551716061d7dc1796065eba843db73b140180fd203aa4e7f9960f",
+      "content_hash": "sha256:7c159c2c19a3bb1bd46eb317efa01183b1b1e3f09eeb40149f77c13f58f77f06",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/robot.py": {
-      "content_hash": "sha256:a3f22d49fc6533b452508fde65ce61b77648bbc2ff808f40884999f504deb663",
+      "content_hash": "sha256:5661f4c9e0ae21a70e2208b02d4e65c8426da7d0c5fca5efddd74983f1609829",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/runtime_control.py": {
       "content_hash": "sha256:4d5a129f28cd93249e8e0280e584a1636edec74ceaef48cfeb8918f7e68140a9",
@@ -1103,28 +1103,28 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/safety.py": {
-      "content_hash": "sha256:b03849a616a071b1588959e02cced5974f3e6d288968cdb3d74b4f3d9938c128",
+      "content_hash": "sha256:b467d2cb592dc498806e4a755d418227b4b477362b5d94152b5e99626aaaf071",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/scheduler.py": {
-      "content_hash": "sha256:840b0ee773f2c46b47eac8649ca5a3d15185f9915a91520109a7558333bb0a60",
+      "content_hash": "sha256:5d780174bf99d903edb128ecd9940a1ee51592eac3b554f5b35336b1294260d1",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/servo.py": {
-      "content_hash": "sha256:4717b84858328087c86de7677ed41d5d3c75f5daa6388ff84c4d9de43cde2ef1",
+      "content_hash": "sha256:14ee42a52dd215a891f790bb66f7a7a2df7a4a77bcd2cadc4c52900d18ac9527",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/simulation.py": {
       "content_hash": "sha256:2c6605a019d0330a2b2ca50c4a4804d432218760aeccd6fdcf9cdc3bcf6a826e",
@@ -1149,6 +1149,62 @@
         "wiki/concepts/features-and-tools.md"
       ],
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/task_tools.py": {
+      "content_hash": "sha256:639640ab360f5d315e784ae703a562ecceffc2bedeb2ed56715e075c80923c43",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "New Phase 0–2 component reviewed against source checkpoint, ownership/scoping contracts and synthetic tests; no claim of physical validation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/task_controls.py": {
+      "content_hash": "sha256:f03f9c4fcf11700b6e22008ab3b1c3c45799b65386d591d79903588251f43337",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "New Phase 0–2 component reviewed against source checkpoint, ownership/scoping contracts and synthetic tests; no claim of physical validation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/memory_controls.py": {
+      "content_hash": "sha256:edc52ce721abc2e662eaa77e1ff67fc9df484db3ab03363419bc0e2ef1433563",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "New Phase 0–2 component reviewed against source checkpoint, ownership/scoping contracts and synthetic tests; no claim of physical validation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/task_models.py": {
+      "content_hash": "sha256:9768ef9db52d8409da82d63b6ad7e269b9155bdb402c3f329d8a20a719a2d944",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "New Phase 0–2 component reviewed against source checkpoint, ownership/scoping contracts and synthetic tests; no claim of physical validation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/backup.py": {
+      "content_hash": "sha256:56b22ac3c5f4b5d7d546f3df9ebbe065d61f9ed6ae5a8f81c83dffba5d5881e3",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "New Phase 0–2 component reviewed against source checkpoint, ownership/scoping contracts and synthetic tests; no claim of physical validation."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/task_service.py": {
+      "content_hash": "sha256:ccbe877389cbef0a1a814f186218ec7fbf55e57f4b9cf0dfb3f623d9c789b001",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "New Phase 0–2 component reviewed against source checkpoint, ownership/scoping contracts and synthetic tests; no claim of physical validation."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/diagnostics.py": {
+      "content_hash": "sha256:333771e70ccfd213e2b31d32ea16305fcc6547808ea3723d3e01b504366bd349",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "New Phase 0–2 component reviewed against source checkpoint, ownership/scoping contracts and synthetic tests; no claim of physical validation."
     }
   },
   "adapters": [
@@ -1237,10 +1293,12 @@
     "THIRD_PARTY_NOTICES.md",
     "ninjarobot_pi5_wiki/README.md",
     "ninjarobot_pi5_wiki/docs/PROJECT_WORKFLOW.md",
-    "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/InstallationGuide.md",
-    "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/DevelopmentGuide.md",
-    "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/NinjaRobot_MCP_Skill.md",
-    "ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-07-02/DevelopmentLog.md"
+    "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09/InstallationGuide.md",
+    "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09/DevelopmentGuide.md",
+    "ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09/NinjaRobot_MCP_Skill.md",
+    "ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-09/DevelopmentLog.md",
+    "docs/validation/refinement_phase2_walkthrough_260909.md"
   ],
-  "integration_status": "ready"
+  "integration_status": "ready",
+  "review_note": "Reviewed working-tree Phase 0–2 patch on this base; file hashes identify actual reviewed content. Not a clean-commit or hardware certification."
 }

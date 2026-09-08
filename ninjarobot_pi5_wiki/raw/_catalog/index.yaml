@@ -1,5 +1,5 @@
 version: 2
-generated_at: '2026-09-08T15:23:00Z'
+generated_at: '2026-09-08T17:10:49Z'
 sources:
 - id: src-20260906-developmentguide
   title: DevelopmentGuide.md
@@ -60,19 +60,19 @@ sources:
   title: Developmentguide
   path: raw/articles/ninjarobotpi5/2026-09-09/DevelopmentGuide.md
   kind: text
-  state: pending
+  state: ingested
 - id: src-20260908-developmentlog
   title: Developmentlog
   path: raw/notes/ninjarobotpi5/2026-09-09/DevelopmentLog.md
   kind: text
-  state: pending
+  state: ingested
 - id: src-20260908-installationguide
   title: Installationguide
   path: raw/articles/ninjarobotpi5/2026-09-09/InstallationGuide.md
   kind: text
-  state: pending
+  state: ingested
 - id: src-20260908-ninjarobot-mcp-skill
   title: Ninjarobot Mcp Skill
   path: raw/articles/ninjarobotpi5/2026-09-09/NinjaRobot_MCP_Skill.md
   kind: text
-  state: pending
+  state: ingested

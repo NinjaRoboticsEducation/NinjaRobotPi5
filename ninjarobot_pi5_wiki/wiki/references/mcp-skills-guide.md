@@ -9,10 +9,10 @@ generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20260906-ninjarobot-mcp-skill
-  resource: urn:llmwiki:source:src-20260906-ninjarobot-mcp-skill
+- id: src-20260908-ninjarobot-mcp-skill
+  resource: urn:llmwiki:source:src-20260908-ninjarobot-mcp-skill
   title: NinjaRobot_MCP_Skill.md
-  content_hash: sha256:df8076ccc2683b24b6752310558ce4e62828d54cee67f1102aae7196c0ee97bb
+  content_hash: sha256:f4ad853bb46a8dd3caa961c2e6337ea316a75889e1c6c049d2960b60507603e0
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -20,8 +20,8 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:codex
-  performed_at: '2026-09-07T00:45:19Z'
-  target_hash: sha256:cbdd4a7d3c84eabd5ccfb03bc1ffa2b38387b8dbc0eb4635220746b4e57ee8a1
+  performed_at: '2026-09-08T15:25:18.461989+00:00'
+  target_hash: sha256:4c9b30b97d3076441ab3b1ef20aaf3857cde145574be3a18a4bb6984060dac4a
   result: passed
   checks:
     source_support: passed
@@ -30,14 +30,16 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Rechecked the navigation-only correction and updated source versions; other cited
-    explanations are unchanged.
-  - AI evidence review; no human verification or hardware test is claimed.
+  - Reviewed this page against its registered manual checkpoint and retained source
+    text; no human verification is claimed.
+  - New checkpoint claims distinguish software tests from physical acceptance, pending
+    managed changes and the monetary-budget gap; retained navigation claims remain
+    source-supported.
 ---
 
 # MCP and Agent Skills tutorial
 
-The tutorial explains external tools, configuration, read-only Tavily and Calendar examples, and reusable Agent Skills. It describes restrictions for the robot Agent, not a development wiki server.[^src-20260906-ninjarobot-mcp-skill]
+The tutorial explains external tools, configuration, read-only Tavily and Calendar examples, and reusable Agent Skills. It describes restrictions for the robot Agent, not a development wiki server.[^src-20260908-ninjarobot-mcp-skill]
 
 Use the source identifier below to resolve the complete manual through the raw
 source catalog. The outer wiki README also links directly to the current full
@@ -46,5 +48,13 @@ Read the relevant full section before acting on an abbreviated explanation.[^src
 
 [Return to project overview](/overview.md).
 
-[^src-20260906-ninjarobot-mcp-skill]: NinjaRobot_MCP_Skill.md, source version `migration-2026-09-07`; registered source `src-20260906-ninjarobot-mcp-skill`.
+## Current checkpoint
+
+The 9 September source adds custom-server read-only/retry-safe allowlists,
+bounded discovery, schema/result checks and uncertain-outcome handling. Internal
+local task tools list or preview reminders; direct user review is required to
+confirm an effect. Existing MCP extensions gain no direct device access.[^src-20260908-ninjarobot-mcp-skill]
+
+
+[^src-20260908-ninjarobot-mcp-skill]: NinjaRobot_MCP_Skill.md, source version `refinement-phase2-260909`; registered source `src-20260908-ninjarobot-mcp-skill`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
