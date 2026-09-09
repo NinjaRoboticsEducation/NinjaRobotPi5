@@ -60,8 +60,9 @@ class TaskToolProvider:
                         },
                         "timezone": {"type": "string", "description": "IANA zone, e.g. Asia/Tokyo"},
                         "repeat": {"enum": ["none", "daily", "weekly"]},
+                        "notification_language": {"type": "string", "enum": ["en", "zh"]},
                         "notification": {
-                            "enum": ["text", "display_buzzer"],
+                            "enum": ["text", "display_buzzer", "speech"],
                             "description": "text means a silent local task inbox notice; "
                             "display_buzzer means a short screen message and buzzer tone",
                         },

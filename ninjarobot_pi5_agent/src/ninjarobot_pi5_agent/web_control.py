@@ -201,6 +201,9 @@ class WebRobotController:
     }
     SPECIAL_BEHAVIORS = {"greeting", "celebrate"}
 
+    async def speech_control(self, operation: str) -> dict[str, Any]:
+        return await self._runtime.speech_control(operation)
+
     async def guided_checks(self, step: int = 0) -> dict[str, Any]:
         """Share the interactive CLI's optional read-only guide."""
         return await self._runtime.guided_checks(step)

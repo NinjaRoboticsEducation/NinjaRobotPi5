@@ -1,5 +1,21 @@
 # Refinement implementation progress — 7 September 2026
 
+## Latest checkpoint — Phase 3, 9 September 2026
+
+Phase 3 H02/B01 implementation is complete at the software level: optional local
+Piper speech, IDE-owned selected-speaker playback, microphone coordination,
+foreground priority, cancellation and spoken reminders. The gate passes 772 tests.
+The owner reports Phase 2 manual tests and wiki maintenance completed. Earlier
+entries below retain their historical status and are superseded by this checkpoint.
+
+See the [Phase 3 handoff](refinement_phase3_handoff_260909.md) and
+[step-by-step walkthrough](refinement_phase3_walkthrough_260909.md).
+No live Phase 3 audio or hardware test has run. Documentation revisions are prepared;
+wiki ingestion and review are deferred under the latest owner instruction.
+Development pauses before Phase 4, pending the owner's acceptance and confirmation.
+The separate display-font proposal and T07 monetary-cap decision remain pending.
+
+
 **Later update — face cleanup approved and implemented:** the owner's 9 September
 instruction authorized the F08 driver repair. It now passes the independent camera
 suite and focused cleanup tests. See the [repair record](refinement_f08_face_cleanup_260909.md)

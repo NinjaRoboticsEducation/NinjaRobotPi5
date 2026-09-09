@@ -29,6 +29,11 @@ def task_summary(task: LocalTask) -> str:
         if task.notification == "text"
         else "show the message on the robot and play a short buzzer tone"
     )
+    if task.notification == "speech":
+        effect = (
+            f"speak in {task.notification_language}; if unavailable, show the message "
+            "and play a short buzzer tone"
+        )
     summary = (
         f"{task.task_id}: {task.status.value}\nMessage: {task.title}\n"
         f"Due: {due} [{task.timezone}]\nRepeat: {task.repeat}\nEffect: {effect}."
@@ -108,7 +113,14 @@ class TaskControls:
                 arguments = json.loads(text[len("/remind-json") :].strip())
                 if not isinstance(arguments, dict):
                     raise ValueError("reminder specification must be a JSON object")
-                allowed = {"title", "due_at", "timezone", "repeat", "notification"}
+                allowed = {
+                    "title",
+                    "due_at",
+                    "timezone",
+                    "repeat",
+                    "notification",
+                    "notification_language",
+                }
                 if (
                     not {"title", "due_at", "timezone"} <= arguments.keys()
                     or arguments.keys() - allowed

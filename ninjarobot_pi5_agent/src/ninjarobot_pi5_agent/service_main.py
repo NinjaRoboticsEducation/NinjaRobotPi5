@@ -281,6 +281,8 @@ async def run_service(arguments: argparse.Namespace) -> None:
     )
     from ninjarobot_pi5_ide.diagnostics import diagnose_environment
 
+    from .speech import SimulatedSynthesizer, SpeechService
+
     runtime = AgentRuntime(
         provider=model,
         tools=tools,
@@ -293,6 +295,11 @@ async def run_service(arguments: argparse.Namespace) -> None:
         model_manager=model,
         robot_status=ide.status,
         tasks=tasks,
+        speech=SpeechService(
+            config.speech_output,
+            ide,
+            synthesizer=SimulatedSynthesizer(config.speech_output) if not arguments.real else None,
+        ),
         memory=memory,
         enroll_identity=ide.enroll_face_identity if memory is not None else None,
         recognize_identity=ide.identify_face if memory is not None else None,

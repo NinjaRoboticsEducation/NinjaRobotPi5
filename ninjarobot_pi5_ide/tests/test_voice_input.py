@@ -407,3 +407,68 @@ def test_voice_runtime_never_imports_historical_openclaw_loop() -> None:
     assert "pi5mic.core.voiceinput" not in controller_source + integration_source
     assert "pi5mic.integration.openclaw" not in controller_source + integration_source
     assert "pi5mic.transport.openclaw" not in controller_source + integration_source
+
+
+def test_output_pause_rejects_recording_without_interrupting_it() -> None:
+    async def scenario() -> None:
+        source = FakeSource([pcm_frame(1200)])
+        controller = build_controller(
+            FakeDetector([True]), [source], FakeTranscriber(), [], asyncio.Event(), []
+        )
+        await controller.start()
+        async with asyncio.timeout(1):
+            while controller.status()["state"] != "recording":
+                await asyncio.sleep(0)
+        with pytest.raises(VoiceInputError, match="listener_busy"):
+            await controller.pause(for_output=True)
+        assert controller._manual_pause_count == 0
+        assert not source.closed
+        assert controller._resume_event.is_set()
+        await controller.stop()
+
+    asyncio.run(scenario())
+
+
+def test_output_pause_then_user_disable_never_reopens_microphone() -> None:
+    async def scenario() -> None:
+        source = FakeSource([pcm_frame(0)])
+        controller = build_controller(
+            FakeDetector([False]), [source], FakeTranscriber(), [], asyncio.Event(), []
+        )
+        await controller.start()
+        await controller.pause(for_output=True)
+        assert source.closed
+        await controller.stop()
+        await controller.resume()
+        assert not controller.status()["enabled"]
+        assert controller._task is None
+        assert controller._manual_pause_count == 0
+
+    asyncio.run(scenario())
+
+
+def test_cancelled_pause_rolls_back_reservation() -> None:
+    async def scenario() -> None:
+        release = asyncio.Event()
+
+        class BlockedSource(FakeSource):
+            async def read(self):
+                await release.wait()
+                return pcm_frame(0), False
+
+        source = BlockedSource([pcm_frame(0)])
+        controller = build_controller(
+            FakeDetector([False]), [source], FakeTranscriber(), [], asyncio.Event(), []
+        )
+        await controller.start()
+        request = asyncio.create_task(controller.pause(for_output=True))
+        await asyncio.sleep(0)
+        request.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await request
+        assert controller._manual_pause_count == 0
+        assert controller._resume_event.is_set()
+        release.set()
+        await controller.stop()
+
+    asyncio.run(scenario())

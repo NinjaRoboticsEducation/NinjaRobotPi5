@@ -401,6 +401,30 @@ class ProviderConfig(ConfigModel):
         return self
 
 
+class SpeechOutputConfig(ConfigModel):
+    """Optional local synthesis and explicitly selected PipeWire output."""
+
+    enabled: bool = False
+    language: Literal["en", "zh"] = "en"
+    piper_python: NonEmptyText = "~/.local/share/ninjarobot_pi5/speech/bin/python"
+    english_model: str = ""
+    chinese_model: str = ""
+    output_node: Annotated[
+        str, StringConstraints(max_length=256, pattern=r"^[A-Za-z0-9_.:-]*$")
+    ] = ""
+    volume: Annotated[float, Field(gt=0, le=1)] = 0.35
+    max_characters: Annotated[int, Field(ge=20, le=1000)] = 500
+    synthesis_timeout_seconds: Annotated[float, Field(ge=1, le=60)] = 30.0
+    playback_timeout_seconds: Annotated[float, Field(ge=1, le=120)] = 60.0
+
+    @field_validator("output_node")
+    @classmethod
+    def explicit_output(cls, value: str) -> str:
+        if value in {"auto", "0"} or value.isdecimal():
+            raise ValueError("select a stable PipeWire node name, not auto or a numeric id")
+        return value
+
+
 class RobotConfig(ConfigModel):
     """Top-level V4 configuration schema."""
 
@@ -410,6 +434,7 @@ class RobotConfig(ConfigModel):
     agent: AgentConfig = Field(default_factory=AgentConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
     voice_input: VoiceInputConfig = Field(default_factory=VoiceInputConfig)
+    speech_output: SpeechOutputConfig = Field(default_factory=SpeechOutputConfig)
     remote_access: RemoteAccessConfig = Field(default_factory=RemoteAccessConfig)
     onboarding: OnboardingConfig = Field(default_factory=OnboardingConfig)
     deployment: DeploymentConfig = Field(default_factory=DeploymentConfig)

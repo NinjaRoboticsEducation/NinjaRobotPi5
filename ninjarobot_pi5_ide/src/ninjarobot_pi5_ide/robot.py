@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import asdict
 from typing import Any, cast
 
+from .audio_output import AudioOutput
 from .behavior_assets import BehaviorAssetRepository
 from .behavior_models import (
     BehaviorDefinition,
@@ -67,6 +70,7 @@ class RobotAssembly:
         undervoltage_provider: UndervoltageProvider = raspberry_pi_undervoltage_active,
         simulated: bool = False,
     ) -> None:
+        self.audio: AudioOutput | None = None
         display_config = config.hardware.display
         buzzer_config = config.hardware.buzzer
         servo_config = config.hardware.servos
@@ -187,7 +191,7 @@ class RobotAssembly:
         self.system_safety = SystemSafetyController(
             motion=self.motion,
             state=self.safety_state,
-            silence_buzzer=self.buzzer.stop,
+            silence_buzzer=self._silence_outputs,
             show_stopped=self._show_system_stopped,
             sensors=(self.distance, self.camera, self.microphone),
             display_hold_seconds=config.behaviors.system_stopped_display_seconds,
@@ -208,6 +212,29 @@ class RobotAssembly:
         self._hardware_ownership = HardwareOwnership()
         if not simulated:
             self._hardware_ownership.acquire()
+
+    async def _silence_outputs(self) -> None:
+        if self.audio is not None:
+            await self.audio.stop()
+        await self.buzzer.stop()
+
+    @asynccontextmanager
+    async def speech_scene(self) -> AsyncIterator[None]:
+        """Reuse the silent speaking face; foreground/privacy/safety output wins."""
+        if (
+            self.system_safety.stopped
+            or self._foreground_behaviors
+            or self._ambient_face == "camera"
+        ):
+            raise RuntimeError("speech_presentation_busy")
+        shown = False
+        if self.display.enabled:
+            shown = await self.show_agent_face("speaking")
+        try:
+            yield
+        finally:
+            if shown and self._ambient_face == "speaking" and not self.system_safety.stopped:
+                await self.restore_idle_face()
 
     async def start(self) -> None:
         """Initialize shared expression hardware without running a behavior."""
@@ -296,6 +323,8 @@ class RobotAssembly:
     ) -> dict[str, Any]:
         """Coordinate a raw endpoint request with motion safety and presentation."""
         self.ensure_action_allowed("servo.move")
+        if self.audio is not None:
+            await self.audio.stop()
         await self._begin_foreground_behavior()
         try:
             return await self.motion.move_endpoint(
@@ -415,6 +444,8 @@ class RobotAssembly:
 
     async def show_agent_face(self, expression: str) -> bool:
         """Loop one silent agent face unless safety or a foreground action has priority."""
+        if self.audio is not None and expression not in {"speaking", "idle"}:
+            await self.audio.stop()
         face = normalize_face_name(expression)
         self._ambient_face = face
         await self._stop_idle()
@@ -431,6 +462,8 @@ class RobotAssembly:
 
     async def show_camera_capture(self) -> bool:
         """Count down clearly, then loop the camera icon during capture."""
+        if self.audio is not None:
+            await self.audio.stop()
         if self.system_safety.stopped:
             return False
         self._ambient_face = "camera"
@@ -592,6 +625,8 @@ class RobotAssembly:
             self._closing = True
             self._idle_suppressed = True
             try:
+                if self.audio is not None:
+                    await self.audio.close()
                 await self._stop_idle()
                 await self.behaviors.stop()
                 await asyncio.gather(

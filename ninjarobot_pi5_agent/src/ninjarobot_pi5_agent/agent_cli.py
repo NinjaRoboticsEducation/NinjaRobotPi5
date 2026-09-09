@@ -80,6 +80,8 @@ DEFAULT_WEB_KEY = Path("~/.config/ninjarobot_pi5/tls/agent-key.pem")
 DEFAULT_WEB_CA_EXPORT = Path("~/ninjarobotpi5-local-ca.pem")
 MAX_SERVICE_LOG_BYTES = 5_000_000
 CHAT_HELP_TEXT = """Available chat commands:
+/speech on|off|stop|status|outputs|en|zh
+  Control local spoken replies; Stop also cancels queued speech without cancelling chat.
 
 /help
   Show this command list and explain how to use chat.

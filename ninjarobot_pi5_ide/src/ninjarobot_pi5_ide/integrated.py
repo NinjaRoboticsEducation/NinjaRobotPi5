@@ -8,6 +8,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
+from .audio_output import AudioOutput
 from .behavior_drafts import BehaviorDraftCompiler, BehaviorDraftError
 from .behavior_models import (
     BehaviorDefinition,
@@ -56,6 +57,34 @@ from .voice_input import (
     VoiceStatusHandler,
     WakeWordDetector,
 )
+
+
+class _SpeechPriorityAdapter:
+    """Keep existing explicit device actions ahead of optional spoken output."""
+
+    def __init__(self, adapter: Any, robot: RobotAssembly) -> None:
+        self._adapter = adapter
+        self._robot = robot
+        self.descriptor = adapter.descriptor
+
+    async def start(self) -> None:
+        await self._adapter.start()
+
+    async def execute(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        audio = self._robot.audio
+        if audio is None:
+            result: dict[str, Any] = await self._adapter.execute(arguments)
+            return result
+        async with audio.foreground():
+            result = await self._adapter.execute(arguments)
+            return result
+
+    async def health(self) -> ResourceHealth:
+        result: ResourceHealth = await self._adapter.health()
+        return result
+
+    async def close(self) -> None:
+        await self._adapter.close()
 
 
 class _InlineBehaviorAdapter:
@@ -536,6 +565,26 @@ class RobotIDEClient:
             status_handler=status_handler,
         )
 
+    async def speech_health(self) -> dict[str, Any]:
+        if self.robot.audio is None:
+            return {"ready": False, "reason": "speech_not_configured"}
+        generation = self.robot.audio.generation
+        return {**await self.robot.audio.health(), "generation": generation}
+
+    async def speech_outputs(self) -> list[dict[str, str]]:
+        if self.robot.audio is None:
+            return []
+        return await self.robot.audio.outputs()
+
+    async def play_speech(self, audio: bytes, *, generation: int | None = None) -> dict[str, Any]:
+        if not self._started or self._closed or self.robot.audio is None:
+            raise RuntimeError("speech_not_available")
+        return await self.robot.audio.play(audio, generation=generation)
+
+    async def stop_speech(self) -> None:
+        if self.robot.audio is not None:
+            await self.robot.audio.stop()
+
     async def start_voice_input(self) -> dict[str, object]:
         """Activate the single IDE-owned microphone listener."""
         if self._voice_input is None:
@@ -788,7 +837,20 @@ def build_robot_ide_client(
         MicrophoneCaptureAdapter(robot.microphone),
         MicrophoneTranscribeAdapter(robot.microphone, transcriber),
     ):
-        registry.register(adapter)
+        priority = adapter.descriptor.name in {
+            "behavior.run",
+            "behavior.execute_expression",
+            "behavior.execute_movement",
+            "display.show_text",
+            "display.clear",
+            "display.set_brightness",
+            "buzzer.play_tone",
+            "camera.capture",
+            "camera.preview",
+            "microphone.capture",
+            "microphone.transcribe",
+        }
+        registry.register(_SpeechPriorityAdapter(adapter, robot) if priority else adapter)
     engine = ExecutionEngine(
         registry,
         ActionLedger(ledger_path),
@@ -836,6 +898,14 @@ def build_robot_ide_client(
         language=voice_config.language,
         retry_limit=voice_config.retry_limit,
         startup_timeout_seconds=voice_config.startup_timeout_seconds,
+    )
+    robot.audio = AudioOutput(
+        config.speech_output,
+        voice=voice_input,
+        microphone=robot.microphone,
+        permitted=lambda: not robot.system_safety.stopped and not robot._closing,
+        scene=robot.speech_scene,
+        simulated=simulated,
     )
     robot.microphone.set_voice_coordinator(voice_input)
     return RobotIDEClient(robot, engine, identity, voice_input)

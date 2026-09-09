@@ -805,3 +805,51 @@ def test_emergency_stop_revokes_before_dispatch_without_motion_queue() -> None:
             controller._motion_command_lock.release()
 
     asyncio.run(exercise())
+
+
+def test_speech_stop_bypasses_busy_web_connection_operation_lock():
+    import threading
+    from unittest.mock import Mock
+
+    entered = threading.Event()
+    stopped = threading.Event()
+
+    class Controller(_FakeController):
+        async def chat(self, *args, **kwargs):
+            self.release = asyncio.Event()
+            entered.set()
+            await asyncio.wait_for(self.release.wait(), 2)
+            reply = Mock()
+            reply.model_dump.return_value = {"text": "Text retained"}
+            return reply
+
+        async def speech_control(self, operation):
+            assert operation == "stop"
+            stopped.set()
+            self.release.set()
+            return {"stopped": True}
+
+    runtime, controller = _FakeRuntime(), Controller()
+    leases = ControllerLeaseManager(on_revoke=controller.lease_revoked)
+    static = Path(__file__).resolve().parents[1] / "src" / "ninjarobot_pi5_agent" / "web_static"
+    app = create_web_app(
+        runtime=cast(AgentRuntime, runtime),
+        controller=cast(WebRobotController, controller),
+        leases=leases,
+        static_directory=static,
+    )
+    with TestClient(app) as client, client.websocket_connect("/ws") as websocket:
+        lease = websocket.receive_json()["lease_id"]
+        websocket.receive_json()
+        websocket.receive_json()
+        websocket.send_json(
+            {"type": "chat", "request_id": "chat", "lease_id": lease, "text": "hello"}
+        )
+        assert entered.wait(2)
+        websocket.send_json(
+            {"type": "speech", "request_id": "stop", "lease_id": lease, "operation": "stop"}
+        )
+        messages = [websocket.receive_json(), websocket.receive_json()]
+        assert stopped.is_set()
+        assert all(item["type"] == "result" for item in messages)
+        assert {item["request_id"] for item in messages} == {"chat", "stop"}

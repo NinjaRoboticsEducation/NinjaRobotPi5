@@ -39,6 +39,7 @@ from .policy import CameraGrantManager, MotionArmManager, PolicyContext, PolicyE
 from .providers import LLMProvider
 from .release_foundations import ReleaseStatusRegistry
 from .skills import SkillRepository
+from .speech import SpeechService
 from .task_controls import TaskControls, task_summary
 from .task_models import LocalTask, TaskStatus, TaskStep
 from .task_service import TaskService
@@ -95,7 +96,9 @@ class AgentRuntime:
         release_status: Callable[[], Mapping[str, Any]] | None = None,
         guide_diagnostics: Callable[[], dict[str, Any]] | None = None,
         tasks: TaskService | None = None,
+        speech: SpeechService | None = None,
     ) -> None:
+        self.speech = speech
         self.provider = provider
         self.tools = tools
         self.store = store
@@ -238,6 +241,18 @@ class AgentRuntime:
         self._ensure_started()
         self._begin_operation()
         try:
+            if text.startswith("/speech"):
+                parts = text.split()
+                operation = parts[1] if len(parts) == 2 and parts[0] == "/speech" else "status"
+                import json
+
+                result = await self.speech_control(operation)
+                return await self._identity_reply(
+                    session_id,
+                    json.dumps(result, ensure_ascii=False),
+                    on_text_delta=on_text_delta,
+                    persist=False,
+                )
             if text.startswith("/memory"):
                 user_id = await self._user_for_existing_session(session_id)
                 memory_reply = (
@@ -325,9 +340,23 @@ class AgentRuntime:
                         on_text_delta=on_text_delta,
                     )
                     reply = reply.model_copy(update={"text": reply.text + suffix})
+                if self.speech is not None and self.speech.enabled:
+                    spoken = await self.speech.speak(reply.text)
+                    if spoken.get("status") not in {"played", "simulated", "disabled"}:
+                        notice = "Spoken output unavailable or stopped; the text reply is retained."
+                        await self._append_memory_notice(
+                            session_id, notice, on_text_delta=on_text_delta
+                        )
+                        reply = reply.model_copy(update={"text": reply.text + "\n\n" + notice})
                 return reply
         finally:
             self._end_operation()
+
+    async def speech_control(self, operation: str = "status") -> dict[str, Any]:
+        self._ensure_started()
+        if self.speech is None:
+            return {"enabled": False, "reason": "speech_not_configured"}
+        return await self.speech.control(operation)
 
     def _cancel_request_task(self, task: LocalTask) -> None:
         session = self._request_tasks.get(task.task_id)
@@ -414,6 +443,12 @@ class AgentRuntime:
                 True,
                 "Notice saved in the local task inbox. Reading by the user is not confirmed.",
             )
+        if task.notification == "speech" and self.speech is not None:
+            spoken = await self.speech.speak(task.title, language=task.notification_language)
+            if spoken.get("played"):
+                return True, "IDE reported spoken notification completion; hearing not verified."
+            if spoken.get("status") == "cancelled":
+                raise RuntimeError("spoken notification cancelled; no fallback after dismissal")
         definition = self.tools.get("robot.behavior.execute_expression")
         decision = self.policy.evaluate(
             definition,
@@ -453,7 +488,12 @@ class AgentRuntime:
             raise RuntimeError("notification interrupted")
         return (
             True,
-            f"IDE reported notification success ({result.action_id}). "
+            (
+                "Speech unavailable; reviewed display/buzzer fallback. "
+                if task.notification == "speech"
+                else ""
+            )
+            + f"IDE reported notification success ({result.action_id}). "
             "Whether the user saw or heard it is not verified.",
         )
 
@@ -1729,6 +1769,8 @@ class AgentRuntime:
             return
         self._closed = True
         cleanup: list[Callable[[], Awaitable[object]]] = []
+        if self.speech is not None:
+            cleanup.append(self.speech.close)
         if self.tasks is not None:
             cleanup.append(self.tasks.close)
         if self._voice_input is not None:

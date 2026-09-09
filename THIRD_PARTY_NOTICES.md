@@ -96,3 +96,30 @@ The repository knowledge-validation workflow uses the MIT-licensed
 full source revisions in `.github/workflows/wiki-validation.yml`. The uv executable
 is pinned to 0.12.5, matching the local validation environment. No runtime service
 or robot dependency was added.
+
+## Refinement Phase 3: optional local speech
+
+Piper is an external, opt-in executable in a separate environment. It is not
+vendored into the robot packages or installed by the normal robot startup.
+The root MIT license does not replace the following component licenses.
+
+| Component | Purpose | License/provenance |
+| --- | --- | --- |
+| Piper TTS 1.8.0 | Local speech generation | GPL-3.0-or-later; [upstream source](https://github.com/OHF-Voice/piper1-gpl/tree/v1.8.0), [package metadata](https://pypi.org/project/piper-tts/1.8.0/). |
+| ONNX Runtime, NumPy, FlatBuffers, packaging, pathvalidate, protobuf | Piper's isolated dependencies | Respect each installed distribution's license files: respectively MIT, BSD-3-Clause, Apache-2.0, Apache-2.0/BSD-2-Clause, MIT, BSD-3-Clause. Versions and hashes are in [local-speech.txt](requirements/local-speech.txt). |
+| en_US-ljspeech-high | Optional 114 MB English voice | Model card identifies the LJ Speech dataset as public domain. Retain [the upstream card](https://huggingface.co/rhasspy/piper-voices/blob/1162a9173d0ce503555aed757976b7a9912eae4c/en/en_US/ljspeech/high/MODEL_CARD) and review it for your distribution. |
+| PipeWire / WirePlumber | OS-owned audio routing and Bluetooth session management | External OS components, MIT; not bundled or reconfigured by this feature. [PipeWire source](https://gitlab.freedesktop.org/pipewire/pipewire), [WirePlumber source](https://gitlab.freedesktop.org/pipewire/wireplumber). |
+
+The optional engine requirements were resolved for Python 3.11, Linux ARM64, with
+all transitive versions and content hashes pinned. The voice helper pins upstream
+revision `1162a9173d0ce503555aed757976b7a9912eae4c` and separately verifies the model,
+configuration and model-card hashes before publishing downloaded files. Existing
+files are not overwritten. The source revision is not a promise of future upstream
+availability. No engine or model download was executed during implementation.
+
+Mandarin capability accepts an operator-supplied compatible Piper model. The
+[Huayan upstream card](https://huggingface.co/rhasspy/piper-voices/blob/1162a9173d0ce503555aed757976b7a9912eae4c/zh/zh_CN/huayan/medium/MODEL_CARD)
+labels its dataset license unknown; no Chinese model is bundled, automatically
+installed, or represented as cleared for redistribution. Japanese speech is not
+implemented. Speech synthesis is local; the chosen conversation provider retains
+its separate data-handling terms and charges.

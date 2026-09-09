@@ -30,18 +30,24 @@ manuals, project knowledge, and [maintenance workflow](ninjarobot_pi5_wiki/docs/
 Open the project root for coding or the wiki folder for documentation queries.
 The wiki uses a separate environment and does not run or control the robot.
 
-The Phase 2 local task assistant now includes reviewed reminders, task progress
-and cancellation, restart recovery, and preference review/correction. The combined
-software gate passes 734 tests; physical and browser acceptance remains pending.
-Development is paused before Phase 3. Start with the
-[Phase 2 walkthrough and manual tests](docs/validation/refinement_phase2_walkthrough_260909.md)
-and [progress record](docs/validation/refinement_progress_260907.md).
-Default reminders are silent inbox notices; display/buzzer notification needs
-explicit review. The service must be running. Usage limits are not a monetary
-spending cap. The face-recognition cleanup is approved and implemented; the display-font repair
-still requires its specific approval. See the [cleanup tests](docs/validation/refinement_phase2_walkthrough_260909.md#face-recognition-cleanup-tests).
-The consolidated manuals and searchable pages describe this checkpoint; see
-the dated walkthrough for limitations and pending acceptance.
+Phase 3 now adds optional local spoken replies, IDE-owned Bluetooth/PipeWire
+output, independent Stop Speech controls and reviewed spoken reminders. Speech
+starts off; English uses Piper, Mandarin accepts a suitable operator-supplied model,
+and Japanese speech is not implemented. Text remains available after audio failure.
+Development is paused before Phase 4 for your acceptance tests. Start with the
+[Phase 3 setup and manual-test walkthrough](docs/validation/refinement_phase3_walkthrough_260909.md)
+and [implementation handoff](docs/validation/refinement_phase3_handoff_260909.md).
+The automated gate passes 772 tests; physical audio and browser acceptance remain
+pending. The owner reports completing the earlier Phase 2 tests.
+
+Default reminders remain silent; audible effects require review. The Agent service
+must be running. Usage limits are not a monetary spending cap. Face cleanup is
+already implemented; the separate display-font proposal remains pending.
+
+Consolidated Phase 3 manual revisions are linked from the handoff. Wiki ingestion
+and review are deferred at the owner's request, so the published wiki and manual
+links below still describe the earlier checkpoint. Preserve those registered
+sources; use the Phase 3 walkthrough for the new speech behavior until publication.
 
 ## What is NinjaRobotPi5?
 
@@ -251,8 +257,10 @@ The approved custom **Hey Ninja** ONNX wake model and its pinned openWakeWord
 feature/VAD assets are packaged with the IDE and protected by recorded SHA-256
 checksums. Always-on voice is opt-in and runs locally: say **Hey Ninja**, speak
 for up to 15 seconds, and the command ends early after silence. No continuous
-audio or command WAV is retained, and v1.0.0 is input-only—replies remain on
-the display/web interface and use existing robot behaviors rather than TTS.
+audio or command WAV is retained. The original v1.0.0 release provided voice
+input only. Refinement Phase 3 adds optional local spoken replies; see the
+[setup and acceptance guide](docs/validation/refinement_phase3_walkthrough_260909.md).
+Speech remains disabled until configured and enabled.
 
 ---
 

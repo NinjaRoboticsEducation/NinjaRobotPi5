@@ -42,7 +42,8 @@ class LocalTask(AgentContractModel):
     due_at: datetime
     timezone: str
     repeat: Literal["none", "daily", "weekly"] = "none"
-    notification: Literal["text", "display_buzzer"] = "text"
+    notification: Literal["text", "display_buzzer", "speech"] = "text"
+    notification_language: Literal["en", "zh"] = "en"
     approved_at: datetime | None = None
     recurrence_anchor: datetime | None = None
     occurrence: Annotated[int, Field(ge=0)] = 0
@@ -52,7 +53,7 @@ class LocalTask(AgentContractModel):
 
     @model_validator(mode="after")
     def validate_times(self) -> LocalTask:
-        if self.notification == "display_buzzer" and len(self.title) > 160:
+        if self.notification in {"display_buzzer", "speech"} and len(self.title) > 160:
             raise ValueError("display reminders are limited to 160 characters")
         for value in (
             self.created_at,

@@ -277,3 +277,36 @@ def test_pause_joins_delivery_and_restart_does_not_repeat_uncertain_task(tmp_pat
             await store.close()
 
     asyncio.run(exercise())
+
+
+def test_spoken_reminder_review_and_language_survive_restart(tmp_path):
+    from ninjarobot_pi5_agent.task_controls import task_summary
+    from ninjarobot_pi5_agent.task_models import LocalTask
+
+    async def scenario():
+        async def notify(task):
+            return True, "unused"
+
+        store, tasks, now = await setup(tmp_path, notify)
+        try:
+            item = await preview(tasks, now, notification="speech", notification_language="zh")
+            assert "speak in zh" in task_summary(item)
+            assert "buzzer" in task_summary(item)
+            await tasks.change(item.owner_scope, item.task_id, "confirm")
+            await tasks.close()
+            tasks = TaskService(store.path, notify, clock=lambda: now[0])
+            await tasks.start(background=False)
+            restored = (await tasks.list(item.owner_scope))[0]
+            assert restored.notification_language == "zh"
+            assert restored.notification == "speech"
+            old_payload = restored.model_dump()
+            old_payload.pop("notification_language")
+            old_payload["notification"] = "text"
+            assert LocalTask.model_validate(old_payload).notification_language == "en"
+            with pytest.raises(ValueError):
+                await preview(tasks, now, notification="speech", title="a" * 161)
+        finally:
+            await tasks.close()
+            await store.close()
+
+    asyncio.run(scenario())

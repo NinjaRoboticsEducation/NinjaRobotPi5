@@ -53,6 +53,19 @@
             </button>
           </div>
 
+          <details class="speech-controls">
+            <summary>Spoken replies</summary>
+            <p>Replies are audible nearby. Requires a configured local voice and speaker.</p>
+            <button type="button" data-speech="on">Enable spoken replies</button>
+            <button type="button" data-speech="off">Disable spoken replies</button>
+            <button type="button" data-speech="stop">Stop speech</button>
+            <button type="button" data-speech="status">Check speech status</button>
+            <button type="button" data-speech="outputs">List speaker outputs</button>
+            <button type="button" data-speech="en">English</button>
+            <button type="button" data-speech="zh">Mandarin (optional voice)</button>
+            <pre id="speechResult" class="guide-result" aria-live="polite"></pre>
+          </details>
+
           <div class="action-pad" aria-label="Special robot controls" data-i18n-aria="controls.special">
             <button id="greetingButton" class="action-button action-a"><strong>A</strong><span data-i18n="behavior.greeting">Greeting</span></button>
             <button id="celebrateButton" class="action-button action-b"><strong>B</strong><span data-i18n="behavior.celebrate">Celebrate</span></button>

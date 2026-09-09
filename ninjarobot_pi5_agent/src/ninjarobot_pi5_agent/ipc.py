@@ -365,6 +365,17 @@ class AgentIPCServer:
                 {"type": "result", "data": await self._runtime.disable_voice_input()},
             )
             return
+        if command == "speech":
+            await _write_message(
+                writer,
+                {
+                    "type": "result",
+                    "data": await self._runtime.speech_control(
+                        _required_text(payload, "operation")
+                    ),
+                },
+            )
+            return
         if command == "voice_status":
             await _write_message(
                 writer,

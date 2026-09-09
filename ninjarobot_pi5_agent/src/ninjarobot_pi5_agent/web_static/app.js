@@ -783,6 +783,18 @@
     }
   }
 
+  document.querySelectorAll("[data-speech]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const resultElement = document.querySelector("#speechResult");
+      try {
+        const result = await send("speech", { operation: button.dataset.speech });
+        resultElement.textContent = JSON.stringify(result, null, 2);
+      } catch (error) {
+        resultElement.textContent = error.message || "Speech control unavailable.";
+      }
+    });
+  });
+
   elements.menuButton.addEventListener("click", openMenu);
   elements.closeMenu.addEventListener("click", () => closeMenu());
   elements.menu.addEventListener("click", (event) => {

@@ -512,7 +512,7 @@ def create_web_app(
             request_id = _request_id(message)
             try:
                 kind = _required_string(message, "type")
-                if kind in {"emergency_stop", "move_stop", "usb_microphone_stop"}:
+                if kind in {"emergency_stop", "move_stop", "usb_microphone_stop", "speech"}:
                     data = await _dispatch_web_message(
                         controller,
                         lease.lease_id,
@@ -676,6 +676,8 @@ async def _dispatch_web_message(
         return await controller.enable_voice_input()
     if kind == "voice_disable":
         return await controller.disable_voice_input()
+    if kind == "speech":
+        return await controller.speech_control(_required_string(message, "operation"))
     if kind == "voice_status":
         return controller.voice_input_status()
     if kind == "poweroff_prepare":

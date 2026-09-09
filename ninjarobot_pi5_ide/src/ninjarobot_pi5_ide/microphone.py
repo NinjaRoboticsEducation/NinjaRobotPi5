@@ -661,6 +661,8 @@ class MicrophoneDevice:
         self._closed = False
         self._lock = asyncio.Lock()
         self._voice_coordinator: VoiceListenerCoordinator | None = None
+        self._manual_users = 0
+        self._output_active = False
 
     @property
     def simulated(self) -> bool:
@@ -674,14 +676,31 @@ class MicrophoneDevice:
     @asynccontextmanager
     async def manual_access(self) -> AsyncIterator[None]:
         """Pause always-on listening across one complete manual operation."""
+        if self._output_active:
+            raise RuntimeError("speech_output_active; stop speech before manual recording")
+        self._manual_users += 1
         coordinator = self._voice_coordinator
-        if coordinator is not None:
-            await coordinator.pause()
+        paused = False
+        try:
+            if coordinator is not None:
+                await coordinator.pause()
+                paused = True
+            yield
+        finally:
+            self._manual_users -= 1
+            if coordinator is not None and paused:
+                await coordinator.resume()
+
+    @asynccontextmanager
+    async def output_access(self) -> AsyncIterator[None]:
+        """Reserve silence from manual intake; the voice controller pauses separately."""
+        if self._manual_users or self._output_active:
+            raise RuntimeError("microphone_busy")
+        self._output_active = True
         try:
             yield
         finally:
-            if coordinator is not None:
-                await coordinator.resume()
+            self._output_active = False
 
     async def start(self) -> None:
         """Check device and PortAudio readiness without recording audio."""

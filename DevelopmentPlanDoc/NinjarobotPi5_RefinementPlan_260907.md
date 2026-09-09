@@ -1,5 +1,16 @@
 # NinjaRobotPi5 refinement plan — 7 September 2026
 
+**Implementation checkpoint — 9 September 2026:** Phase 3 H02/B01 software is
+implemented with optional Piper English speech, operator-selected PipeWire output,
+listen-then-speak ownership, independent stop controls, existing-face coordination
+and reviewed spoken reminders. The 772-test gate passes. Physical speaker and
+microphone acceptance remains pending; see the
+[walkthrough](../docs/validation/refinement_phase3_walkthrough_260909.md) and
+[handoff](../docs/validation/refinement_phase3_handoff_260909.md). No managed driver
+changed. Phase 4 has not started and requires the owner's confirmation. Japanese
+speech is deferred; Mandarin needs a compatible operator-supplied licensed model.
+
+
 The goal is to turn NinjaRobotPi5 into a dependable desktop assistant: a robot
 that listens, explains what it is doing, remembers useful preferences, and
 finishes everyday tasks. It should feel approachable while remaining predictable
@@ -372,7 +383,7 @@ documentation, interface mockups, and tests with simulated devices can proceed.
 | Done / ID | Refinement | Why it is needed | Expected user benefit | Effort | Priority |
 | --- | --- | --- | --- | --- | --- |
 | [ ] H01 (revised) | Record additional listening/thinking/approval/action/completion/interruption/error transitions in the existing system log. | Troubleshooting needs correlated events; additional display/web lifecycle presentation was declined. | Operators can understand task flow from logs while current presentation stays unchanged. | Low | P1 |
-| [ ] H02 (confirmed) | Add optional TTS — text-to-speech, turning an answer into audio — and IDE-owned playback to a configured OS audio output, including Bluetooth when supported. | Connecting a speaker alone does not generate or manage spoken answers. | Listen to spoken replies and reminders using sequential input/output. | High | P1 |
+| [x] H02 (software implemented; physical acceptance pending) | Add optional TTS — text-to-speech, turning an answer into audio — and IDE-owned playback to a configured OS audio output, including Bluetooth when supported. | Connecting a speaker alone does not generate or manage spoken answers. | Listen to spoken replies and reminders using sequential input/output. | High | P1 |
 | Deferred H03 (deferred) | Add spoken interruption handling, microphone/playback coordination, and echo control after H02. | The robot must not transcribe its own answer or keep speaking over the user. | More natural turn-taking and immediate control of long answers. | Very High | P1 |
 | [ ] H04 (confirmed) | Make clarification brief and specific; confirm exact consequential actions and explain what remains uncertain. | Fluent guesses about time, identity, or external actions damage trust. | Fewer wrong reminders and clearer permission requests. | Medium | P1 |
 | Deferred H05 (deferred) | Add a desktop profile, quiet hours, adjustable expression intensity, speech rate, and a visible microphone state. | A robot that is entertaining briefly may become distracting during work. | The assistant fits the user's environment and attention needs. | Medium | P1 |
@@ -406,7 +417,7 @@ documentation, interface mockups, and tests with simulated devices can proceed.
 
 | Done / ID | Refinement | Why it is needed | Expected user benefit | Effort | Priority |
 | --- | --- | --- | --- | --- | --- |
-| [ ] B01 (confirmed) | Coordinate face, buzzer, and future speech on one IDE-owned timeline with interruption and priority rules. | Separate reactions can conflict or appear late. | A coherent robot response that matches the answer or task. | High | P1 |
+| [x] B01 (software implemented; physical acceptance pending) | Coordinate face, buzzer, and future speech on one IDE-owned timeline with interruption and priority rules. | Separate reactions can conflict or appear late. | A coherent robot response that matches the answer or task. | High | P1 |
 | [ ] B02 (confirmed) | Add small bounded variations to existing safe expressions and sound cues, with stable personality settings. | Repetition feels mechanical, while uncontrolled randomness feels unreliable. | A recognizable character that remains calm and predictable. | Medium | P2 |
 | Deferred B03 (deferred) | Introduce an opt-in attention experience using camera observations and animated eyes, with freshness limits and consent. | Reacting to the person can make interaction easier, but stale detections can mislead. | The robot visibly attends to the interaction without moving its wheels. | High | P2 |
 | [ ] B04 (confirmed) | Add an explicit distance-controlled buzzer/display game, selectable through conversation, with bounded duration and stop handling. | A simple sensor-to-feedback loop makes robotics tangible. | Ask “let’s play a game,” then move a hand in front of the sensor to change sound and an existing face or simple graphic. | Medium | P3 |

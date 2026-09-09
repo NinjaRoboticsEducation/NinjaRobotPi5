@@ -1,0 +1,2 @@
+# Optional isolated Piper environment; never sync into the robot environment.
+piper-tts==1.8.0

@@ -143,6 +143,7 @@ class TaskService:
         timezone: str,
         repeat: str = "none",
         notification: str = "text",
+        notification_language: str = "en",
     ) -> LocalTask:
         now = self._now()
         task = LocalTask.model_validate(
@@ -158,6 +159,7 @@ class TaskService:
                 "timezone": timezone,
                 "repeat": repeat,
                 "notification": notification,
+                "notification_language": notification_language,
                 "steps": (
                     TaskStep(description="Wait for the reviewed due time"),
                     TaskStep(description="Deliver the reviewed notification and record evidence"),
@@ -384,7 +386,7 @@ class TaskService:
         if task.status is TaskStatus.MISSED:
             return True
         try:
-            async with asyncio.timeout(10):
+            async with asyncio.timeout(195 if task.notification == "speech" else 10):
                 success, evidence = await self._notify(task)
             status = TaskStatus.COMPLETED if success else TaskStatus.FAILED
         except asyncio.CancelledError:

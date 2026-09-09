@@ -987,3 +987,82 @@ def test_reviewed_reminder_uses_valid_nonmoving_ide_draft(tmp_path):
             await runtime.notify_task(task)
 
     asyncio.run(exercise())
+
+
+def test_speech_stop_keeps_completed_text_reply_and_bypasses_chat_lock(tmp_path):
+    from ninjarobot_pi5_agent.speech import LocalSynthesizer, SpeechService
+    from ninjarobot_pi5_ide.config import SpeechOutputConfig
+
+    async def scenario():
+        runtime = build_runtime(tmp_path)
+        ide = AsyncMock()
+        ide.speech_health.return_value = {"ready": True, "generation": 1}
+        synth = AsyncMock(spec=LocalSynthesizer)
+        entered = asyncio.Event()
+
+        async def blocked(*args):
+            entered.set()
+            await asyncio.Event().wait()
+
+        synth.synthesize.side_effect = blocked
+        runtime.speech = SpeechService(SpeechOutputConfig(enabled=True), ide, synthesizer=synth)
+        await runtime.start()
+        try:
+            task = asyncio.create_task(runtime.chat(session_id="speaker-test", text="Hello"))
+            await asyncio.wait_for(entered.wait(), 2)
+            control = await asyncio.wait_for(
+                runtime.chat(session_id="operator", text="/speech stop"), 1
+            )
+            assert '"enabled": true' in control.text
+            reply = await task
+            assert "Hello from NinjaRobot." in reply.text
+            assert "text reply is retained" in reply.text
+            ide.play_speech.assert_not_awaited()
+        finally:
+            await runtime.close()
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("outcome", ["played", "cancelled", "disabled"])
+def test_spoken_reminder_honors_approval_language_and_stop(tmp_path, outcome):
+    from datetime import timedelta
+    from unittest.mock import Mock
+
+    from ninjarobot_pi5_agent.task_models import LocalTask
+
+    async def scenario():
+        runtime = build_runtime(tmp_path)
+        runtime.speech = AsyncMock()
+        runtime.speech.speak.return_value = {"status": outcome, "played": outcome == "played"}
+        runtime.tools.get = Mock(side_effect=RuntimeError("fallback reached"))
+        now = datetime.now(UTC)
+        task = LocalTask(
+            task_id="task-" + "a" * 32,
+            owner_scope="session:test",
+            source_session_id="test",
+            title="喝水",
+            created_at=now,
+            updated_at=now,
+            due_at=now + timedelta(minutes=1),
+            timezone="UTC",
+            notification="speech",
+            notification_language="zh",
+        )
+        assert not (await runtime.notify_task(task))[0]
+        runtime.speech.speak.assert_not_awaited()
+        task = task.model_copy(update={"approved_at": now})
+        if outcome == "played":
+            success, evidence = await runtime.notify_task(task)
+            assert success and "hearing not verified" in evidence
+            runtime.tools.get.assert_not_called()
+        elif outcome == "cancelled":
+            with pytest.raises(RuntimeError, match="no fallback"):
+                await runtime.notify_task(task)
+            runtime.tools.get.assert_not_called()
+        else:
+            with pytest.raises(RuntimeError, match="fallback reached"):
+                await runtime.notify_task(task)
+        runtime.speech.speak.assert_awaited_once_with("喝水", language="zh")
+
+    asyncio.run(scenario())

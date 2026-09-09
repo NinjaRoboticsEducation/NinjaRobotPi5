@@ -171,6 +171,7 @@ class VoiceInputController:
         self._paused_event = asyncio.Event()
         self._startup_event = asyncio.Event()
         self._manual_pause_count = 0
+        self._source_open = False
         self._lifecycle_lock = asyncio.Lock()
 
     def bind_handlers(
@@ -206,6 +207,8 @@ class VoiceInputController:
                     )
                     raise VoiceInputError("transcriber_unavailable")
                 self._stop_event.clear()
+                if self._manual_pause_count:
+                    raise VoiceInputError("listener_paused_by_output")
                 self._resume_event.set()
                 self._paused_event.clear()
                 self._startup_event.clear()
@@ -284,25 +287,34 @@ class VoiceInputController:
         )
         return self.status()
 
-    async def pause(self) -> None:
+    async def pause(self, *, for_output: bool = False) -> None:
         """Pause and release the stream for one explicit manual microphone user."""
         async with self._lifecycle_lock:
+            if for_output and (
+                self._manual_pause_count
+                or self._status.state
+                in {
+                    VoiceInputState.STARTING,
+                    VoiceInputState.DETECTED,
+                    VoiceInputState.RECORDING,
+                    VoiceInputState.TRANSCRIBING,
+                }
+            ):
+                raise VoiceInputError("listener_busy")
             self._manual_pause_count += 1
             if self._task is None or self._task.done():
                 self._paused_event.set()
                 return
             self._resume_event.clear()
-            state = self._status.state
-            if state not in {
-                VoiceInputState.LISTENING,
-                VoiceInputState.DETECTED,
-                VoiceInputState.RECORDING,
-            }:
+            if not self._source_open:
                 self._paused_event.set()
         try:
             await asyncio.wait_for(self._paused_event.wait(), timeout=2.0)
-        except TimeoutError as exc:
-            raise VoiceInputError("listener_pause_timeout") from exc
+        except BaseException as exc:
+            await self.resume()
+            if isinstance(exc, TimeoutError):
+                raise VoiceInputError("listener_pause_timeout") from exc
+            raise
 
     async def resume(self) -> None:
         """Resume only after the final nested manual microphone user finishes."""
@@ -405,6 +417,7 @@ class VoiceInputController:
         speech_started = False
         silent_frames = 0
         try:
+            self._source_open = True
             await source.start()
             assembler = _PCMFrameAssembler(
                 source_rate=source.sample_rate,
@@ -427,6 +440,8 @@ class VoiceInputController:
             self._startup_event.set()
             while self._resume_event.is_set() and not self._stop_event.is_set():
                 pcm, overflowed = await source.read()
+                if not self._resume_event.is_set() or self._stop_event.is_set():
+                    break
                 if overflowed:
                     raise VoiceInputError("audio_overflow")
                 for frame in assembler.feed(pcm):
@@ -447,6 +462,8 @@ class VoiceInputController:
                         continue
                     samples = _pcm_samples(frame)
                     wake = await asyncio.to_thread(detector.process, samples)
+                    if not self._resume_event.is_set() or self._stop_event.is_set():
+                        break
                     if wake.detected:
                         capture_started = True
                         capture.clear()
@@ -465,6 +482,7 @@ class VoiceInputController:
             return None
         finally:
             await source.close()
+            self._source_open = False
             if not self._resume_event.is_set():
                 self._paused_event.set()
 
