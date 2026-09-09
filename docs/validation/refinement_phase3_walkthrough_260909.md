@@ -1,6 +1,7 @@
 # Phase 3: spoken replies and coordinated output — walkthrough
 
-Phase 3 is implemented and software-tested. **Development pauses before Phase 4.**
+The baseline is **Raspberry Pi OS Lite (64-bit), with no desktop**. All essential
+setup and speech controls below work from a terminal. Phase 3 is implemented and software-tested. **Development pauses before Phase 4.**
 These instructions are for your acceptance test (checking the real robot yourself).
 The coding agent has not paired your speaker, installed Piper, played audio,
 captured media, changed the running service, or tested physical behavior.
@@ -114,46 +115,293 @@ explains this startup cost.
 
 ## Pair and select the Bluetooth speaker
 
-Pairing changes the operating system's Bluetooth settings. Do this yourself; the
-project installer and Agent do not perform pairing or choose an output for you.
+The default platform is **Raspberry Pi OS Lite, 64-bit, without a desktop**.
+Run these steps over SSH (a remote terminal) or a locally connected keyboard.
+No desktop menus, browser on the Pi, PulseAudio replacement or graphical login
+are needed. The optional phone/computer web controller still works separately.
 
-1. Log into the Raspberry Pi desktop as the account that will run the Agent.
-2. Put your speaker into pairing mode using its own instructions.
-3. Open the desktop Bluetooth device menu, add the speaker and complete pairing.
-   Menu wording varies by Raspberry Pi OS version. Verify the speaker is connected.
-4. In the desktop sound controls, choose its stereo playback profile if available
-   and set a low volume. Selecting the desktop default alone is not sufficient:
-   NinjaRobotPi5 also requires an explicit device name below.
-5. Check the audio tools without playing anything:
+### 1. Identify the account and stop the existing robot owner
 
-   ```bash
-   command -v pw-play
-   command -v pw-dump
-   ```
+Log in directly as the normal Linux account that runs NinjaRobotPi5, not `root`.
+Run these read-only checks from your checkout; adjust the first path if necessary:
 
-   Expected: both commands print installed program paths. If either is absent,
-   complete your OS audio setup first. Raspberry Pi OS Lite may need separate
-   PipeWire/Bluetooth setup; this guide does not silently replace its audio stack.
-6. After starting the updated Agent under the safety conditions below, open
-   **Spoken replies → List speaker outputs**, or enter `/speech outputs` in chat.
-   Copy the speaker's exact `name`, such as `bluez_output.…`, into the configuration.
-   This query runs inside the Agent's environment and is stronger evidence than
-   seeing the speaker only in a separate desktop terminal.
+```bash
+cd "$HOME/NinjaRobotPi5"
+id -un
+id -u
+cat /etc/os-release
+uname -m
+systemctl show ninjarobot-agent.service -p LoadState -p ActiveState -p User
+```
 
-Bluetooth audio can be restricted to the active logged-in user. Pairing in one
-account does not guarantee access from a boot service, SSH session or another
-account. First test from the logged-in desktop account. If boot startup is used,
-repeat the output/status and listening tests in that deployment. No automatic
-logout, lingering, system service or WirePlumber policy changes are included.
-See [WirePlumber's Bluetooth session guidance](https://pipewire.pages.freedesktop.org/wireplumber/daemon/configuration/bluetooth.html)
-and [Raspberry Pi audio guidance](https://www.raspberrypi.com/documentation/computers/getting-started.html).
+Expected: a non-root account, architecture `aarch64`, and the OS release name.
+If a system service is installed, its `User=` must match `id -un`. If it differs,
+log in as that account before continuing; do not configure root's audio session.
+`LoadState=not-found` means there is no installed system service; this is normal
+for a manually launched Agent.
+
+Stop the robot before changing audio services. Choose **one** command according
+to the launch method. Stopping ends in-progress operations; do not do it mid-task.
+
+For an installed system service:
+
+```bash
+sudo systemctl stop ninjarobot-agent.service
+```
+
+For a manually launched Agent:
+
+```bash
+uv run --frozen --no-sync ninjarobot-agent service stop
+```
+
+Do not use the manual launcher to compete with an installed running service.
+Keep this terminal open for the following steps. Starting the Agent later can
+move devices or activate configured microphone input, so raise the wheels and
+have an operator ready to remove power before that step.
+
+### 2. Install the Lite audio prerequisites
+
+These commands change installed **OS packages** and need `sudo`. They do not
+install a desktop or Piper into the robot Python environment. A package install
+may start its own audio/Bluetooth service; keep the Agent stopped.
+
+First refresh package metadata, then preview the exact package transaction:
+
+```bash
+sudo apt-get update
+sudo apt-get --simulate install --no-install-recommends \
+  bluez rfkill pipewire pipewire-bin wireplumber libspa-0.2-bluetooth \
+  dbus-user-session jq nano
+```
+
+Read the preview. If it proposes removing your existing audio stack or unrelated
+robot packages, stop and resolve that conflict instead of accepting it. Otherwise:
+
+```bash
+sudo apt-get install --no-install-recommends \
+  bluez rfkill pipewire pipewire-bin wireplumber libspa-0.2-bluetooth \
+  dbus-user-session jq nano
+wireplumber --version
+pw-play --version
+```
+
+Expected: both version commands succeed. `pipewire-bin` supplies `pw-play` and
+`pw-dump`; the Bluetooth plugin supplies Bluetooth audio support. `jq` filters
+structured output in later commands. This setup uses native PipeWire playback;
+`pipewire-pulse` and changing the default ALSA audio route are not required here.
+Use the distribution's repositories, not a mixture of Bookworm/Trixie packages.
+See the [Debian PipeWire package](https://packages.debian.org/bookworm/pipewire-bin)
+and [Bluetooth plugin](https://packages.debian.org/trixie/libspa-0.2-bluetooth).
+
+### 3. Keep this user's audio session available without a desktop
+
+PipeWire and WirePlumber run as **user services**, separate from the robot's
+system service. The following explicitly enables them and allows this user's
+services to remain running after SSH logout and to start at boot. This is called
+*lingering*. It affects this user's other enabled user services too; record the
+initial `Linger=` value for rollback.
+
+```bash
+loginctl show-user "$(id -un)" -p Linger
+sudo loginctl enable-linger "$(id -un)"
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+test -d "$XDG_RUNTIME_DIR" && test -S "$XDG_RUNTIME_DIR/bus"
+systemctl --user status --no-pager
+```
+
+Expected: the `test` command succeeds and the user manager is reachable. A `degraded`
+manager may contain unrelated failed units; inspect the named audio units below.
+If the runtime directory/bus is absent or you see “Failed to connect to bus”,
+log out and reconnect **directly as the same user**, then repeat the two exports
+and checks. Do not create `/run/user` yourself or point it at another user's ID.
+Do not run `sudo systemctl --user`; that selects the wrong user context.
+See [systemd lingering documentation](https://www.freedesktop.org/software/systemd/man/252/loginctl.html).
+
+### 4. Allow Bluetooth audio in a headless session
+
+Without a desktop, Bluetooth pairing can succeed while no speaker appears in
+PipeWire. WirePlumber's active-seat rule can cause this. Disable that rule only
+for the dedicated robot account, using **one** version-specific configuration
+below. This allows that account to own Bluetooth audio even when no one is
+logged into a local screen. Do not run competing audio owners under other users.
+
+Check `wireplumber --version` from step 2. Configuration formats differ:
+
+**WirePlumber 0.5.x (typically Trixie):**
+
+```bash
+mkdir -p "$HOME/.config/wireplumber/wireplumber.conf.d"
+nano "$HOME/.config/wireplumber/wireplumber.conf.d/90-ninjarobot-headless.conf"
+```
+
+If this file already exists, preserve its contents and reconcile the setting;
+do not replace unrelated configuration. Put the following in the file, save with
+Ctrl+O, press Enter, and exit with Ctrl+X:
+
+```ini
+wireplumber.profiles = {
+  main = {
+    monitor.bluez.seat-monitoring = disabled
+  }
+}
+```
+
+**WirePlumber 0.4.x (typically Bookworm):** use this instead, not the 0.5 fragment:
+
+```bash
+mkdir -p "$HOME/.config/wireplumber/bluetooth.lua.d"
+nano "$HOME/.config/wireplumber/bluetooth.lua.d/90-ninjarobot-headless.lua"
+```
+
+Save this one line:
+
+```lua
+bluez_monitor.properties["with-logind"] = false
+```
+
+For another version, check its upstream configuration format before continuing.
+The [0.5 headless configuration](https://pipewire.pages.freedesktop.org/wireplumber/daemon/configuration/bluetooth.html)
+and [0.4 upstream configuration](https://raw.githubusercontent.com/PipeWire/wireplumber/0.4.17/src/config/bluetooth.lua.d/50-bluez-config.lua)
+are different; a Lua fragment will not configure 0.5.
+
+Now start the user audio services and reload WirePlumber's configuration:
+
+```bash
+systemctl --user enable --now pipewire.socket wireplumber.service
+systemctl --user start pipewire.service
+systemctl --user restart wireplumber.service
+systemctl --user is-active pipewire.service wireplumber.service
+```
+
+Expected: two `active` lines. If not, inspect the failure locally:
+
+```bash
+journalctl --user -u pipewire.service -u wireplumber.service -n 60 --no-pager
+```
+
+Correct configuration errors before pairing. Do not publish raw logs without
+checking them for device names, identifiers and other private information.
+
+### 5. Enable Bluetooth and pair the speaker
+
+This changes Bluetooth settings, but does not start the Agent or play test audio:
+
+```bash
+sudo systemctl enable --now bluetooth.service
+rfkill list bluetooth
+sudo rfkill unblock bluetooth
+bluetoothctl show
+```
+
+Expected: a controller is listed. A hard block cannot be fixed by `rfkill unblock`;
+check the hardware/OS configuration. If no controller is listed, resolve that
+first. Do not change boot files blindly.
+
+Put the speaker into pairing mode and disconnect it from a phone if necessary.
+Start the interactive Bluetooth tool:
+
+```bash
+bluetoothctl
+```
+
+At its `[bluetooth]` prompt, type the following lines **one at a time**:
+
+```text
+power on
+agent on
+default-agent
+scan on
+```
+
+Wait until your speaker's name appears. Note its address, such as
+`AA:BB:CC:DD:EE:FF`. Replace that example in **every** following line with your
+speaker's actual address. These are commands inside `bluetoothctl`, not Bash:
+
+```text
+scan off
+pair AA:BB:CC:DD:EE:FF
+trust AA:BB:CC:DD:EE:FF
+connect AA:BB:CC:DD:EE:FF
+info AA:BB:CC:DD:EE:FF
+quit
+```
+
+Answer any pairing confirmation only after verifying it is your speaker. Expected:
+`Paired: yes`, `Trusted: yes`, and `Connected: yes`. Already-paired devices usually
+need only `trust`/`connect`; do not repeatedly remove and re-pair them.
+The [BlueZ command reference](https://github.com/bluez/bluez/blob/master/doc/bluetoothctl.rst)
+describes pairing, trust and connection separately.
+
+### 6. Choose the audio output and set a low volume
+
+Back at the normal shell, list playback outputs without playing anything:
+
+```bash
+wpctl status
+pw-dump | jq -r '.[] | select(.info.props."media.class" == "Audio/Sink") | [.id, .info.props."node.name", .info.props."node.description"] | @tsv'
+```
+
+Expected: a sink (an audio playback output) for your speaker, normally with a
+`bluez_output.…` name. Keep that exact **node name** for `output_node` below.
+A Bluetooth address and a PipeWire node name are different values.
+
+For volume commands only, enter the current numeric sink ID printed in the first
+column. Numeric IDs can change after reconnect; do not save one in robot config.
+
+```bash
+read -r -p "Current speaker sink ID from the list: " NINJA_SINK_ID
+wpctl set-mute "$NINJA_SINK_ID" 0
+wpctl set-volume "$NINJA_SINK_ID" 0.25
+wpctl get-volume "$NINJA_SINK_ID"
+```
+
+Expected: roughly `Volume: 0.25`, without `MUTED`. Also lower the speaker's physical
+volume. Nothing has been played yet. The Agent's configured volume is separate.
+[PipeWire target selection](https://docs.pipewire.org/page_man_pw-cat_1.html) uses
+the explicit node name; changing the desktop/default route is unnecessary.
+
+If Bluetooth says connected but no sink appears, check the step 4 configuration,
+user services, and plugin installation. If a device appears under **Audio → Devices**
+in `wpctl status` but has the wrong profile, inspect the available profiles:
+
+```bash
+read -r -p "Bluetooth device ID under Audio Devices (not sink ID): " NINJA_AUDIO_DEVICE_ID
+pw-cli enum-params "$NINJA_AUDIO_DEVICE_ID" EnumProfile
+```
+
+Find an available `a2dp-sink` profile (A2DP is Bluetooth stereo playback), then use
+its actual numeric `index`:
+
+```bash
+read -r -p "Available A2DP profile index: " NINJA_A2DP_INDEX
+wpctl set-profile "$NINJA_AUDIO_DEVICE_ID" "$NINJA_A2DP_INDEX"
+wpctl status
+```
+
+Do not assume a fixed profile number. Keep the robot's existing USB microphone
+for voice input; this guide does not switch it to the speaker's headset profile.
 
 ## Configure spoken output
 
-Edit your existing private `~/.config/ninjarobot_pi5/config.toml` with your editor.
-If you use `--config`, edit that selected file instead. Add or update **one**
-`[speech_output]` section; do not replace unrelated settings or add duplicate tables.
-Replace the example output name with the exact one returned by `/speech outputs`.
+### 1. Edit and validate the robot configuration
+
+The English Piper installation above must be complete. Back up the default private
+configuration, then edit it in the terminal. If your service uses `--config`, use
+that actual path in all three commands instead. The backup is kept private and
+is not overwritten on rerun:
+
+```bash
+test -f "$HOME/.config/ninjarobot_pi5/config.toml"
+cp -pn "$HOME/.config/ninjarobot_pi5/config.toml" "$HOME/.config/ninjarobot_pi5/config.toml.before-bluetooth"
+nano "$HOME/.config/ninjarobot_pi5/config.toml"
+```
+
+If the first command fails, stop and find the configuration used by your installation;
+do not create an empty replacement. Add or update **one** `[speech_output]` table.
+Replace the example node with the exact `bluez_output.…` name from step 6 above.
+Do not overwrite unrelated settings or add a duplicate table.
 
 ```toml
 [speech_output]
@@ -169,24 +417,180 @@ synthesis_timeout_seconds = 30.0
 playback_timeout_seconds = 60.0
 ```
 
-`output_node` is the stable PipeWire name, not a numeric device ID and not `auto`.
-The Agent will not silently switch to HDMI or another speaker after a disconnect.
-The selected [PipeWire target](https://docs.pipewire.org/page_man_pw-cat_1.html)
-controls routing; the operating system and speaker's own volume also affect loudness.
+For initial speaker testing, set the existing `[voice_input]` table's `enabled`
+field to `false` too; remember its previous value. This prevents capture on startup.
+Do not add a second `[voice_input]` table. Save with Ctrl+O, Enter, Ctrl+X.
 
-Under the safety conditions above, restart your existing service to load code and
-configuration. For the ordinary manually started Agent, use:
+Validate the file without starting devices or printing private settings:
 
 ```bash
-uv run --frozen --no-sync ninjarobot-agent service stop
+uv run --frozen --no-sync python -c 'from ninjarobot_pi5_ide.config import load_robot_config; load_robot_config("~/.config/ninjarobot_pi5/config.toml"); print("Configuration valid")'
+```
+
+Expected: `Configuration valid`. Correct any reported error locally before starting
+the Agent; errors may contain configuration details, so review before sharing.
+
+### 2. If using the installed system service, add its audio-session path
+
+Skip this subsection for a manually launched Agent. The project's existing
+`ninjarobot-agent.service` template runs under `User=...`, but does not define
+`XDG_RUNTIME_DIR`. `User=` alone does not select that user's PipeWire socket.
+Use a separate **drop-in** (a small systemd override) to add audio access while
+preserving the existing executable, hardware groups and security restrictions.
+This changes `/etc/systemd` and needs `sudo`; it does not install another Agent.
+
+Confirm the service account matches your login, and note its numeric UID (user ID):
+
+```bash
+id -un
+id -u
+systemctl show ninjarobot-agent.service -p User -p LoadState
+sudo mkdir -p /etc/systemd/system/ninjarobot-agent.service.d
+sudo nano /etc/systemd/system/ninjarobot-agent.service.d/20-local-audio.conf
+```
+
+If the file already exists, preserve it and reconcile the entries. In the following
+example replace **every `1000`** with the number printed by `id -u`:
+
+```ini
+[Unit]
+Requires=user@1000.service
+Wants=bluetooth.service
+After=user@1000.service bluetooth.service
+
+[Service]
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
+Environment="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus"
+```
+
+Save and reload the unit definitions without starting the robot:
+
+```bash
+sudo systemctl daemon-reload
+systemctl show ninjarobot-agent.service -p User -p After -p Requires -p DropInPaths
+```
+
+Expected: the same user, the matching `user@NUMBER.service` dependency, and your
+`20-local-audio.conf` path. Do not remove `ProtectSystem`, `ProtectHome`, hardware
+ownership checks or any other safety setting. The user audio manager must already
+be enabled and healthy from the preceding steps; the override does not install or
+pair the speaker. Keep this override when updating the main unit template.
+
+### 3. Start the one existing Agent and query its own audio environment
+
+**This step can move the robot at startup.** Raise wheels, clear nearby objects,
+keep an operator ready to remove power and leave voice input off for the first test.
+Choose **one** launch method:
+
+Installed system service:
+
+```bash
+sudo systemctl start ninjarobot-agent.service
+systemctl is-active ninjarobot-agent.service
+```
+
+Manually launched Agent, from the same shell/user where audio was configured:
+
+```bash
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
 uv run --frozen --no-sync ninjarobot-agent service start --real
 ```
 
-**Startup can move the robot or activate configured microphone input.** If your
-Agent is managed by boot startup, use its existing documented restart procedure
-instead; do not compete with it by starting another service. Refresh the controller
-page to load the new buttons. Keep `enabled = false` for initial testing. You can
-later choose `true` for spoken replies at every startup after acceptance.
+Expected: the existing Agent starts normally. If it reports an existing hardware
+owner or safety fault, resolve that through the normal installation/recovery
+instructions rather than starting a second process or erasing safety state.
+
+Now open the chat terminal:
+
+```bash
+uv run --frozen --no-sync ninjarobot-agent chat
+```
+
+At the `You>` prompt, enter these commands one at a time:
+
+```text
+/voice input status
+/speech outputs
+/speech status
+```
+
+Expected: voice input off, speech disabled, your exact selected speaker listed,
+and separate synthesis/playback readiness. These queries run **inside the Agent**,
+so they check its actual audio context, including the installed system service.
+A sink listed by `pw-dump` in SSH alone is not enough. If this fails only in the
+system service, recheck its `User`, UID and drop-in, then restart safely:
+
+```bash
+sudo systemctl restart ninjarobot-agent.service
+```
+
+The restart carries the same startup hardware risk. Run it from a second shell or
+exit chat with `/exit` first. For a manual owner, use `service stop` followed by
+`service start --real` instead. Do not confuse `/exit` with stopping the service.
+
+### 4. First spoken reply and independent stop, entirely from terminals
+
+These steps play sound, but need no desktop or browser. In chat enter:
+
+```text
+/speech on
+Please reply with: Hello, I am NinjaRobot.
+```
+
+Expected: text appears and then English speech plays from the selected speaker.
+Piper may take time to load the model. After the answer completes, `/speech status`
+should report `played`; this does not prove the speaker was audible unless you heard it.
+
+For the stop test, open a **second SSH terminal** as the same account, then run:
+
+```bash
+cd "$HOME/NinjaRobotPi5"
+uv run --frozen --no-sync ninjarobot-agent chat --session speech-operator
+```
+
+Ask for a longer answer in terminal 1. While it speaks, enter in terminal 2:
+
+```text
+/speech stop
+```
+
+Expected: audio stops promptly while the text reply remains. Buffered Bluetooth
+sound may take a short time to drain. `/speech stop` allows later replies to speak;
+`/speech off` also keeps future replies silent. Neither command changes persisted
+microphone enablement. Finish the first test with `/speech off`.
+
+### 5. Reconnect and verify operation after SSH logout
+
+A trusted speaker is not guaranteed to reconnect automatically. Turn it on, then
+run this from a shell, entering its saved Bluetooth address at the prompt:
+
+```bash
+read -r -p "Speaker Bluetooth address: " NINJA_BT_ADDRESS
+bluetoothctl connect "$NINJA_BT_ADDRESS"
+bluetoothctl info "$NINJA_BT_ADDRESS"
+```
+
+Expected: `Connected: yes`. Recheck `/speech outputs` and `/speech status` in the
+Agent before requesting new speech. Never replay an interrupted utterance merely
+because the speaker reconnected. If the node name changed after a profile change,
+update only `output_node`, validate configuration and restart safely.
+
+With the robot stationary and speech off, exit chat and log out of SSH. Reconnect
+as the same account and check:
+
+```bash
+systemctl --user is-active pipewire.service wireplumber.service
+uv run --frozen --no-sync ninjarobot-agent service status
+uv run --frozen --no-sync ninjarobot-agent chat
+```
+
+Then repeat `/speech outputs`, `/speech status`, and one short opted-in reply.
+Expected: audio services survived logout and the existing Agent still sees the
+speaker. A manual Agent is not made boot-enabled by audio lingering; only its
+previously installed boot deployment provides that. Do not reboot as an unattended
+test: an enabled Agent may greet/move or capture at boot. When you next perform a
+supervised normal boot, reconnect the speaker if needed and repeat these checks.
 
 ## Safe smoke tests
 
@@ -223,11 +627,13 @@ These tests produce sound. Keep voice input disabled initially.
    The current speaking face runs during output and returns to the normal idle face.
    Record delay before sound, intelligibility, volume and whether the full short
    sentence plays. `/speech status` should report `played`, with hearing unverified.
-2. Ask for a longer answer. During speech, click **Spoken replies → Stop speech**.
+2. Ask for a longer answer. During speech, enter `/speech stop` in the second chat terminal.
+   The optional web equivalent is **Spoken replies → Stop speech**.
    Expected: sound stops promptly (Bluetooth may briefly drain buffered sound), text
    stays visible, and a later reply can speak again. Test while the same browser's
    chat request is still open. Stop must not wait for that request to finish.
-3. Repeat, selecting **Disable spoken replies** instead. Expected: current speech
+3. Repeat using `/speech off` in the second chat terminal (or the optional
+   **Disable spoken replies** web button). Expected: current speech
    stops and later replies remain silent. `/speech on` enables it again.
 4. CLI alternative: open a second terminal with
    `uv run --frozen --no-sync ninjarobot-agent chat`, then enter `/speech stop`.
@@ -240,7 +646,9 @@ These tests produce sound. Keep voice input disabled initially.
 6. Set `english_model` temporarily to a nonexistent test path, restart safely and
    repeat one request with speech enabled. Expected: text remains and speech reports
    failure. Restore the path and restart. Do not remove your installed model.
-7. With the robot stationary, test the existing Emergency Stop during speech.
+7. Optional controller regression: from a separate phone/computer, with the robot
+   stationary, test the existing Emergency Stop during speech. The browser is not
+   required on the Pi and is not required for the terminal-only speaker setup.
    Expected: speech stops and the existing safety indication takes priority.
    Speech must not bypass a latched stop. Remove the cause and use the existing
    reviewed Resume operation; the interrupted utterance must not restart.
@@ -253,18 +661,18 @@ hang or kill unrelated OS audio services to reproduce a timeout manually.
 These steps use the microphone. Obtain consent; do not retain test recordings.
 Use the existing separate robot microphone, not the Bluetooth speaker's headset mic.
 
-1. With **Voice Input off**, play a reply. Expected: Voice Input remains off afterwards.
-2. Explicitly enable **Voice Input**, say “Ninja” followed by a simple request, then
+1. Enter `/voice input off` in interactive chat, then play a reply. Expected: Voice Input remains off afterwards.
+2. Enter `/voice input on` in interactive chat, say “Hey Ninja” followed by a simple request, then
    stop speaking. Expected: the request is transcribed once, the reply plays after
    recording closes, and the wake listener returns afterwards. The robot must not
    treat its own reply as a second command.
-3. While it is speaking, disable **Voice Input**. Expected: playback cleanup does not
+3. While it is speaking, enter `/voice input off` in the second interactive chat. Expected: playback cleanup does not
    undo your choice; it remains off. Re-enable only when you choose to do so.
 4. With consent, start a bounded recording and arrange for a spoken reminder to become
    due during it. Expected: speech does not truncate recording. The reminder may use
    its already reviewed display/buzzer fallback. Inspect the inbox for honest outcome
    evidence; it must not claim spoken delivery when none occurred.
-5. During speech, use the explicit **Record Once** control only if you consent to that
+5. During speech, optionally use the web controller on a separate phone/computer and its **Record Once** control only if you consent to that
    capture. Expected: the foreground request stops speech before recording begins.
    After it completes, ownership is released for the next requested operation.
 
@@ -294,7 +702,7 @@ silent inbox notice. The Pi and Agent must be running at the due time.
 4. Schedule a second harmless reminder. Turn speech off before it becomes due.
    Expected: its explicitly reviewed display/buzzer fallback is used, with matching
    result evidence. There must be no silent switch to an unrelated speaker.
-5. During a third spoken reminder, press Stop Speech. Expected: no fallback is played
+5. During a third spoken reminder, enter `/speech stop` in the second terminal. Expected: no fallback is played
    after this dismissal, and the record reports an uncertain/cancelled delivery
    rather than claiming success. It must not replay itself. Snooze creates a new
    review that you must confirm.
@@ -348,7 +756,7 @@ fault appears, follow the existing safety/recovery procedure; do not erase its l
 | `check_piper_and_language_model` | Check the dedicated Python path, both model files and matching language. Status alone does not test synthesis. |
 | `select_output_node` / `selected_output_unavailable` | Choose the exact current node name, reconnect the speaker and check from the Agent account. |
 | `pipewire_tools_missing` | Complete supported OS audio setup; do not substitute a raw hardware path in the Agent. |
-| `audio_session_unavailable` | Check the active login/session and service user. Desktop pairing is not proof of boot-service access. |
+| `audio_session_unavailable` | Check the active login/session and service user. Check the same-user runtime path, lingering and the system-service drop-in above. |
 | Playback completes but nothing is heard | Check speaker volume/mute and actual routing. Software completion is not an audibility guarantee. |
 | Text works but speech times out | Try a shorter sentence; check Pi load and model paths. Defaults bound synthesis to 30 seconds and playback to 60 seconds. |
 | Speech stops during another operation | Foreground actions, capture, safety, or Stop Speech intentionally take priority. Send a new request if desired. |
@@ -361,6 +769,57 @@ remove the new `[speech_output]` section from that older code's configuration
 (strict configuration rejects unknown fields). Back up the database first: older
 software may not understand newly saved `notification = "speech"` reminders.
 Cancel or migrate only those reviewed test records; do not erase the database.
+
+### Undo the optional Lite audio setup
+
+First use `/speech off` and keep `[speech_output].enabled = false`. If you only
+want silent robot replies, stop here; no OS rollback is needed.
+
+If you also want to undo the OS setup, stop the Agent using its existing launch
+method before restarting audio services. Restore any previous content you edited;
+do not delete a file that already contained your own settings. For files newly
+created by this guide, rename the **applicable** file so it no longer loads.
+Run only the command for your WirePlumber version:
+
+WirePlumber 0.5:
+
+```bash
+mv -n "$HOME/.config/wireplumber/wireplumber.conf.d/90-ninjarobot-headless.conf" "$HOME/.config/wireplumber/wireplumber.conf.d/90-ninjarobot-headless.conf.disabled"
+```
+
+WirePlumber 0.4:
+
+```bash
+mv -n "$HOME/.config/wireplumber/bluetooth.lua.d/90-ninjarobot-headless.lua" "$HOME/.config/wireplumber/bluetooth.lua.d/90-ninjarobot-headless.lua.disabled"
+```
+
+If the optional system-service drop-in was newly created, disable only that file:
+
+```bash
+sudo mv -n /etc/systemd/system/ninjarobot-agent.service.d/20-local-audio.conf /etc/systemd/system/ninjarobot-agent.service.d/20-local-audio.conf.disabled
+sudo systemctl daemon-reload
+systemctl --user restart wireplumber.service
+```
+
+If a `.disabled` destination already exists, `-n` preserves it; inspect both files
+and resolve the names manually before assuming rollback happened. Keep the speech
+setting disabled and start the existing Agent only under the normal safety precautions.
+
+Disable lingering **only if this guide enabled it and no other user service needs it**:
+
+```bash
+sudo loginctl disable-linger "$(id -un)"
+```
+
+To disconnect without removing the pairing, enter the speaker's address and run:
+
+```bash
+read -r -p "Speaker Bluetooth address: " NINJA_BT_ADDRESS
+bluetoothctl disconnect "$NINJA_BT_ADDRESS"
+```
+
+Do not purge audio packages, remove unrelated pairings, or disable existing user
+services merely to undo speech. Saved models and private robot data can remain.
 
 ## Record your results
 

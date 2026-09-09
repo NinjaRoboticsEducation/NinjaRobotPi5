@@ -17,7 +17,7 @@
 > [!NOTE]
 > **v1.0.0 public release.** The project owner completed the Phase 8 manual
 > Raspberry Pi validation. New installations must still follow the safety and
-> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09/InstallationGuide.md) because
+> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09-03/InstallationGuide.md) because
 > wiring and hardware tolerances differ between robots.
 
 ---
@@ -44,10 +44,11 @@ Default reminders remain silent; audible effects require review. The Agent servi
 must be running. Usage limits are not a monetary spending cap. Face cleanup is
 already implemented; the separate display-font proposal remains pending.
 
-Consolidated Phase 3 manual revisions are linked from the handoff. Wiki ingestion
-and review are deferred at the owner's request, so the published wiki and manual
-links below still describe the earlier checkpoint. Preserve those registered
-sources; use the Phase 3 walkthrough for the new speech behavior until publication.
+The Installation and Development Guide links now open the corrected **Lite,
+command-line** manual revisions. Wiki ingestion/review remains deferred: the
+curated wiki pages and document map still describe the published earlier checkpoint.
+The new manual files preserve registered originals; use them and the walkthrough
+for Phase 3 setup until wiki publication.
 
 ## What is NinjaRobotPi5?
 
@@ -189,8 +190,28 @@ uv run --frozen --extra hardware ninjarobot-agent
 
 The installer does not download an Ollama model, start the Agent, move a motor,
 open the camera or microphone, or deploy boot startup. Follow the complete
-[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09/InstallationGuide.md) for wiring, module initialization,
+[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09-03/InstallationGuide.md) for wiring, module initialization,
 calibration, model download, and safe first movement.
+
+---
+
+## Bluetooth speech on Raspberry Pi OS Lite
+
+The default OS is **Lite (64-bit), with no desktop**. Do not look for a desktop
+Bluetooth or volume menu. Use an SSH terminal logged in as the Agent's normal
+Linux account and follow the [complete command-line setup](docs/validation/refinement_phase3_walkthrough_260909.md#pair-and-select-the-bluetooth-speaker):
+
+1. Stop the existing Agent and preview/install the Lite audio packages.
+2. Enable the same user's PipeWire/WirePlumber services and headless Bluetooth policy.
+3. Pair, trust and connect the speaker using `bluetoothctl`.
+4. Select its stable PipeWire node name and set low volume with `wpctl`.
+5. Configure local Piper speech; if using boot startup, add the documented audio-session override.
+6. Start safely and test from chat, using a second terminal for `/speech stop`.
+
+The [English engine installation](docs/validation/refinement_phase3_walkthrough_260909.md#install-the-optional-english-voice)
+is separate and opt-in. The guide includes copyable commands, expected results,
+Bookworm/Trixie configuration differences, reconnect steps and rollback. No Pi
+desktop or browser is needed; a phone/computer web controller is optional.
 
 ---
 
@@ -224,9 +245,9 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 
 | Document | Purpose |
 |---|---|
-| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
+| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09-03/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
 | [MCP and Agent Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09/NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
-| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
+| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09-03/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
 | [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-09/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
 | [Documentation Index](docs/README.md) | Public, developer, architecture, history, and validation documents |
 | [Audit Report](docs/project-history/AuditReport_260731.md) | Historical security, reliability, and documentation audit findings |

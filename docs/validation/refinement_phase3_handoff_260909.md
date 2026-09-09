@@ -5,6 +5,29 @@ confirms acceptance.** Start with the
 [step-by-step setup and manual tests](refinement_phase3_walkthrough_260909.md).
 Physical acceptance is pending; no automated result below proves audibility.
 
+## Lite command-line documentation correction
+
+The default platform is Raspberry Pi OS Lite (64-bit), without a desktop.
+The walkthrough now supplies complete SSH/local-terminal commands for OS package
+preview/install, same-user audio services, lingering, WirePlumber 0.4/0.5 headless
+policy, Bluetooth pairing/trust/connect, stable output selection, volume, private
+configuration backup/validation and actual Agent-side diagnostics.
+
+For boot deployment, the existing system-service template needs the documented
+same-user runtime-directory drop-in to reach PipeWire. This is an operator-applied
+setup instruction, not a change applied to this Pi or the repository's runtime.
+Manual service startup and systemd startup are distinct paths; only one may own
+hardware. Two-terminal speech tests, reconnect/logout checks and scoped rollback
+are included. A desktop is not required, and the optional web controller runs on
+a separate phone/computer.
+
+The implementation gate below remains the earlier 772-test evidence. This follow-up
+changes documentation only. Local links in seven changed/new documents and syntax
+of 205 Bash snippets were checked without executing those snippets. No package
+installation, Bluetooth pairing or audible playback is claimed. No runtime test
+suite was rerun for this documentation-only correction.
+Wiki ingestion/review remains deferred and Phase 4 remains paused.
+
 ## Scope and decisions
 
 The owner approved Phase 3 and requested English first, optional Japanese/Chinese,
@@ -84,14 +107,14 @@ OS compatibility and boot-session access remain explicit acceptance items.
 The original registered manuals are preserved byte-for-byte. These complete new
 source versions contain Phase 3 additions and updated checkpoint wording:
 
-- [Installation Guide](../../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09-02/InstallationGuide.md)
-- [Development Guide](../../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09-02/DevelopmentGuide.md)
+- [Installation Guide](../../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09-03/InstallationGuide.md)
+- [Development Guide](../../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09-03/DevelopmentGuide.md)
 - [MCP and Skills Guide](../../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09-02/NinjaRobot_MCP_Skill.md)
-- [Development Log](../../ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-09-02/DevelopmentLog.md)
+- [Development Log](../../ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-09-03/DevelopmentLog.md)
 
 README, refinement plan/progress, third-party notices and the walkthrough are also
-updated. The README explains that existing wiki/manual pointers remain at the
-published earlier checkpoint. The new raw sources above have **not been ingested**.
+updated. Both READMEs expose the latest corrected full manual versions and explicitly
+distinguish them from the older published wiki/document-map checkpoint. The new raw sources above have **not been ingested**.
 
 When the owner resumes wiki maintenance, register these versions, update affected
 installation/architecture/features/history/reference pages from the actual code,

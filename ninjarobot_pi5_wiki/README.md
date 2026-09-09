@@ -4,14 +4,26 @@ Start here for project documentation, architecture, development history, and
 AI-assisted development. Open this folder in your coding tool for wiki questions,
 or open the parent project for development and implementation verification.
 
-## Current full manuals
+## Latest full manuals — Lite documentation correction
+
+These updated source revisions are readable now; ingestion and semantic review
+remain deferred. The document map and curated search pages still identify the
+published earlier checkpoint. Use these manuals for Phase 3 headless audio setup:
+
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-09-03/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-09-03/DevelopmentGuide.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-09-03/DevelopmentLog.md)
+- [Command-line walkthrough](../docs/validation/refinement_phase3_walkthrough_260909.md)
+
+## Published full manuals — earlier checkpoint
 
 - [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-09/InstallationGuide.md)
 - [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-09/DevelopmentGuide.md)
 - [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-09/NinjaRobot_MCP_Skill.md)
 - [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-09/DevelopmentLog.md)
 
-These are the complete documents. The root README links directly to these sources;
+These are preserved complete published documents. The root README links to the
+latest Installation and Development revisions above;
 the former root navigation files have been removed.
 Use [the current document map](project-knowledge.json) for source versions and
 [the development workflow](docs/PROJECT_WORKFLOW.md) for setup and updates.
