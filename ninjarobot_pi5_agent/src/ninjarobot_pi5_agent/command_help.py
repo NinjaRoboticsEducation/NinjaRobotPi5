@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 
 CHAT_HELP_TEXT = """Available chat commands:
+/time
+  Read the Pi system date, time, UTC offset and timezone without a model call.
 /speech on|off|stop|status|outputs|en|zh
   Control local spoken replies; Stop also cancels queued speech without cancelling chat.
 

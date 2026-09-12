@@ -243,6 +243,23 @@ class AgentRuntime:
         self._begin_operation()
         try:
             command = text.split(maxsplit=1)
+            if command and command[0] == "/time":
+                from .system_time import system_time_snapshot
+
+                clock = system_time_snapshot()
+                notice = (
+                    f"Pi system time: {clock['local']} "
+                    f"[{clock['timezone'] or 'regional timezone unknown'}]. "
+                    f"UTC: {clock['utc']}. Read now from the Agent host clock."
+                    if len(command) == 1
+                    else "Use /time without arguments."
+                )
+                return await self._identity_reply(
+                    session_id,
+                    notice,
+                    on_text_delta=on_text_delta,
+                    persist=False,
+                )
             if command and command[0] == "/help":
                 return await self._identity_reply(
                     session_id,

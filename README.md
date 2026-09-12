@@ -17,7 +17,7 @@
 > [!NOTE]
 > **v1.0.0 public release.** The project owner completed the Phase 8 manual
 > Raspberry Pi validation. New installations must still follow the safety and
-> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12/InstallationGuide.md) because
+> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12-02/InstallationGuide.md) because
 > wiring and hardware tolerances differ between robots.
 
 ---
@@ -190,7 +190,7 @@ uv run --frozen --extra hardware ninjarobot-agent
 
 The installer does not download an Ollama model, start the Agent, move a motor,
 open the camera or microphone, or deploy boot startup. Follow the complete
-[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12/InstallationGuide.md) for wiring, module initialization,
+[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12-02/InstallationGuide.md) for wiring, module initialization,
 calibration, model download, and safe first movement.
 
 ---
@@ -252,10 +252,10 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 
 | Document | Purpose |
 |---|---|
-| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
-| [MCP and Agent Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12/NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
-| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
-| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-12/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
+| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12-02/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
+| [MCP and Agent Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12-02/NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
+| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12-02/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
+| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-12-02/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
 | [Documentation Index](docs/README.md) | Public, developer, architecture, history, and validation documents |
 | [Audit Report](docs/project-history/AuditReport_260731.md) | Historical security, reliability, and documentation audit findings |
 | [Implementation Plan](docs/project-history/NinjaRobotPi5V4_ImplementationPlan.md) | Historical phase design and delivery decisions |
@@ -454,3 +454,12 @@ The complete normal-user Raspberry Pi acceptance workflow is in the
 Made with ❤️ for AI Robotics Education and Research
 
 </div>
+
+## Current time for reminders
+
+In chat, use `/time` to read the Pi clock without a model call. The Agent also
+receives fresh OS time on every model turn and can call `system.time.get`.
+Relative reminders use this clock and timezone; previews still need your direct
+confirmation. See the [clock fix and tests](docs/validation/system_time_fix_260912.md).
+The linked full manuals include this fix; their new source revisions await wiki
+ingestion. Previously ingested/reviewed sources are preserved.

@@ -4,6 +4,18 @@ Start here for project documentation, architecture, development history, and
 AI-assisted development. Open this folder in your coding tool for wiki questions,
 or open the parent project for development and implementation verification.
 
+## Latest full manuals — system time fix, pending ingestion
+
+These new revisions describe `/time`, fresh model clock context and the read-only
+`system.time.get` tool. They have not replaced the ingested sources or review
+records below. Read the new source directly for this clock fix:
+
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-12-02/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-12-02/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-12-02/NinjaRobot_MCP_Skill.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-12-02/DevelopmentLog.md)
+- [Clock fix and manual tests](../docs/validation/system_time_fix_260912.md)
+
 ## Current full manuals — Phase 3 follow-up
 
 These current source revisions are ingested into the wiki knowledge base.
