@@ -1,0 +1,3607 @@
+# NinjaRobotPi5V4 Development Log
+
+## 12 September 2026 — Phase 3 follow-up
+
+Implemented compact owned task pages and model-result size protection, safe
+interrupted-turn context repair, shared command help and a read-only runtime
+skill, chat access to Guided Checks, stable web control geometry and speech
+buttons, the Bluetooth wizard and independent reconnect service, speech-setting
+serialization preservation and bounded Bluetooth audio startup silence.
+
+No managed driver, robot behavior definition or hardware API was changed.
+Configuration adds optional defaults and retains existing private values. The
+reconnect service is operator-enabled and does not start the Agent or capture
+media. Bluetooth setup and hearing require the manual acceptance tests.
+
+Validation and exact final results are recorded in the
+[follow-up handoff](../../../../../docs/validation/refinement_phase3_followup_handoff_260912.md).
+Wiki ingestion/review was skipped as requested. Current sources are available
+through the READMEs, with earlier published evidence clearly separated.
+
+## 9 September 2026 — correct Phase 3 setup for Raspberry Pi OS Lite
+
+The owner clarified that Lite, without a desktop, is the default platform.
+Replaced desktop pairing/output instructions with terminal-based package preview,
+installation, user-session/lingering setup, WirePlumber 0.4/0.5 configuration,
+Bluetooth pairing/trust/connect, stable output selection and volume checks.
+Documented a same-user systemd audio drop-in because the existing Agent template
+has no XDG_RUNTIME_DIR environment. Included configuration backup/validation,
+manual versus system-service startup, two-terminal speech stop, reconnect,
+logout checks and narrowly scoped rollback.
+
+README, the Installation/Development Guides, Phase 3 walkthrough and handoff
+are updated. Registered and previous source versions remain unchanged. No code,
+installed packages, private settings, running services, capture or robot behavior
+was changed. Validation covers seven documents and 205 Bash snippets (syntax only, not
+execution), plus `git diff --check`; no live
+Bluetooth or speaker test is claimed. The earlier 772-test result is historical
+implementation evidence, not a new physical acceptance result. Wiki ingestion
+and semantic review remain deferred under the owner's instruction. Phase 4 remains
+paused. See the [Lite walkthrough](../../../../../docs/validation/refinement_phase3_walkthrough_260909.md).
+
+
+## Phase 3 checkpoint — 9 September 2026
+
+Spoken replies and coordinated output are implemented and software-tested.
+Development pauses before Phase 4 for the owner's manual acceptance. The owner
+reports completing the Phase 2 manual tests and wiki maintenance; this is an
+owner report, not a physical test performed by the coding agent.
+
+The Phase 3 software gate passes 772 tests, lint, formatting, type checks,
+compilation, JavaScript syntax and both driver verifiers. No managed driver
+changed: 222 files across six drivers retain the baseline plus 56 authorized
+repairs. Face cleanup was approved and implemented previously; the separate
+Traditional Chinese font proposal and monetary-cap decision remain pending.
+
+Use the [Phase 3 walkthrough](../../../../../docs/validation/refinement_phase3_walkthrough_260909.md)
+for setup, expected results, privacy, safety and rollback. This source version
+supersedes the checkpoint wording below. It is prepared for later wiki ingestion;
+the owner asked to skip ingestion and review workflows during this task.
+The existing hardware ownership boundary remains intact; IDE-owned OS audio is
+an optional output, not a new Agent hardware-access path.
+
+### Phase 3 implementation entry
+
+Added optional Piper synthesis, IDE-owned PipeWire playback, speaking-face
+coordination, explicit output selection, listen-then-speak ownership, independent
+speech stop controls and reviewed spoken reminders. New tests cover cleanup,
+queue cancellation, stale output, microphone disable preservation, restart
+compatibility, and stopping speech while the same browser chat is busy.
+
+The 772-test gate has one existing Starlette test-client deprecation warning.
+The environment was preserved with `--frozen --no-sync`; no hardware, capture,
+playback, installed-service or power operation was tested live. Optional Piper
+requirements and the English voice are pinned; installation remains opt-in.
+Read [the Phase 3 handoff](../../../../../docs/validation/refinement_phase3_handoff_260909.md)
+for exact commands, limitations and the deferred publication state. Earlier log
+entries below are preserved as history. Phase 4 awaits owner confirmation.
+
+
+## Refinement checkpoint — 9 September 2026
+
+The Phase 2 local task assistant is implemented and software-tested. Development
+pauses before Phase 3 for owner testing. The consolidated root gate passed 734
+tests, lint, formatting, type checks, compilation and driver verifiers. These
+results do not validate physical behavior. Earlier release acceptance below is
+historical and does not cover this refinement. Two managed-driver proposals
+(face cleanup and a replacement Traditional Chinese font) remain unapplied.
+
+Use the [Phase 2 walkthrough and manual tests](../../../../../docs/validation/refinement_phase2_walkthrough_260909.md) for current commands,
+expected results, safety categories and rollback. This checkpoint takes
+precedence over older descriptions below where they describe pre-refinement
+behavior. The existing Agent → IDE → Pi5 driver hardware boundary is unchanged.
+
+### Consolidated implementation rationale and evidence
+
+The owner approved refinement implementation and subsequently requested a pause
+after Phase 2. Documentation and wiki work were deferred during coding and are
+consolidated at this checkpoint. Unrelated checkout changes and registered raw
+source versions were preserved. No commit, push, deployment, real device action,
+camera/microphone capture or live power command was performed.
+
+Phases 0A/0B added safe stop dispatch, guarded integrated movement, hardware
+ownership, disabled-device/pin checks, read-only environment diagnosis, installer
+preview hardening and verified backup/restore. Independent Phase 0C changes
+hardened external tool discovery/schema/trust and lifecycle cleanup. The managed
+face-backend cleanup proposal remains unapplied awaiting its specific approval.
+Phase 1 added capability health details, privacy-conscious lifecycle logs,
+clarification guidance, optional guided checks and browser accessibility. The
+managed display font proposal also remains unapplied.
+
+Phase 2 adds durable local reminders and request records, exact-time review,
+repeat/snooze/cancel/restart handling, offline direct task controls, browser task
+review, safe recovery attempt budgets, model-input limits and preference review
+and correction. The reminder and request worker belongs to the Agent; physical
+notification stays behind IDE authorization. Database changes are additive.
+No new third-party package was added for Phase 2. Existing third-party notices
+cover earlier installer inputs; the font license change is still a proposal.
+
+Final root result: 734 tests passed, one existing Starlette test-client deprecation
+warning; Ruff lint and format, Mypy (88 source files), compileall, JavaScript syntax,
+both driver verifiers and Git whitespace checks passed. Driver integrity reports
+222 managed files across six drivers and 55 pre-existing authorized repairs.
+The interruption recovery gate had 729 passing tests; five additional regression
+checks cover recurring snooze/clock changes, pausing delivery, input budgets,
+cleanup failure and valid nonmoving notification commands. A clock-change result
+length bug was fixed without touching a managed driver.
+
+Limitations are deliberate and visible: physical and browser acceptance remains
+manual; reminders cannot run while powered off; uncertain effects are not replayed;
+general requests do not autonomously resume; preference contradiction handling is
+limited to structured keys; bounded usage is not a currency-denominated spending
+cap. Strict monetary enforcement from T07 remains an explicit requirement gap,
+not a completed guarantee. Phases 3–5 have not started. See the walkthrough and
+progress record for owner test steps and the exact remaining approvals.
+
+## 2026-08-16 — Fresh-clone automatic-start QR and lgpio runtime repair
+
+### Root cause and implementation
+
+- compared both local checkouts, the installed unit, persisted configuration,
+  deployment status, listening sockets, process tree, Agent log, and boot
+  journal; both repositories were clean and identical, and systemd had started
+  the public-clone Agent and ngrok successfully
+- identified the decisive boot-only display fault in the journal:
+  `lgpio` attempted to create `.lgd-nfy*` in the repository working directory,
+  while the hardened service correctly exposed the home directory as read-only
+- gave the service a private systemd-managed `/run/ninjarobot-agent` directory
+  and set `LG_WD` to it, retaining the read-only home/repository boundary and
+  the existing single IDE-owned hardware path
+- corrected deployment readiness so an arbitrary successful IPC reply is not
+  enough: `startup_status.started` and `startup_status.ready` must both be true,
+  and onboarding no longer becomes ready during its pre-QR `starting` state
+- added bounded journal milestones for waiting on ngrok, successful QR
+  presentation, and the Greeting-to-Idle handoff
+
+### Validation
+
+- focused deployment, IPC, and onboarding coverage passed 45 tests after the
+  runtime-directory and readiness changes
+- deployment template coverage verifies the private runtime directory, mode,
+  `LG_WD`, read-only home boundary, and absence of a writable repository path
+- the complete root gate passed managed-driver/workspace provenance,
+  compileall, Ruff lint/format, strict MyPy across 81 source files, packaging,
+  installer dry-run, JavaScript/Bash syntax, documentation governance,
+  `git diff --check`, and 573 tests with one existing Starlette/httpx warning
+- all six driver suites passed independently: buzzer 68, camera 27, display 65,
+  microphone 92, servo 134, and distance sensor 71; the microphone suite kept
+  its existing Python `audioop` deprecation warning
+- no managed `pi5*` driver source, public CLI, configuration schema, database,
+  MCP, model, web, memory, or behavior contract changed
+
+### Raspberry Pi follow-up
+
+Automated validation did not replace the installed root-owned unit, restart the
+live Agent, access GPIO, display a QR, move an actuator, reboot, or power off the
+Pi. The operator must update the public clone, synchronize its locked hardware
+environment, rerun the confirmed deployment transaction, and reboot with the
+wheels raised. Acceptance requires an on-display remote QR (or local fallback
+QR), `running: true`, `ready: true`, no `xCreatePipe`/read-only filesystem
+error, one Greeting after connection, and stable Idle. See the
+[boot QR runtime checklist](../../../../../docs/validation/boot-autostart-lgpio-runtime-pi-checklist.md).
+
+## 2026-08-16 — Public installation and documentation optimization
+
+### Scope and implementation
+
+- added a confirmed, rerunnable Raspberry Pi 5 installer with `--dry-run`,
+  `--check`, and non-interactive `--yes` modes; pinned uv, Ollama, and
+  whisper.cpp inputs; exact GPIO12/GPIO13 PWM rendering; boot-file backup;
+  private-directory creation; locked hardware dependency installation; camera
+  bridge setup; and driver provenance checks
+- kept Ollama model selection, all hardware initialization, Agent startup,
+  automatic-startup deployment, media capture, and actuator movement outside
+  the installer so each remains an explicit operator action
+- aligned fresh standalone defaults with the validated NinjaRobotPi5 profile:
+  buzzer GPIO27, display GPIO4/GPIO5/GPIO6 at 75%, fixed-focus camera, bundled
+  Hey Ninja model, local `~/whisper.cpp` detection, 15-second maximum command
+  capture, and responsive VAD/silence/cooldown values; existing saved settings
+  continue to take precedence
+- hardened buzzer cancellation so the cancellation result is returned only
+  after the output-off path completes, preventing an asynchronous tone from
+  outliving its reported operation
+- replaced the unusable formatter sample with a project documentation style
+  guide and index, moved historical plans/audits into `docs/project-history/`,
+  removed and ignored the private checkout-root `mic.json`, and added public
+  link/location governance tests
+- updated `README.md`, `InstallationGuide.md`, `DevelopmentGuide.md`,
+  `THIRD_PARTY_NOTICES.md`, and `AGENTS.md` for the v1.0.0 beginner installation
+  path, current status, dependency provenance, and future AI-agent guardrails
+
+### Validation
+
+- immutable verification passed for 222 managed files and 55 authorized
+  repairs; all six editable driver sources resolve directly to this checkout
+- the isolated managed-driver suites passed 457 tests: buzzer 68, camera 27,
+  display 65, microphone 92, servo 134, and distance sensor 71
+- the complete root gate passed compileall, Ruff lint, Ruff format, strict MyPy
+  over 81 source files, JavaScript syntax, Bash syntax, installer dry-run,
+  `git diff --check`, documentation governance, and 566 tests
+- the root tests retained one upstream Starlette/httpx deprecation warning;
+  ShellCheck and markdownlint were not installed, so Bash validation used
+  `bash -n` plus six dedicated installer/boot-renderer tests and documentation
+  structure used repository link tests
+
+### Compatibility and Raspberry Pi follow-up
+
+No Agent, model provider, MCP, memory, web, deployment, device-control, or
+behavior contract was intentionally changed. Existing private configuration
+overrides new first-run defaults. Automated validation did not run apt, download
+tools, edit `/boot`, start services, capture media, energize an actuator,
+reboot, or power off the Pi. A clean Raspberry Pi install must complete
+`docs/validation/v1.0.0-installation-optimization-pi-checklist.md` before the
+installer optimization is accepted for publication.
+
+## 2026-08-16 — Power-off helper staging and X1208 shutdown repair
+
+### Root cause and implementation
+
+- correlated the failed web Power Off with the current system journal: the
+  Agent reached the privileged helper, but the helper exited nonzero before an
+  operating-system power-off request was accepted
+- inspected the installed helper and found that it contained the sudoers rule
+  instead of the packaged shell program; deployment had staged both artifacts
+  under the same `ninjarobot-poweroff` basename, so the second write silently
+  replaced the first before installation
+- assigned unique staging filenames to the systemd unit, power-off helper, and
+  sudoers rule, then verified each staged payload before invoking the privileged
+  installer
+- corrected the unit staging name to the canonical
+  `ninjarobot-agent.service` after Raspberry Pi systemd correctly rejected the
+  generic `systemd-unit.install` suffix; the helper and sudoers files remain
+  collision-safe under distinct names
+- made failed deployment commands report their exit status and at most 500
+  normalized printable diagnostic characters instead of hiding the verifier's
+  actionable error
+- replaced existence-only helper status with fail-closed validation of the
+  exact packaged bytes, root ownership, regular-file/non-symlink type, and
+  `0755` mode; a contaminated or manually altered helper now reports deployment
+  not ready and is rejected before `sudo` is called
+- made runtime failures preserve the helper exit status and a bounded,
+  printable diagnostic so future installation or systemd failures are
+  actionable without placing unbounded subprocess output in logs or Web errors
+- documented the X1208 hardware contract: power the stack through the X1208
+  USB-C input only, seat the power pogo pin against the Pi 5 `PSW` through-hole,
+  and use the standard operating-system power-off path; no undocumented
+  UPS-specific GPIO cut-off command was added
+
+### Validation
+
+- deployment and shutdown tests cover unique staged artifacts, exact installed
+  helper validation, replacement by sudoers content, wrong mode, symlink
+  rejection, preflight refusal, and bounded nonzero-exit diagnostics
+- focused deployment tests passed 16 cases, including the real host
+  `systemd-analyze` path and bounded-error regression; the combined shutdown,
+  Web, service, deployment, and release-assets suite passed 50 cases with one
+  existing upstream Starlette/httpx deprecation warning
+- the complete release gate passed workspace-source provenance, compileall,
+  Ruff lint/format, strict MyPy across 81 source files, JavaScript syntax,
+  `git diff --check`, and 557 tests with that same single upstream warning
+- managed-driver verification passed for 222 tracked files and 47 authorized
+  repairs after both implementation phases; no managed driver or
+  `NinjaClawBot` file changed
+
+### Raspberry Pi status and follow-up
+
+Automated validation did not replace the root-owned installed helper, start a
+service, change EEPROM, reboot, power off the Pi, or energize an actuator. The
+operator must rerun **Startup Agent deployment → Install and deploy automatic
+startup Agent** to reinstall the exact helper, verify
+`artifacts.poweroff_helper: true` and `full_poweroff.ready: true`, and then run
+one paired-browser Power Off test last. On X1208 hardware, a clean operating-
+system shutdown must be followed by automatic removal of the Pi's 5 V rail; if
+the OS shuts down but 5 V remains, inspect X1208 power input, pogo-pin/`PSW`
+contact, and board seating before changing software.
+
+## 2026-08-15 — Raspberry Pi 5 full-power-off bootloader repair
+
+### Root cause and implementation
+
+- correlated the reported web shutdown with the Agent log and systemd state:
+  the fixed helper completed a clean `systemctl poweroff`, systemd recorded no
+  Agent restart, but the Pi booted again about 28 seconds later
+- inspected the active Pi 5 EEPROM configuration and found neither
+  `POWER_OFF_ON_HALT=1` nor `WAKE_ON_GPIO=0`; this left the board in a
+  halt/sleep mode that could start again instead of remaining fully off
+- added read-only reporting for the active EEPROM image and a separately queued
+  `/boot/.../pieeprom.upd` image, including available, configured, pending,
+  scheduled, ready, and exact shutdown-key fields
+- made confirmed Startup Agent deployment use Raspberry Pi OS's official
+  `raspi-config nonint do_power_off_on_halt B1` operation when required;
+  compatible queued settings are accepted for deployment but clearly require
+  one reboot, while incompatible pending updates fail closed
+- made web Power Off verify that the full-power-off mode is active before it
+  issues a nonce or stops any Agent/hardware resource; missing, unreadable, and
+  pending configurations now return an actionable error
+- retained the fixed argument-free root helper and narrow sudoers rule; no
+  general privilege, bootloader write path, or AI-accessible power tool was
+  added
+
+### Validation
+
+- deployment/shutdown focused lint and formatting passed; 21 focused tests
+  cover active, pending-compatible, missing, and unavailable EEPROM states
+- the combined deployment, shutdown, web, and release-assets suite passed 43
+  tests with one existing upstream Starlette/httpx deprecation warning
+- the complete release gate passed workspace-source provenance, compileall,
+  Ruff lint/format, strict MyPy across 81 source files, JavaScript syntax,
+  `git diff --check`, and 553 tests with that same single upstream warning
+- managed-driver verification passed for 222 tracked files and 47 authorized
+  repairs; no managed driver or `NinjaClawBot` file changed
+
+### Raspberry Pi status and follow-up
+
+Automated validation did not schedule an EEPROM update, reboot, power off the
+Pi, or energize hardware. With both wheels raised, the operator must rerun
+**Startup Agent Deployment → Install and deploy automatic startup Agent**,
+reboot once if requested, require `full_poweroff.ready: true`, and perform the
+paired-browser Power Off test last. The expected result is an orderly shutdown
+that remains off rather than restarting.
+
+## 2026-08-15 — Boot readiness and verified local/remote access repair
+
+### Root causes and implementation
+
+- confirmed systemd had enabled and attempted the Agent five times, but the
+  deployment-generated `mcp.toml` contained `schema_version = 1` while the
+  strict MCP model rejected that field; the unit then reached its restart limit
+- made MCP schema version 1 canonical and serializable, retained compatibility
+  with legacy unversioned catalogs, rejected unsupported future versions, and
+  added robot/MCP parsing to deployment preflight
+- replaced the deployment's hand-written empty MCP file with the canonical
+  serializer so a clean installation cannot create a file the Agent rejects
+- separated requested ngrok state from verified remote readiness: connecting
+  and degraded tunnels preserve/restore Local Web, while only a validated
+  public endpoint withdraws local routes; tunnel recovery switches back
+  atomically before the remote QR is published
+- made tunnel health callbacks enforce the access transition independently of
+  QR onboarding, covering runtime activation as well as boot
+- made deployment setup clear stale systemd failed/start-limit state and wait
+  for both `ActiveState=active` and a read-only Agent `startup_status` IPC reply
+  before reporting `running_now`/`ready`
+- changed deployment status to report installed, enabled, running, IPC-ready,
+  and parsed systemd result/restart/exit fields separately
+
+### Validation
+
+- managed-driver verification passed for 222 tracked files and 47 authorized
+  repairs after every phase; no managed driver or `NinjaClawBot` file changed
+- compileall, Ruff lint, Ruff format, targeted MCP/web/remote/deployment tests,
+  and the full suite passed with 550 tests and one existing upstream
+  Starlette/httpx deprecation warning
+- the real persisted version-1 MCP catalog loaded successfully; read-only
+  deployment status accurately reported the currently enabled but failed unit
+
+### Raspberry Pi status and follow-up
+
+No service, ngrok tunnel, GPIO, display, buzzer, servo, camera, microphone, or
+power action was started during automated validation. The operator must rerun
+the confirmed deployment setup to install the repaired behavior and clear the
+existing systemd failure limit, then complete the local/remote/boot checklist
+with both wheels raised.
+
+## 2026-08-15 — Base QR dependency and bare `uv run` startup repair
+
+### Root cause and implementation
+
+- reproduced `ModuleNotFoundError: No module named 'qrcode'` after bare `uv
+  run ninjarobot-agent` synchronized the default dependency set and removed the
+  unselected `display-qr` extra
+- confirmed that `ninjarobot_pi5_ide.qr_display` is imported unconditionally
+  through IDE initialization, so treating qrcode as optional contradicted the
+  actual base runtime graph
+- moved pinned `qrcode[pil]==8.2` into the IDE base dependencies, retained an
+  empty `display-qr` compatibility extra, and refreshed `uv.lock`
+- added package-metadata regression coverage requiring an unconditional qrcode
+  requirement and continued advertisement of the compatibility extra
+- documented activated-environment use on Raspberry Pi and the need for
+  `--extra hardware` when intentionally using `uv run` for physical hardware
+
+### Validation
+
+- a default `uv sync --frozen` installed qrcode 8.2 and the exact no-extra
+  `ninjarobot-agent --help` import path succeeded
+- restored the hardware extra and passed workspace driver-source verification,
+  222-file/47-repair managed-driver integrity, compileall, Ruff lint/format,
+  MyPy across 81 source files, `git diff --check`, 16 focused QR/release tests,
+  and 543 full-suite tests
+- one upstream Starlette/httpx test-client deprecation warning remains
+
+### Raspberry Pi status and follow-up
+
+No GPIO, SPI, I2C, PWM, servo, display, camera, microphone, ngrok, systemd, or
+power action was executed. The remaining Pi check is non-moving: synchronize
+the hardware environment, import qrcode, and open the Interactive Tool.
+
+## 2026-08-15 — Explicit Web ownership, ngrok setup, QR, and deployment refinement
+
+### Root causes and implementation
+
+- separated physical HTTPS backend ownership from the public Local Web mode:
+  local, remote, and deployed local-fallback states now have explicit status
+  and request gates, so ngrok cannot accidentally expose a competing local
+  controller URL
+- made manual Remote Access configuration two steps: one-time hidden token
+  setup/atomic ngrok installation, followed by activation; offline activation
+  validates and persists configuration while the Agent remains the only tunnel
+  process owner
+- added deployed remote-failure fallback to local mDNS HTTPS and recovery back
+  to the remote endpoint; manual deactivation intentionally does not start
+  Local Web
+- added terminal `/show remote access`, which creates a fresh one-use pairing
+  token without revoking existing browsers, clears the QR to Idle after the new
+  browser pairs, and never replays Greeting
+- corrected ASGI WebSocket rejection to use Starlette's denial-response method
+  only when the server advertises the corresponding extension
+- simplified the normal-user Interactive Tool to the approved 14-item main,
+  six-item ngrok, and four-item deployment menus while keeping advanced
+  session, certificate, pairing rotation, credential removal, logs, backup,
+  rollback, and uninstall commands scriptable
+- changed deployment setup to install, enable, and start systemd in one
+  transaction, with `disable --now` rollback after a failed first start; status
+  now verifies the exact power-off authorization using `sudo -n -l` rather than
+  traversing the protected `/etc/sudoers.d` directory
+- preserved the absolute `.venv/bin/python` entry point in generated units;
+  resolving that symlink had selected uv's base interpreter and could omit the
+  project's installed environment at boot
+- updated beginner, release, and developer documentation, including optional
+  search-only Tavily enrollment through the private secret store and MCP preset
+
+### Validation
+
+- each implementation phase passed the 222-file/47-repair managed-driver
+  verifier, Ruff lint/format, and combined IDE/Agent MyPy gate
+- focused access/onboarding/IPC/Web tests passed 69 cases; Interactive Tool
+  tests passed 20 cases; deployment/CLI/shutdown tests passed 35 cases
+- final validation passed workspace source provenance, managed-driver
+  integrity, compileall, Ruff lint/format, MyPy across 81 source files,
+  `git diff --check`, and 542 tests; one upstream Starlette/httpx test-client
+  deprecation warning remains
+
+### Hardware validation status
+
+No actuator-moving, camera capture, microphone capture, ngrok account change,
+systemd installation, reboot, or Raspberry Pi power-off action was executed by
+the automated implementation. These remain explicitly separated manual Pi
+acceptance steps with raised-wheel and privacy precautions.
+
+## 2026-08-14 — Agent onboarding startup and IPC reset hardening
+
+### Root cause and implementation
+
+- traced the reported CLI `ConnectionResetError` to an earlier background
+  service failure: remote access made onboarding operationally required while
+  the release-status registry used only the older explicit onboarding flag and
+  rejected the coordinator's first state transition
+- introduced one effective onboarding invariant—explicit onboarding, remote
+  access, or auto-start—and reused it across release status, pairing/web
+  startup, and the coordinator
+- moved web/onboarding initialization inside the service cleanup boundary so a
+  startup exception releases Agent runtime and hardware ownership rather than
+  bypassing normal close handling
+- converted IPC read/write peer resets into controlled `AgentIPCError`
+  responses and prevented a reset during `wait_closed()` from replacing either
+  a valid response or the more useful exchange failure
+- added regression tests for every onboarding trigger, a reset after a valid
+  response, and a reset while reading the service response
+
+### Validation
+
+- Phase 1: managed-driver verification, Ruff, formatting, combined IDE/Agent
+  MyPy, and 4 service-main tests passed
+- Phase 2: managed-driver verification, Ruff, formatting, combined IDE/Agent
+  MyPy, and 30 IPC/CLI tests passed
+- full validation passed: workspace-source verification, 222-file/47-repair
+  managed-driver verification, compileall, Ruff lint/format, MyPy across 81
+  source files, `git diff --check`, and 529 tests; one upstream
+  Starlette/httpx deprecation warning remains
+
+### Raspberry Pi status
+
+A bounded non-moving Pi startup passed with the existing remote-enabled and
+explicit-onboarding-disabled configuration. The service reported ready in
+`onboarding`, enabled QR/pairing status, and a ready model plus IDE,
+robot-control, and memory tool providers. Remote access reached
+`waiting_for_connection`. No Greeting or actuator movement was triggered.
+Remote access, Web, Agent service, and the older Interactive Tool process were
+then stopped; no ngrok process, Agent socket, or port 8443 listener remained.
+
+## 2026-08-14 — Fresh-install, hardware recovery, onboarding, and deployment repair
+
+### Root causes and implementation
+
+- standardized every standalone managed driver on its canonical per-user XDG
+  configuration path so routine tools no longer write calibration state into a
+  clone or package source directory
+- added a bounded standalone `pi5camera` system-Python bridge for apt-managed
+  Picamera2/libcamera while retaining the locked project environment for the
+  CLI and face recognition
+- changed new integrated configurations to expose calibrated real motion by
+  default while preserving calibration validation, stop latches, obstacle/
+  watchdog controls, and the Agent's independent per-session `/arm` gate
+- represented the wake model as a package resource and imported compatible
+  pi5mic wake/VAD/capture tuning; the packaged ONNX asset remains byte-equivalent
+  to the managed pi5mic model
+- fixed both Level 2 resume entry points to start replacement driver instances
+  before health probing, then restore the Idle presentation
+- made Web status return ready, local/loopback URLs, certificate information,
+  and recovery guidance; rejected WebSocket activation failures are now closed
+  cleanly instead of escaping the handler
+- changed the Interactive Tool's MCP view to report loaded built-in tools and
+  provider health separately from optional external `mcp.toml` servers
+- made ngrok or boot enablement activate QR onboarding automatically; the first
+  paired browser or owner-only terminal chat triggers Greeting once, then Idle
+- added transactional deployment setup and per-artifact status, plus a
+  power-off helper/sudo preflight that rejects an incomplete installation
+  before a nonce is issued or the Agent stops
+- restructured `InstallationGuide.md` around blank-OS setup, detailed managed
+  module dependencies/calibration, short activated-environment commands,
+  direct interactive hardware/Agent tests, remote access, boot, and recovery
+
+### Validation
+
+- managed-driver verifier passed with 222 tracked files and 47 explicitly
+  authorized repairs after standalone-driver changes
+- managed driver suites passed independently: buzzer 67, camera 27, microphone
+  91, servo 134, and distance sensor 71 tests
+- NinjaRobot IDE passed 256 tests; NinjaRobotAgent passed 257 tests with one
+  upstream Starlette/httpx test-client deprecation warning
+- the root suite passed 526 tests; Ruff lint/format, compileall, MyPy for 81
+  source files, both v1.0.0 source/wheel builds, `git diff --check`, and final
+  driver verification passed
+
+### Hardware validation status
+
+No actuator, camera, microphone, power-off, or reboot action was executed by
+this software audit. The Installation Guide and final Pi checklist require
+raised-wheel direct testing, consent before capture, QR/browser acceptance,
+boot verification, and the explicitly separated power-risk test.
+
+## 2026-08-14 — Phase 8 Raspberry Pi test hardening and interactive acceptance guide
+
+### Implemented
+
+- fixed web connection-state translation so changing `en`, `ja`, `zh-TW`, or
+  `zh-CN` re-renders the live semantic state rather than the initial offline
+  label
+- moved Voice Input and Record Once to the main media-control grid below Camera
+  and Web Microphone
+- made Level 2 stop close the presentation gate immediately, report display
+  cleanup errors, keep the emergency frame last/persistent, and attempt a red
+  text fallback if icon rendering fails
+- made voice enablement wait for real `listening` readiness, added a bounded
+  startup timeout and stable microphone failure categories, moved raw stream
+  construction off the event loop, cleaned partial PortAudio ownership, and
+  persisted enablement only after success
+- replaced rejected ngrok legacy request-header options with Traffic Policy
+  remove/add header actions; permanent configuration/credential/account errors
+  now stop retrying while transient loss retains capped recovery
+- made ngrok installation reuse a valid v3 binary or perform validated atomic
+  replacement, preventing in-place `Text file busy` failures
+- made unavailable pairing URLs return `tunnel_not_ready` guidance rather than
+  an argparse traceback
+- added owner-private, symlink-safe, 5 MB service-log rotation and a checkout/
+  mode/interpreter/timestamp marker at every manual service start
+- corrected public branch references and added the consolidated Phase 8
+  existing-checkout/clean-clone normal-user validation workflow
+
+### Validation
+
+- managed-driver verification: 222 tracked files plus 28 authorized repairs,
+  pass before and after every implementation phase
+- Ruff lint and format: pass
+- MyPy: pass for 81 source files
+- Python compileall: pass
+- pytest: 522 passed; one upstream Starlette/httpx test-client deprecation
+  warning remains, with no production runtime failure
+- agent and IDE `1.0.0` wheels/source distributions: build pass; repaired web,
+  voice, remote, safety, locale, wake-model, and offline runtime assets present
+- `git diff --check`: pass before the documentation phase
+- no managed `pi5*` driver or nested `NinjaClawBot/` content changed
+
+### Raspberry Pi follow-up
+
+Run and sign
+`docs/validation/phase-8-final-interactive-pi-validation-2026-08-14.md` on the
+existing checkout and a clean `public_v01` clone. The checklist separates safe
+smoke, device communication, actuator-moving, network, boot, power-risk, soak,
+and rollback steps and uses the normal Interactive Tools for feature tests.
+
+## 2026-08-13 — Phase 8.7 v1.0.0 release candidate
+
+### Implementation
+
+- aligned root, agent, IDE, import, and lockfile versions at `1.0.0`
+- completed direct dependency/license notices, release manifest, support and
+  known-limitations matrix, architecture/privacy/remote-threat review, and
+  release-candidate report
+- built both V4 wheels and sdists and verified isolated installed-package
+  imports, CLI discovery, four locale files, deployment templates, custom wake
+  model, and offline runtime assets
+- preserved the publication gate: no Git tag, GitHub release, service install,
+  power action, or external mutation was performed
+
+### Validation and hardware status
+
+- the final software gate passes with 511 tests, 81 strictly typed source files,
+  immutable-driver verification, compilation, Ruff, formatting, JavaScript,
+  QR decode, systemd verification, package build/install, and whitespace checks
+- one existing Starlette/httpx TestClient deprecation warning remains
+  non-functional; physical Phase 8 acceptance is still pending and documented
+
+### Next step
+
+Run and sign every Phase 8 Raspberry Pi checklist on the exact release-candidate
+commit. After another final gate and explicit owner publication approval, tag
+and publish `v1.0.0`.
+
+## 2026-08-13 — Phase 8.6 explicit systemd deployment
+
+### Implementation
+
+- added a versioned, hardened systemd template with absolute installed-runtime
+  paths, non-root device groups, journald, bounded cleanup, start throttling,
+  and `Restart=on-failure`
+- added fixed root-owned power-off helper/sudoers templates; the agent can run
+  only the argument-free helper through noninteractive sudo after cleanup
+- added scriptable and Interactive Tool deployment validation, disabled install,
+  explicit enable/disable, start/stop/restart, status/logs, upgrade, private
+  backup, verified rollback, and data-preserving uninstall
+- made enablement explicitly persist real-hardware QR onboarding and paired web
+  power-off; fixed manual startup reporting so onboarding QR wait is service
+  readiness rather than a 60-second false timeout
+
+### Validation and hardware status
+
+- unit rendering and `systemd-analyze verify`, absolute paths, real-hardware
+  argv, hardening/restart policy, disabled install, fixed privileged targets,
+  enable/disable persistence, private backup/rollback, helper exactness, and
+  onboarding startup reporting tests pass
+- no sudo, systemctl, journal, installation, boot, hardware, or power command
+  was executed; Pi validation remains in
+  `docs/validation/phase-8-6-systemd-pi-checklist.md`
+
+### Next step
+
+Run the Phase 8.6 full gate, then complete v1.0.0 versioning, package/release
+manifests, security/privacy acceptance, and the final public-release audit.
+
+## 2026-08-13 — Phase 8.5 QR onboarding and first-connection Greeting
+
+### Implementation
+
+- added IDE-owned QR validation/rendering with error correction M, automatic
+  sizing, four-module quiet zone, integer modules, and centered 240×320 output
+- extended one-use pairing to exact local HTTPS origins so onboarding assets,
+  WebSockets, Greeting, and paired power control share one trust boundary
+- added remote connecting, failure-triggered local fallback, recovery-time QR
+  replacement, pre-expiry QR refresh, and endpoint/session invalidation
+- replaced service-start Greeting when onboarding is enabled with a serialized
+  first-paired-controller coordinator that runs Greeting and enters Idle once
+- made QR/display/Greeting failures terminal for that process, with degraded
+  startup state, redaction-safe events, Error display, motion revocation, and
+  a deterministic servo-stop attempt
+
+### Validation and hardware status
+
+- exact OpenCV QR round-trip, dimensions/colors, malformed/long URL, local and
+  remote pairing, fallback/recovery, refresh, probe rejection, concurrent and
+  reconnect exactly-once, and injected-failure tests pass
+- no real display, browser, tunnel, GPIO, buzzer, servo, or other hardware was
+  operated; the Pi checklist is
+  `docs/validation/phase-8-5-onboarding-pi-checklist.md`
+
+### Next step
+
+After the complete Phase 8.5 gate, add explicit disabled-by-default systemd
+installation, the narrow power-off helper/policy, and boot lifecycle checks.
+
+## 2026-08-13 — Phase 8.4 multilingual web and safe power-off
+
+### Implementation
+
+- added complete, key-identical English, Japanese, Traditional Chinese, and
+  Simplified Chinese dictionaries with locale selection, persistence, English
+  fallback, and translated accessibility attributes
+- added an accessible hamburger and full-screen overlay with language, voice,
+  recording, connection, and power controls while keeping Emergency Stop and
+  existing controller functions available
+- added a Power Off/Cancel dialog, paired active-controller enforcement, a
+  30-second one-use lease-bound nonce, replay rejection, and deterministic
+  cleanup outside the model/tool path
+- restricted OS privilege to fixed `/usr/libexec/ninjarobot-poweroff` argv,
+  without a shell or symlink, and only after service cleanup; the versioned
+  helper and policy are installed in Phase 8.6
+
+### Validation and hardware status
+
+- locale parity/reference, JavaScript syntax, preserved-control, pairing,
+  second-confirmation, nonce lease/expiry/replay, degraded cleanup, and fixed
+  helper invocation tests pass
+- no browser, camera, microphone, GPIO, display, buzzer, servo, tunnel, service,
+  or OS power action was activated during implementation
+- Pi UI, actuator, and power-risk acceptance is defined in
+  `docs/validation/phase-8-4-web-poweroff-pi-checklist.md`; final power-off waits
+  for the Phase 8.6 helper/policy installation
+
+### Next step
+
+After the complete Phase 8.4 gate, implement deterministic QR onboarding and
+trigger Greeting exactly once after the first paired controller connects.
+
+## 2026-08-13 — Phase 8.3 passwordless ngrok remote access
+
+### Implementation
+
+- added an explicit setup-only ngrok installer, owner-private authtoken and
+  pairing/session/transport secrets, exact process/tunnel teardown, upstream
+  TLS verification with the NinjaRobot local CA, capped retry/recovery, and
+  stable redaction-safe status/events
+- added one-use URL-fragment pairing, expiry/replay protection, keyed session
+  hashes, Secure/HttpOnly/SameSite cookies, exact Origin/Host validation, and
+  remote authentication for dashboard assets and WebSocket control
+- hardened transport identification with an ngrok rule that removes a
+  client-supplied marker and injects the process-owned value; this prevents a
+  remote Host-header spoof from being mistaken for an unpaired LAN request
+- extended scriptable commands and the Interactive Tool with configure,
+  activate, deactivate, status/URL, rotate/revoke, and credential removal
+- preserved local network/web behavior and the existing exclusive controller
+  lease; tunnel failure never executes hardware or disables local control
+
+### Validation and hardware status
+
+- URL, entropy, expiry, replay, wrong-origin, hostile Host, injected-marker,
+  cookie, unauthenticated asset/WebSocket, exact tunnel close, retry recovery,
+  private config, token redaction, persistence, CLI, IPC, and certificate-SAN
+  tests pass
+- compileall, Ruff lint/format, strict MyPy, and the full root suite passed with
+  474 tests and the one existing Starlette test-client warning before the final
+  documentation gate
+- no ngrok executable was downloaded, no account token was entered, and no
+  public endpoint, HTTP request, WebSocket, camera, microphone, display, GPIO,
+  servo, buzzer, or system service was activated during implementation
+
+### Next step
+
+Complete the Phase 8.3 documentation gate and operator live-account checklist,
+then proceed to the four-locale responsive web menu and safe power-off boundary.
+
+## 2026-08-13 — Phase 8.2 IDE-owned always-on voice input
+
+### Implementation
+
+- added one IDE-owned wake/listen/capture/transcribe state machine with bounded
+  16 kHz PCM buffering, 15-second maximum commands, silence completion,
+  cooldown/retry handling, cancellation, and temporary-WAV deletion
+- serialized manual USB capture/transcription with the listener so PortAudio
+  never has competing owners and always restores listening through cleanup
+- dispatched finalized transcripts exactly once through an independent owner
+  voice session using the existing model, policy, IDE, memory, presentation,
+  and event paths; no TTS or alternate hardware execution path was introduced
+- added explicit terminal and web enable/disable/status controls, four local
+  transcription locales, web transcript/reply events, and shared `/arm` / web
+  motion authorization with lease-scoped revocation
+- packaged the openWakeWord feature and Silero VAD assets with exact hashes
+  after a live arm64 load check proved the upstream wheel omits them; extended
+  the managed pi5mic detector with explicit offline asset paths and recorded
+  the two authorized driver-file hashes
+
+### Validation and hardware status
+
+- focused voice, microphone arbitration, identity/session, persistence, CLI,
+  policy, web, overflow, resampling, deletion, and no-OpenClaw-import tests pass
+- the Raspberry Pi 5 arm64 environment loaded the custom wake model, feature
+  models, and VAD model under ONNX Runtime at 16 kHz without a runtime download
+- immutable-driver verification reports 222 baseline files plus 28 authorized
+  repairs; compileall, Ruff lint/format, strict MyPy, `git diff --check`, and
+  the full root suite pass with 453 tests and one existing Starlette warning
+- the complete managed pi5mic suite passes with 91 tests and its existing
+  Python `audioop` deprecation warning; the built IDE wheel contains the custom
+  wake model, all three pinned offline runtime assets, and the asset notice
+- no microphone audio was captured and no display, GPIO, buzzer, servo, or
+  movement action was executed; live wake/false-trigger and actuator acceptance
+  remain operator validation work
+
+### Next step
+
+Proceed only after the Phase 8.2 gate passes. Phase 8.3 adds optional ngrok
+remote access and short-lived passwordless QR pairing without exposing an
+anonymous robot controller.
+
+## 2026-08-13 — Phase 8.1 strict release foundations
+
+### Implementation
+
+- added strict, default-disabled voice, remote access, QR onboarding, and
+  deployment sections while preserving Phase 7 configuration compatibility
+- bounded the wake model/framework, 15-second maximum command, language set,
+  retry policy, fixed local HTTPS upstream, pairing/session lifetimes, QR
+  parameters, systemd unit name, and privileged helper path
+- pinned openWakeWord, ONNX Runtime, pyngrok, and qrcode in opt-in package extras
+  and refreshed the root lock; the hardware extra selects all release runtimes
+- moved the wake model and adjacent notice into the IDE package that owns the
+  microphone boundary, retaining the approved checksum and source manifest
+- hardened `SecretStore` with unique temporary files, fsync, symbolic-link and
+  non-regular-path rejection, owner-only reads, and environment-token redaction
+- added normalized status and event categories for voice, tunnel, pairing,
+  onboarding, and shutdown without performing active hardware/network probes
+
+### Validation and hardware status
+
+- added configuration migration/round-trip/bounds tests, hostile secret-path
+  tests, environment-token redaction tests, dependency-degraded status tests,
+  lifecycle contract tests, and runtime status coverage
+- immutable-driver verification passed with 222 tracked files and 26 authorized
+  repairs; compileall, Ruff lint/format, strict MyPy, and the full suite passed
+  with 435 tests and the one existing Starlette test-client warning
+- the frozen hardware-extra dry run resolved all pinned release dependencies,
+  and the built IDE wheel contained the 206,276-byte model and adjacent notice
+- dependency metadata confirms an ONNX Runtime CPython 3.11/aarch64 wheel; the
+  actual Raspberry Pi import and model-load test remains deferred to device
+  validation
+- no microphone, display, GPIO, actuator, ngrok tunnel, system service, or OS
+  power-off action was performed in this low-risk foundation phase
+
+### Next step
+
+Proceed to the IDE-owned voice controller. Raspberry Pi microphone/model-load
+acceptance remains deferred until the Phase 8 device-communication checklist.
+
+## 2026-08-13 — Phase 8.0 release contract and asset provenance
+
+### Implementation
+
+- added the root MIT license and a third-party notice covering the Phase 8
+  qrcode, pyngrok/ngrok, openWakeWord, and ONNX Runtime boundaries
+- added the approved public-release contract and threat model for voice privacy,
+  QR pairing, remote control, privileged power-off, boot ownership, secrets,
+  supply-chain integrity, backup, rollback, and release blockers
+- copied the owner-approved `hey_Ninja.onnx` model into the IDE package that
+  owns the microphone control plane,
+  recorded its source, size, license, approval, and SHA-256 in a machine-readable
+  manifest, and added a package-adjacent model notice
+- added tests proving that the source and packaged model are byte-identical and
+  that the built consuming-package wheel contains the model and notice
+- added SPDX-compatible MIT metadata to the root, IDE, and agent projects and
+  updated README/DevelopmentGuide licensing and binary-asset guidance
+
+### Validation and hardware status
+
+- the consuming-package wheel build contained the 206,276-byte model and model notice
+- immutable-driver verification passed with 222 tracked files and 26 authorized
+  repairs; compileall, Ruff lint/format, strict MyPy, and the full suite passed
+  with 424 tests and the one existing Starlette test-client warning
+- no dependency was installed for unattended runtime use, no managed driver was
+  modified, and no microphone, display, GPIO, actuator, network tunnel, service,
+  or operating-system power action was performed
+
+### Next step
+
+Proceed to Phase 8.1 strict configuration, pinned optional dependencies, secret
+handling, and normalized lifecycle status. Raspberry Pi ONNX/aarch64 loading
+remains deferred until the Phase 8 device-communication checklist.
+
+## 2026-08-13 — Phase 8 final public-release roadmap
+
+### Scope and decisions
+
+- replaced the former separate Phase 8 voice/multimodal and Phase 9 deployment
+  entries with one final Phase 8 targeting the first public `v1.0.0` release
+- recorded the approved “Hey Ninja” ONNX wake model and checksum, 15-second
+  silence-bounded command capture, voice-input-only response flow, owner voice
+  identity, shared existing motion-arming controls, and four interface locales
+- designed optional ngrok access around short-lived passwordless QR pairing
+  rather than anonymous access, reusable credentials in a URL, or misuse of the
+  robot's ngrok authtoken as a browser credential
+- specified remote/local QR failure behavior, first-paired-browser Greeting,
+  truthful Idle/Error transitions, accessible hamburger navigation, confirmed
+  power-off, and explicitly enabled systemd startup
+- retained multi-agent hierarchy, text-to-speech, router port forwarding,
+  anonymous remote control, and silent installation-time auto-start as
+  `v1.0.0` non-goals
+
+### Plan structure and validation
+
+- divided Phase 8 into contract/licensing, lifecycle/configuration, voice,
+  remote access, web/i18n/power-off, QR onboarding, systemd, and final release
+  subphases; each records likely files, deliverables, validation, hardware risk,
+  documentation, rollback, and exit criteria
+- reviewed `README.md`, `DevelopmentGuide.md`, and `InstallationGuide.md`; they
+  remain unchanged because Phase 8 behavior is planned but not implemented and
+  must not be documented as currently available
+- immutable-driver verification passed with 222 tracked files and 26 authorized
+  repairs; compileall, Ruff lint/format, strict MyPy, and the full suite passed
+  with 422 tests and the one existing Starlette test-client deprecation warning
+- no runtime, dependency, configuration, managed driver, GPIO, microphone,
+  display, actuator, network service, or operating-system power behavior changed
+
+### Raspberry Pi status and next step
+
+No Raspberry Pi hardware or ngrok account was accessed for this planning-only
+change. Phase 8 implementation begins only after explicit implementation
+approval and proceeds through the documented subphase gates; physical tests are
+deferred to the safe-smoke, device-communication, raised-wheel actuator, and
+power-risk checklists in the finalized plan.
+
+## 2026-08-13 — Gemini 3 tool-continuation and quota-retry correction
+
+### Root cause and correction
+
+- audited the live service log and confirmed Gemini model discovery and normal
+  chat requests succeeded, while HTTP 400 appeared immediately after a Gemini
+  `memory.*` or `robot.*` tool result
+- corrected the Gemini `generateContent`/stream continuation format to retain
+  the provider-issued function-call ID and opaque thought signature. The
+  signature is replayed as a sibling field of the `functionCall` part, and the
+  exact ID is sent in the matching function response
+- added bounded conversion of old persisted or other-provider tool traces to
+  reference text when Gemini is selected, preventing a model switch from
+  forging an invalid Gemini function-call history
+- added up to two bounded pre-output Gemini 429 retries, including a bounded
+  `Retry-After` delay, without retrying or replaying any local tool action
+- replaced the misleading generic failover message with provider-specific,
+  redaction-safe reasons; Gemini 400 reports only its safe error category
+
+### Validation and Raspberry Pi status
+
+- added recorded-response coverage for Gemini IDs/signatures, persistence,
+  legacy and foreign history, 400 redaction, 429 generate/stream retry, and
+  explicit fallback diagnostics; the full suite passed with 422 tests
+- no managed driver, GPIO behavior, or hardware ownership path changed. One
+  non-tool Gemini request using the previously failing persisted trace was
+  accepted; no actuator was operated
+- the Phase 6 checklist now requires a non-moving Gemini tool-continuation test
+  before the existing raised-wheel movement test; rollback remains selecting a
+  known-good provider/model or restoring the prior source revision while the
+  service is stopped
+
+## 2026-08-12 — Phase 7 personalization consistency field fix
+
+### Root cause and correction
+
+- confirmed that behavior memory was shared correctly, while the exact user
+  sentence “I want to call you Pocky ... please call me Master” existed only in
+  the terminal transcript: the rename parser did not accept “want to call you,”
+  the preference parser did not model a form of address, and capture returned
+  after the first match, so neither value reached structured persistence
+- added deterministic compound personalization extraction and one transactional
+  store operation for `preferred_robot_name` plus the structured
+  `preferred_form_of_address` preference; invalid input cannot leave a partial
+  identity update
+- made bounded context and `memory.profile.get` expose the form of address for
+  the active user, while the identity prompt treats it only as a conversational
+  label; terminal, independent browser sessions, and replacement model
+  providers now read the same canonical per-user values
+- hardened successful-behavior confirmation so one quoted name is retained even
+  with natural surrounding wording or the observed `behavor` typo
+- stopped-service verification found the retained explicit owner request,
+  created an adjacent pre-repair SQLite backup, and replayed only that request
+  through the deterministic memory service; `Pocky` and `Master` are now stored
+  for `local-user`, with existing transcripts and behavior memories preserved
+
+### Validation and hardware status
+
+- each implementation phase passed immutable-driver verification, compileall,
+  Ruff lint/format, combined agent+IDE mypy, and the complete 415-test suite;
+  focused tests cover atomic rollback, exact field-test parsing, independent
+  terminal/browser context, provider switching, and quoted behavior names
+- no managed driver or hardware ownership path changed and no actuator was
+  operated; Raspberry Pi validation remains a safe terminal/web/model-switch
+  personalization check followed by the existing optional raised-wheel test
+
+## 2026-08-12 — Phase 7 cross-interface memory and deterministic behavior saving
+
+### Summary
+
+- replaced lease-derived web chat IDs with a stable per-browser identifier;
+  controller reconnects retain that browser session while terminal and other
+  browser sessions remain independent
+- kept the active user's SQLite profile and long-term memory shared across
+  interfaces and unchanged across provider/model selection; model switching
+  still revokes motion authorization as designed
+- made bounded automatic retrieval include recent successful behaviors and a
+  recent task recipe in addition to query matches, removing provider-dependent
+  reliance on a model deciding to call a memory tool
+- changed successful-behavior confirmation to a deterministic bounded parser;
+  the tested form `Yes, and please record and name this behavior "Exciting one
+  step forward"` no longer reaches the model or invents a confirmation button
+- retained the exact IDE-compiled behavior definition after successful dynamic
+  execution, then used the user's Yes as explicit confirmation to save both a
+  searchable user memory and a runnable private IDE catalog entry
+- added safe ASCII catalog-name normalization, no-overwrite behavior, rollback,
+  retry preservation, and explicit partial-failure reporting
+
+### Compatibility and safety
+
+Terminal and web transcripts are not merged. Switching one interface never
+switches another; both interfaces share memory only after independently
+selecting the same user. Catalog persistence does not rerun hardware and still
+passes through `PolicyEngine` plus the IDE `behavior.save_user` capability.
+Managed drivers and `NinjaClawBot/` were not changed.
+
+### Validation
+
+- immutable-driver verification: 222 tracked files across six drivers and 26
+  authorized repairs passed before/after every implementation phase
+- compileall, Ruff lint/format, and mypy passed
+- complete repository suite: 414 tests passed; the only warning is the existing
+  Starlette/httpx test-client deprecation
+- focused coverage confirms stable browser identity, independent browser
+  sessions, cross-model memory/transcript continuity, provider-independent
+  recent-memory retrieval, named affirmative parsing, IDE-compiled definition
+  retention, and dual memory/catalog save
+
+### Raspberry Pi status
+
+No physical hardware was operated. The Phase 7 validation checklist now covers
+same-user terminal/web consistency, browser reconnect, model switching, named
+dual-save, collision retry, optional raised-wheel replay, expected outcomes,
+and rollback.
+
+## 2026-08-12 — Phase 7 full reset and face-verified switching refinement
+
+### Summary
+
+- added a separately confirmed full-memory reset that removes every user,
+  including the owner, plus conversations, preferences, behavior memories and
+  attempts, pending confirmations, audit records, retrieval indexes, and face
+  identity data; configured retention defaults are restored and the next chat
+  starts owner registration
+- retained the existing active-user and owner protections for ordinary profile
+  deletion; only `memory reset-all --confirm` and the interactive phrase
+  `DELETE ALL ROBOT MEMORY` enter the full-reset path
+- coordinated SQLite and IDE face cleanup by quarantining the dedicated face
+  directory before the database transaction, restoring it on rollback, and
+  deleting it only after commit
+- made face cleanup fail closed when a configured identity directory contains
+  unrelated entries, preventing a bad path from moving or deleting other data
+- added deterministic registration/replacement of an existing profile's face
+  through the memory CLI and interactive management menu, without switching to
+  that profile
+- changed `/switch user` so name selection alone never changes identity; the
+  selected profile's exact opaque face identity must be recognized first
+- preserved the original user on missing enrollment, mismatch, unknown/no/
+  multiple faces, camera failure, or timeout; every attempt revokes the
+  session's motion and camera grants and IDE capture still returns to Idle
+
+### Preserved state
+
+The full-memory reset does not remove provider/API-key configuration, selected
+model settings, saved IDE behavior definitions, hardware calibration, or
+service logs. Managed drivers and `NinjaClawBot/` remain unchanged.
+
+### Validation
+
+- immutable-driver verification passed with 222 tracked files and 26
+  authorized repairs after every implementation phase
+- compileall, Ruff lint/format, and strict mypy passed after every phase
+- complete repository suite: 411 tests passed; the only warning is the existing
+  Starlette `httpx` test-client deprecation
+- new regression coverage includes atomic database reset, identity quarantine
+  commit/rollback, inactive-profile face recovery, no-owner onboarding,
+  exact-match switching, mismatch privacy, unregistered profiles, camera
+  failures, authorization revocation, and cross-user transcript isolation
+
+### Raspberry Pi status
+
+No physical hardware was operated. The Phase 7 Pi checklist now includes the
+destructive-reset boundary, face-verified terminal/web switching, camera/Idle
+recovery, expected outcomes, and rollback instructions.
+
+## 2026-08-12 — Phase 7 field-test correction: face enrollment and identity precedence
+
+### Summary
+
+- reproduced the Raspberry Pi failure with `opencv-python-headless 5.0.0.93`:
+  its `cv2` namespace does not provide the `CascadeClassifier` API used by the
+  existing `pi5camera` fallback
+- constrained the managed camera dependency to `opencv-python-headless>=4.8,<5`,
+  regenerated the lock at 4.14.0.94, recorded the approved driver hash, and
+  added a non-capturing backend diagnostic
+- made IDE enrollment and recognition restore silent Idle after success,
+  failure, and cancellation, and prevented capture when the countdown cannot
+  start
+- changed `/update profile` to show the active name and face status and accept
+  `name=<new name>` or the explicit `register user face` action
+- added retry guidance for backend/no-face/multiple-face failures and permitted
+  a registered user to refresh the same face identity
+- changed the default conversational name to `NinjaAgent`; explicit chat
+  renames are persisted per active user before model reasoning and override old
+  assistant messages, while `robot_name=...` is no longer accepted by the
+  profile command
+
+### Validation
+
+- immutable-driver verification passed with 222 tracked files and 26
+  authorized repairs
+- the OpenCV diagnostic passed with 4.14.0 and a loadable frontal-face cascade
+- compilation, Ruff lint/format, and strict mypy passed after every phase
+- the repository suite passed with 405 tests and one pre-existing Starlette
+  `httpx` test-client deprecation warning
+- regression coverage includes dependency incompatibility, Idle recovery,
+  cancellation, stopped presentation, enrollment retry/refresh, profile status,
+  chat-only robot naming, and refusal of ambiguous rename questions
+
+### Raspberry Pi status
+
+No physical hardware was operated during the correction. The updated Phase 7
+checklist separates the backend diagnostic, camera/display tests, optional
+actuator tests, expected outcomes, and rollback steps.
+
+## 2026-08-12 — Phase 7 persistent multi-user memory implementation
+
+### Summary
+
+- added migration-safe, owner-only SQLite persistence for multiple user
+  profiles, face references, preferences, recipes, successful/failed behavior
+  memories, technical attempts, retention settings, and mutation audit events
+- backfilled per-message `user_id` so switching users inside one terminal or web
+  session cannot expose another profile's transcript
+- made the first profile the owner/default and added deterministic `/new user`,
+  `/switch user`, `/identify`, and explicit `/update profile` workflows
+- added IDE-owned face enrollment/recognition through the existing `pi5camera`
+  API with the existing display countdown; full capture frames are deleted and
+  unknown/ambiguous/multiple faces never switch users
+- added shared final-result behavior capture for both model chat and direct web
+  controller execution, explicit confirmation for new dynamic successes,
+  automatic technical failure capture, and visible conservative
+  preference/task-recipe notices
+- added bounded automatic retrieval plus a fixed in-process FastMCP server with
+  four trusted, read-only, active-user `memory.*` tools and the bundled
+  `memory-retrieval` skill; no model-accessible memory mutation surface exists
+- added the interactive **Manage Memory** menu and scriptable `memory` CLI for
+  confirmed profile/behavior deletion, owner transfer, and retention changes
+
+### Data lifecycle and compatibility
+
+Raw conversations default to seven days. Failed behaviors default to 180 days
+and 1,000 entries per user. Profiles, preferences, recipes, and confirmed
+successful behaviors persist until deterministic deletion. Configuration
+supplies database defaults only once; later CLI settings survive restart.
+Existing conversation databases migrate transactionally and retain old tool
+calls. Provider switching, current robot tools, motion/camera authorization,
+Greeting/Idle presentation, and simulation/real-hardware modes remain intact.
+
+Profile deletion is restricted to inactive non-owner profiles, erases that
+user's raw messages and structured memory, and asks the IDE to delete the face
+index/cropped image first. Ownership must be transferred before owner deletion.
+Raspberry Pi administrators can read the local cropped face photo and encoding
+index, as explicitly approved for this educational project.
+
+### Safety and hardware boundary
+
+The agent still imports no managed `pi5*` package. All enrollment and
+recognition operations cross `RobotIDEClient` and reuse the serialized
+`CameraDevice`. Registration uses a visible countdown but does not consume an
+AI camera-preview grant. A camera or recognition failure leaves the profile
+pending and does not block chat. Face recognition is identity/personalization,
+not authentication. No managed driver or `NinjaClawBot/` file changed.
+
+Memory capture/retrieval errors are auxiliary: they publish bounded diagnostic
+events but cannot replace the IDE action result, retry hardware, or destabilize
+an otherwise successful robot action.
+
+### Validation
+
+- immutable-driver verification: 222 tracked files across six drivers plus 25
+  authorized repairs matched before and after every implementation phase
+- `compileall`, Ruff lint, Ruff format, and strict mypy passed
+- complete repository suite: 398 tests passed; the only warning remains the
+  existing Starlette `httpx` test-client deprecation
+- legacy-database migration, cross-user isolation, owner invariants, full-frame
+  deletion, camera-unavailable enrollment, session restart default, technical
+  result capture, confirmation, read-only MCP scoping, and management IPC have
+  dedicated regression coverage
+- synthetic 1,000-entry/50-query benchmark: median 4.186 ms, p95 4.363 ms,
+  database 1,261,568 bytes; all software limits passed
+
+### Raspberry Pi status
+
+No physical hardware was operated during this implementation. Profile-camera,
+visual countdown, long-run restart, and optional actuator validation remain for
+the operator. Follow
+`docs/validation/phase-7-persistent-memory-validation-2026-08-12.md` in order;
+the memory tests themselves do not require servo motion.
+
+### Follow-up
+
+Complete the Phase 7 Pi checklist, retain the result with this log, then review
+measured recognition quality and long-run database growth before changing the
+approved tolerance, retention defaults, or retrieval budget.
+
+## 2026-08-02 — Documentation accuracy correction
+
+### Summary
+
+- Reconciled the README checkout branch with the installation guide's current `alpha01` branch.
+- Removed the unbacked root MIT licence claim and broken `LICENSE` link.
+- Corrected the developer module map and the managed-driver boundary to match the IDE's controlled lazy imports and the agent's strict IDE-only access.
+- Clarified Level 2 suspend/recovery behavior, the non-persistent operator stop, the live-provider pytest marker, session-motion revocation, and local data locations.
+
+### Validation
+
+- `uv run --frozen python scripts/verify_immutable_drivers.py` passed before the documentation edit.
+- No implementation or managed-driver source changed; Raspberry Pi hardware was not accessed.
+
+### Follow-up
+
+- Add a root licence file only after the project owner confirms the intended legal licence and copyright terms.
+
+## 2026-08-01 — Long-run agent hardware ownership and recovery repair
+
+### Summary
+
+- replaced startup's 100 ms full-status polling with a lightweight readiness
+  command, followed by one detailed status request after Greeting settles
+- made threaded display and buzzer calls cancellation-safe so their async lock
+  remains owned until the underlying hardware call really exits
+- added explicit display and buzzer backend reconstruction for confirmed Level
+  2 recovery from their persisted driver-failure codes
+- required a reconstructed display to pass backend health and an actual
+  black-frame SPI write before the safety latch can clear
+- exposed Idle supervisor state and its bounded error through agent status;
+  unexpected loss now reports `liveliness_degraded`
+- added complete hardware-driver and Idle tracebacks plus Level 2 cleanup-error
+  logging to the agent service log
+
+### Root causes addressed
+
+Cancelling the looping Idle task cancelled its `asyncio.to_thread()` await but
+did not stop the worker thread. The async display lock was consequently
+released while an SPI transfer could still be running, allowing the next web
+or terminal presentation to overlap the same display. Separately,
+`DisplayDevice.start()` intentionally attempted initialization only once; a
+failed initial factory call or a stale post-failure driver could therefore not
+be replaced inside the long-running service. The prior display health check
+tested only backend/SPI-handle state and could accept a driver that still could
+not write. Frequent startup full-status polling added unnecessary provider and
+shared hardware health traffic during Greeting, and later Idle failures lacked
+enough service-log/status evidence for diagnosis.
+
+### Safety and compatibility
+
+The managed `pi5*` drivers remain unchanged. All reconstruction stays in the
+IDE integration boundary, and the agent still reaches hardware only through
+the IDE. Recovery remains explicit and fail-closed, never re-arms motion, and
+never retries an interrupted behavior. The display probe writes black but does
+not move an actuator; buzzer recovery initializes silently. Normal tools,
+behaviors, web controls, terminal chat, provider selection, and MCP names are
+unchanged.
+
+### Validation
+
+- immutable verification passed after every phase: 222 tracked files and 25
+  authorized repairs
+- compileall, Ruff lint/format, and strict mypy passed after each implemented
+  phase
+- 54 focused regression tests passed in the final stress phase
+- the complete repository suite passed with 379 tests; the only warning is the
+  pre-existing Starlette `httpx` test-client deprecation
+- coverage includes side-effect-free startup polling, cancelled-call lock
+  ownership, failed-first-start reconstruction, write-probed latch handling,
+  20 successive display and buzzer replacements, and 100 rapid Idle restarts
+  without overlapping writes or supervisor loss
+
+### Raspberry Pi status
+
+No physical device was operated during implementation. Follow
+`docs/validation/agent-long-run-hardware-stability-validation-2026-08-01.md`.
+Complete smoke and communication checks before Greeting/buzzer tests; keep all
+servo motion disarmed during the display/buzzer soak unless separately testing
+raised-wheel movement.
+
+## 2026-08-01 — Authoritative agent startup and safety readiness
+
+### Summary
+
+- changed detached service startup to wait for the Greeting/Idle result instead
+  of returning when the IPC socket first became reachable
+- added separate `started`, `ready`, `operational_state`, and structured
+  `startup` fields while preserving the existing status fields
+- exposed the IDE-owned persistent safety snapshot through a non-invasive
+  status callback, including the latch reason, original fault detail, recovery
+  requirement, and operator instructions
+- retained the Level 2 fail-closed policy and explicit confirmed resume; no
+  latch is automatically cleared and recovery still leaves AI motion disarmed
+- added traceback logging for Greeting/Idle failure and made event-publishing
+  failure unable to hide the actual startup result
+- marked readiness as recovered after successful health-checked resume
+
+### Root cause addressed
+
+The service previously bound its IPC socket before running Greeting. The
+detached launcher treated the first successful status response as complete
+startup, so it could print `started: true` while Greeting was still pending or
+had failed because of a persistent safety latch. Model and MCP health remained
+ready, making the output appear to say the complete robot was ready. Safety
+state lives outside the checkout and correctly survived repository reinstall,
+but status did not expose that boundary.
+
+### Validation
+
+- immutable-driver verification passed after both code and regression-test
+  phases: 222 tracked files and 25 authorized repairs
+- focused compilation, Ruff lint, Ruff formatting, and 31 startup/IPC/IDE/CLI
+  tests passed
+- regression coverage verifies pending, ready, degraded,
+  `recovery_required`, status-read failure, explicit recovery, launcher wait,
+  traceback logging, and non-invasive IDE safety serialization
+- full `compileall`, Ruff lint, Ruff formatting, and strict mypy passed; the
+  complete suite passed with 369 tests and the one pre-existing Starlette
+  test-client deprecation warning
+
+### Raspberry Pi status
+
+No actuator, camera, microphone, or real recovery action was executed during
+implementation. Follow
+`docs/validation/agent-startup-readiness-validation-2026-08-01.md`; run the
+safe smoke and communication checks before Greeting/buzzer or servo tests.
+
+## 2026-08-01 — API-key-only cloud auth and trusted robot-control MCP
+
+### Summary
+
+- removed Google Desktop OAuth and Anthropic `ant` web-login execution while
+  preserving a one-release `provider login` migration message
+- normalized legacy `auth_method = "oauth"` configuration to `api_key` and
+  stopped persisting `oauth_profile`
+- removed `google-auth-oauthlib` and its transitive OAuth dependencies from the
+  locked environment
+- added a read-only `behavior.preview` IDE capability that compiles compact
+  expression or movement drafts into canonical behavior definitions without
+  starting hardware
+- added a fixed, trusted, in-process MCP façade for behavior catalog, preview,
+  expression, movement, and stop operations
+- delegated existing model-visible behavior execution names to the MCP façade,
+  retained all other IDE tools, and preserved the existing session motion arm,
+  emergency policy, action IDs, cancellation, and IDE-only hardware boundary
+- reviewed `AuditReport_260731.md` against executable code and recorded a
+  correction addendum instead of treating every static finding as confirmed
+
+### Safety and compatibility
+
+The façade never imports a managed driver and never accepts raw GPIO fields.
+It derives risk, confirmation, timeout, idempotency, and cancellation metadata
+from project-owned IDE descriptors. External MCP servers remain separately
+namespaced and untrusted. Existing expression and movement tool names are
+unchanged, so current prompts, skills, web controls, and stored workflows keep
+working. Legacy OAuth configuration loads but no former refresh token or CLI
+profile is used.
+
+### Validation
+
+- immutable-driver verification passed before and after every phase: 222
+  tracked files and 25 authorized repairs
+- `compileall`, Ruff lint, Ruff format, and strict mypy passed
+- 363 automated tests passed; the only warning is the pre-existing Starlette
+  `httpx` test-client deprecation
+- focused tests cover fixed MCP discovery, authoritative risk classification,
+  schema rejection before execution, IDE action translation, ownership-aware
+  close ordering, cancellation propagation, legacy auth migration, and
+  simulated canonical behavior preview
+- source distributions and wheels for the IDE and agent both built successfully
+
+### Raspberry Pi status
+
+No physical device was operated during this refinement. Follow
+`docs/validation/robot-control-mcp-validation-2026-08-01.md`; complete safe
+smoke and device-communication checks before raised-wheel actuator tests.
+
+## 2026-07-30 — Integrated hardware recovery and false-latch repair
+
+### Summary
+
+- confirmed on the Raspberry Pi test workspace that every safe real hardware
+  probe was ready while the persistent safety state remained Level 2 latched
+- separated genuine device-driver errors from invalid generated behavior,
+  policy, and configuration failures
+- retained Level 2 shutdown for stable display, buzzer, servo, distance,
+  camera, and microphone driver-failure codes
+- stored a bounded original `fault_detail` in the persistent safety state
+- changed system recovery to report each unhealthy component and its error
+- added a cross-process hardware-owner lock for real integrated IDE and agent
+  assemblies
+- repaired the interactive resume failure path so a rejected recovery closes
+  the candidate assembly and releases ownership
+
+### Root cause
+
+`BehaviorRunner` forwarded every non-cancellation exception to the assembly's
+driver-failure handler. A non-hardware problem, such as generated text that
+did not fit the configured display, could therefore persist a Level 2
+`driver_failure` latch. Both the IDE and agent then correctly refused hardware
+actions, which looked like every driver had disconnected. The old safety file
+stored no original exception, and concurrent real agent/IDE processes had no
+shared device-ownership guard.
+
+### Validation
+
+- managed-driver verification passed before and after both implementation
+  phases: 222 baseline files plus 25 authorized repairs
+- Phase 1 full gate passed with 371 tests
+- Phase 2 full gate passed with 373 tests
+- `python -m compileall`, Ruff lint, Ruff formatting, and `mypy .` passed
+- regression coverage verifies false-latch prevention, genuine driver
+  escalation, persisted fault detail, named recovery failures, exclusive
+  hardware ownership, lock release, and repeated release safety
+
+### Raspberry Pi status
+
+The post-update safe real probe successfully reported buzzer, camera, display,
+distance, microphone, and servo boundaries as `ready`; no servo movement,
+recording, photograph, or retained media was requested. A live contention
+check rejected a second real IDE process with the recorded owner information,
+and ownership was reacquired normally after that process exited. The existing
+Level 2 latch was intentionally left unchanged. Physical recovery and the
+staged manual tests in
+`docs/validation/hardware-recovery-repair-validation-2026-07-30.md` remain for
+the owner to run after pulling this change.
+
+## 2026-07-30 — Native Gemini OAuth and provider-login refinement
+
+### Summary
+
+Removed Gemini's Google Cloud CLI dependency and made the interactive cloud
+authentication choices match the providers' supported workflows:
+
+- added `google-auth-oauthlib` to the locked agent dependencies
+- added a headless Google Desktop OAuth flow that prints the authorization
+  URL and accepts the final loopback URL through a hidden terminal prompt
+- added state, host, port, Desktop-client JSON, size, symbolic-link, and file
+  permission checks before storing or using credentials
+- added owner-private, atomic Gemini refresh-token storage under
+  `~/.config/ninjarobot_pi5/oauth/`
+- refreshed expired Gemini access tokens outside the asynchronous agent loop
+  and saved the renewed credential safely
+- changed Gemini logout to remove only NinjaRobotAgent's matching credential
+- removed Web Login from OpenAI's interactive submenu while preserving the
+  explicit scriptable error for unsupported OpenAI account login
+- retained Anthropic Web Login through the separately installed official
+  `ant` CLI
+- preserved the provider-neutral MCP, Agent Skill, policy, and IDE boundaries
+
+### Validation
+
+- managed-driver verification passed: 222 baseline files plus 25 authorized
+  repairs
+- 369 repository tests passed
+- `python -m compileall`, `ruff check`, `ruff format --check`, and `mypy .`
+  passed
+- OAuth tests cover confined filenames, owner-only permissions, symbolic
+  links, token refresh, redirect state, loopback destination, Desktop client
+  validation, hidden headless login, and secret-free status output
+- interactive-menu tests confirm OpenAI no longer offers Web Login and Gemini
+  requires a Desktop OAuth client JSON file
+
+No managed `pi5*` driver, hardware configuration, GPIO, I2C, SPI, PWM, camera,
+microphone, or nested `NinjaClawBot/` file changed. Live Google and Anthropic
+login remains an owner-run Raspberry Pi validation because it requires private
+accounts, internet access, and may incur provider charges.
+
+### Main files changed
+
+- `google_oauth.py`, `provider_auth.py`, `cloud_registry.py`, and
+  `agent_cli.py`
+- agent dependency lock and OAuth/provider-menu tests
+- README, installation guide, developer guide, implementation plan, this log,
+  and the Phase 6 Raspberry Pi validation guide
+
+## 2026-07-30 — Phase 6 cloud-provider adapters
+
+### Summary
+
+Implemented OpenAI, Google Gemini, and Anthropic model providers without
+changing the agent, MCP, Skill, policy, or IDE execution boundaries:
+
+- added HTTPS adapters for OpenAI Responses, Gemini generateContent, and
+  Anthropic Messages, including text streaming, usage, health, dynamic model
+  catalogs, and normalized tool calls
+- added deterministic provider-safe aliases for dotted `robot.*` and `mcp.*`
+  tool names; unknown aliases are rejected before policy evaluation
+- added terminal-only API-key management for all three providers, Google
+  Application Default Credential login through `gcloud`, and Anthropic profile
+  login through `ant`
+- explicitly rejected unsupported ChatGPT account login as OpenAI API
+  authentication
+- expanded the interactive Change Agent Model menu to Ollama, OpenAI, Google,
+  and Anthropic, while preserving scriptable provider/model commands
+- kept model switching idle-only, health-checked, atomic, motion-disarming,
+  and configuration-persistent
+- added optional provider fallback, disabled by default and allowed only
+  before tool execution and visible output; automatic fallback never persists
+  a provider change
+- preserved the shared MCP registry and Agent Skill prompt assembly for every
+  provider
+- updated private configuration serialization for authentication metadata and
+  fallback provider IDs
+
+### Validation
+
+- managed-driver verification passed before and after every implementation
+  group: 222 baseline files plus 25 authorized repairs
+- 348 repository tests passed after the documentation and validation pass
+- `ruff check` and `ruff format --check` passed for the changed source and
+  tests
+- strict typing passed: `mypy .` reported no issues in 64 source files
+- recorded-response tests covered OpenAI, Gemini, and Anthropic text/tool
+  normalization without making a live or billable provider request
+- cross-provider fixtures verified that MCP tool definitions and subordinate
+  Skill instructions survive each adapter's wire translation
+- secret-status tests verified that stored values never appear in CLI metadata
+
+No managed `pi5*` driver or nested `NinjaClawBot/` file changed. Live provider
+authentication and one read-only/one confirmed robot action per provider are
+deferred to the owner's Raspberry Pi checklist because they require private
+accounts, credentials, network access, and may incur charges.
+
+### Main files changed
+
+- cloud adapter, credential, registry, model-selection, service, and CLI
+  modules under `ninjarobot_pi5_agent`
+- provider and fallback configuration under `ninjarobot_pi5_ide`
+- recorded-response, registry, secret, fallback, CLI, and configuration tests
+- README, installation guide, developer guide, implementation plan, this log,
+  and the Phase 6 Raspberry Pi validation guide
+
+## 2026-07-30 — Deterministic granted camera requests
+
+### Summary
+
+Closed the remaining repeat-photo failure found during physical testing:
+
+- Explicit English and Japanese requests to take a photo are now recognized
+  before the first model turn.
+- With a valid current grant, the service directly constructs
+  `robot.camera.preview` and executes it through the existing policy and IDE.
+- Without a matching grant, the service returns stable `/camera` guidance.
+- Camera questions and negated requests do not enter the deterministic capture
+  path.
+- Deterministic replies report zero model turns and stream normally to the web
+  and terminal interfaces.
+
+### Main files changed
+
+- Agent loop deterministic intent, camera execution, response, and model-turn
+  accounting.
+- Regression tests for model refusal, three same-chat grants, English and
+  Japanese matching, negation, questions, lease mismatch, failure retry,
+  streaming, and JPEG redaction.
+- README, installation guide, developer guide, implementation plan, this log,
+  and the Raspberry Pi validation checklist.
+
+No managed `pi5*` driver or nested `NinjaClawBot/` file changed.
+
+### Why
+
+The physical transcript showed a successful first `robot.camera.preview`, then
+assistant-only authorization refusals after later grants. The action ledger
+contained no second camera attempt and no policy or IDE denial. The previous
+test proved that a scripted cooperative model could call the tool, but did not
+cover a model that ignored trusted runtime authorization. Privacy permission
+must be enforced by deterministic service code, not model interpretation.
+
+### Validation
+
+- Pre-change and implementation-phase immutable-driver verification passed.
+- Compilation, Ruff, formatting, strict MyPy, and all 329 tests passed.
+- The refusal-model regression confirms the provider receives zero requests
+  while the authorized photo succeeds and remains redacted from the transcript.
+- Final documentation-phase validation is recorded at task handoff.
+- Physical Raspberry Pi camera acceptance remains pending.
+
+### Recommended next step
+
+Run the updated Phase 5 camera checklist with three grants in one unchanged
+chat, including the Japanese, camera-question, and negative-request checks.
+
+## 2026-07-30 — Repeatable one-photo AI camera grants
+
+### Summary
+
+Fixed the model-side refusal that occurred after the first successful AI photo
+in a chat session:
+
+- Every `/camera` command or **AI camera** button press now issues a fresh,
+  numbered one-photo grant.
+- The current trusted runtime authorization explicitly overrides stale
+  conversation messages that describe an older consumed grant.
+- The agent is instructed to use temporary `robot.camera.preview`, not retained
+  `robot.camera.capture`, for this permission.
+- A successful preview consumes only its current grant. A failed preview keeps
+  that grant available for retry. The user may grant another photo repeatedly
+  without restarting or clearing the chat.
+
+### Main files changed
+
+- Agent camera policy, runtime state, prompts, service IPC, terminal/web
+  controller responses, and browser feedback.
+- Camera-policy, prompt, IPC, agent-loop, CLI, and web regression tests.
+- README, installation guide, developer guide, implementation plan, this log,
+  and the Raspberry Pi camera validation checklist.
+
+No managed `pi5*` driver or nested `NinjaClawBot/` file changed.
+
+### Why
+
+Physical test history showed that the first preview succeeded, but later
+requests were refused by the local model before any camera tool call. The
+backend could already replace a consumed grant; older assistant text such as
+“one preview per session” incorrectly overruled the newer button or `/camera`
+action. Numbered trusted grants make the newest permission unambiguous.
+
+### Validation
+
+- Pre-change and Phase 1 immutable-driver verification passed.
+- Phase 1 compilation, Ruff, formatting, strict MyPy, and all 314 tests passed.
+- The new same-conversation regression executes two successful previews with
+  grant sequences 1 and 2 and confirms that JPEG bytes are not stored.
+- Final documentation-phase validation is recorded at task handoff.
+- Physical Raspberry Pi acceptance remains pending using the updated checklist.
+
+### Recommended next step
+
+On the Raspberry Pi, grant and capture three temporary photos in one unchanged
+browser chat, verifying that every new grant succeeds once and an ungranted
+fourth request is refused.
+
+## 2026-07-30 — Restartable Resume, deterministic Idle, and one-shot AI camera
+
+### Summary
+
+Repaired three Phase 5 issues found during physical testing:
+
+- Level 2 Emergency Stop now suspends the distance sensor, camera, and
+  microphone instead of permanently closing their IDE adapters. `/resume` and
+  web Y can restart and health-check those devices in the same agent service.
+- Every normally completed foreground behavior resets the supervised ambient
+  face to looping Idle. Idle-task failures are visible as degraded health
+  instead of being ignored.
+- Terminal and web `/camera`, plus the **AI camera** button, grant one
+  temporary AI photo. The robot shows `3`, `2`, `1`, then an animated camera
+  icon. Successful preview delivery consumes the grant; a failed capture keeps
+  it available.
+- Preview JPEG bytes are broadcast only to the active live browser and are
+  removed before the tool result enters model context, transcripts, retained
+  event history, or the durable IDE action ledger.
+
+### Main files changed
+
+- IDE device lifecycle, Level 2 safety controller, robot Idle supervisor,
+  camera presentation, and embedded face renderer.
+- Agent policy, runtime, loop, prompt, IPC, terminal chat, web controller, and
+  ephemeral event delivery.
+- Mobile web AI-camera control, temporary preview handling, and regression
+  tests.
+- README, installation guide, developer guide, implementation plan, this log,
+  and a dated Raspberry Pi validation guide.
+
+No managed `pi5*` driver or nested `NinjaClawBot/` file changed.
+
+### Why
+
+The action ledger showed `RuntimeError: distance adapter is closed` after
+Emergency Stop. Level 2 had used terminal adapter shutdown for a recoverable
+runtime stop. The old foreground lifecycle also resumed whichever ambient
+emotion was previously selected and silently discarded Idle-task exceptions.
+Finally, the agent had no bounded way to use temporary camera preview without
+confirming an entire conversational turn.
+
+### Validation
+
+- Phase 1: immutable-driver verification, compilation, Ruff, format, MyPy, and
+  309 tests passed.
+- Phase 2: the same gate passed with 309 tests.
+- Phase 3: JavaScript syntax and the complete Python gate passed with 313
+  tests. One existing Starlette/httpx deprecation warning remains and does not
+  affect runtime behavior.
+- Physical Raspberry Pi acceptance is pending using the dated validation
+  checklist.
+
+### Recommended next step
+
+Run the Emergency Stop/Resume, Greeting/Idle, Celebrate/Idle with raised
+wheels, and one-shot AI camera checks in
+`docs/validation/phase-5-recovery-idle-camera-validation-2026-07-30.md`.
+
+## 2026-07-29 — Health-checked `/resume` in agent chat
+
+### Summary
+
+Added a direct recovery command to both NinjaRobotAgent chat interfaces:
+
+- terminal chat recognizes `/resume`, asks the operator to type `RESUME`, and
+  sends a dedicated local service request instead of involving Ollama
+- web chat recognizes `/resume`, shows the existing browser confirmation
+  dialog, and sends the fixed Resume operation instead of an AI prompt
+- the shared runtime calls `robot.system.resume` with the IDE-required
+  `{"confirmed": true}` argument and confirmation policy
+- the existing web Y Resume path now uses the same shared boundary; its former
+  empty arguments could fail strict IDE validation
+- successful recovery restores the IDE-owned Idle loop
+- failed health checks keep the Level 2 latch and controls inactive
+- AI chat motion remains disarmed after recovery and still requires `/arm` or
+  **Arm AI Motion**
+
+### Main files changed
+
+- Agent runtime, Unix-socket IPC protocol, terminal chat, and web controller.
+- Mobile web chat JavaScript and recovery messages.
+- Agent IPC, CLI, and web regression tests.
+- Project, installation, developer, implementation-plan, log, and Raspberry
+  Pi validation documentation.
+
+No managed `pi5*` driver or nested NinjaClawBot file changed. Hardware access
+continues exclusively through `ninjarobot_pi5_ide`.
+
+### Why
+
+The IDE already had the correct confirmed Level 2 recovery: it probes the
+display/expression system, servos, distance sensor, camera, and microphone,
+clears the latch only when all probes pass, and restores Idle. The agent chat
+had no route to that capability, so the operator had to stop the single-owner
+service or use another interface. The web controller also sent an empty
+argument object even though the IDE schema requires `confirmed=true`.
+
+### Validation
+
+- Phase-focused Ruff, format, joint Agent+IDE MyPy, JavaScript syntax, IPC,
+  CLI, and web tests passed.
+- The complete gate passed with 306 tests and one known Starlette test-client
+  deprecation warning.
+- All 222 managed-driver files plus 25 authorized repairs matched the
+  immutable manifests.
+- Automated tests were simulation-only and did not energize hardware.
+
+### Raspberry Pi status
+
+Follow
+`docs/validation/phase-5-agent-chat-resume-validation-2026-07-29.md`.
+Test the health-check-only recovery first. Keep AI motion disarmed until Idle
+has returned, then raise both wheels before a separate `/arm` and one-second
+movement test.
+
+## 2026-07-29 — Generated-behavior compiler and local-model recovery
+
+### Summary
+
+Reproduced the reported “I've encountered an unexpected system failure”
+against the operator's real test databases and repaired the behavior-generation
+path without changing any Pi5 hardware library:
+
+- recovered nine failed dynamic-behavior calls from the conversation and
+  action ledgers; every one used model shorthand instead of the IDE's strict
+  canonical behavior schema
+- added a compact behavior-draft compiler that accepts common flat stage
+  fields, canonical definitions, named movement assets, note names, and known
+  melody aliases
+- added the bundled, non-executable `robot-behavior-generation` agent skill
+  with exact expression and movement examples
+- changed pre-execution draft failures to the actionable
+  `BEHAVIOR_DRAFT_INVALID` code with safe retry guidance
+- conservatively corrects an expression-tool call to the movement tool only
+  when its structured JSON explicitly contains motion; policy evaluation
+  occurs after correction, so unarmed motion remains denied
+- increased the local-model output allowance from 512 to 1,024 tokens and
+  strengthened the base prompt to call the correct trusted tool before prose
+- retries an Ollama connection/read failure once only before visible output
+  and hardens IPC cleanup when a client disconnects
+
+### Root cause and safety boundary
+
+Display, buzzer, servo-stop, and simple IDE actions in the same real history
+succeeded. The failure was not a hardware-driver or calibration problem. The
+models omitted required stage names and canonical `operations`/`kind` fields,
+used flat `face`, `melody`, or `movement` keys, and sometimes selected the
+expression tool for movement. Strict IDE validation then failed, and the prior
+agent converted that correct rejection into a generic failure message.
+
+The new compiler runs inside `ninjarobot_pi5_ide`. It never imports or changes
+a driver, never maps movement directly to GPIO, and never bypasses arming,
+calibration, obstacle, latch, resource, cancellation, or servo-limit checks.
+Invalid drafts are rejected before execution. The agent still reaches hardware
+only through the IDE.
+
+### Validation
+
+- immutable-driver verification passed before and after implementation: 222
+  tracked files plus 25 authorized repairs
+- compilation, Ruff lint, Ruff format, and strict MyPy passed
+- 299 automated tests passed; the only warning is the existing Starlette
+  `TestClient` deprecation notice
+- agent and IDE source distributions and wheels built successfully
+- wheel inspection confirmed the compiler and all three bundled skill files
+- hardware-free local-model probes showed Qwen3.5:0.8B produced a usable
+  compact movement draft; Qwen3.5:2B exhibited the corrected tool-name routing
+  case; Qwen3:1.7B and Qwen3:4B did not reliably reach a tool call within the
+  tested output/time bounds and remain model-quality limitations
+
+### Raspberry Pi status
+
+Automated tests did not energize hardware. Follow
+`docs/validation/phase-5-behavior-generation-repair-validation-2026-07-29.md`.
+Run expressions in simulation first, then use raised wheels, a one-second
+movement, the correct armed session, and an immediately accessible Emergency
+Stop for physical acceptance.
+
+## 2026-07-29 — Session-lived AI motion and creative behavior composition
+
+### Summary
+
+Repaired the local-agent movement failure and expanded the IDE boundary so the
+robot can express model-selected combinations rather than only running bundled
+behavior names:
+
+- reproduced the real failure where a Qwen tool call arrived more than seven
+  minutes after the prompt and was denied because its 300-second arm expired
+- replaced time-limited consent with session-lived consent revoked by Disarm,
+  Emergency Stop, controller loss, model change, or service shutdown
+- made Disarm cancel active motion tokens and request an immediate servo stop
+- replaced ambiguous model-visible state with explicit real/simulation and
+  motion-authorization facts while retaining compatibility fields
+- instructed local models that an armed real session may execute trusted
+  robot tools instead of incorrectly refusing or merely explaining the action
+- added transient expression and movement capabilities that combine validated
+  faces, text, tones, melodies, and logical servo targets
+- added a bounded tone behavior operation using the existing buzzer limits
+- made expression schemas omit drive operations and movement schemas publish
+  only configured logical servo roles
+- added confirmation-gated `behavior.save_user` plus interactive
+  `/confirm <request>`; assets remain confined, private, non-overwriting, and
+  schema-validated
+- kept camera and microphone privacy approval separate from motion arming
+
+### Main files changed
+
+- Agent policy, runtime, prompt, service state, IPC, web disarm handling, and
+  interactive CLI.
+- IDE behavior models, runtime, integrated capability adapters, and public
+  exports.
+- Agent and IDE policy, prompt, behavior, integration, and persistence tests.
+- Project, installation, developer, implementation-plan, log, and Raspberry
+  Pi validation documentation.
+
+No managed `pi5*` driver or nested NinjaClawBot file changed. The agent still
+uses hardware only through `ninjarobot_pi5_ide`.
+
+### Why
+
+The stored physical-test transcript proved two distinct causes. Runtime state
+was captured as armed, but a slow model exceeded the five-minute arm lifetime
+before its tool call reached policy. Other responses interpreted
+`simulated: false` backwards because the prompt called runtime state
+“untrusted data.” The prior agent also lacked a validated inline multimodule
+behavior capability, so creativity was limited to selecting bundled assets or
+calling devices independently.
+
+### Validation
+
+Every implementation phase passed immutable-driver verification and the full
+compile, Ruff, format, strict MyPy, and pytest gate. The pre-documentation gate
+reported 284 passing tests and one known Starlette test-client deprecation
+warning. The final documentation gate reported 285 passing tests, 57 strictly
+typed source files, 291 formatted files, clean JavaScript and web-manifest
+checks, successful agent and IDE source/wheel builds, required packaged
+assets, 222 immutable tracked driver files plus 25 authorized repairs, and a
+clean `git diff --check`.
+
+### Raspberry Pi status
+
+Automated validation is simulation-only. Follow
+`docs/validation/phase-5-dynamic-behavior-validation-2026-07-29.md` in order.
+Keep both wheels raised until expression, authorization, cancellation,
+Disarm, obstacle, and Emergency Stop checks pass.
+
+## 2026-07-29 — Model-arm, HTTPS chain, and mobile viewport repair
+
+### Summary
+
+Completed the owner-approved repair for three issues found during Raspberry Pi
+and mobile Chrome testing:
+
+- removed benchmark acceptance as a natural-language motion permission, so
+  every installed selected model that passes provider health can arm after
+  explicit operator confirmation
+- retained session arming, the exclusive browser lease, tool policy, IDE
+  motion checks, obstacle handling, and Emergency Stop
+- changed generated HTTPS serving from a leaf-only PEM file to a leaf-plus-CA
+  chain and added an atomic migration that preserves the existing private key
+- made Chrome CA installation optional when that browser offers its own
+  certificate-warning bypass, while retaining CA trust as the recommended
+  path and the normal requirement for Safari and reliable browser speech
+- added actionable WebSocket recovery guidance to Live Activity
+- changed D-pad row sizing to obey its allocated grid height, preventing
+  overlap with camera and USB microphone controls in short, non-fullscreen
+  portrait viewports
+
+### Cause and boundaries
+
+The benchmark block was an intentional earlier policy that no longer matched
+the owner's approved model-selection behavior. The generated certificate was
+validly signed by the local CA but Uvicorn received only the leaf PEM file.
+The D-pad used intrinsic clamped row heights that could exceed the parent grid
+track when mobile browser controls reduced the visible height.
+
+No managed `pi5*` driver changed. Agent hardware access still passes only
+through `ninjarobot_pi5_ide`.
+
+### Validation
+
+Regression tests cover confirmed arming with an unaccepted model, explicit
+confirmation, complete-chain generation, leaf-only migration with exact
+private-key preservation, WebSocket guidance, and allocation-bounded D-pad
+sizing. The final gate passed immutable verification for 222 driver files and
+25 authorized repairs, compilation, Ruff lint and format checks, strict MyPy
+for 57 source files, all 279 pytest tests, JavaScript syntax, web-manifest
+validation, both agent and IDE source/wheel builds, packaged-web-asset
+inspection, and `git diff --check`. Pytest reported one known Starlette
+test-client deprecation warning.
+
+### Raspberry Pi status
+
+Automated validation does not prove mobile trust behavior or actuator
+clearance. Follow
+`docs/validation/phase-5-agent-model-ui-refinement-validation-2026-07-29.md`
+with wheels raised. Test Chrome first without CA trust only when it offers
+**Advanced → Proceed**, then test the trusted-CA route required for Safari.
+
+## 2026-07-29 — Local model, expressive-agent, Tavily, and controller refinement
+
+### Summary
+
+Completed the approved post-test refinement in five independently validated
+implementation phases:
+
+- corrected the Tavily preset to allow current raw server tool
+  `tavily_search`, preserved public name `mcp.tavily.tavily-search`, and added
+  in-memory migration for an older owner configuration
+- repaired browser-microphone state and label handling while preserving the
+  rule that recognized text waits in the input until the user presses Send
+- added provider-neutral installed-model discovery, numbered interactive
+  selection, scriptable `model list|current|select`, atomic persistence, and
+  idle-only hot switching
+- closed the old provider after a successful switch, disarmed previous AI
+  motion sessions, and initially gated natural-language physical motion on an
+  accepted benchmark; the newer repair entry above records the owner-approved
+  removal of that benchmark gate
+- serialized conversations and added the IDE-owned Idle, Thinking,
+  Speaking/emotion, tool-action, and return-to-Idle presentation lifecycle
+- added a strict display-only emotion directive that is removed before
+  streaming or transcript persistence and cannot grant tool or motion access
+- refined the portrait controller to match `templates/webinterface_02.jpg`,
+  removed redundant labels, consolidated AI motion state into its button,
+  protected the chat form from the Live Activity tab, and added the
+  fullscreen/start gesture with a mobile Safari standalone fallback
+- made `load_robot_config` consistently expand a leading home-directory
+  shortcut so default CLI paths work for new commands
+
+### Architecture and safety
+
+The agent still reaches robot presentation and actions only through
+`RobotIDEClient`. Ambient faces yield to foreground IDE behaviors and do not
+overwrite Level 1, Level 2, driver-failure, or shutdown presentation. Model
+emotion is a bounded display choice, not an action or permission.
+
+No managed `pi5*` driver file changed. The immutable-driver report continues
+to match 222 tracked files and 25 previously authorized repairs.
+
+### Validation
+
+Each implementation phase passed compile checks, Ruff lint and format checks,
+strict MyPy, pytest, JavaScript syntax, diff checks, and immutable-driver
+verification. The last pre-documentation gate reported 278 passing tests with
+one known Starlette test-client deprecation warning. The complete
+post-documentation gate repeated the same 278-test result, built both agent and
+IDE source/wheel distributions, and confirmed the packaged web assets. Live
+read-only checks confirmed local Ollama model discovery and current Tavily
+health/tool discovery.
+
+### Raspberry Pi status
+
+Software implementation is complete. Physical and browser acceptance remains
+an operator task. Follow
+`docs/validation/phase-5-agent-model-ui-refinement-validation-2026-07-29.md`
+in order, beginning with simulation and read-only checks before display,
+privacy, network-loss, or raised-wheel motion tests.
+
+## 2026-07-29 — Phase 5 agent and mobile web refinement
+
+### Summary
+
+Refined the completed Phase 5 agent and controller after Raspberry Pi testing:
+
+- replaced the single short model timeout with a 600-second complete-request
+  limit and a 120-second inactivity limit that resets on visible or private
+  model activity
+- kept private model thinking out of chat, transcripts, and user-facing logs
+- added one real startup Greeting followed by a service-owned, silent,
+  continuously looping Idle face
+- restored Idle after normal behavior completion or Resume without overwriting
+  Level 1, Level 2, driver-failure, or shutdown safety displays
+- removed the distance-clear startup gate, changed the obstacle threshold to
+  50 mm, and applied three-reading Level 1 stops to Forward and both turns
+- retained backward movement as warning-only and treated exact raw `8191` as
+  clear space; null, invalid, missing, and stale readings do not stop motion
+- replaced the generated self-signed leaf certificate with a persistent local
+  certificate authority and `.local` server certificate
+- added public-CA status/export commands while keeping both private keys
+  owner-only
+- changed the printed controller URL to
+  `https://ninjarobotpi5.local:8443/`
+- rebuilt the controller as a fixed portrait layout for mobile Chrome and
+  Safari, with a rotate-back landscape overlay and hidden Live Activity drawer
+- hardened D-pad pointer/touch behavior against text selection, touch callouts,
+  lost releases, page hiding, and focus loss
+- changed browser speech recognition to fill the chat input for review; only
+  Send transmits it
+
+### Main files changed
+
+- `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/agent_loop.py`
+- `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/ollama.py`
+- `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/service_main.py`
+- `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_app.py`
+- `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/`
+- `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/robot.py`
+- `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/config.py`
+- the related agent and IDE tests
+- `README.md`, `InstallationGuide.md`, `DevelopmentGuide.md`,
+  `NinjaRobotPi5V4_ImplementationPlan.md`, and the new Raspberry Pi validation
+  checklist
+
+No managed `pi5*` hardware-driver file was changed. Cross-device behavior
+remains inside `ninjarobot_pi5_ide`, and the agent still accesses hardware
+only through the IDE boundary.
+
+### Why
+
+Physical testing showed that local model thinking could outlast the previous
+timeout, the old distance preflight could prevent valid movement, and an
+untrusted leaf certificate was difficult to use with mobile Safari. The
+controller also needed a reliable portrait touch layout and a review step
+between speech recognition and sending a prompt.
+
+### Validation
+
+Each implementation phase passed immutable-driver verification and its full
+Python gate. Before the documentation pass, the final software suite reported
+268 passing tests. JavaScript syntax validation also passed. The complete
+post-documentation gate and packaged-static-asset check are recorded in the
+final task handoff.
+
+### Raspberry Pi status
+
+Operator validation is still required for the refreshed Qwen3:4B timeout
+behavior, startup Greeting/Idle lifecycle, 50 mm obstacle stops, certificate
+trust in both mobile Safari and Chrome, portrait touch controls, heartbeat
+loss, camera preview, USB microphone cleanup, and raised-wheel movement.
+
+Follow
+`docs/validation/phase-5-agent-refinement-validation-2026-07-29.md` from top
+to bottom.
+
+### Follow-up
+
+Record the completed device checklist and benchmark report. Keep the web
+controller local to the trusted LAN; authentication and internet exposure
+remain outside this phase.
+
+## 2026-07-28 — Phase 5.0–5.7 agent implementation
+
+### Summary
+
+Implemented the bounded NinjaRobotAgent through the complete approved Phase 5
+software scope. The result is one reconnectable owner service shared by the
+conversational CLI and optional FastAPI HTTPS web interface. Robot operations
+remain confined to the NinjaRobotPi5 IDE; no agent module imports a managed
+`pi5*` driver.
+
+Implemented:
+
+- owner-only process lock, Unix-domain IPC socket, bounded event broker, and
+  SQLite transcripts with seven-day retention
+- provider-neutral model, message, tool, policy, recovery, and cancellation
+  contracts
+- IDE tool discovery under `robot.*`, collision-safe MCP tools under
+  `mcp.<server-id>.*`, and non-bypassable risk evaluation
+- official MCP SDK connections over `stdio` and Streamable HTTP, owner-only
+  secret storage, result limits, optional-provider degradation, and the
+  search-only Tavily preset
+- strict non-executable skills with `skill.json`, `instructions.md`, optional
+  `examples.json`, prompt-order protection, atomic installation, simulation,
+  and explicit approval for AI-proposed skills
+- loopback-only Ollama adapter, Qwen3:4B candidate profile, streaming,
+  normalized tool calls, bounded turns/tools/time, and a hardware-free model
+  benchmark that never executes tools
+- reconnectable `ninjarobot-agent` chat, interactive menu, service lifecycle,
+  session, motion-arm, MCP, skill, and benchmark commands
+- FastAPI HTTPS web UI with one exclusive controller lease, `423 Locked`
+  second-client rejection, heartbeat stop, short refresh reconnection, direct
+  D-pad control, Emergency Stop, confirmed Resume, Greeting, Celebrate, AI
+  chat, and live events
+- temporary IDE camera previews and local whisper.cpp USB-microphone
+  transcription, with media cleanup on success, failure, and cancellation
+- browser speech recognition for English and Japanese; recognized text is sent
+  to the agent, while spoken robot responses remain outside Phase 5
+
+### Safety and privacy decisions
+
+- The first browser on the LAN wins the unauthenticated controller lease, as
+  explicitly accepted by the owner. The web interface is HTTPS-only and must
+  never be internet-exposed or port-forwarded.
+- Direct controls use fixed server mappings. The browser cannot submit an
+  arbitrary tool name.
+- Direct D-pad and approved buttons use the controller session arm. Natural
+  language motion uses a separate, explicitly confirmed chat-session arm.
+- Emergency Stop remains model-independent. Lost heartbeats and controller
+  shutdown cancel active movement and request zero servo pulse.
+- Camera preview has a five-megabyte bound, is not retained on disk, and is
+  redacted from the durable action ledger.
+- USB audio and whisper.cpp transcript staging are removed after the text is
+  produced or the operation is interrupted.
+- External MCP metadata and results remain untrusted and cannot grant robot
+  authority.
+
+### Validation
+
+- Managed-driver verification passed: 222 tracked files across six drivers
+  match the import baseline plus 25 authorized repairs.
+- Python compilation passed.
+- Ruff lint and format checks passed.
+- Strict mypy passed for 55 V4 source files.
+- Automated suite passed: 259 tests.
+- JavaScript syntax validation passed for the packaged web application.
+- Wheel build inspection confirmed `index.html`, `styles.css`, and `app.js`
+  are included.
+- A real simulated-service smoke test started the owner process, started HTTPS
+  on `127.0.0.1:18443`, returned ready health, stopped the web server, stopped
+  the service, removed the IPC socket, and left no service process.
+- A live Qwen3:4B greeting attempt streamed output but exceeded the 90-second
+  development timeout. This is not an acceptance result; the model remains a
+  candidate until the documented Pi benchmark passes.
+
+No GPIO, PWM, I2C, SPI, camera, microphone, actuator, or live Tavily check was
+performed during the local implementation gate.
+
+### Files changed
+
+- `ninjarobot_pi5_agent/`: agent loop, providers, tools, policy, MCP, skills,
+  persistence, service, CLI, web server, web controller, TLS generation, static
+  interface, tests, and package dependencies
+- `ninjarobot_pi5_ide/`: integrated agent client plus temporary camera-preview
+  and local microphone-transcription capabilities
+- `README.md`, `DevelopmentGuide.md`, `InstallationGuide.md`,
+  `NinjaRobotPi5V4_ImplementationPlan.md`: implemented behavior and workflows
+- `docs/validation/phase-5-agent-validation-2026-07-28.md`: operator checklist
+- `pyproject.toml`: exact strict-mypy discovery scope for V4 sources
+- `uv.lock`: locked FastAPI and direct Phase 5 dependencies
+
+### Next step
+
+Run the Phase 5 Raspberry Pi checklist in order. Accept Qwen3:4B only if its
+saved benchmark meets every threshold. Complete network and privacy tests
+before raised-wheel motion, then report results so Phase 5 can be marked
+operator-validated.
+
+## 2026-07-28 — Phase 5 MCP, Tavily search, and agent-skill plan
+
+### Summary
+
+Refined the approved Phase 5 architecture so NinjaRobotAgent can gain new MCP
+tools and validated agent skills without rebuilding its core. MCP means Model
+Context Protocol, the client-server connection used to discover and call tools
+from separate programs or hosted services.
+
+The revised plan now includes:
+
+- one single-owner agent service shared by reconnectable CLI and FastAPI web
+  clients
+- the new planned `ninjarobot-agent` conversational and interactive command
+  while preserving `ninjarobot_pi5_cli` and `ninjarobot-ide-tool`
+- a provider-neutral tool registry for IDE and MCP tool providers
+- local `stdio` and remote Streamable HTTP MCP connections
+- the official hosted Tavily MCP server as the default real-time search
+  integration
+- a strict search-only Tavily allowlist with environment-based secret loading,
+  bounded output, citations, and explicit network/quota failures
+- confined `skill.json`, `instructions.md`, and optional `examples.json` agent
+  skill packages
+- immutable safety-prompt ordering and rejection of executable-code skills
+- the previously approved benchmark-first Qwen3:4B policy, seven-day
+  transcript retention, exclusive browser lease, mobile web controls, camera,
+  USB microphone, and English/Japanese browser speech requirements
+
+### Files changed
+
+- `NinjaRobotPi5V4_ImplementationPlan.md`
+  - reconciled older CLI-only and no-HTTP statements with the approved
+    single-owner FastAPI service
+  - added MCP, tool-provider, Tavily, skill, prompt-composition, secret, and
+    namespace requirements
+  - divided Phase 5 into independently validated subphases with files,
+    validation, hardware risk, and documentation gates
+- `InstallationGuide.md`
+  - added a clearly marked future Phase 5 extension appendix
+  - documented default Tavily enrollment, secret handling, health, discovery,
+    and harmless search testing
+  - documented generic remote and local MCP server formats and management
+  - documented the complete agent-skill directory, JSON manifest,
+    instructions, examples, validation, simulation, installation, removal, and
+    troubleshooting workflow
+- `DevelopmentGuide.md`
+  - added the planned tool-provider contract, MCP trust boundary, skill
+    confinement, prompt ordering, and required test suites
+- `README.md`
+  - clarified that Phase 5 is planned rather than currently implemented
+  - summarized the approved Ollama, Tavily, MCP, skill, CLI, and web direction
+
+### Rationale
+
+The existing provider-neutral `ToolDefinition` and planned tool registry are a
+sound base, but the older plan assumed only IDE-generated tools and no first
+release HTTP service. Adding explicit tool-provider, MCP lifecycle, namespace,
+trust, secret, and skill contracts now prevents future web search or Maps tools
+from forcing a new agent loop or bypassing the IDE boundary.
+
+Tavily was selected over the community DuckDuckGo MCP server because Tavily
+maintains an official hosted MCP server designed for real-time agent search and
+currently offers 1,000 free monthly API credits without requiring a credit
+card. The project will not bundle a shared key, and external service terms or
+quotas are not treated as project guarantees.
+
+### Validation
+
+- managed-driver verification: passed; 222 tracked files across six drivers
+  match the import baseline plus 25 authorized repairs
+- Python compilation: passed
+- Ruff lint: passed
+- Ruff format check: passed; 61 files already formatted
+- strict mypy: passed for 34 source files
+- pytest: passed; 213 tests
+- documentation contradiction search: passed after removing old no-HTTP and
+  pending-Phase-4 statements
+- `git diff --check`: passed before the log update and will be repeated in the
+  final documentation gate
+
+### Raspberry Pi status
+
+No GPIO, PWM, I2C, SPI, servo, sensor, display, buzzer, camera, microphone,
+Ollama, web server, or external MCP tool was opened or executed. This task
+changes approved plans and future setup documentation only. Tavily and the
+documented `ninjarobot-agent` commands require Phase 5 implementation and
+Raspberry Pi validation before the guide's planned-feature notice can be
+removed.
+
+### Follow-up
+
+Review and approve the fully revised Phase 5 plan, then implement Phase 5.0
+through Phase 5.7 in order. After each subphase, pass the complete quality gate
+and immutable-driver verification before continuing.
+
+## 2026-07-28 — Beginner installation and configuration-sync guide
+
+### Summary
+
+Reorganized the installation documentation into one complete workflow for a
+new Raspberry Pi 5. Raspberry Pi OS Lite 64-bit is now the default
+recommendation because the command-line-only system avoids desktop overhead
+and leaves more memory and processing capacity for robot control and future
+local AI models.
+
+The guide now proceeds in this order:
+
+1. install and preconfigure Raspberry Pi OS Lite 64-bit
+2. configure I2C, SPI, GPIO12/GPIO13 hardware PWM, and system packages
+3. clone and install NinjaRobotPi5 with the locked hardware environment
+4. initialize and calibrate all six standalone `pi5*` modules
+5. preview, apply, validate, and maintain the private IDE configuration
+6. run simulation, safe health checks, and progressively riskier physical tests
+
+### Files changed
+
+- `InstallationGuide.md`
+  - added the project, hardware, software, and directory overview
+  - added copy-paste-ready headless Raspberry Pi OS Lite installation
+  - documented explicit canonical configuration paths for every standalone
+    hardware tool
+  - separated the streamlined installation from testing and troubleshooting
+  - added configuration ownership, resynchronization, update, and uninstall
+    references
+- `README.md`
+  - made the complete installation guide the entry point for new Pi users
+  - recorded why Lite 64-bit is preferred for the local-AI target
+- `DevelopmentGuide.md`
+  - documented preview-first import, explicit destinations, overwrite
+    behavior, configuration ownership, and the fields imported from each
+    standalone module
+
+### Rationale
+
+Some standalone tools default to JSON files in the current working directory,
+while the integrated IDE prefers the corresponding files under
+`~/.config/pi5*`. That difference allowed a correctly calibrated
+project-root `servo.json` or configured `buzzer.json` to be missed in normal
+IDE discovery. The installation now passes every standalone configuration
+path explicitly and explains that standalone JSON and integrated TOML files
+are not continuously synchronized.
+
+### Validation
+
+- managed-driver verification: passed; 222 tracked files match the baseline
+  plus 25 authorized repairs
+- Python compilation: passed
+- Ruff lint: passed
+- Ruff format check: passed; 61 files already formatted
+- mypy strict type check: passed for 34 source files
+- pytest: passed; 213 tests
+- documentation whitespace and local-link checks: passed
+- `git diff --check`: passed
+
+### Raspberry Pi status
+
+No hardware was opened or moved because this was a documentation-only change.
+The documented commands were checked against the current command help and
+configuration-import implementation. A clean-device walkthrough on Raspberry
+Pi OS Lite 64-bit remains the recommended final operator validation.
+
+### Follow-up
+
+Perform the new guide from a freshly imaged card, record any prompts that
+differ on the current Raspberry Pi OS release, and keep all module JSON files
+at the documented canonical paths.
+
+## 2026-07-27 — Phase 4 animated-face, distance, and IDE-tool refinement
+
+### Summary
+
+- Changed integrated movement safety so a measured value above 100 mm or the
+  exact VL53L0X raw `8191` out-of-range sentinel counts as silent clear space.
+  The public distance capability still reports `DEVICE_OUT_OF_RANGE` instead
+  of publishing `8191` as a real millimetre measurement. Generic null values,
+  I2C communication errors, timeouts, disconnects, and stale samples continue
+  to block guarded startup.
+- Independently implemented 20 scalable animated face renderers inside
+  `ninjarobot_pi5_ide`: Idle, Happy, Laughing, Sad, Cry, Angry, Surprising,
+  Sleepy, Speaking, Shy, Scary, Exciting, Confusing, Greeting, Listening,
+  Thinking, Curious, Success, Warning, and Error. The immutable historical
+  checkout remains unmodified and is neither imported nor packaged.
+- Expanded the read-only behavior catalog. Every face has a semantically
+  matched existing buzzer melody; normal movements combine face and drive
+  without buzzer sound. Added guarded Celebrate and non-moving Error Warning
+  combinations.
+- Made face rendering frame-based for its whole active lifetime. Interactive
+  faces loop until replaced, stopped, or the tool exits. Scriptable behavior
+  stays finite unless `--loop` is selected, and simulation always applies a
+  time bound.
+- Added a persistent red octagonal Emergency Stop screen. Level 2 still stops
+  servos and sensors and silences the buzzer. Interactive Resume reconstructs
+  stopped device boundaries, runs health checks, clears safety state only on
+  success, shows Idle, and never restarts the previous movement.
+- Replaced the original prompt-only IDE menu with a Blessed-style direct
+  control interface. It now has the approved seven main choices, nested face,
+  movement, and special menus, clear explanations, Back in every submenu, and
+  an Emergency Stop shortcut throughout.
+- Added guided creation, private behavior listing/running/deletion, and a
+  hardware-free simulation browser. Existing scriptable commands remain
+  available; `behavior delete --confirm` and final-face `behavior run --loop`
+  were added.
+- Fixed the friendly Click command group so a normal `--help` exit no longer
+  appears as `Error: 0`.
+
+### Hardware impact
+
+The implementation and automated validation did not initialize GPIO
+(general-purpose input/output), PWM (pulse-width modulation), I2C, SPI, motors,
+sensors, camera, microphone, display, or buzzer hardware. Physical behavior
+changes affect the next Raspberry Pi test: open-space `8191` samples can now
+complete the forward startup gate, faces animate continuously, interactive
+selections execute directly, and Emergency Stop displays the new sign.
+
+### Validation
+
+- Focused distance, safety, face, asset, runtime, and CLI tests pass.
+- The complete root suite passes with 213 tests.
+- Compilation, Ruff lint, Ruff format checking, strict mypy, dependency-lock
+  validation, and `git diff --check` pass.
+- Immutable-driver verification passes before and after every phase: 222
+  tracked files across six libraries match the baseline plus 25 authorized
+  repairs.
+- No managed `pi5*` file changed. Reference hashes for the inspected
+  historical expression files remained unchanged.
+- The 320×240 Emergency Stop frame was visually inspected.
+
+### Raspberry Pi status
+
+The operator previously reported the original Phase 4 checklist passed. The
+new behavior refinements are software-complete and await the ordered physical
+checklist in
+`docs/validation/phase-4-refinement-validation-2026-07-27.md`. Begin with
+simulation and non-moving checks. Keep both wheels raised and a second terminal
+ready before any actuator-moving test. Do not intentionally induce
+undervoltage, disconnect a powered sensor, or freeze the operating system.
+
+### Recommended next step
+
+Run the refinement checklist one section at a time, record the pass/fail boxes,
+and stop at the first unexpected movement, traceback, failed health probe, or
+managed-driver verification error.
+
+## 2026-07-27 — Editable managed-driver installation repair
+
+### Summary
+
+- Changed all six root `pi5*` path dependencies from copied directory installs
+  to editable installs.
+- Added `scripts/verify_workspace_driver_sources.py`, which safely confirms
+  that Python resolves each managed package into this checkout without
+  importing or initializing hardware.
+- Added regression tests for both `pyproject.toml` and `uv.lock` so a managed
+  driver cannot silently return to non-editable installation.
+- Added the source-origin check to the Raspberry Pi camera bootstrap and the
+  Phase 4 installation gate.
+
+### Cause
+
+The repaired buzzer source was present in the Raspberry Pi test checkout, but
+its virtual environment still contained the previous non-editable wheel.
+Because the package version and package metadata were unchanged, an ordinary
+frozen synchronization did not rebuild the local dependency after only its
+Python source changed. Physical testing therefore executed the old global
+GPIO-cleanup implementation.
+
+### Hardware impact
+
+None. This repair changes only how the root environment links local packages.
+It does not initialize GPIO, PWM, I2C, SPI, motors, sensors, camera, microphone,
+display, or buzzer hardware.
+
+### Validation
+
+- Root compilation, Ruff lint, Ruff formatting, strict mypy, lock validation,
+  shell syntax validation, and all 156 tests pass.
+- Immutable-driver verification passes for 222 tracked files and 25 authorized
+  repairs.
+- The runtime-source verifier passes for all six managed libraries.
+- A clean temporary workspace created a new virtual environment from the
+  frozen lock, resolved every managed library into that copied checkout, and
+  executed the repaired pin-scoped buzzer source.
+
+### Raspberry Pi status
+
+Repeat the non-moving greeting cross-terminal stop only after the runtime-source
+verifier confirms that all six managed packages resolve into the fresh
+checkout. Do not resume motor tests until no destructor traceback appears.
+
+## 2026-07-26 — Deterministic shared-GPIO shutdown repair
+
+### Summary
+
+- Repaired the managed `pi5buzzer` Raspberry Pi backend so cleanup releases
+  only the buzzer's configured GPIO pin instead of closing the process-wide
+  `rpi-lgpio` chip handle shared with the display.
+- Made tone waiting interruptible so Ctrl+C and cross-terminal behavior stop
+  finish the buzzer worker before releasing its PWM object.
+- Preserved all existing CLI commands, melodies, tone behavior, servo
+  functions, display functions, and two-level stop results.
+- Recorded both managed-driver changes in the authorized repair manifest.
+- Clarified the Phase 4 calibration path and cross-terminal stop expectations.
+
+### Cause
+
+The physical Phase 4 test stopped the robot successfully, but the buzzer PWM
+object's destructor ran after an unscoped `GPIO.cleanup()` had set the shared
+`rpi-lgpio` handle to `None`. Its second defensive stop then printed an ignored
+`TypeError`. The repair uses pin-scoped cleanup, which releases GPIO27 without
+invalidating other GPIO-backed devices.
+
+### Validation
+
+- Standalone buzzer driver tests: 31 passed.
+- Integrated buzzer, behavior-runtime, and safety tests: 22 passed.
+- Ruff lint and formatting pass for the repaired driver and regression tests.
+- Immutable-driver verification passes with 222 tracked files and 25
+  authorized repairs.
+- Root compile validation, Ruff lint, Ruff formatting, strict mypy, and all 154
+  root tests pass.
+- All 66 standalone `pi5buzzer` tests pass with its Ruff lint and formatting
+  checks.
+
+### Raspberry Pi status
+
+The reported cross-terminal stop reached Level 2 with no cleanup errors, but
+the destructor traceback makes that original run a documentation-level fail.
+Repeat the updated non-moving and raised-wheel stop checks with no traceback.
+
+### Follow-up
+
+Run the updated Phase 4 cross-terminal stop test and confirm Terminal A contains
+the Level 2 result and `Aborted!` but no `Exception ignored` or `TypeError`.
+
+## 2026-07-26 — Phase 4.4 integrated IDE tool and Phase 4 completion
+
+### Summary
+
+- Added the `ninjarobot-ide-tool` console entry point with both an interactive
+  menu and scriptable subcommands.
+- Added configuration-only and safe real hardware status, behavior catalog
+  list/show/health, simulation, real execution, validation, private action
+  creation, full stop, Level 1 resume, and health-gated Level 2 resume.
+- Added read-only discovery and preview-first import of known standalone
+  `pi5*` JSON settings. Applying an import creates an owner-private V4 TOML
+  file and never rewrites a standalone source configuration.
+- Added hardware-free display, buzzer, servo, and distance simulation drivers.
+  Continuous simulated movement is always time-bounded.
+- Added preview and explicit save confirmation for user-created actions.
+  Private files are schema-validated, atomic, owner-only, confined to their
+  directory, and cannot silently overwrite bundled or existing actions.
+- Added active real-behavior registration with PID and Linux process-start
+  token validation. A second `behavior stop` process requests Ctrl+C from the
+  correct foreground behavior rather than trusting a reused PID.
+- Added concise CLI error conversion so expected validation and safety failures
+  do not print Python tracebacks.
+- Updated README, installation guide, developer guide, implementation plan,
+  and the Phase 4 Raspberry Pi validation procedure.
+
+### Validation
+
+- Added CLI tests for catalog inspection, simulation, physical confirmation
+  gates, private action creation, friendly failures, interactive exit, latch
+  resume, and TOML round-trip.
+- Added configuration import tests proving supported field mapping, unchanged
+  source JSON, valid private output, mode `0600`, and no silent overwrite.
+- Added active-process registry permission and ownership tests.
+- The complete V4 suite passes with 154 tests.
+- Root compilation, Ruff lint, Ruff formatting, strict mypy, dependency lock,
+  and diff validation pass.
+- Managed-driver provenance remains 222 tracked files and 23 authorized
+  repairs. No `pi5*` file changed during Phase 4.
+
+### Raspberry Pi status
+
+All Phase 4 implementation validation used deterministic simulation. Physical
+expressions and wheel movement are deliberately deferred to the ordered
+operator checklist. The first real motor checks must use raised wheels and a
+second terminal prepared with `behavior stop`.
+
+### Follow-up
+
+Run and record the Phase 4 Raspberry Pi checklist. After physical approval,
+begin Phase 5 bounded agent-core work without giving the agent direct driver
+access.
+
+## 2026-07-26 — Phase 4.3 guarded continuous movement and two-level stop
+
+### Summary
+
+- Added coordinated GPIO12/GPIO13 movement through the existing
+  calibration-gated `ServoDevice` boundary. No integrated code imports or
+  bypasses the managed servo driver.
+- Added logical `left_motor` and `right_motor` resolution for the approved
+  forward, backward, left-turn, and right-turn targets.
+- Added three valid clear readings before front-guarded movement can start.
+- Added a 100 mm front obstacle rule that requires three consecutive low
+  readings before a Level 1 motion stop. The threshold remains configurable
+  but cannot be lower than 50 mm.
+- Preserved the owner's selected policy that invalid, missing, or stale
+  distance samples produce warnings and do not stop a movement already in
+  progress. A guarded movement still cannot start without valid clear samples.
+- Added rear-coverage warnings for backward movement and side/rear-coverage
+  warnings for turns.
+- Added Level 1 stops for front obstacles, current undervoltage, and a
+  thread-backed software watchdog. The watchdog directly requests zero pulse
+  even when the asyncio event loop is frozen.
+- Added Level 2 cleanup for Ctrl+C/shutdown/operator-stop integration and
+  latched driver failure: stop servos, stop ranging, close camera and
+  microphone devices, silence the buzzer, and show `SYSTEM STOPPED`.
+- Added owner-private atomic safety state. Motion resumes through explicit
+  confirmation; a driver-failure system latch requires confirmation plus
+  healthy device probes.
+- Kept every managed `pi5*` source file unchanged.
+
+### Validation
+
+- Added tests for group-motion gates and calibrations, exact approved motor
+  targets, clear-start checks, obstacle debounce, warning-only invalid samples,
+  undervoltage, watchdog event-loop freeze, long asynchronous servo ramps,
+  Level 1 resume, Level 2 cleanup, system latching, health-gated resume, state
+  corruption, atomic storage, and owner-only permissions.
+
+### Follow-up
+
+Implement Phase 4.4 `ninjarobot-ide-tool`, including interactive and scriptable
+behavior, status, safe import, action creation, stop, and resume workflows.
+
+## 2026-07-26 — Phase 4.2 coordinated expressions and robot assembly
+
+### Summary
+
+- Added a V4 `RobotAssembly` that owns and shares one configured display and
+  buzzer instance.
+- Added procedural Pillow face rendering for the approved idle, happy,
+  thinking, success, warning, and error expressions.
+- Added sequential behavior stages whose operations run concurrently within
+  each stage. This makes the greeting text and existing happy melody begin
+  together after the initial happy-face stage.
+- Added a narrowly scoped melody loader that reads the existing
+  `pi5buzzer.notes` definitions without importing its command-line or runtime
+  layers.
+- Added expression cancellation, buzzer cleanup after cancellation or device
+  failure, health reporting, and idempotent assembly cleanup.
+- Added an image-frame method to the shared display device so integrated
+  behavior never creates a second SPI display instance.
+- Kept movement execution closed until the Phase 4.3 safety controller is
+  active.
+
+### Validation
+
+- Added tests for every procedural face, sequential/concurrent stages,
+  cancellation, forced display failure, shared assembly health, cleanup, and
+  movement rejection before the safety layer.
+
+### Follow-up
+
+Implement Phase 4.3 continuous-rotation drive execution, obstacle monitoring,
+watchdog and undervoltage motion stops, and full-system cleanup/latching.
+
+## 2026-07-26 — Phase 4.1 behavior contracts and secure catalog
+
+### Summary
+
+- Added strict, immutable schemas for expression and movement behaviors,
+  sequential stages, concurrent stage operations, colors, text, faces,
+  existing buzzer melodies, waits, logical servo roles, and bounded targets.
+- Added read-only bundled behaviors for `idle`, `greeting`, `happy`,
+  `thinking`, `success`, `warning`, `error`, `move_forward`,
+  `move_backward`, `turn_right`, and `turn_left`.
+- Preserved `stop` as a safety command instead of treating it as an ordinary
+  behavior asset.
+- Added a confined user behavior repository with validated names, symbolic-link
+  rejection, owner-only files, atomic writes, and no silent overwrite.
+- Changed the default robot servo topology to GPIO12 and GPIO13 while retaining
+  explicit support for the four DFR0566 PWM endpoints in custom configurations.
+- Mapped `left_motor` to GPIO12 and `right_motor` to GPIO13 in V4 configuration,
+  rather than embedding hardware endpoints in behavior assets.
+- Normalized the VL53L0X and DFR0566 shared I2C resource name to `i2c1`.
+- Kept every managed `pi5*` file unchanged.
+
+### Validation
+
+- Added catalog, path traversal, symbolic-link, filename mismatch, schema,
+  motion-map, permissions, and no-overwrite tests.
+- Updated configuration and servo compatibility coverage for the two-endpoint
+  default and optional custom topology.
+
+### Follow-up
+
+Implement Phase 4.2 robot assembly, procedural faces, and concurrent display
+and buzzer expression execution.
+
+## 2026-07-26 — Phase 3 physical validation closed
+
+### Summary
+
+- Recorded the operator's confirmation that every Phase 3.5 microphone test
+  passed.
+- Marked all Phase 3 device integrations and their physical validation
+  complete.
+- Cleared the Phase 4 entry gate without changing any runtime or managed
+  driver file.
+
+### Validation
+
+- Managed-driver provenance passed with 222 tracked files and 23 authorized
+  repairs.
+- No physical hardware was accessed during this documentation-only close-out.
+
+### Follow-up
+
+Implement the approved Phase 4 integrated behavior system one validated
+subphase at a time.
+
+## 2026-07-26 — Phase 3.5 privacy-bounded microphone adapter
+
+### Summary
+
+- Added `microphone.status`, a read-only capability that discovers and
+  validates the selected USB input without recording audio.
+- Added `microphone.capture`, a confirmation-required privacy capability for
+  one bounded mono WAV recording.
+- Kept simulation as the default and required both `--real` and
+  `--confirm-microphone` for physical recording.
+- Enforced default non-retention. Explicit retention saves only owner-readable
+  files inside the configured private microphone directory.
+- Added duration bounds, safe filename validation, directory confinement,
+  no-overwrite behavior, secure staging, SHA-256 metadata, and cleanup after
+  success, failure, timeout, or cancellation.
+- Serialized the `microphone` resource and preserved durable non-idempotent
+  action replay.
+- Added the managed `pi5mic` package to the root hardware dependency group
+  without changing any managed driver file.
+- Added a V4-owned device-only loader that bypasses `pi5mic` package exports
+  and loads only errors, models, audio backend, device discovery, and recorder
+  modules.
+- Kept transcription, Gemini, wake-word detection, listener state, transport,
+  presence, and OpenClaw outside the Phase 3.5 runtime.
+- Recorded the operator-reported Phase 3.4 camera checklist as PASS.
+
+### Files and documentation
+
+- Added `ninjarobot_pi5_ide/.../microphone.py` and its focused tests.
+- Extended the unified CLI, V4 configuration, root hardware dependency lock,
+  capability listing, and CLI tests.
+- Updated README, InstallationGuide, DevelopmentGuide, this log, hardware
+  profile, and managed-driver containment matrix.
+- Added the Phase 3.5 Raspberry Pi validation report with separate simulation,
+  interface, privacy-sensitive recording, expected-result, checklist, and
+  rollback sections.
+
+### Validation
+
+- All 109 V4 tests passed.
+- All 36 focused microphone, configuration, and CLI tests passed.
+- Strict mypy passed for 23 V4 source files.
+- Root compilation, Ruff lint, Ruff formatting, dependency lock, and diff
+  validation passed.
+- All 449 managed-library tests passed. The only warning was the inherited
+  Python `audioop` deprecation in `pi5mic`.
+- Root and all six managed libraries passed Ruff lint and format checks.
+- Driver provenance remained at 222 tracked files and 23 authorized repairs.
+- Runtime containment loaded exactly seven approved `pi5mic` namespace/module
+  names and no historical or voice-processing module.
+
+### Raspberry Pi status
+
+Safe interface validation is PASS. ALSA identifies `USB PnP Sound Device` at
+card 0/device 0. Real V4 health reports both microphone capabilities ready,
+and status selects that device without recording. The device rejects the
+requested 16 kHz input and the managed driver safely selects 44.1 kHz; V4
+reports both values and the fallback warning.
+
+No real recording was made during implementation. The physical transient and
+retained WAV checklist remains pending because it requires consent from
+everyone nearby.
+
+### Follow-up
+
+Run and review the Phase 3.5 Raspberry Pi checklist. Do not begin Phase 4
+integrated robot behaviors until the microphone result is reviewed.
+
+## 2026-07-26 — Phase 3.4 camera interpreter-bridge correction
+
+### Summary
+
+- Reproduced the operator's `ModuleNotFoundError` for `picamera2` and
+  `libcamera`.
+- Confirmed that the first bootstrap created a system-Python environment but
+  `uv sync` replaced it with the project-pinned Python 3.11 environment.
+- Kept the normal locked project environment and added a V4-only bridge that
+  probes and runs managed `pi5camera` through Raspberry Pi OS
+  `/usr/bin/python3`.
+- Restricted the bridge to the exact local `pi5camera/src` directory. This
+  prevents Python 3.13 from loading compiled Python 3.11 packages such as
+  NumPy from `.venv`.
+- Replaced the bootstrap workflow so it never moves, deletes, or recreates
+  `.venv`.
+- Kept every managed `pi5*` source file unchanged.
+
+### Validation
+
+- Driver provenance passed before implementation: 222 tracked files and 23
+  authorized repairs.
+- Twelve focused camera adapter tests pass, including the exact missing
+  Picamera2 fallback, bounded subprocess environment, dual-interpreter error,
+  and bootstrap no-replacement regression.
+- Raspberry Pi OS `/usr/bin/python3` imports `libcamera` and `picamera2`.
+- Safe real camera health reports `camera.capture` and `camera.status` ready.
+  Health does not open the camera or take a photograph.
+- All 96 V4 tests and all 35 focused camera, configuration, and CLI tests
+  pass.
+- Strict mypy passes for 22 source files. Root and all six managed libraries
+  pass Ruff lint and format checks.
+- All 449 managed-library tests pass. The only warning is the inherited
+  `audioop` deprecation from `pi5mic`.
+- The physical capture checklist remains pending because implementation
+  validation intentionally did not take a photograph.
+
+### Operator note
+
+The failed capture action stored in the old ledger is durable. Retesting must
+use a fresh ledger or new action and idempotency identifiers. Idempotency means
+that replaying the same identifier returns the stored result rather than
+performing the operation again.
+
+## 2026-07-26 — Phase 3.4 privacy-bounded camera adapter
+
+### Summary
+
+- Added `camera.status`, a read-only readiness and retention-policy capability
+  that never takes a photograph.
+- Added `camera.capture`, a confirmation-required privacy capability for one
+  1280×720 JPEG through the managed `pi5camera` capture path.
+- Kept simulation as the default and required both `--real` and
+  `--confirm-camera` for physical capture.
+- Enforced default non-retention through V4 configuration. Explicit
+  `--retain` saves only owner-readable files inside the configured private
+  camera directory.
+- Added filename validation, directory confinement, no-overwrite behavior,
+  secure staging, SHA-256 metadata, and cleanup after success, failure,
+  timeout, or cancellation.
+- Serialized camera ownership and waited for worker-thread cleanup before
+  returning a timeout or cancellation.
+- Added the managed `pi5camera` package to the root hardware dependency group
+  without changing any managed driver file.
+- Added the initial Raspberry Pi workspace bootstrap for the system-provided
+  Picamera2/libcamera Python environment. The correction above replaces its
+  environment-replacement design with the permanent interpreter bridge.
+
+### Validation
+
+- All 92 V4 tests passed.
+- The 31 focused camera, configuration, and CLI tests passed.
+- Camera tests cover simulated status/capture, default non-retention, explicit
+  private retention, no overwrite, path traversal rejection, dependency
+  failure, failure cleanup, timeout cleanup, cancellation cleanup, and
+  serialized access.
+- All 449 managed-library tests passed. The only warning was the inherited
+  Python `audioop` deprecation in `pi5mic`.
+- Root compilation, Ruff lint, Ruff format, strict mypy for 22 source files,
+  dependency lock, CLI smoke, bootstrap syntax, and `git diff --check` passed.
+- Driver provenance remained at 222 files and 23 authorized repairs.
+
+### Raspberry Pi status
+
+No real camera capture was run during implementation. The Raspberry Pi OS
+system Python imports Picamera2, while the root Python 3.11 environment does
+not. The correction above now handles that verified environment boundary
+without altering `pi5camera`.
+
+The operator reports that every physical Phase 3.4 checklist item passed,
+including transient and retained capture, owner-only file permissions,
+no-overwrite behavior, visual inspection, cleanup, and device isolation.
+
+### Follow-up
+
+Proceed to the approved Phase 3.5 microphone integration.
+
+## 2026-07-26 — Phase 3.3 six-servo mixed-backend adapter
+
+### Summary
+
+- Expanded V4 configuration to the fixed `gpio12`, `gpio13`, and
+  `hat_pwm1`–`hat_pwm4` topology.
+- Added a calibration-file reference, a default-off real-motion gate, and a
+  permanently disabled Phase 3.3 group-motion gate.
+- Added one shared servo service that lazily selects `pi5servo`'s mixed
+  hardware-PWM/DFR0566 backend without changing the managed library.
+- Added read-only `servo.status`, confirmation-required single-endpoint
+  `servo.move`, and lock-free emergency `servo.stop` capabilities.
+- Required valid explicit endpoint calibration before real movement and
+  checked endpoint-specific angle limits before sending a center pulse.
+- Added cancellation and emergency shutdown that abort movement and sets all
+  six outputs to zero.
+- Added simulation-first and explicit-real CLI paths. Real movement also
+  requires `--confirm-motion`; `--hold` is bounded to five seconds.
+- Added `pi5servo[pi]` to the root hardware dependency group.
+
+### Validation
+
+- All 81 V4 tests passed, including topology validation, disabled-motion and
+  missing-calibration gates, endpoint limits, center-first movement,
+  cancellation, emergency stop, unavailable backends, CLI confirmation, and
+  action-result semantics.
+- The 30 focused servo/configuration/CLI tests passed.
+- All 449 managed-library tests and every package-local Ruff gate passed. The
+  only warning was the inherited Python `audioop` deprecation in `pi5mic`.
+- Root compilation, Ruff lint, Ruff format, strict mypy for 21 source files,
+  dependency lock, CLI smoke, and `git diff --check` passed.
+- Driver provenance remained at 222 files and 23 authorized repairs.
+
+### Raspberry Pi status
+
+No PWM, I2C, servo pulse, calibration, or movement command was run during
+implementation. The operator subsequently reported that all Phase 3.3 manual
+tests passed. No command transcript, electrical table, or measured values were
+attached to that report, so the validation document records an
+operator-reported pass without inventing detailed evidence.
+
+### Follow-up
+
+The Phase 3.3 operator review is complete. Proceed with Phase 3.4 camera
+integration.
+
+## 2026-07-26 — Phase 3.2 ST7789V display adapter
+
+### Summary
+
+- Added one shared, SPI-serialized display service with lazy `pi5disp` loading.
+- Added idempotent `display.show_text`, `display.clear`, and
+  `display.set_brightness` capabilities.
+- Passed SPI0 device 0, DC GPIO4, reset GPIO5, backlight GPIO6, 32 MHz,
+  240×320 dimensions, rotation 90°, and initial brightness 75% from V4-owned
+  configuration.
+- Added Pillow-based RGB text rendering with bounded text length, font size,
+  hexadecimal colors, fit checking, and centered multiline placement.
+- Added simulated and explicit-real CLI health, text, clear, and brightness
+  commands. The optional `--hold` value keeps a real visual test visible before
+  deterministic cleanup.
+- Added `pi5disp[pi]` to the root hardware dependency group without changing
+  the managed library.
+- Hardened partial startup cleanup so a constructed driver is closed if
+  backlight initialization fails.
+
+### Validation
+
+- All 66 V4 tests passed, including exact driver settings, RGB-frame size,
+  shared lifecycle, SPI resource declarations, bounded arguments, partial
+  startup failure, write failure, CLI simulation, and CLI hold bounds.
+- The 19 focused display/CLI tests passed.
+- All 449 managed-library tests and every package-local Ruff gate passed. The
+  only warning was the inherited Python `audioop` deprecation in `pi5mic`.
+- Root compilation, Ruff lint, Ruff format, strict mypy for 20 source files,
+  dependency lock, CLI smoke, and `git diff --check` passed.
+- Driver provenance remained at 222 files and 23 authorized repairs.
+
+### Raspberry Pi status
+
+No SPI or physical display command was run during implementation. The operator
+subsequently reported the complete checklist as passing. Attached output
+confirms real red and blue frames, centered 320×240 text at rotation 90,
+25%/75% brightness changes, safe retry classification, and real rather than
+simulated execution. Green was visually confirmed by the operator, although
+its JSON output was not included in the transcript.
+
+### Follow-up
+
+The Phase 3.2 Pi checklist is complete and passed. Phase 3.3 may proceed.
+
+## 2026-07-26 — Phase 3.1 GPIO27 buzzer adapter
+
+### Summary
+
+- Added a shared buzzer device service with lazy `pi5buzzer` loading.
+- Added bounded `buzzer.play_tone` and emergency `buzzer.stop` capability
+  descriptors.
+- Limited tones to 20–20,000 hertz, 0.05–2 seconds, and volume 1–128.
+- Added cancellation-safe shutdown and an emergency stop path that does not
+  wait for the normal playback resource lock.
+- Added simulated and explicit-real CLI health, play, and stop commands.
+- Added `pi5buzzer[pi]` to the root hardware dependency group without changing
+  the managed library.
+- Corrected successful non-idempotent action results to report retry safety
+  `unsafe`.
+
+### Validation
+
+- All 56 V4 tests passed, including bounded arguments, unavailable GPIO,
+  cancellation, concurrent emergency stop, CLI simulation, and action-result
+  semantics.
+- All 449 managed-library tests and every package-local Ruff gate passed.
+- Root compilation, Ruff lint, Ruff format, strict mypy, CLI smoke, dependency
+  lock, and `git diff --check` passed.
+- Driver provenance remained at 222 files and 23 authorized repairs.
+
+### Raspberry Pi status
+
+No real GPIO or audible command was run during implementation. The operator
+subsequently reported the complete Phase 3.1 checklist as passing, including
+the electrical prerequisite, real GPIO27 health, quiet 440 Hz and 660 Hz
+tones, emergency silence, duplicate protection, and GPIO release.
+
+### Follow-up
+
+The Phase 3.1 Pi checklist is complete and passed. Phase 3.2 may proceed.
+
+## 2026-07-26 — Phase 2 IDE core and VL53L0X reference adapter
+
+### Summary
+
+- Added capability registration, explicit adapter lifecycle, bounded
+  scheduling, deterministic resource locks, and a durable SQLite action
+  ledger.
+- Added an execution engine that prevents duplicate action execution and
+  records deadlines, queue rejection, timeout, cancellation, unexpected
+  failures, and restart-time unknown outcomes.
+- Added the read-only `distance.read` adapter. It lazily loads the unchanged
+  `pi5vl53l0x` package only for real execution and normalizes its output into
+  the Phase 1 action-result contract.
+- Added an explicit guard that reports `8191 mm` as
+  `DEVICE_INVALID_READING`; it can no longer look like a successful distance.
+- Added hardware-free capability, health, simulated distance, idempotency, and
+  action-ledger CLI paths. Real I2C use requires `--real`.
+- Added the root `hardware` extra so the local managed VL53L0X package can be
+  installed without changing that package.
+
+### Validation
+
+- Registry rollback, ledger persistence, resource races, bounded queues,
+  cancellation, deadlines, idempotency, timeouts, unknown outcomes, restart
+  recovery, adapter lifecycle, invalid readings, and CLI persistence are
+  covered by automated tests.
+- Compilation, Ruff lint, Ruff formatting, strict mypy, root pytest, all
+  package-local managed-driver tests, and immutable-driver verification passed.
+- Driver provenance remained at 222 files and 23 authorized repairs. No
+  `pi5*` file changed.
+
+### Raspberry Pi status
+
+No physical hardware command was run during implementation. Operator
+validation subsequently passed on I2C bus 1 at address `0x29`: all 10 requested
+actions succeeded, distances ranged from 48 mm to 149 mm, each raw value
+matched its normalized value, and no `8191 mm` sentinel appeared. The earlier
+physical failure is cleared, although its hardware root cause was not
+established.
+
+### Follow-up
+
+Run the Phase 2 Raspberry Pi checklist. Begin Phase 3 with the buzzer adapter
+only after Phase 2 review and separate approval.
+
+## 2026-07-26 — Phase 1 contracts and package skeletons
+
+### Summary
+
+- Added installable `ninjarobot_pi5_ide` and `ninjarobot_pi5_agent` workspace
+  packages plus the unified `ninjarobot_pi5_cli`.
+- Added strict, serializable capability, action, result, error, provider, tool,
+  session, memory, health, and configuration contracts.
+- Added deterministic fake IDE/provider/clock/ID helpers that cannot access
+  hardware.
+- Added V4-owned hardware configuration with GPIO12/GPIO13 servos, GPIO27
+  buzzer, ST7789V DC4/RST5/BL6, rotation 90°, and brightness 75%.
+- Accepted ADRs for Pydantic v2 boundary validation and strict mypy typing.
+- Added import-boundary tests preventing agent imports of `pi5*`, OpenClaw, or
+  the historical runtime.
+
+### Validation
+
+- Phase 1 compilation, Ruff lint, Ruff format, and strict mypy passed.
+- All 30 V4/root tests passed in the final full regression gate.
+- All 447 managed-library tests and every package-local Ruff gate passed after
+  Phase 1, confirming no driver regression.
+- CLI version, help, configuration validation, module execution, schema, and
+  simulated dry-run paths passed.
+- Driver provenance remained at 222 files and 23 authorized repairs.
+
+### Raspberry Pi status
+
+Phase 1 contains contracts and fakes only. No GPIO, PWM, I2C, SPI, camera,
+microphone, buzzer, display, sensor, or servo operation was performed.
+
+### Follow-up
+
+Phase 2 may implement the IDE registry, execution engine, action ledger,
+resource locks, and the first read-only adapter after separate approval.
+
+## 2026-07-26 — Phase 0 exit reconciliation
+
+### Summary
+
+- Revalidated all managed libraries without changing their current functions.
+- Corrected the V4-owned hardware record to GPIO12/GPIO13 servos, GPIO27
+  buzzer, and the 240×320 ST7789V display on DC4/RST5/BL6 with rotation 90°
+  and brightness 75%.
+- Excluded private runtime configuration, captured photos, and recognition data
+  from the V4 Git repository.
+- Reconciled the historical Phase 0 baseline with the current authorized-driver
+  state.
+
+### Validation
+
+- All 447 managed-library tests passed.
+- All 7 root governance tests passed.
+- Compilation, Ruff lint, Ruff format, immutable-driver provenance, and
+  `git diff --check` passed.
+- The driver verifier reported 222 files and 23 authorized repairs.
+
+### Raspberry Pi status
+
+No hardware command was executed during this reconciliation. GPIO27 buzzer and
+DC4/RST5/BL6 display wiring are recorded but remain pending adapter-phase
+hardware validation.
+
+### Follow-up
+
+Proceed with Phase 1 contracts, fakes, configuration, packages, and the unified
+CLI without importing or editing any managed driver.
+
+## 2026-07-26 — Correct native Pi PWM channel routing
+
+### Summary
+
+- Corrected `pi5servo` so GPIO12/GPIO18 map to hardware PWM0 and GPIO13/GPIO19
+  map to hardware PWM1.
+- Added a guard that rejects selecting both alternate pins for one PWM channel.
+- Corrected the `pi5servo` setup documentation: the standard `pwm-2chan`
+  overlay provides two independent servo signals, not four.
+- Preserved local servo calibration and VL53L0X offset files as runtime data in
+  the driver-provenance verifier; they are not library source files.
+
+### Validation
+
+- Automated tests validate the alternate-pin mapping and duplicate-route guard.
+- The Raspberry Pi validation remains non-moving until an operator supplies
+  correctly rated external servo power and has an accessible power disconnect.
+
+### Follow-up
+
+For four independently controlled servos, use DFR0566 PWM0–PWM3 with a
+properly rated external servo supply.
+
+## 2026-07-25 — standalone Pi5 library documentation and runtime-data policy
+
+### Summary
+
+- Updated all six managed-library README files to describe standalone source
+  folders rather than requiring NinjaRobotPi5 or NinjaClawBot.
+- Added frozen-environment guidance, CLI-first test paths, and servo lockfile
+  safety guidance.
+- Narrowed the provenance script so normal buzzer configuration and camera
+  photos/face data are treated as runtime data, not immutable driver source.
+
+### Validation
+
+- Driver provenance passed after the change.
+- Root Ruff lint and formatting checks passed.
+- Repository governance tests passed.
+
+### Raspberry Pi status
+
+Documentation changes do not energize hardware. Manual CLI testing remains
+subject to the existing buzzer/display confirmation, servo emergency-disconnect,
+and VL53L0X invalid-reading limits.
+
+## 2026-07-25 — pi5mic PortAudio and local STT repair
+
+### Summary
+
+- Installed PortAudio runtime/development packages.
+- Built current whisper.cpp for Raspberry Pi 5 and downloaded the multilingual
+  `ggml-base.bin` model.
+- Registered the executable and model in
+  `~/.config/pi5mic/mic.json`, keeping OpenClaw out of the validation path.
+
+### Root cause
+
+ALSA could capture from the USB microphone, but the Python `sounddevice`
+backend could not load because the native PortAudio library was absent.
+Local STT also lacked both the `whisper-cli` executable and a configured model.
+No `pi5mic` source defect was reproduced.
+
+### Validation
+
+- Package compile, Ruff lint, Ruff format, and all 90 tests passed with one
+  inherited Python 3.11 `audioop` deprecation warning.
+- `pi5mic devices` listed four inputs including the USB PnP device.
+- Library recording produced a five-second, 44.1 kHz, mono, 16-bit WAV with
+  220,500 frames and no overflow; the temporary file was deleted.
+- Doctor passed with only the expected automatic two-thread warning.
+- Offline transcription of the whisper.cpp JFK sample returned the expected
+  sentence using `ggml-base.bin`.
+
+### Raspberry Pi status
+
+Microphone capture and local speech-to-text are PASS. Automated recording was
+very quiet because no operator speech was supplied during its fixed window.
+
+### Follow-up
+
+Proceed to the VL53L0X timing and calibration repair.
+
+## 2026-07-25 — pi5camera Picamera2 environment and error repair
+
+### Summary
+
+- Installed Raspberry Pi OS `python3-picamera2` 0.3.36 and
+  `python3-libcamera` 0.7.1.
+- Created the camera environment with system Python 3.13 and
+  `--system-site-packages`, then synced the frozen package lock.
+- Changed capture, recognize, and enrollment commands to translate every
+  package-level `CameraError` into a concise Click error.
+- Added a regression proving a missing backend produces no traceback.
+
+### Root cause
+
+Native `rpicam-still` used the OS camera stack successfully, but the earlier
+isolated Python 3.11 environment could not import ABI-specific Picamera2 and
+libcamera modules installed for Raspberry Pi OS Python 3.13. In addition,
+`capture_cmd` caught `CaptureError` but not its sibling
+`BackendNotAvailableError`, allowing a traceback to escape.
+
+### Validation
+
+- Picamera2 enumerated one OV5647 camera.
+- Camera compile, Ruff lint, Ruff format, and all 24 tests passed.
+- `pi5camera doctor` passed with camera and recognition readiness.
+- `pi5camera capture` saved a valid RGB 1280×720 JPEG with camera metadata; the
+  temporary image was deleted afterward.
+- Bootstrap shell syntax passed; ShellCheck is not installed.
+
+### Raspberry Pi status
+
+Camera capture is now a hardware PASS. Face enrollment was intentionally
+skipped, as requested.
+
+### Follow-up
+
+Proceed to the USB microphone, PortAudio, and local whisper.cpp phase.
+
+## 2026-07-25 — pi5disp runtime configuration repair
+
+### Summary
+
+- Moved the default writable configuration from the package directory to
+  `~/.config/pi5disp/display.json`.
+- Added `XDG_CONFIG_HOME` support, a `PI5DISP_CONFIG` override, automatic parent
+  directory creation, and regression tests.
+- Migrated the known-good rotation-0 configuration into the user runtime path
+  without changing the tracked `pi5disp/display.json`.
+
+### Root cause
+
+`ConfigManager` calculated its default by walking four directories upward from
+`config_manager.py`. In this source layout that path was the package root, so
+`init`, `brightness`, and config writes modified source-controlled
+`display.json`.
+
+### Validation
+
+- Package compile, Ruff lint, and Ruff format passed.
+- All 65 tests passed, including two new path-selection regressions.
+- Clear, 25% brightness, static text, scrolling text, image, and two-second
+  animation commands completed on the ST7789V.
+- The tracked display config retained SHA-256
+  `374f1619c9ccb1c7a8d8aff8b6ded447a250893b9a099b8af6e33cf7639f1b16`.
+
+### Raspberry Pi status
+
+The display was cleared and its backlight set to 0% after validation. Command
+execution passed; an operator still needs to confirm orientation, color, text,
+and animation visually.
+
+### Follow-up
+
+Proceed to the Picamera2 environment and camera error-handling repair.
+
+## 2026-07-25 — pi5servo DFR0566 GPIO/PWM correction
+
+### Summary
+
+- Confirmed the two test servos use the DFR0566 digital GPIO12/GPIO13
+  breakouts, which route to native Raspberry Pi PWM channels 0 and 1.
+- Verified the separate DFR0566 I2C controller identity at `0x10`, but did not
+  treat that as validation of the digital servo signal path.
+- Added the persistent `pwm-2chan` overlay and disabled conflicting analog PWM
+  audio in `/boot/firmware/config.txt`; saved a dated backup beside it.
+- Corrected the servo and root setup documentation.
+
+### Root cause
+
+The Pi exposed a PWM controller, but GPIO12 and GPIO13 were not muxed to PWM
+because the required boot overlay was missing. Earlier status checks therefore
+proved only that a PWM controller existed. A temporary runtime overlay changed
+both pins to `PWM0_CHAN0`/`PWM0_CHAN1`, and a claim-only probe exported both
+channels with `enable=0`, `duty_cycle=0`, and no pulse.
+
+The backend intentionally leaves healthy sysfs PWM channels exported for reuse;
+its tests cover that behavior. Attempting to hot-remove the temporary overlay
+after export was not a supported validation path and left `dtoverlay -r`
+waiting in the kernel. A reboot is required to clear that process and apply the
+persistent configuration cleanly.
+
+### Validation
+
+- All 132 package tests passed.
+- Package compile, Ruff lint, and Ruff format passed.
+- DFR0566 identity registers returned PID `0xDF` and VID `0x10`.
+- Native GPIO12/GPIO13 claim-only checks remained disabled at zero duty.
+- Driver provenance passed with the documented README repair.
+
+### Raspberry Pi status
+
+No servo pulse, angle, movement, or calibration command was issued. Final
+post-reboot pin-mux and claim-only validation remains pending. Actuator movement
+continues to be blocked by the missing emergency disconnect.
+
+### Rollback
+
+Restore `/boot/firmware/config.txt.ninjarobotpi5-20260725.bak` over
+`/boot/firmware/config.txt` and reboot.
+
+### Follow-up
+
+Continue with `pi5disp`; perform the servo post-reboot check before any future
+movement test.
+
+## 2026-07-25 — pi5buzzer reproducible validation repair
+
+### Summary
+
+- Pinned Ruff 0.15.5 and declared the package lint rules explicitly.
+- Added a package lockfile and corrected one import-order violation exposed by
+  the explicit rule set.
+- Updated the package and root developer documentation.
+
+### Root cause
+
+`pi5buzzer` declared an unbounded Ruff development dependency and had no
+lockfile. A fresh package-local sync selected Ruff 0.16.0 with a materially
+different effective rule set, producing 23 errors even though the validated
+Ruff 0.15.5 workflow passed. The runtime driver itself had no reproduced
+functional failure.
+
+### Validation
+
+- Fresh frozen environment resolved Ruff 0.15.5.
+- Compile, Ruff lint, and Ruff format passed.
+- All 65 package tests passed.
+- Driver provenance passed with four authorized `pi5buzzer` files.
+
+### Raspberry Pi status
+
+GPIO17 initialization and health checks passed. A 440 Hz tone and all 14
+predefined emotion commands completed without exceptions, and GPIO17 returned
+to input mode. Audible confirmation remains an operator observation.
+
+### Follow-up
+
+Proceed to `pi5servo` using DFR0566 digital GPIO12/GPIO13 and native hardware
+PWM, without issuing an actuator-moving pulse.
+
+## 2026-07-25 — Managed-driver repair authorization
+
+### Summary
+
+- Confirmed the attached expansion HAT is DFR0566.
+- Confirmed that the temporary servos remain on DFR0566 digital GPIO12/GPIO13
+  breakouts. They use native Raspberry Pi hardware PWM, not the HAT's dedicated
+  I2C PWM0/PWM1 sockets.
+- Replaced the copied-driver immutability rule with an audited managed-driver
+  repair workflow while preserving the historical import hashes.
+- Added a separate authorized-change manifest and provenance validation.
+
+### Rationale
+
+The project owner explicitly authorized fixing each standalone Pi5 library
+after README review, Serena audit, failure reproduction, linting, tests, and
+hardware validation. Keeping original and repaired hashes in separate manifests
+preserves historical provenance without blocking validated repairs.
+
+### Validation
+
+The original 221-file import manifest matched with zero authorized repairs.
+Compilation, Ruff lint, Ruff format, `git diff --check`, and all six root
+governance tests passed.
+
+### Raspberry Pi status
+
+No actuator-moving command is authorized because the continuous-rotation
+servos have no accessible emergency disconnect. DFR0566 communication and
+non-moving checks may proceed.
+
+### Follow-up
+
+Repair and validate the six libraries one at a time, beginning with
+`pi5buzzer`.
+
+## 2026-07-25 — Phase 0 repository foundation
+
+### Summary
+
+- Confirmed the V4 architecture and phase ordering.
+- Confirmed `/home/rogerchang/NinjaRobotPi5` as the new repository root.
+- Classified nested `NinjaClawBot/` as an ignored, read-only code reference.
+- Exported the six tracked Pi5 library trees without changing their contents.
+- Added root project governance, documentation, validation, hardware, and ADR
+  scaffolding.
+
+### Rationale
+
+The clean root prevents the OpenClaw runtime from becoming an accidental V4
+dependency. Immutable driver copies preserve the already-tested hardware
+contracts while all integration and containment work moves into V4-owned
+middleware.
+
+### Validation
+
+The root gate passed with three governance tests. All six copied-driver suites
+passed with 435 tests, and their native Ruff lint and format checks passed.
+The 221-file immutable manifest matched before and after validation. Ruff is
+pinned to 0.15.5 because 0.16 changes inherited package-configuration behavior;
+upgrading it requires a separate review and must not trigger driver rewrites.
+Full command output and the one inherited `audioop` deprecation warning are
+summarized in `docs/validation/phase-0-baseline.md`.
+
+### Raspberry Pi status
+
+No physical hardware was accessed. Powered servo validation remains blocked
+until the supply, current, protection, grounding, and emergency-disconnect
+record is complete.
+
+### Follow-up
+
+After Phase 0 review, Phase 1 will add strict shared contracts and the initial
+`ninjarobot_pi5_ide` and `ninjarobot_pi5_agent` package skeletons.
+
+## 2026-07-25 — Pre-Phase-1 Raspberry Pi hardware validation
+
+### Summary
+
+- Exercised public standalone hardware paths for all six copied Pi5 libraries.
+- Excluded OpenClaw integrations and face enrollment as requested.
+- Used temporary configurations and deleted captured camera/audio media.
+- Kept servo testing non-moving because no emergency disconnect is available.
+
+### Results
+
+- Buzzer GPIO health, tones, and all 14 predefined sounds completed.
+- Display clear, brightness, text, image, and animation commands completed;
+  visual confirmation remains pending.
+- Direct GPIO and DFR0566 servo backend probes completed without movement.
+- Native OV5647 capture passed, but `pi5camera capture` failed because
+  Picamera2 is unavailable to its Python environment.
+- Native USB microphone capture passed at 44.1 kHz, but `pi5mic` recording
+  failed because PortAudio is missing; local Whisper is also unconfigured.
+- VL53L0X identity reads passed, but driver initialization timed out during
+  reference calibration.
+- `pi5disp init --defaults` and brightness commands attempted to rewrite the
+  immutable driver config. The manifest caught the changes and the original
+  file was restored after the hardware backlight was turned off.
+
+### Safety and rollback
+
+No servo pulse or movement command was issued. The display was cleared with its
+backlight set to 0%, relevant GPIO returned to safe states, the Pi remained
+unthrottled, all temporary media was deleted, and all 221 immutable files
+matched the Phase 0 baseline.
+
+### Follow-up
+
+Resolve the camera Python dependency, microphone runtime/STT setup, and VL53L0X
+initialization failure. Add an accessible servo emergency disconnect before
+movement validation. Full evidence is recorded in
+`docs/validation/raspberry-pi-hardware-validation-2026-07-25.md`.
+
+## 2026-07-25 — pi5vl53l0x timing and validation repair
+
+### Summary
+
+- Replaced incomplete measurement-timing calculations with the Pololu/ST
+  sequence-step algorithm.
+- Decoded VCSEL period registers before macro-period conversion.
+- Added deterministic calibration cleanup and one bounded recovery attempt.
+- Prevented CLI commands from reporting success for invalid range samples.
+- Prevented calibration from saving an offset derived from sentinel data.
+
+### Root cause
+
+The driver passed raw VCSEL register encodings directly into macro-period
+calculations, omitted TCC and DSS/MSRC timing stages, and used incorrect fixed
+overheads. A timed-out calibration also left ranging state uncleared. After
+those fixes, the live revision-`0x10` sensor consistently required one bounded
+retry of phase calibration. The retry succeeds, but the connected module still
+returns the `8191 mm` out-of-range sentinel at the reported 100 mm target.
+
+### Validation
+
+- Package compilation, Ruff lint, and Ruff format passed.
+- All 71 package tests passed, including timing, VCSEL decoding, timeout
+  cleanup/retry, invalid CLI status, and calibration rejection tests.
+- I2C address `0x29` and identity `0xEE/0xAA/0x10` passed.
+- Live initialization and health checks passed after bounded recovery.
+- Live status, quick test, and repeated-read commands correctly returned
+  non-zero status for invalid `8191 mm` samples.
+- Six repaired files were recorded in the authorized-driver manifest.
+
+### Raspberry Pi status
+
+This phase is a software pass and a partial hardware pass. No actuator was
+involved. Valid 100 mm distance measurement remains blocked on a physical
+optical/alignment, wiring, power, or sensor-module issue. Calibration remains
+intentionally blocked until valid samples are observed.
+
+### Follow-up
+
+With Pi power disconnected, inspect the sensor window for film or obstruction,
+verify target alignment and the `3.3V/GND/SDA/SCL` path through DFR0566, then
+cold-power-cycle and rerun `pi5vl53l0x status` and `pi5vl53l0x test`.
+
+## 2026-08-19 — MCP and Agent Skills tutorial
+
+### Summary
+
+- Added a beginner-facing guide for NinjaRobotAgent's actual MCP configuration,
+  allowlisting, secret handling, lifecycle, testing, and troubleshooting.
+- Documented the supported Tavily preset and a compatible local read-only Google
+  Calendar server using Google's official Calendar API and OAuth read-only scope.
+- Added a confined custom MCP example that reads a Bluetooth speaker setup record
+  without contacting or controlling hardware.
+- Documented the strict Agent Skill package format and a complete read-only
+  calendar-summary Skill workflow.
+
+### Compatibility and safety
+
+This was a documentation-only change. Agent, IDE, driver, MCP, Skill, hardware,
+configuration, database, IPC, web, and deployment behavior remain unchanged.
+The guide explicitly excludes write-capable external tools, direct external MCP
+hardware control, hosted MCP OAuth claims unsupported by the current client,
+and text-to-speech claims unsupported by NinjaRobotPi5 v1.0.0.
+
+### Validation
+
+The tutorial examples were checked against the repository's strict MCP and
+Skill schemas. Repository validation results are recorded in the task handoff.
+
+## 2026-08-22 — Obstacle interruption and display lifecycle hardening
+
+### Summary
+
+- Changed a confirmed front obstacle from a persistent Level 1 latch into a
+  normal behavior interruption. It stops the servos, cancels concurrent and
+  later behavior operations, shows a bounded silent scary face, and restores
+  supervised Idle without requiring Resume.
+- Added structured `completed`, `interrupted`, cause, recovery, resume, and next
+  state fields so models cannot confuse an interrupted movement with success.
+- Added deterministic Agent notices so terminal and web chat always display the
+  obstacle or persistent-stop cause and recovery instruction, even when the
+  selected model omits it.
+- Preserved persistent undervoltage, watchdog, servo-interruption, corrupt-state,
+  and unrecoverable-driver fail-safe stops. Their reasons and recovery steps are
+  now emitted in both logs and tool/chat results.
+- Added one bounded ST7789V reconstruction and frame retry for idempotent display
+  output, including remembered-brightness restoration and a real clear-frame
+  probe before retry.
+- Closed behavior admission before shutdown and waited for active threaded frame
+  writes before switching off the backlight and releasing SPI/GPIO.
+
+### Root causes
+
+The distance monitor called `stop_motion("front_obstacle", latch=True)`, so a
+normal obstacle persisted a motion gate and rejected every later command until
+manual Resume. Behavior stages also treated the stopped drive as a successful
+operation, allowing sibling and later operations to continue.
+
+For the display, the service log showed the ST7789V backend closing while a face
+task remained pending; that task then wrote through an unavailable driver and
+created a persistent Level 2 failure. Separately, a transient SPI frame error
+terminated the Idle supervisor because ordinary display writes had no bounded
+reconstruction path. The managed driver correctly turns off its backlight on
+`close()`, which made the lifecycle race appear as a disconnected display.
+
+### Compatibility and safety
+
+Public CLI, configuration, IPC, behavior definitions, MCP tools, memory schema,
+web controls, and managed `pi5*` driver sources remain compatible. Obstacle
+interruption results are additive. Genuine fail-safe latches and manual
+Emergency Stop remain available. Automated tests did not move actuators or
+access the physical display, distance sensor, camera, microphone, network, or
+power controls.
+
+### Validation
+
+- Focused Ruff and MyPy checks passed.
+- Focused IDE/Agent tests passed, including repeated transient display recovery
+  across 300 frames, active-frame shutdown, full-stage obstacle cancellation,
+  scary-face-to-Idle handoff, immediate follow-up movement, memory exclusion,
+  persistent-stop logging, and deterministic chat guidance.
+- Complete repository and separate managed-driver results are recorded in the
+  final task handoff after the remaining gate completes.
+
+## 2026-09-07 — Local wiki integration
+
+The owner approved the local knowledge integration plan. Shared project rules,
+Codex/Claude/Antigravity/Cursor adapters, isolated wiki commands, source versioning,
+and documentation-impact checks are being integrated without robot changes.
+The wiki formatting cleanup passed Ruff and all 61 existing wiki tests. Driver
+integrity passed (222 tracked files, 55 authorized repairs). No hardware was
+operated. Final integration results and any pending semantic approval are recorded
+in [the validation record](../../../../../docs/validation/wiki_integration_260907.md).
+
+## 2026-09-07 — Direct wiki manual links
+
+Verified the owner-applied 11 knowledge pages: all current AI semantic reviews
+passed, five sources were ingested, and strict lint, links, indexes and project
+knowledge checks passed. The owner requested removal of the four root navigation
+manuals. Both READMEs and other incoming links now point to full wiki sources.
+Documentation checks and maintenance instructions were updated accordingly;
+registered originals and robot code were preserved. See the
+[validation record](../../../../../docs/validation/wiki_root_manual_cleanup_260907.md)
+for final checks. No hardware operation was performed.

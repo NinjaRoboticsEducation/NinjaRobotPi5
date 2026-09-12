@@ -17,7 +17,7 @@
 > [!NOTE]
 > **v1.0.0 public release.** The project owner completed the Phase 8 manual
 > Raspberry Pi validation. New installations must still follow the safety and
-> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09-03/InstallationGuide.md) because
+> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12/InstallationGuide.md) because
 > wiring and hardware tolerances differ between robots.
 
 ---
@@ -190,7 +190,7 @@ uv run --frozen --extra hardware ninjarobot-agent
 
 The installer does not download an Ollama model, start the Agent, move a motor,
 open the camera or microphone, or deploy boot startup. Follow the complete
-[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09-03/InstallationGuide.md) for wiring, module initialization,
+[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12/InstallationGuide.md) for wiring, module initialization,
 calibration, model download, and safe first movement.
 
 ---
@@ -201,12 +201,19 @@ The default OS is **Lite (64-bit), with no desktop**. Do not look for a desktop
 Bluetooth or volume menu. Use an SSH terminal logged in as the Agent's normal
 Linux account and follow the [complete command-line setup](docs/validation/refinement_phase3_walkthrough_260909.md#pair-and-select-the-bluetooth-speaker):
 
-1. Stop the existing Agent and preview/install the Lite audio packages.
-2. Enable the same user's PipeWire/WirePlumber services and headless Bluetooth policy.
-3. Pair, trust and connect the speaker using `bluetoothctl`.
-4. Select its stable PipeWire node name and set low volume with `wpctl`.
-5. Configure local Piper speech; if using boot startup, add the documented audio-session override.
-6. Start safely and test from chat, using a second terminal for `/speech stop`.
+1. Follow the Lite prerequisites below if audio services are not installed.
+2. Run `uv run --frozen --no-sync ninjarobot-ide-tool bluetooth connect`, or choose IDE menu **8**.
+3. Select the speaker number; the wizard pairs, trusts, connects and saves its output.
+4. Review and enable the independent reconnect service if desired. It works with the Agent running or stopped; boot/logout support requires user lingering.
+5. Configure the optional local Piper voice, then restart an existing Agent safely to load the saved output.
+6. Use **A — Speech ON**, **B — Speech OFF**, `/speech status` and `/speech stop`.
+
+Follow the [current walkthrough and manual tests](docs/validation/refinement_phase3_followup_walkthrough_260912.md)
+for copyable commands, expected results, cold/warm first-word checks and rollback.
+Natural-language command help and `/help TOPIC` explain features without executing
+them; `/guide 1` through `/guide 5` open optional guided checks. Model task queries
+now use compact owned pages with task IDs and content. Robot behavior tools remain
+available, including Greeting and Celebrate.
 
 The [English engine installation](docs/validation/refinement_phase3_walkthrough_260909.md#install-the-optional-english-voice)
 is separate and opt-in. The guide includes copyable commands, expected results,
@@ -245,10 +252,10 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 
 | Document | Purpose |
 |---|---|
-| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09-03/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
-| [MCP and Agent Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09/NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
-| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-09-03/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
-| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-09/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
+| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
+| [MCP and Agent Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12/NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
+| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
+| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-12/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
 | [Documentation Index](docs/README.md) | Public, developer, architecture, history, and validation documents |
 | [Audit Report](docs/project-history/AuditReport_260731.md) | Historical security, reliability, and documentation audit findings |
 | [Implementation Plan](docs/project-history/NinjaRobotPi5V4_ImplementationPlan.md) | Historical phase design and delivery decisions |

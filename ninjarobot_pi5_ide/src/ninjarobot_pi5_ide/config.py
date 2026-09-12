@@ -416,6 +416,7 @@ class SpeechOutputConfig(ConfigModel):
     max_characters: Annotated[int, Field(ge=20, le=1000)] = 500
     synthesis_timeout_seconds: Annotated[float, Field(ge=1, le=60)] = 30.0
     playback_timeout_seconds: Annotated[float, Field(ge=1, le=120)] = 60.0
+    bluetooth_lead_in_seconds: Annotated[float, Field(ge=0, le=2)] = 0.5
 
     @field_validator("output_node")
     @classmethod
@@ -423,6 +424,14 @@ class SpeechOutputConfig(ConfigModel):
         if value in {"auto", "0"} or value.isdecimal():
             raise ValueError("select a stable PipeWire node name, not auto or a numeric id")
         return value
+
+
+class BluetoothSpeakerConfig(ConfigModel):
+    """Explicitly selected speaker; reconnection never enables the Agent."""
+
+    address: Annotated[str, StringConstraints(pattern=r"^(?:[0-9A-F]{2}:){5}[0-9A-F]{2}$|^$")] = ""
+    adapter: Annotated[str, StringConstraints(pattern=r"^hci[0-9]{1,3}$")] = "hci0"
+    auto_reconnect: bool = False
 
 
 class RobotConfig(ConfigModel):
@@ -435,6 +444,7 @@ class RobotConfig(ConfigModel):
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
     voice_input: VoiceInputConfig = Field(default_factory=VoiceInputConfig)
     speech_output: SpeechOutputConfig = Field(default_factory=SpeechOutputConfig)
+    bluetooth_speaker: BluetoothSpeakerConfig = Field(default_factory=BluetoothSpeakerConfig)
     remote_access: RemoteAccessConfig = Field(default_factory=RemoteAccessConfig)
     onboarding: OnboardingConfig = Field(default_factory=OnboardingConfig)
     deployment: DeploymentConfig = Field(default_factory=DeploymentConfig)

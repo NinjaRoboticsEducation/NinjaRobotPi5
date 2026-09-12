@@ -154,6 +154,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
         retention_days=config.memory.conversation_retention_days,
     )
     memory = MemoryStore(arguments.database) if config.memory.enabled else None
+    from .command_help_tool import CommandHelpProvider
     from .task_service import TaskService
     from .task_tools import TaskToolProvider
 
@@ -169,6 +170,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
         ),
         RobotControlMCPProvider(ide),
         TaskToolProvider(tasks, lambda session: runtime.task_scope(session)),
+        CommandHelpProvider(),
     ]
     if memory is not None:
         providers.append(MemoryMCPProvider(MemoryRetrievalService(memory), store))

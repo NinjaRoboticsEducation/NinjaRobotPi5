@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "id": "robot-command-help",
+  "version": "1.0.0",
+  "name": "Robot Command Help",
+  "description": "Explain robot functions using the maintained local command reference without changing settings.",
+  "activation_examples": [
+    "How do I enable spoken replies?",
+    "Can you turn on the audio and voice out your answer?"
+  ],
+  "allowed_tools": [
+    "command_help.search"
+  ],
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "maxLength": 500
+      }
+    },
+    "additionalProperties": false
+  },
+  "limits": {
+    "max_model_turns": 3,
+    "max_tool_calls": 2,
+    "timeout_seconds": 60.0
+  },
+  "safety": {
+    "external_content": "untrusted",
+    "physical_motion": "session_armed"
+  }
+}

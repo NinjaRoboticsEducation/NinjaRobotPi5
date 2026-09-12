@@ -12,7 +12,7 @@ dependencies = [
 [project.optional-dependencies]
 hardware = [
     "ninjarobot-pi5-agent[remote]",
-    "ninjarobot-pi5-ide[display-qr,voice]",
+    "ninjarobot-pi5-ide[display-qr,voice,bluetooth]",
     "pi5buzzer[pi]",
     "pi5camera",
     "pi5disp[pi]",

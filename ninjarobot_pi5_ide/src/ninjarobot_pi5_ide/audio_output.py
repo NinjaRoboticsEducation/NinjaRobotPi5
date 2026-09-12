@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import re
 import shutil
 import wave
 from collections.abc import AsyncIterator, Callable, Coroutine
@@ -36,6 +37,30 @@ def wav_duration(data: bytes) -> float:
         return duration
 
 
+def with_startup_silence(data: bytes, seconds: float) -> bytes:
+    """Start the same output stream before speech without discarding any samples.
+
+    Silence is bounded and included in existing size/duration limits. A physical
+    cold-start listening test is still needed: some speakers gate silent input.
+    """
+    wav_duration(data)
+    if not 0 <= seconds <= 2:
+        raise ValueError("speech_lead_in_invalid")
+    if seconds == 0:
+        return data
+    with wave.open(io.BytesIO(data), "rb") as reader:
+        params = reader.getparams()
+        silence = b"\0" * (round(seconds * params.framerate) * params.nchannels * params.sampwidth)
+        frames = reader.readframes(params.nframes)
+    output = io.BytesIO()
+    with wave.open(output, "wb") as writer:
+        writer.setparams(params)
+        writer.writeframes(silence + frames)
+    result = output.getvalue()
+    wav_duration(result)
+    return result
+
+
 class AudioOutput:
     """Playback is optional and never selects a replacement/default output."""
 
@@ -61,6 +86,7 @@ class AudioOutput:
         self._generation = 0
         self._closed = False
         self._foreground_users = 0
+        self._target_node = config.output_node
 
     async def outputs(self) -> list[dict[str, str]]:
         if self._simulated:
@@ -103,11 +129,21 @@ class AudioOutput:
             return {"ready": False, "reason": "pipewire_tools_missing"}
         try:
             available = await self.outputs()
-            ready = any(row["name"] == self.config.output_node for row in available)
+            selected = self.config.output_node
+            bluetooth = re.fullmatch(
+                r"(bluez_output\.(?:[0-9A-F]{2}_){5}[0-9A-F]{2}\.).+", selected
+            )
+            if bluetooth:
+                matches = [
+                    row["name"] for row in available if row["name"].startswith(bluetooth.group(1))
+                ]
+                selected = matches[0] if len(matches) == 1 else ""
+            ready = bool(selected) and any(row["name"] == selected for row in available)
+            self._target_node = selected
             return {
                 "ready": ready,
                 "reason": "available" if ready else "selected_output_unavailable",
-                "selected_output": self.config.output_node,
+                "selected_output": selected,
             }
         except Exception:
             return {"ready": False, "reason": "audio_session_unavailable"}
@@ -122,6 +158,8 @@ class AudioOutput:
                 await self.voice.resume()
 
     async def play(self, data: bytes, *, generation: int | None = None) -> dict[str, Any]:
+        if not self._simulated and self.config.output_node.startswith("bluez_output."):
+            data = with_startup_silence(data, self.config.bluetooth_lead_in_seconds)
         duration = wav_duration(data)
         if generation is not None and generation != self._generation:
             raise RuntimeError("speech_superseded")
@@ -151,9 +189,10 @@ class AudioOutput:
     async def _play_stream(self, data: bytes, duration: float, generation: int) -> dict[str, Any]:
         playback: asyncio.Task[bytes] | None = None
         try:
+            target = self._target_node
             arguments = [
                 "pw-play",
-                "--target=" + self.config.output_node,
+                "--target=" + target,
                 "--volume=" + str(self.config.volume),
                 "--properties="
                 + json.dumps(
@@ -178,7 +217,8 @@ class AudioOutput:
                 if not done:
                     if not self._permitted() or generation != self._generation:
                         raise RuntimeError("speech_interrupted")
-                    if not (await self.health())["ready"]:
+                    health = await self.health()
+                    if not health["ready"] or health.get("selected_output") != target:
                         raise RuntimeError("speaker_disconnected")
             await playback
             if generation != self._generation or not self._permitted():

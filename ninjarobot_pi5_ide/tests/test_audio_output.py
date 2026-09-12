@@ -74,7 +74,7 @@ def test_playback_cleanup_precedes_listener_restore(monkeypatch, mode):
 
         monkeypatch.setattr("ninjarobot_pi5_ide.audio_output.shutil.which", lambda cmd: cmd)
         output = AudioOutput(
-            SpeechOutputConfig(output_node="bluez_output.test"),
+            SpeechOutputConfig(output_node="bluez_output.test", bluetooth_lead_in_seconds=0),
             voice=voice,
             microphone=Microphone(),
             permitted=lambda: True,
@@ -163,3 +163,60 @@ def test_foreground_priority_rejects_stale_synthesis_and_new_playback():
             await output.play(audio())
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("channels,rate", [(1, 16000), (1, 22050), (2, 48000)])
+def test_startup_silence_preserves_every_original_sample(channels, rate):
+    from ninjarobot_pi5_ide.audio_output import with_startup_silence
+
+    raw = b"\x34\x12\x78\x56" * 1000 * channels
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as writer:
+        writer.setnchannels(channels)
+        writer.setsampwidth(2)
+        writer.setframerate(rate)
+        writer.writeframes(raw)
+    original = buffer.getvalue()
+    padded = with_startup_silence(original, 0.5)
+    with wave.open(io.BytesIO(padded), "rb") as reader:
+        assert reader.readframes(round(rate * 0.5)) == b"\0" * round(rate * 0.5) * channels * 2
+        assert reader.readframes(reader.getnframes()) == raw
+    assert wav_duration(padded) == pytest.approx(wav_duration(original) + 0.5)
+    assert with_startup_silence(original, 0) == original
+    with pytest.raises(ValueError):
+        with_startup_silence(original, 3)
+
+
+def test_bluetooth_profile_change_resolves_only_same_speaker(monkeypatch):
+    async def exercise():
+        node = "bluez_output.12_34_56_78_9A_BC.7"
+        runner = AsyncMock(
+            return_value=json.dumps(
+                [{"info": {"props": {"media.class": "Audio/Sink", "node.name": node}}}]
+            ).encode()
+        )
+        monkeypatch.setattr("ninjarobot_pi5_ide.audio_output.shutil.which", lambda cmd: cmd)
+        output = AudioOutput(
+            SpeechOutputConfig(output_node="bluez_output.12_34_56_78_9A_BC.1"),
+            voice=AsyncMock(),
+            microphone=Microphone(),
+            permitted=lambda: True,
+            scene=lambda: None,
+            runner=runner,
+        )
+        assert (await output.health())["selected_output"] == node
+        runner.return_value = json.dumps(
+            [
+                {
+                    "info": {
+                        "props": {
+                            "media.class": "Audio/Sink",
+                            "node.name": "bluez_output.AA_BB_CC_DD_EE_FF.1",
+                        }
+                    }
+                }
+            ]
+        ).encode()
+        assert not (await output.health())["ready"]
+
+    asyncio.run(exercise())

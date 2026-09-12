@@ -78,6 +78,73 @@ def main(context: click.Context, config_path: Path | None) -> None:
         _interactive_menu(context.obj)
 
 
+@main.group("bluetooth")
+def bluetooth_group() -> None:
+    """Connect a speaker without starting the robot or microphone."""
+
+
+@bluetooth_group.command("connect")
+@click.pass_obj
+def bluetooth_connect(tool: ToolContext) -> None:
+    from .bluetooth_setup import connect_wizard
+
+    asyncio.run(connect_wizard(tool.config_path))
+
+
+@bluetooth_group.command("service")
+@click.option("--apply", is_flag=True, help="Install and enable the displayed user service.")
+@click.pass_obj
+def bluetooth_service(tool: ToolContext, apply: bool) -> None:
+    from .bluetooth_setup import install_service
+
+    click.echo(asyncio.run(install_service(tool.config_path or DEFAULT_USER_CONFIG, apply=apply)))
+
+
+@bluetooth_group.command("status")
+@click.pass_obj
+def bluetooth_status(tool: ToolContext) -> None:
+    from .audio_process import run_audio_process
+    from .bluetooth_setup import SERVICE
+
+    click.echo(json.dumps(tool.config().bluetooth_speaker.model_dump(), indent=2))
+    click.echo(
+        asyncio.run(
+            run_audio_process(
+                ["systemctl", "--user", "show", SERVICE, "--property=ActiveState,UnitFileState"],
+                timeout=5,
+            )
+        ).decode()
+    )
+
+
+@bluetooth_group.command("disconnect")
+@click.pass_obj
+def bluetooth_disconnect(tool: ToolContext) -> None:
+    """Disable reconnect across boots, then disconnect only the saved speaker."""
+    from .audio_process import run_audio_process
+    from .bluetooth_setup import SERVICE
+    from .bluetooth_speaker import DEVICE, BlueZSpeaker
+
+    async def disconnect() -> None:
+        await run_audio_process(["systemctl", "--user", "disable", "--now", SERVICE], timeout=15)
+        selected = tool.config().bluetooth_speaker
+        backend = BlueZSpeaker(selected.adapter)
+        try:
+            await backend.start()
+            device = next(
+                (item for item in await backend.devices() if item.address == selected.address), None
+            )
+            if device is not None and device.connected:
+                await backend.call(device.path, DEVICE, "Disconnect")
+        finally:
+            await backend.close()
+
+    asyncio.run(disconnect())
+    click.echo(
+        "Reconnect disabled and speaker disconnected. Use bluetooth service --apply to resume."
+    )
+
+
 @main.group("hardware")
 def hardware_group() -> None:
     """Inspect the configured hardware without changing standalone settings."""
@@ -432,6 +499,7 @@ def _interactive_menu(tool: ToolContext) -> None:
         run_interactive(
             tool.config(),
             simulation_runner=_run_simulated,
+            config_path=tool.config_path,
         )
     )
 

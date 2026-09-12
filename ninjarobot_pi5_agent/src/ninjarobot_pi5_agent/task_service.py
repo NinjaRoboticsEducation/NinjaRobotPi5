@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sqlite3
 import threading
 import uuid
@@ -197,6 +198,78 @@ class TaskService:
                     .fetchall()
                 )
                 return tuple(LocalTask.model_validate_json(row[0]) for row in rows)
+
+        return await asyncio.to_thread(read)
+
+    async def model_page(
+        self,
+        scope: str,
+        *,
+        limit: int = 10,
+        after: str = "",
+        kind: str = "all",
+        status: str = "all",
+    ) -> dict[str, Any]:
+        """Bounded model projection; ownership is applied before pagination.
+
+        Immutable IDs give stable traversal without exposing execution evidence.
+        Pages are live reads, not a snapshot across concurrent task changes.
+        """
+        if isinstance(limit, bool) or not 1 <= limit <= 20:
+            raise ValueError("limit must be 1 through 20")
+        if len(after) > 150 or kind not in {"all", "reminder", "request"}:
+            raise ValueError("invalid task cursor or kind")
+        if status not in {"all", "scheduled", *(item.value for item in TaskStatus)}:
+            raise ValueError("invalid task status")
+
+        def read() -> dict[str, Any]:
+            clauses = ["owner_scope=?"]
+            values: list[Any] = [scope]
+            if kind != "all":
+                clauses.append("kind=?")
+                values.append(kind)
+            if status == "scheduled":
+                clauses.append("kind='reminder' AND status IN ('queued', 'running')")
+            elif status != "all":
+                clauses.append("status=?")
+                values.append(status)
+            where = " AND ".join(clauses)
+            with self._lock:
+                connection = self._db()
+                total = connection.execute(
+                    "SELECT COUNT(*) FROM local_tasks WHERE " + where, values
+                ).fetchone()[0]
+                rows = connection.execute(
+                    "SELECT record_json FROM local_tasks WHERE "
+                    + where
+                    + " AND task_id>? ORDER BY task_id LIMIT ?",
+                    [*values, after, limit + 1],
+                ).fetchall()
+            tasks = [LocalTask.model_validate_json(row[0]) for row in rows[:limit]]
+            fields = {
+                "task_id",
+                "title",
+                "kind",
+                "status",
+                "due_at",
+                "timezone",
+                "repeat",
+                "notification",
+                "notification_language",
+            }
+            projected = [task.model_dump(mode="json", include=fields) for task in tasks]
+            # Account for JSON escaping as well as field length. Never split a
+            # record or lose the last exposed cursor when shortening a page.
+            while len(projected) > 1 and len(json.dumps(projected, ensure_ascii=False)) > 12_000:
+                projected.pop()
+            has_more = len(rows) > len(projected)
+            return {
+                "tasks": projected,
+                "total": total,
+                "has_more": has_more,
+                "next_after": projected[-1]["task_id"] if has_more else None,
+                "ordering": "task_id; live pages, not a snapshot",
+            }
 
         return await asyncio.to_thread(read)
 

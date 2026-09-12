@@ -354,6 +354,18 @@ def robot_config_to_toml(config: RobotConfig) -> str:
             f"language = {_toml(config.voice_input.language)}",
             f"retry_limit = {config.voice_input.retry_limit}",
             "",
+            "[speech_output]",
+            *[
+                f"{key} = {_toml(value)}"
+                for key, value in config.speech_output.model_dump().items()
+            ],
+            "",
+            "[bluetooth_speaker]",
+            *[
+                f"{key} = {_toml(value)}"
+                for key, value in config.bluetooth_speaker.model_dump().items()
+            ],
+            "",
             "[remote_access]",
             f"enabled = {_toml(config.remote_access.enabled)}",
             f"config_file = {_toml(config.remote_access.config_file)}",
@@ -417,7 +429,7 @@ def _read_json_object(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _toml(value: str | bool | list[str]) -> str:
+def _toml(value: str | bool | int | float | list[str]) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, list):

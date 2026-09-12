@@ -263,6 +263,7 @@ async def run_interactive(
     config: RobotConfig,
     *,
     simulation_runner: SimulationRunner,
+    config_path: Path | None = None,
 ) -> None:
     """Run the complete direct-control interactive experience."""
     console = InteractiveConsole()
@@ -307,11 +308,16 @@ async def run_interactive(
                         "Simulation",
                         "Run with simulated modules and no GPIO, PWM, I2C, or SPI access.",
                     ),
+                    (
+                        "8",
+                        "Bluetooth Speaker Connection",
+                        "Scan, pair, trust, connect and save a speaker.",
+                    ),
                     ("7", "Quit", "Stop active work, release hardware, and exit the tool."),
                 ),
                 back=False,
             )
-            choice = await console.choose(("1", "2", "3", "4", "5", "6", "7", "e", "q"))
+            choice = await console.choose(("1", "2", "3", "4", "5", "6", "7", "8", "e", "q"))
             try:
                 if choice == "1":
                     await _hardware_menu(console, session)
@@ -325,6 +331,15 @@ async def run_interactive(
                     await _user_delete_menu(console, session)
                 elif choice == "6":
                     await _simulation_menu(console, session, simulation_runner)
+                elif choice == "8":
+                    if session.robot is not None:
+                        console.warning(
+                            "Exit active hardware work first, then reopen speaker setup."
+                        )
+                    else:
+                        from .bluetooth_setup import connect_wizard
+
+                        await connect_wizard(config_path)
                 elif choice == "e":
                     await _emergency(console, session)
                 else:

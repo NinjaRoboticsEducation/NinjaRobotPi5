@@ -20,6 +20,7 @@ dependencies = [
 # Kept as an empty compatibility extra for existing installers. QR rendering is
 # part of the base IDE import/runtime contract and can no longer be optional.
 display-qr = []
+bluetooth = ["dbus-fast==5.0.22"]
 voice = [
     "onnxruntime==1.27.0",
     "openwakeword==0.6.0",

@@ -161,3 +161,20 @@ model = "claude-sonnet-4-5"
 enabled = true
 auth_method = "api_key"
 api_key_env = "ANTHROPIC_API_KEY"
+
+# Optional local spoken replies. Install a voice explicitly before enabling.
+[speech_output]
+enabled = false
+language = "en"
+english_model = ""
+chinese_model = ""
+output_node = ""
+volume = 0.35
+bluetooth_lead_in_seconds = 0.5
+
+# Saved by ninjarobot-ide-tool bluetooth connect. Reconnection needs its opt-in
+# user service; setting this flag alone does not install or start any service.
+[bluetooth_speaker]
+address = ""
+adapter = "hci0"
+auto_reconnect = false

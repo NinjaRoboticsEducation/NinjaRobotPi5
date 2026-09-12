@@ -278,6 +278,7 @@
       setConnection("connection.active", "badge-ok");
       log(t("connection.owned"));
       updateConnectionDetail();
+      refreshSpeechState();
       const interval = Math.max(1000, Number(message.heartbeat_seconds) * 1000);
       window.clearInterval(state.heartbeatTimer);
       state.heartbeatTimer = window.setInterval(() => {
@@ -474,14 +475,6 @@
 
   document.querySelector("#resumeButton").addEventListener("click", () => {
     resumeRobot().catch(() => {});
-  });
-
-  document.querySelector("#greetingButton").addEventListener("click", () => {
-    send("behavior", { name: "greeting" }).catch(() => {});
-  });
-
-  document.querySelector("#celebrateButton").addEventListener("click", () => {
-    send("behavior", { name: "celebrate" }).catch(() => {});
   });
 
   document.querySelector("#armAiButton").addEventListener("click", (event) => {
@@ -783,14 +776,41 @@
     }
   }
 
+  let speechStatusPending = false;
+  async function refreshSpeechState() {
+    if (speechStatusPending || !state.leaseId || document.hidden) return;
+    speechStatusPending = true;
+    try {
+      showSpeechState(await send("speech", { operation: "status" }));
+    } catch {
+      // A dropped connection is already reported by the connection badge.
+    } finally {
+      speechStatusPending = false;
+    }
+  }
+  window.setInterval(refreshSpeechState, 5000);
+
+  function showSpeechState(result) {
+    const data = result.data || result;
+    const enabled = data.enabled === true;
+    document.querySelector("#speechOnButton").setAttribute("aria-pressed", String(enabled));
+    document.querySelector("#speechOffButton").setAttribute("aria-pressed", String(!enabled));
+    const unavailable = data.reason || (enabled &&
+      (data.playback?.ready === false || data.synthesis?.ready === false));
+    document.querySelector("#speechResult").textContent = unavailable
+      ? t("speech.unavailable") : t(enabled ? "speech.enabled" : "speech.disabled");
+  }
+
   document.querySelectorAll("[data-speech]").forEach((button) => {
     button.addEventListener("click", async () => {
-      const resultElement = document.querySelector("#speechResult");
       try {
+        // OFF remains available while an ON request or a chat turn is pending.
         const result = await send("speech", { operation: button.dataset.speech });
-        resultElement.textContent = JSON.stringify(result, null, 2);
+        showSpeechState(result);
+        refreshSpeechState();
       } catch (error) {
-        resultElement.textContent = error.message || "Speech control unavailable.";
+        document.querySelector("#speechResult").textContent = t("speech.unavailable");
+        log(error.message || String(error), "error");
       }
     });
   });
@@ -876,22 +896,6 @@
   }
   document.querySelector("#tasksRefresh").addEventListener("click", () => refreshTasks());
 
-  document.querySelector("#guideButton").addEventListener("click", async () => {
-    const output = document.querySelector("#guideOutput");
-    const diagnostics = document.querySelector("#guideDiagnostics");
-    diagnostics.textContent = "";
-    try {
-      const result = await send("guided_checks", {
-        step: Number(document.querySelector("#guideStep").value),
-      });
-      const data = result.data || result;
-      output.textContent = `${data.title}: ${data.text}`;
-      diagnostics.textContent = data.diagnostics ? JSON.stringify(data.diagnostics, null, 2) : "";
-    } catch (error) {
-      output.textContent = error.message;
-    }
-  });
-
   document.addEventListener("keydown", (event) => {
     if (!elements.powerDialog.classList.contains("hidden")) {
       if (event.key === "Escape") closePowerDialog();
@@ -942,6 +946,11 @@
 
   function syncViewportHeight() {
     const height = window.visualViewport?.height || window.innerHeight;
+    // The keyboard changes viewport proportions, not the physical orientation.
+    const orientation = window.screen.orientation?.type;
+    const landscape = orientation ? orientation.startsWith("landscape")
+      : window.screen.width > window.screen.height;
+    document.body.classList.toggle("physical-landscape", landscape);
     document.documentElement.style.setProperty("--app-height", `${height}px`);
   }
   window.addEventListener("resize", syncViewportHeight);

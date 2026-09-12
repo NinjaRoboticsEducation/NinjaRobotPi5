@@ -6,8 +6,12 @@ bounded task retrieval and consistent documentation. It preserves the current
 Agent -> IDE -> managed driver -> device architecture. Phase 4 and Phase 5
 implementation remain outside this work.
 
-**Status: investigation completed to the extent possible without new physical
-tests; implementation approval pending.** Prepared 10 September 2026 against
+**Status: implementation approved and software refinements implemented; physical
+acceptance remains pending.**
+
+See the [current handoff](../docs/validation/refinement_phase3_followup_handoff_260912.md)
+and [manual tests](../docs/validation/refinement_phase3_followup_walkthrough_260912.md).
+The proposal and investigation evidence below are retained as the design record. Prepared 10 September 2026 against
 checkout `7badd66`. The working tree was clean at the start. No runtime file,
 driver, live configuration, service or wiki publication was changed during this
 investigation. This document is a proposal, not an implementation completion report.
@@ -428,6 +432,10 @@ Do not describe the work as complete until the implementation gates pass and any
 remaining physical or publication acceptance is clearly identified.
 
 ## Approval boundary
+
+The owner approved implementation in the conversation. The later instruction
+skips all wiki ingestion/review; no wiki proposal or publication was performed.
+The following paragraph records the original scope boundary.
 
 Approve R0–R6 as a Phase 3 follow-up before implementation. This includes the
 owner-confirmed independent reconnect service, read-only natural-language help,

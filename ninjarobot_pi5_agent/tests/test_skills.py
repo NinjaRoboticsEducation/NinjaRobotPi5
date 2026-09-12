@@ -72,6 +72,7 @@ def test_bundled_skills_validate_and_simulate_without_execution(tmp_path) -> Non
         "memory-retrieval",
         "offline-robot-check",
         "robot-behavior-generation",
+        "robot-command-help",
     ]
     offline = repository.get(
         "offline-robot-check",

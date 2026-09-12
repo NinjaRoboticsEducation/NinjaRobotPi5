@@ -4,16 +4,17 @@ Start here for project documentation, architecture, development history, and
 AI-assisted development. Open this folder in your coding tool for wiki questions,
 or open the parent project for development and implementation verification.
 
-## Latest full manuals — Lite documentation correction
+## Latest full manuals — Phase 3 follow-up
 
 These updated source revisions are readable now; ingestion and semantic review
 remain deferred. The document map and curated search pages still identify the
-published earlier checkpoint. Use these manuals for Phase 3 headless audio setup:
+published earlier checkpoint. Use these manuals for current Phase 3 setup and follow-up behavior:
 
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-09-03/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-09-03/DevelopmentGuide.md)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-09-03/DevelopmentLog.md)
-- [Command-line walkthrough](../docs/validation/refinement_phase3_walkthrough_260909.md)
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-12/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-12/DevelopmentGuide.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-12/DevelopmentLog.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-12/NinjaRobot_MCP_Skill.md)
+- [Command-line walkthrough](../docs/validation/refinement_phase3_followup_walkthrough_260912.md)
 
 ## Published full manuals — earlier checkpoint
 

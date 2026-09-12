@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "examples": [
+    {
+      "input": {
+        "query": "spoken replies"
+      },
+      "expected_tools": [
+        "command_help.search"
+      ],
+      "simulation_only": true
+    }
+  ]
+}

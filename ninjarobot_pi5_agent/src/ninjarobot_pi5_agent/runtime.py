@@ -14,6 +14,7 @@ from typing import Any, Protocol
 from ninjarobot_pi5_ide import RiskLevel
 
 from .agent_loop import AgentLoop, AgentReply, TextDeltaHandler
+from .command_help import help_text, wants_command_help
 from .events import AgentEventType, EventBroker
 from .memory_controls import memory_command
 from .memory_models import MemorySettings, UserProfile
@@ -241,6 +242,41 @@ class AgentRuntime:
         self._ensure_started()
         self._begin_operation()
         try:
+            command = text.split(maxsplit=1)
+            if command and command[0] == "/help":
+                return await self._identity_reply(
+                    session_id,
+                    help_text(command[1] if len(command) > 1 else ""),
+                    on_text_delta=on_text_delta,
+                    persist=False,
+                )
+            if command and command[0] == "/guide":
+                try:
+                    step = int(command[1]) - 1 if len(command) > 1 else 0
+                    guide = await self.guided_checks(step)
+                    notice = f"{guide['title']}: {guide['text']}\nUse /guide 1 through /guide 5."
+                except ValueError:
+                    notice = "Use /guide followed by a step number from 1 through 5."
+                return await self._identity_reply(
+                    session_id,
+                    notice,
+                    on_text_delta=on_text_delta,
+                    persist=False,
+                )
+            if skill_id is None and wants_command_help(text):
+                available = {tool.name for tool in self.tools.list_tools()}
+                if "command_help.search" in available and any(
+                    item.manifest.id == "robot-command-help" and item.enabled
+                    for item in self.skills.list()
+                ):
+                    skill_id = "robot-command-help"
+                else:
+                    return await self._identity_reply(
+                        session_id,
+                        help_text(text),
+                        on_text_delta=on_text_delta,
+                        persist=False,
+                    )
             if text.startswith("/speech"):
                 parts = text.split()
                 operation = parts[1] if len(parts) == 2 and parts[0] == "/speech" else "status"

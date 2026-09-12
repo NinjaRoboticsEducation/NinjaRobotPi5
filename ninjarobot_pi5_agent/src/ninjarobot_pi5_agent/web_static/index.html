@@ -53,22 +53,9 @@
             </button>
           </div>
 
-          <details class="speech-controls">
-            <summary>Spoken replies</summary>
-            <p>Replies are audible nearby. Requires a configured local voice and speaker.</p>
-            <button type="button" data-speech="on">Enable spoken replies</button>
-            <button type="button" data-speech="off">Disable spoken replies</button>
-            <button type="button" data-speech="stop">Stop speech</button>
-            <button type="button" data-speech="status">Check speech status</button>
-            <button type="button" data-speech="outputs">List speaker outputs</button>
-            <button type="button" data-speech="en">English</button>
-            <button type="button" data-speech="zh">Mandarin (optional voice)</button>
-            <pre id="speechResult" class="guide-result" aria-live="polite"></pre>
-          </details>
-
           <div class="action-pad" aria-label="Special robot controls" data-i18n-aria="controls.special">
-            <button id="greetingButton" class="action-button action-a"><strong>A</strong><span data-i18n="behavior.greeting">Greeting</span></button>
-            <button id="celebrateButton" class="action-button action-b"><strong>B</strong><span data-i18n="behavior.celebrate">Celebrate</span></button>
+            <button id="speechOnButton" data-speech="on" aria-pressed="false" class="action-button action-a"><strong>A</strong><span data-i18n="speech.enable">Speech ON</span></button>
+            <button id="speechOffButton" data-speech="off" aria-pressed="false" class="action-button action-b"><strong>B</strong><span data-i18n="speech.disable">Speech OFF</span></button>
             <button id="emergencyButton" class="action-button action-x"><strong>X</strong><span data-i18n="behavior.emergency">Emergency Stop</span></button>
             <button id="resumeButton" class="action-button action-y"><strong>Y</strong><span data-i18n="behavior.resume">Resume</span></button>
           </div>
@@ -79,6 +66,7 @@
             <div>
               <p class="eyebrow" data-i18n="chat.eyebrow">CONVERSATION</p>
               <h2 id="chatTitle" data-i18n="chat.title">Talk to NinjaRobot</h2>
+              <p id="speechResult" class="speech-status" role="status" aria-live="polite"></p>
             </div>
             <button id="clearChatButton" class="small-button" data-i18n="chat.clear">Clear view</button>
           </div>
@@ -161,20 +149,6 @@
           <button id="tasksRefresh" class="small-button" type="button" data-i18n="tasks.refresh">Refresh tasks</button>
           <p id="tasksNotice" role="status"></p>
           <div id="tasksList"></div>
-        </section>
-        <section class="menu-section" aria-labelledby="guideTitle">
-          <h3 id="guideTitle" data-i18n="guide.title">Guided checks</h3>
-          <label for="guideStep" data-i18n="guide.step">Choose a step; skip or return at any time</label>
-          <select id="guideStep">
-            <option value="0" data-i18n="guide.environment">Environment</option>
-            <option value="1" data-i18n="guide.safety">Stop and resume</option>
-            <option value="2" data-i18n="guide.text">Text chat</option>
-            <option value="3" data-i18n="guide.reminders">Reminders</option>
-            <option value="4" data-i18n="guide.help">Help</option>
-          </select>
-          <button id="guideButton" class="small-button" type="button" data-i18n="guide.open">Read step</button>
-          <p id="guideOutput" role="status"></p>
-          <details><summary data-i18n="guide.diagnostics">Diagnostic details</summary><pre id="guideDiagnostics"></pre></details>
         </section>
         <section class="menu-section danger-section" aria-labelledby="powerTitle">
           <h3 id="powerTitle" data-i18n="power.title">System power</h3>

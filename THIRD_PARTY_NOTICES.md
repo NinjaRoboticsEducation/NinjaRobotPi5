@@ -123,3 +123,16 @@ labels its dataset license unknown; no Chinese model is bundled, automatically
 installed, or represented as cleared for redistribution. Japanese speech is not
 implemented. Speech synthesis is local; the chosen conversation provider retains
 its separate data-handling terms and charges.
+
+## Phase 3 Bluetooth follow-up
+
+The optional IDE `bluetooth` extra pins **dbus-fast 5.0.22**, licensed under MIT,
+from the [upstream project](https://github.com/bluetooth-devices/dbus-fast).
+The workspace lock records package hashes. It provides structured communication
+with BlueZ; it does not replace any robot driver. Existing BlueZ, PipeWire and
+WirePlumber OS packages retain their upstream licenses and installation policy.
+
+Browser validation used Playwright 1.55.0 (Apache-2.0) and its Chromium test build
+in a temporary test environment. Neither is a robot runtime dependency. See the
+[Playwright project](https://github.com/microsoft/playwright) for licenses and
+browser notices. No additional model, cloud service or voice download is added.

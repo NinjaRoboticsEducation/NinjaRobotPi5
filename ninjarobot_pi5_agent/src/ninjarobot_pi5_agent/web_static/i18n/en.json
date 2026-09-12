@@ -123,5 +123,10 @@
   "voice.status": "Always-on Ninja: {state}",
   "voice.title": "VOICE INPUT",
   "voice.titleOn": "VOICE INPUT ON",
-  "voice.transcript": "[Voice] {text}"
+  "voice.transcript": "[Voice] {text}",
+  "speech.enable": "Speech ON",
+  "speech.disable": "Speech OFF",
+  "speech.enabled": "Spoken replies: on",
+  "speech.disabled": "Spoken replies: off",
+  "speech.unavailable": "Speech unavailable; type /speech status."
 }

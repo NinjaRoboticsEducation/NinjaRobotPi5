@@ -27,13 +27,38 @@ class TaskToolProvider:
 
     def __init__(self, service: TaskService, scope: ScopeResolver) -> None:
         self._service = service
+        self._scope = scope
         self._controls = TaskControls(service, scope)
         self._definitions = (
             ToolDefinition(
                 name="tasks.list",
                 version="1.0.0",
-                description="Read the active user's saved local reminders and delivery evidence.",
-                input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+                description="Read a compact page of the active user's tasks. Use status=scheduled "
+                "for scheduled reminders. Report task_id and title. Fetch next_after only "
+                "when needed; do not combine every page into one response.",
+                input_schema={
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "limit": {"type": "integer", "minimum": 1, "maximum": 20},
+                        "after": {"type": "string", "maxLength": 150},
+                        "kind": {"enum": ["all", "reminder", "request"]},
+                        "status": {
+                            "enum": [
+                                "all",
+                                "scheduled",
+                                "draft",
+                                "queued",
+                                "running",
+                                "completed",
+                                "failed",
+                                "cancelled",
+                                "missed",
+                                "uncertain",
+                            ]
+                        },
+                    },
+                },
                 output_schema={"type": "object"},
                 risk=RiskLevel.READ_ONLY,
                 default_timeout_seconds=5.0,
@@ -116,17 +141,18 @@ class TaskToolProvider:
             raise KeyError("unknown local task tool")
         try:
             Draft202012Validator(definition.input_schema).validate(call.arguments)
-            data = (
-                await self._controls.list(invocation.session_id)
-                if call.name == "tasks.list"
-                else (await self._controls.preview(invocation.session_id, call.arguments))
-            )
+            if call.name == "tasks.list":
+                scope, _ = await self._scope(invocation.session_id)
+                data = await self._service.model_page(scope, **call.arguments)
+            else:
+                data = await self._controls.preview(invocation.session_id, call.arguments)
         except SchemaError:
             return ToolExecutionResult(
                 call_id=call.call_id,
                 tool_name=call.name,
                 status=ToolExecutionStatus.FAILED,
-                error="Reminder not scheduled. Use only title, exact due_at with offset, "
+                error="Invalid task arguments. Check the tool schema. "
+                "For reminders use title, due_at, "
                 "timezone, repeat and notification. Ask the user for missing details.",
                 definitely_not_executed=True,
             )
@@ -135,7 +161,7 @@ class TaskToolProvider:
                 call_id=call.call_id,
                 tool_name=call.name,
                 status=ToolExecutionStatus.FAILED,
-                error=("Reminder not scheduled: " + str(error))[:1000],
+                error=("Task request rejected: " + str(error))[:1000],
                 definitely_not_executed=True,
             )
         return ToolExecutionResult(

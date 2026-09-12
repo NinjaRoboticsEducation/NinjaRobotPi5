@@ -123,5 +123,10 @@
   "voice.status": "Ninja 常时待命：{state}",
   "voice.title": "语音输入",
   "voice.titleOn": "语音输入已开启",
-  "voice.transcript": "［语音］{text}"
+  "voice.transcript": "［语音］{text}",
+  "speech.enable": "语音开启",
+  "speech.disable": "语音关闭",
+  "speech.enabled": "语音回复：开",
+  "speech.disabled": "语音回复：关",
+  "speech.unavailable": "语音不可用，请输入 /speech status。"
 }

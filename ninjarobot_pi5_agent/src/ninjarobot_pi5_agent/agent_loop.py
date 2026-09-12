@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import re
 import unicodedata
 import uuid
@@ -39,6 +38,7 @@ from .prompts import PromptComposer
 from .providers import LLMProvider
 from .recovery import RecoveryAction, RecoveryPolicy
 from .skills import LoadedSkill
+from .tool_messages import repair_tool_history, tool_message_content
 from .tools import CancellationToken, ToolRegistry
 
 IDFactory = Callable[[], str]
@@ -296,6 +296,7 @@ class AgentLoop:
                 )
             )
             request_id = self._id_factory()
+            history = repair_tool_history(history)
             request = ModelRequest(
                 request_id=request_id,
                 session_id=session_id,
@@ -379,11 +380,7 @@ class AgentLoop:
                     session_id,
                     ModelMessage(
                         role=MessageRole.TOOL,
-                        content=json.dumps(
-                            result.model_dump(mode="json"),
-                            sort_keys=True,
-                            ensure_ascii=False,
-                        ),
+                        content=tool_message_content(result),
                         name=call.name,
                         tool_call_id=call.call_id,
                     ),
@@ -466,11 +463,7 @@ class AgentLoop:
             session_id,
             ModelMessage(
                 role=MessageRole.TOOL,
-                content=json.dumps(
-                    result.model_dump(mode="json"),
-                    sort_keys=True,
-                    ensure_ascii=False,
-                ),
+                content=tool_message_content(result),
                 name=call.name,
                 tool_call_id=call.call_id,
             ),

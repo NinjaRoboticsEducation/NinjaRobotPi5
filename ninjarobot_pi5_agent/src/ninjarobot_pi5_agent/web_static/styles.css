@@ -4,7 +4,7 @@
   box-shadow: 0 0 0 6px #07111f;
 }
 
-#guideOutput, #guideDiagnostics, #tasksList pre {
+#tasksList pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-size: 1rem;
@@ -83,6 +83,8 @@ p {
 .app-shell {
   width: min(100%, 600px);
   height: var(--app-height);
+  overflow-y: auto;
+  overflow-x: hidden;
   margin: 0 auto;
   padding:
     max(8px, env(safe-area-inset-top))
@@ -90,7 +92,7 @@ p {
     max(44px, calc(env(safe-area-inset-bottom) + 38px))
     max(8px, env(safe-area-inset-left));
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(600px, 1fr);
   gap: 7px;
 }
 
@@ -185,7 +187,7 @@ h2 {
 }
 
 .dashboard {
-  min-height: 0;
+  min-height: 600px;
   display: grid;
   grid-template-rows: minmax(0, 1.58fr) minmax(0, 0.82fr);
   gap: 7px;
@@ -444,7 +446,7 @@ h2 {
   padding: 8px;
   color: var(--ink);
   background: #06111e;
-  font-size: 0.78rem;
+  font-size: 16px;
 }
 
 .chat-form button {
@@ -555,7 +557,7 @@ h2 {
 .activity-content {
   height: 100%;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(600px, 1fr);
   gap: 7px;
 }
 
@@ -803,8 +805,8 @@ h2 {
   border: 0;
 }
 
-@media (orientation: landscape) and (max-height: 600px) {
-  .orientation-blocker {
+@media (orientation: landscape) and (max-height: 600px) and (pointer: coarse) {
+  body.physical-landscape .orientation-blocker {
     display: grid;
   }
 }
@@ -854,3 +856,10 @@ h2 {
     transition: none !important;
   }
 }
+
+/* Keep long replies inside the transcript and preserve control geometry while
+   a mobile keyboard reduces the available height. The shell can scroll. */
+.message { flex: 0 0 auto; min-width: 0; }
+.chat-messages, .chat-form, .conversation-panel { min-width: 0; }
+.speech-status { font-size: 0.7rem; color: var(--muted); min-height: 1em; }
+.action-button[aria-pressed="true"] { outline: 2px solid white; outline-offset: -4px; }

@@ -1,5 +1,10 @@
 # Phase 3: spoken replies and coordinated output — walkthrough
 
+For the current speaker wizard, independent reconnect service and updated web
+controls, start with the [12 September follow-up guide](refinement_phase3_followup_walkthrough_260912.md).
+The original setup and historical validation below remain useful; the follow-up
+guide supersedes the old speech-dropdown and manual-pairing user flow.
+
 The baseline is **Raspberry Pi OS Lite (64-bit), with no desktop**. All essential
 setup and speech controls below work from a terminal. Phase 3 is implemented and software-tested. **Development pauses before Phase 4.**
 These instructions are for your acceptance test (checking the real robot yourself).
@@ -628,12 +633,12 @@ These tests produce sound. Keep voice input disabled initially.
    Record delay before sound, intelligibility, volume and whether the full short
    sentence plays. `/speech status` should report `played`, with hearing unverified.
 2. Ask for a longer answer. During speech, enter `/speech stop` in the second chat terminal.
-   The optional web equivalent is **Spoken replies → Stop speech**.
+   The optional web equivalent is `/speech stop` in a second chat terminal.
    Expected: sound stops promptly (Bluetooth may briefly drain buffered sound), text
    stays visible, and a later reply can speak again. Test while the same browser's
    chat request is still open. Stop must not wait for that request to finish.
 3. Repeat using `/speech off` in the second chat terminal (or the optional
-   **Disable spoken replies** web button). Expected: current speech
+   **B — Speech OFF** web button). Expected: current speech
    stops and later replies remain silent. `/speech on` enables it again.
 4. CLI alternative: open a second terminal with
    `uv run --frozen --no-sync ninjarobot-agent chat`, then enter `/speech stop`.

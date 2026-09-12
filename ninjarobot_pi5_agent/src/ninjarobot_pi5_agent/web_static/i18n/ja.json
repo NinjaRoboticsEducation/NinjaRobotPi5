@@ -123,5 +123,10 @@
   "voice.status": "常時待受 Ninja：{state}",
   "voice.title": "音声入力",
   "voice.titleOn": "音声入力オン",
-  "voice.transcript": "［音声］{text}"
+  "voice.transcript": "［音声］{text}",
+  "speech.enable": "音声オン",
+  "speech.disable": "音声オフ",
+  "speech.enabled": "音声応答：オン",
+  "speech.disabled": "音声応答：オフ",
+  "speech.unavailable": "音声を利用できません。/speech status で確認してください。"
 }

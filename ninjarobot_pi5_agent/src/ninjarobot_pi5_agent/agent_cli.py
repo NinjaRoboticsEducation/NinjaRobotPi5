@@ -22,6 +22,7 @@ from ninjarobot_pi5_ide import RemoteAccessConfig, RiskLevel, load_robot_config
 from .benchmark import BenchmarkCase, ModelBenchmark
 from .cloud_common import CloudProviderError
 from .cloud_registry import ConfiguredProviderRegistry
+from .command_help import CHAT_HELP_TEXT
 from .deployment import DeploymentManager, create_backup, current_spec, restore_backup
 from .ipc import AgentIPCClient, AgentIPCError
 from .mcp_client import (
@@ -79,66 +80,6 @@ DEFAULT_WEB_CERTIFICATE = Path("~/.config/ninjarobot_pi5/tls/agent-cert.pem")
 DEFAULT_WEB_KEY = Path("~/.config/ninjarobot_pi5/tls/agent-key.pem")
 DEFAULT_WEB_CA_EXPORT = Path("~/ninjarobotpi5-local-ca.pem")
 MAX_SERVICE_LOG_BYTES = 5_000_000
-CHAT_HELP_TEXT = """Available chat commands:
-/speech on|off|stop|status|outputs|en|zh
-  Control local spoken replies; Stop also cancels queued speech without cancelling chat.
-
-/help
-  Show this command list and explain how to use chat.
-/exit
-  Exit chat without stopping the Agent service.
-/clear
-  Clear this interface's conversation transcript.
-/status
-  Show Agent, model, hardware, memory, and tool status.
-/remind SECONDS MESSAGE
-  Preview a silent local inbox reminder; then confirm its exact task ID.
-/tasks
-  List local reminders, progress and delivery evidence without a model call.
-/tasks confirm ID
-  Schedule the exact reminder preview you reviewed (expires after ten minutes).
-/tasks cancel ID
-  Cancel further delivery; an in-progress notification may already have happened.
-/tasks snooze ID MINUTES
-  Preview a new due time; review and confirm it again.
-/remind-json JSON
-  Preview title, due_at (with UTC offset), timezone, repeat and notification.
-/memory review
-  Inspect saved information, source, confidence and confirmation for the active user.
-/memory confirm ID
-  Confirm the reviewed preference.
-/memory edit ID NEW TEXT
-  Correct and confirm a preference for the active user.
-/memory forget ID
-  Remove that item and its active preference value.
-/resume
-  Confirm recovery after an Emergency Stop.
-/camera
-  Authorize one temporary AI camera preview for this chat session.
-/arm
-  Confirm and arm physical AI motion for this chat session.
-/disarm
-  Revoke physical AI motion authorization for this chat session.
-/confirm <request>
-  Explicitly confirm and send one request that requires confirmation.
-/voice input on
-  Enable always-on wake-word voice input.
-/voice input off
-  Disable always-on wake-word voice input.
-/voice input status
-  Show wake-word and microphone listener status.
-/show remote access
-  Display a fresh one-use ngrok pairing QR without revoking existing browsers.
-/new user
-  Register an additional user profile and face.
-/switch user
-  Verify and switch this interface to another registered user.
-/identify
-  Identify a registered user with the camera.
-/update profile
-  Show and update the active user's name or registered face.
-
-Ordinary text is sent to NinjaRobot using this interface's active user and session."""
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -1,5 +1,10 @@
 # Phase 3 implementation handoff — 9 September 2026
 
+For the current speaker wizard, independent reconnect service and updated web
+controls, start with the [12 September follow-up guide](refinement_phase3_followup_walkthrough_260912.md).
+The original setup and historical validation below remain useful; the follow-up
+guide supersedes the old speech-dropdown and manual-pairing user flow.
+
 Phase 3 H02/B01 software is implemented. **Pause before Phase 4 until the owner
 confirms acceptance.** Start with the
 [step-by-step setup and manual tests](refinement_phase3_walkthrough_260909.md).
