@@ -1,5 +1,9 @@
 # Wiki Update Log
 
+## 2026-09-12
+
+* **Update**: Applied plan `phase3-followup-ingest-260912` — Ingest 2026-09-12 Phase 3 follow-up and 2026-09-09-03 Raspberry Pi OS Lite manuals; update eleven knowledge pages with headless audio deployment, IDE menu 8 Bluetooth wizard, standalone reconnect service, lead-in silence buffer, robot-command-help skill, and CLI /help.. Sources: `src-20260907-knowledgeintegration`, `src-20260912-developmentguide`, `src-20260912-installationguide`, `src-20260912-ninjarobot-mcp-skill`, `src-20260912-developmentlog`.
+
 ## 2026-09-08
 
 * **Update**: Applied plan `refinement-phase2-260909` — Consolidate Phase 0–2 manuals and eleven existing knowledge pages; preserve explicit spending-cap, managed-driver and hardware-validation gaps.. Sources: `src-20260907-knowledgeintegration`, `src-20260908-developmentguide`, `src-20260908-ninjarobot-mcp-skill`, `src-20260908-installationguide`, `src-20260908-developmentlog`.

@@ -14,15 +14,15 @@ sources:
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
   content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
-- id: src-20260908-developmentguide
-  resource: urn:llmwiki:source:src-20260908-developmentguide
+- id: src-20260912-developmentguide
+  resource: urn:llmwiki:source:src-20260912-developmentguide
   title: DevelopmentGuide.md
-  content_hash: sha256:640cb37251c7d9c7d41a23a4998aa0b25dcbfa8bba952435adeda61f821fd6e6
+  content_hash: sha256:9843060f7eb54f90846eb51f4dac8ab23e1a3d5dae78211a1d2dae4cd198d376
 semantic_review:
   version: 1
-  performed_by: agent:codex
-  performed_at: '2026-09-08T15:25:18.461989+00:00'
-  target_hash: sha256:872ba8ad84d8801b976e4dbfc5c56ce45440107854fd5bcb7e7f06bfdae1c297
+  performed_by: agent:antigravity
+  performed_at: '2026-09-12T09:37:00Z'
+  target_hash: sha256:fddef3685444dbdbb5c1d1d7012dd8fc65388c1271cf0c64907b255da9a0e0fa
   result: passed
   checks:
     source_support: passed
@@ -31,18 +31,17 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against its registered manual checkpoint and retained source
-    text; no human verification is claimed.
-  - New checkpoint claims distinguish software tests from physical acceptance, pending
-    managed changes and the monetary-budget gap; retained navigation claims remain
-    source-supported.
+  - Reviewed this page against registered Phase 3 follow-up evidence; no human verification
+    is claimed.
+  - Checkpoint claims distinguish software tests from physical hardware acceptance
+    and note pending font repair and monetary spending cap.
 ---
 
 # NinjaRobotPi5 project overview
 
 NinjaRobotPi5 documents an Agent layer for user/model interaction, an IDE layer
 for coordinating devices, and managed Pi5 libraries for individual devices.
-The development guide describes their permitted ownership boundary.[^src-20260908-developmentguide]
+The development guide describes their permitted ownership boundary.[^src-20260912-developmentguide]
 
 The local wiki is the primary developer knowledge collection. Full manuals are
 versioned under raw source folders; outer README links and the project knowledge
@@ -62,16 +61,24 @@ compare important claims with the current checkout before coding.[^src-20260907-
 - [Development log](references/development-log.md)
 - [MCP and skills tutorial](references/mcp-skills-guide.md)
 
+## Phase 3 follow-up checkpoint
 
-## Phase 2 checkpoint
-
-The local task assistant now has reviewed reminders, durable request records and
-preference correction. Development pauses before Phase 3 for owner testing.
-The Agent/IDE/driver boundary remains. Two managed-driver repairs are pending,
-and bounded model usage is not a currency-denominated spending cap. Read
+Spoken replies, coordinated output, and Bluetooth speaker integration are implemented
+and software-tested. The existing Agent/IDE/driver boundary remains intact: IDE-owned
+OS audio is an optional output, not a new Agent hardware path. English speech uses
+optional local Piper synthesis, Mandarin accepts an operator-supplied model, and
+Japanese is not implemented. IDE owns PipeWire playback, RobotAssembly speaking
+face coordination, independent speech stop controls, and Bluetooth speaker connections.
+Raspberry Pi OS Lite headless setup uses session lingering (`loginctl enable-linger`),
+WirePlumber headless seat configuration, and an optional systemd audio drop-in.
+The Phase 3 follow-up adds IDE menu 8 (Bluetooth Speaker Connection wizard), saved
+TOML configuration (`[audio.bluetooth]`), a standalone reconnect helper daemon,
+bounded same-stream lead-in silence buffering (`bluetooth_lead_in_ms`), the bundled
+`robot-command-help` skill, CLI `/help` and `/guide` commands, and interrupted-turn
+context repair. Display font repair and monetary spending cap remain pending. Read
 [local tasks and memory](concepts/features-and-tools.md) before treating a saved
-request as a delivered notification.[^src-20260908-developmentguide]
+request as delivered.[^src-20260912-developmentguide]
 
 
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
-[^src-20260908-developmentguide]: DevelopmentGuide.md, source version `refinement-phase2-260909`; registered source `src-20260908-developmentguide`.
+[^src-20260912-developmentguide]: DevelopmentGuide.md, source version `refinement-phase3-followup-260912`; registered source `src-20260912-developmentguide`.

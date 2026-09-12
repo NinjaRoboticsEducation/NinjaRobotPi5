@@ -12,5 +12,5 @@ retrieved_at: null
 normalized_at: '2026-09-07T00:45:19Z'
 normalizer: llmwiki-text/0.2
 error: null
-ingested_at: '2026-09-08T17:10:49Z'
-last_plan: refinement-phase2-260909
+ingested_at: '2026-09-12T09:38:07Z'
+last_plan: phase3-followup-ingest-260912

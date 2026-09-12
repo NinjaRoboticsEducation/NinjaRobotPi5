@@ -13,28 +13,29 @@ tags:
 - reminders
 - tasks
 - memory
-- phase2
+- speech
+- command-help
 generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20260908-ninjarobot-mcp-skill
-  resource: urn:llmwiki:source:src-20260908-ninjarobot-mcp-skill
+- id: src-20260912-ninjarobot-mcp-skill
+  resource: urn:llmwiki:source:src-20260912-ninjarobot-mcp-skill
   title: NinjaRobot_MCP_Skill.md
-  content_hash: sha256:f4ad853bb46a8dd3caa961c2e6337ea316a75889e1c6c049d2960b60507603e0
-- id: src-20260908-developmentguide
-  resource: urn:llmwiki:source:src-20260908-developmentguide
+  content_hash: sha256:a378ca8b20ecbab88c423690017a12a8a44d3f0e1e591c4538b34432777ba810
+- id: src-20260912-developmentguide
+  resource: urn:llmwiki:source:src-20260912-developmentguide
   title: DevelopmentGuide.md
-  content_hash: sha256:640cb37251c7d9c7d41a23a4998aa0b25dcbfa8bba952435adeda61f821fd6e6
+  content_hash: sha256:9843060f7eb54f90846eb51f4dac8ab23e1a3d5dae78211a1d2dae4cd198d376
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
   content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
 semantic_review:
   version: 1
-  performed_by: agent:codex
-  performed_at: '2026-09-08T15:25:18.461989+00:00'
-  target_hash: sha256:79e9260a1e363c78e47af7130924231b68d4b1e6532fbce01b288f362d33897f
+  performed_by: agent:antigravity
+  performed_at: '2026-09-12T09:37:00Z'
+  target_hash: sha256:4e1795c24ea92f76120423f4ef4134f0b0ba79079185965e77a81cb1c9501bb5
   result: passed
   checks:
     source_support: passed
@@ -43,25 +44,24 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against its registered manual checkpoint and retained source
-    text; no human verification is claimed.
-  - New checkpoint claims distinguish software tests from physical acceptance, pending
-    managed changes and the monetary-budget gap; retained navigation claims remain
-    source-supported.
+  - Reviewed this page against registered Phase 3 follow-up evidence; no human verification
+    is claimed.
+  - Checkpoint claims distinguish software tests from physical hardware acceptance
+    and note pending font repair and monetary spending cap.
 ---
 
 # Features, MCP tools, and Agent Skills
 
 The development guide describes conversational and web interfaces, model
-providers, behaviors, memory, and device capabilities. These are documented
-implementation areas; use the current code and tests to verify a specific
-feature or failure case before changing it.[^src-20260908-developmentguide]
+providers, behaviors, memory, device capabilities, and local audio output.
+These are documented implementation areas; use current code and tests to verify
+a specific feature or failure case before changing it.[^src-20260912-developmentguide]
 
 MCP (Model Context Protocol) lets an application discover and call external tools.
 The robot tutorial describes allowlisted read-only tools, bounded results,
 timeouts, and untrusted external content. Its examples include Tavily search
 and a read-only Google Calendar server. Agent Skills package reusable workflows;
-they do not grant extra hardware permissions.[^src-20260908-ninjarobot-mcp-skill]
+they do not grant extra hardware permissions.[^src-20260912-ninjarobot-mcp-skill]
 
 Development wiki skills are a separate coding-tool workflow. This local knowledge
 integration does not install a robot MCP provider or change runtime interfaces.
@@ -70,34 +70,35 @@ guide for developer knowledge updates.[^src-20260907-knowledgeintegration]
 
 [MCP and skills tutorial](/references/mcp-skills-guide.md).
 
-
-## Local reminders, task progress and memory
+## Local tasks, speech, and command guidance
 
 In existing chat, `/remind 120 Practice` creates a silent draft. `/tasks confirm ID`
-explicitly schedules the reviewed time and effect. `/tasks`, cancel and snooze
+explicitly schedules the reviewed time and effect. `/tasks`, cancel, and snooze
 controls also appear in the browser Local tasks panel. Snooze needs fresh review.
-Exact dated reminders support daily/weekly repeat and optional reviewed display
-text plus a buzzer tone. They do not request wheel movement.[^src-20260908-developmentguide]
+Exact dated reminders support daily/weekly repeat, optional reviewed display
+text, buzzer tones, and optional spoken reminder delivery.[^src-20260912-developmentguide]
 
-The Pi and Agent must stay running. Once saved, reminders need no cloud model.
-Late reminders become missed; interrupted delivery becomes uncertain without
-automatic replay. A silent reminder's completion means its local inbox result was
-saved, not that the user read it. Request completion means response processing
-ended; tool evidence determines what is known about external effects.[^src-20260908-developmentguide]
+Local speech synthesis uses English Piper by default (`en_US-lessac-medium`).
+Mandarin accepts an operator-supplied ONNX model, and Japanese is not implemented.
+Audio output routes through PipeWire to the configured ALSA or Bluetooth speaker sink.
+IDE menu 8 provides an interactive Bluetooth setup wizard that writes `[audio.bluetooth]`
+configuration to `config/ninjarobot_pi5.toml`. Same-stream lead-in silence buffering
+prevents truncated speech from waking Bluetooth speakers.[^src-20260912-developmentguide]
+
+The bundled `robot-command-help` skill uses `command_help.search` to resolve natural
+language inquiries into deterministic `/help <topic>` and `/guide 1` through `/guide 5`
+instructions. Web interface additions provide Bluetooth speaker status, reconnect
+triggers, and command-help shortcuts. Interrupted turns cleanly cancel active audio
+and repair context without repeating stale actions.[^src-20260912-ninjarobot-mcp-skill][^src-20260912-developmentguide]
 
 Task progress requires refresh. General requests do not autonomously resume after
-restart. Model calls, actual tool attempts including retries, input size, requested
-output and time are bounded; this is not a currency-denominated spending cap.
-`/memory review`, confirm, edit and forget expose source/confidence and correction.
-Confirmed structured preferences resist contradictory inference; arbitrary
-natural-language contradiction resolution is not comprehensive.[^src-20260908-developmentguide]
-
-Custom MCP servers require local read-only and retry-safe allowlists. Discovery,
-schemas and results are bounded and checked; external output remains untrusted.
-The local task tools can list or preview, but have no model confirmation tool.
-Calendar writes and later refinement phases are outside this checkpoint.[^src-20260908-ninjarobot-mcp-skill]
+restart. Model calls, tool attempts, input size, requested output, and time are
+bounded; this is not a currency-denominated spending cap. `/memory review`, confirm,
+edit, and forget expose source/confidence and correction. Confirmed structured
+preferences resist contradictory inference; arbitrary natural-language contradiction
+resolution is not comprehensive.[^src-20260912-developmentguide]
 
 
-[^src-20260908-ninjarobot-mcp-skill]: NinjaRobot_MCP_Skill.md, source version `refinement-phase2-260909`; registered source `src-20260908-ninjarobot-mcp-skill`.
-[^src-20260908-developmentguide]: DevelopmentGuide.md, source version `refinement-phase2-260909`; registered source `src-20260908-developmentguide`.
+[^src-20260912-ninjarobot-mcp-skill]: NinjaRobot_MCP_Skill.md, source version `refinement-phase3-followup-260912`; registered source `src-20260912-ninjarobot-mcp-skill`.
+[^src-20260912-developmentguide]: DevelopmentGuide.md, source version `refinement-phase3-followup-260912`; registered source `src-20260912-developmentguide`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

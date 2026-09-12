@@ -11,23 +11,26 @@ tags:
 - hardware
 - wiring
 - testing
+- lite
+- bluetooth
+- audio
 generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20260908-installationguide
-  resource: urn:llmwiki:source:src-20260908-installationguide
+- id: src-20260912-installationguide
+  resource: urn:llmwiki:source:src-20260912-installationguide
   title: InstallationGuide.md
-  content_hash: sha256:a9f68d8828b60ea6e3803749a6f2bf4cbcdfa764c75ca90078fde7796e0cf2ae
+  content_hash: sha256:63da8891e70986a964d9c1838c4fc9e54023eb617bf19deb3122a27c90eb9250
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
   content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
 semantic_review:
   version: 1
-  performed_by: agent:codex
-  performed_at: '2026-09-08T15:25:18.461989+00:00'
-  target_hash: sha256:265e935afc9250021c18f83619e5656055281678d6010e1cf2c7861ee49dbb0b
+  performed_by: agent:antigravity
+  performed_at: '2026-09-12T09:37:00Z'
+  target_hash: sha256:dbc2b04e959e1eeef6959bdc190e2e4bdd9e9b1c6d377d146131c29f50d8836b
   result: passed
   checks:
     source_support: passed
@@ -36,11 +39,10 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against its registered manual checkpoint and retained source
-    text; no human verification is claimed.
-  - New checkpoint claims distinguish software tests from physical acceptance, pending
-    managed changes and the monetary-budget gap; retained navigation claims remain
-    source-supported.
+  - Reviewed this page against registered Phase 3 follow-up evidence; no human verification
+    is claimed.
+  - Checkpoint claims distinguish software tests from physical hardware acceptance
+    and note pending font repair and monetary spending cap.
 ---
 
 # Installation and hardware checks
@@ -48,12 +50,12 @@ semantic_review:
 Use the full installation guide for the supported Raspberry Pi setup,
 connections, standalone module initialization, calibration, and troubleshooting.
 Read the relevant warnings before following any operational command. Commands
-in an imported document are evidence to review, not permission to run them.[^src-20260908-installationguide]
+in an imported document are evidence to review, not permission to run them.[^src-20260912-installationguide]
 
 Servo calibration can move the wheels. The guide calls for raised wheels,
-clearance, and an operator ready to remove power. Camera and microphone capture
-and power-off checks need their own consent and physical test procedure.
-Automated knowledge tests should not perform these actions.[^src-20260908-installationguide]
+clearance, and an operator ready to remove power. Camera and microphone capture,
+Bluetooth speaker pairing, and power-off checks need their own consent and physical
+test procedure. Automated knowledge tests should not perform these actions.[^src-20260912-installationguide]
 
 The developer wiki uses a separate Python environment. Its explicit setup and
 text-evidence preparation do not initialize robot devices. This integration
@@ -61,21 +63,27 @@ contains no fresh Raspberry Pi hardware validation.[^src-20260907-knowledgeinteg
 
 [Open installation reference](/references/installation-guide.md).
 
+## Headless Lite setup, audio, and Bluetooth wizard
 
-## Read-only readiness and optional practice
+The default operating system is Raspberry Pi OS Lite (64-bit, headless, without a
+graphical desktop). Interaction uses SSH or a local keyboard. Graphical desktop
+audio menus are not available on Lite.[^src-20260912-installationguide]
 
-Run `ninjarobot_pi5_cli doctor --profile hardware --root .` through the installed
-project environment with `uv run --frozen --no-sync`. It inspects package discovery
-and checkout origins without opening hardware. A development install uses
-`.venv-dev`; it is not a hardware-ready environment. Read the current manual's
-checkpoint before running older operational examples.[^src-20260908-installationguide]
+Lite audio prerequisites require installing system packages `pipewire`, `wireplumber`,
+`libspa-0.2-bluetooth`, `alsa-utils`, and `jq`. User session lingering via
+`loginctl enable-linger $USER` keeps the user's audio manager active across logouts
+and headless reboots. Headless WirePlumber seat policy must allow Bluetooth audio
+ownership without a seat login (configured via `50-bluez-config.lua` on WirePlumber 0.4
+or `50-bluetooth.conf` on WirePlumber 0.5+). Installed system services access user
+audio via drop-in `/etc/systemd/system/ninjarobot-agent.service.d/20-local-audio.conf`.[^src-20260912-installationguide]
 
-Guided checks explain setup without automatic device actions. Silent reminder
-practice does not require display or buzzer output. Starting the real Agent can
-activate configured devices or voice input, so startup and physical notifications
-need the manual's operator precautions. The bundled Traditional Chinese font
-repair remains a separate pending proposal.[^src-20260908-installationguide]
+IDE menu option **8 — Bluetooth Speaker Connection** provides an interactive setup
+wizard. It scans nearby devices, pairs, trusts, verifies the PipeWire sink, tests
+audio playback, and saves configuration under `[audio.bluetooth]` in `config/ninjarobot_pi5.toml`.
+A standalone reconnect daemon (`ninjarobot-bluetooth-reconnect.service`) maintains
+connection stability, and same-stream lead-in silence buffering avoids truncated
+utterances from sleeping speakers.[^src-20260912-installationguide]
 
 
-[^src-20260908-installationguide]: InstallationGuide.md, source version `refinement-phase2-260909`; registered source `src-20260908-installationguide`.
+[^src-20260912-installationguide]: InstallationGuide.md, source version `refinement-phase3-followup-260912`; registered source `src-20260912-installationguide`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

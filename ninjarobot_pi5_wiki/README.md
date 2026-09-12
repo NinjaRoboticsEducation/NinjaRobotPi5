@@ -4,11 +4,11 @@ Start here for project documentation, architecture, development history, and
 AI-assisted development. Open this folder in your coding tool for wiki questions,
 or open the parent project for development and implementation verification.
 
-## Latest full manuals — Phase 3 follow-up
+## Current full manuals — Phase 3 follow-up
 
-These updated source revisions are readable now; ingestion and semantic review
-remain deferred. The document map and curated search pages still identify the
-published earlier checkpoint. Use these manuals for current Phase 3 setup and follow-up behavior:
+These current source revisions are ingested into the wiki knowledge base.
+Use [the current document map](project-knowledge.json) for source versions and
+provenance. Use these manuals for current Phase 3 setup and follow-up behavior:
 
 - [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-12/InstallationGuide.md)
 - [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-12/DevelopmentGuide.md)
@@ -16,7 +16,7 @@ published earlier checkpoint. Use these manuals for current Phase 3 setup and fo
 - [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-12/NinjaRobot_MCP_Skill.md)
 - [Command-line walkthrough](../docs/validation/refinement_phase3_followup_walkthrough_260912.md)
 
-## Published full manuals — earlier checkpoint
+## Historical full manuals — earlier checkpoints
 
 - [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-09/InstallationGuide.md)
 - [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-09/DevelopmentGuide.md)

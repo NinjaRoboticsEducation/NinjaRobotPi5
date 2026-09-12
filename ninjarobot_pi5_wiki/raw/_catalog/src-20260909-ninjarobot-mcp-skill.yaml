@@ -1,0 +1,16 @@
+id: src-20260909-ninjarobot-mcp-skill
+path: raw/articles/ninjarobotpi5/2026-09-09-02/NinjaRobot_MCP_Skill.md
+media_type: text/markdown
+kind: text
+title: NinjaRobot_MCP_Skill.md
+added_at: '2026-09-09T09:24:06Z'
+content_hash: sha256:abf9b523e5f7cb9e477ac33e63a3cb7757a532c53118f4ed3d171b983aa4b427
+state: ingested
+original_uri: urn:llmwiki:source:src-20260909-ninjarobot-mcp-skill
+source_version: refinement-phase3-260909
+retrieved_at: null
+normalized_at: '2026-09-09T09:24:11Z'
+normalizer: llmwiki-text/0.2
+error: null
+ingested_at: '2026-09-09T09:28:43Z'
+last_plan: refinement-phase3-260909

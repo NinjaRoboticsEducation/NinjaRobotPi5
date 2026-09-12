@@ -21,15 +21,15 @@ sources:
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
   content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
-- id: src-20260908-developmentguide
-  resource: urn:llmwiki:source:src-20260908-developmentguide
+- id: src-20260912-developmentguide
+  resource: urn:llmwiki:source:src-20260912-developmentguide
   title: DevelopmentGuide.md
-  content_hash: sha256:640cb37251c7d9c7d41a23a4998aa0b25dcbfa8bba952435adeda61f821fd6e6
+  content_hash: sha256:9843060f7eb54f90846eb51f4dac8ab23e1a3d5dae78211a1d2dae4cd198d376
 semantic_review:
   version: 1
-  performed_by: agent:codex
-  performed_at: '2026-09-08T15:25:18.461989+00:00'
-  target_hash: sha256:6fb90d4737801aed3be54d072fefda2254692c32487c339fa8faed71bb4457e9
+  performed_by: agent:antigravity
+  performed_at: '2026-09-12T09:37:00Z'
+  target_hash: sha256:f8e4ca0a72d0c56b9c8b42fd8b174fce73b9cce7a60afe2b9f0b0bf9e973f2c2
   result: passed
   checks:
     source_support: passed
@@ -38,22 +38,21 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against its registered manual checkpoint and retained source
-    text; no human verification is claimed.
-  - New checkpoint claims distinguish software tests from physical acceptance, pending
-    managed changes and the monetary-budget gap; retained navigation claims remain
-    source-supported.
+  - Reviewed this page against registered Phase 3 follow-up evidence; no human verification
+    is claimed.
+  - Checkpoint claims distinguish software tests from physical hardware acceptance
+    and note pending font repair and monetary spending cap.
 ---
 
 # Development and documentation workflow
 
-Before significant development, consult the local wiki and the current full
+Before significant development, consult the local wiki and current full
 manuals, inspect relevant code, and identify missing or conflicting evidence.
 The root project policy requires an approved phased plan and preservation of
-robot interfaces and managed-driver rules.[^src-20260908-developmentguide]
+robot interfaces and managed-driver rules.[^src-20260912-developmentguide]
 
 Feature completion includes a wiki impact assessment. Update affected manual
-versions, topic pages, specifications and architecture guidance, then record
+versions, topic pages, specifications, and architecture guidance, then record
 the change and validation in the development log. If no documentation change is
 needed, record a specific reason. A new source version preserves the old source;
 current navigation and the knowledge map identify the active version.[^src-20260907-knowledgeintegration]
@@ -61,22 +60,25 @@ current navigation and the knowledge map identify the active version.[^src-20260
 Use the project's maintenance guide outside the knowledge bundle for exact
 commands. Prepare a semantic page plan, validate it, show the actual diff, and
 apply the approved plan with the wiki CLI. Review source support honestly and
-check current pointers, file fingerprints, links, indexes and review coverage.
+check current pointers, file fingerprints, links, indexes, and review coverage.
 AI review is distinct from human verification.[^src-20260907-knowledgeintegration]
 
 [Development guide](/references/development-guide.md) ·
 [History](/concepts/development-history.md).
 
+## Phase 3 follow-up consolidation
 
-## Refinement consolidation exception
+The current manuals are versioned under `raw/articles/ninjarobotpi5/2026-09-12/`
+and `raw/notes/ninjarobotpi5/2026-09-12/`, consolidating Phase 3 local audio and
+the Phase 3 follow-up (Bluetooth setup wizard, reconnect helper daemon, lead-in
+silence buffer, command-help skill, and CLI `/help` / `/guide` commands). Intermediate
+Raspberry Pi OS Lite setup revisions from 9 September (`2026-09-09-03`) are also registered
+in the source catalog.[^src-20260912-developmentguide]
 
-For this approved refinement, the owner's latest instruction defers documentation
-and wiki changes during code implementation, consolidates them at Phase 2, and
-pauses before Phase 3. This replaces the earlier all-phases deferral. The old
-F02-only wiki proposal is stale. Registered originals stay unchanged, new full
-manuals are versioned, and searchable changes use an approved semantic diff.
-Software checks do not substitute for owner hardware tests.[^src-20260908-developmentguide]
+Automated validation covers extensive unit tests, compilation, linting, formatting,
+type checks, and driver verification gates. Passing software gates does not
+substitute for owner physical acceptance testing on real hardware with raised wheels.[^src-20260912-developmentguide]
 
 
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
-[^src-20260908-developmentguide]: DevelopmentGuide.md, source version `refinement-phase2-260909`; registered source `src-20260908-developmentguide`.
+[^src-20260912-developmentguide]: DevelopmentGuide.md, source version `refinement-phase3-followup-260912`; registered source `src-20260912-developmentguide`.
