@@ -9,10 +9,10 @@ generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20260912-ninjarobot-mcp-skill
-  resource: urn:llmwiki:source:src-20260912-ninjarobot-mcp-skill
+- id: src-20260913-ninjarobot-mcp-skill
+  resource: urn:llmwiki:source:src-20260913-ninjarobot-mcp-skill
   title: NinjaRobot_MCP_Skill.md
-  content_hash: sha256:a378ca8b20ecbab88c423690017a12a8a44d3f0e1e591c4538b34432777ba810
+  content_hash: sha256:893fd4a9ceb771012ad2c009bfd5d0ded89959a28341fcb301eee361c318b697
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -20,8 +20,8 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-09-12T09:37:00Z'
-  target_hash: sha256:dc4de6c4577e4382c67968908cae206f1d79a0f0242a8ed8e8dec44e2389c552
+  performed_at: '2026-09-13T14:15:00Z'
+  target_hash: sha256:fd827e76e89e6d24c6e56876eb963c96163a78025ae8292697ea06b5e0a0c0d3
   result: passed
   checks:
     source_support: passed
@@ -30,7 +30,7 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered Phase 3 follow-up evidence; no human verification
+  - Reviewed this page against registered Phase 4 information evidence; no human verification
     is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
     and note pending font repair and monetary spending cap.
@@ -38,7 +38,7 @@ semantic_review:
 
 # MCP and Agent Skills tutorial
 
-The tutorial explains external tools, configuration, read-only Tavily and Calendar examples, and reusable Agent Skills. It describes restrictions for the robot Agent, not a development wiki server.[^src-20260912-ninjarobot-mcp-skill]
+The tutorial explains external tools, configuration, read-only Tavily and Calendar examples, and reusable Agent Skills. It describes restrictions for the robot Agent, not a development wiki server.[^src-20260913-ninjarobot-mcp-skill]
 
 Use the source identifier below to resolve the complete manual through the raw
 source catalog. The outer wiki README also links directly to the current full
@@ -47,12 +47,14 @@ Read the relevant full section before acting on an abbreviated explanation.[^src
 
 [Return to project overview](/overview.md).
 
-## Current checkpoint
+## Current checkpoint: completed Phase 4 information work
 
-The 12 September source adds the bundled `robot-command-help` skill, `command_help.search`
-tool, and natural language help queries mapped to deterministic `/help <topic>` and
-`/guide 1` through `/guide 5` commands. Existing MCP extensions gain no direct device access.[^src-20260912-ninjarobot-mcp-skill]
+The 13 September 2026 source (`2026-09-13-03`) details information-assistant tools
+(`calendar.list`, `calendar.events.preview_create/update/delete`, `research.topic.run`,
+`notes.preview_create/update`, `briefing.local.request`), the bundled `distance-game`
+skill v1, the bundled `project-help` skill v2, command help, and system time tools.
+External MCP extensions retain no direct device or hardware access.[^src-20260913-ninjarobot-mcp-skill]
 
 
-[^src-20260912-ninjarobot-mcp-skill]: NinjaRobot_MCP_Skill.md, source version `refinement-phase3-followup-260912`; registered source `src-20260912-ninjarobot-mcp-skill`.
+[^src-20260913-ninjarobot-mcp-skill]: NinjaRobot_MCP_Skill.md, source version `refinement-phase4-information-260913`; registered source `src-20260913-ninjarobot-mcp-skill`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

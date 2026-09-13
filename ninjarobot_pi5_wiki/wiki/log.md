@@ -1,5 +1,9 @@
 # Wiki Update Log
 
+## 2026-09-13
+
+* **Update**: Applied plan `refinement-phase4-information-260913` — Ingest 2026-09-13-03 Phase 4 information manuals and update eleven knowledge pages with calendar planning, research service, notes/checklists/briefings, Phase 4 foundations, Phase 5 distance game, and system clock access.. Sources: `src-20260907-knowledgeintegration`, `src-20260913-developmentguide`, `src-20260913-installationguide`, `src-20260913-ninjarobot-mcp-skill`, `src-20260913-developmentlog`.
+
 ## 2026-09-12
 
 * **Update**: Applied plan `phase3-followup-ingest-260912` — Ingest 2026-09-12 Phase 3 follow-up and 2026-09-09-03 Raspberry Pi OS Lite manuals; update eleven knowledge pages with headless audio deployment, IDE menu 8 Bluetooth wizard, standalone reconnect service, lead-in silence buffer, robot-command-help skill, and CLI /help.. Sources: `src-20260907-knowledgeintegration`, `src-20260912-developmentguide`, `src-20260912-installationguide`, `src-20260912-ninjarobot-mcp-skill`, `src-20260912-developmentlog`.

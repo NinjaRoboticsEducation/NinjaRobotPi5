@@ -4,12 +4,14 @@ Start here for project documentation, architecture, development history, and
 AI-assisted development. Open this folder in your coding tool for wiki questions,
 or open the parent project for development and implementation verification.
 
-## Latest full manuals — completed Phase 4 information work, pending ingestion
+## Current full manuals — completed Phase 4 information work
 
-M03 memory retrieval, M04 read-only recipes, X01 compatible skills and X05 public
-help are retained. These new full revisions also document T04 calendar planning,
-T05 research and T06 notes/checklists/requested briefings. No ingestion, review
-or publication was run:
+These current source revisions are ingested into the wiki knowledge base.
+M03 memory retrieval, M04 read-only recipes, X01 compatible skills, and X05 public
+help are retained alongside T04 calendar planning, T05 research, and T06
+notes/checklists/requested briefings. System clock access and Refinement Phase 5
+foundations are also consolidated here. Use [the current document map](project-knowledge.json)
+for source versions and provenance:
 
 - [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-13-03/InstallationGuide.md)
 - [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-13-03/DevelopmentGuide.md)
@@ -19,42 +21,15 @@ or publication was run:
 - [Information-assistant handoff](../docs/validation/refinement_phase4_information_handoff_260913.md)
 - [Earlier Phase 4 walkthrough](../docs/validation/refinement_phase4_walkthrough_260913.md)
 - [Phase 4 handoff](../docs/validation/refinement_phase4_handoff_260913.md)
+- [Phase 5 walkthrough](../docs/validation/refinement_phase5_walkthrough_260912.md)
+- [Phase 5 handoff](../docs/validation/refinement_phase5_handoff_260913.md)
+- [Clock fix and manual tests](../docs/validation/system_time_fix_260912.md)
 
 Runtime project help is separate from developer wiki search. It uses a fixed
 public list pinned to the published 12 September checkpoint and reports
-draft/older coverage. It does not ingest these prepared revisions.
+draft/older coverage.
 
-## Previous full manuals — Phase 5, pending ingestion
-
-These revisions cover the optional distance game, silent expression variations,
-sensor ownership repair and evaluation-only hardware proposals. The owner deferred
-wiki ingestion and review. Registered originals and current curated pages remain
-preserved; read these new sources directly for Phase 5:
-
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-13/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-13/DevelopmentGuide.md)
-- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-13/NinjaRobot_MCP_Skill.md)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-13/DevelopmentLog.md)
-- [Phase 5 walkthrough](../docs/validation/refinement_phase5_walkthrough_260912.md)
-- [Phase 5 handoff](../docs/validation/refinement_phase5_handoff_260913.md)
-
-## Previous full manuals — system time fix, pending ingestion
-
-These new revisions describe `/time`, fresh model clock context and the read-only
-`system.time.get` tool. They have not replaced the ingested sources or review
-records below. Read the new source directly for this clock fix:
-
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-12-02/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-12-02/DevelopmentGuide.md)
-- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-12-02/NinjaRobot_MCP_Skill.md)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-12-02/DevelopmentLog.md)
-- [Clock fix and manual tests](../docs/validation/system_time_fix_260912.md)
-
-## Current full manuals — Phase 3 follow-up
-
-These current source revisions are ingested into the wiki knowledge base.
-Use [the current document map](project-knowledge.json) for source versions and
-provenance. Use these manuals for current Phase 3 setup and follow-up behavior:
+## Historical full manuals — earlier checkpoints
 
 - [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-12/InstallationGuide.md)
 - [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-12/DevelopmentGuide.md)

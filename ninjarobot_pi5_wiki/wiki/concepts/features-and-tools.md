@@ -15,18 +15,21 @@ tags:
 - memory
 - speech
 - command-help
+- recipes
+- information
+- distance-game
 generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20260912-ninjarobot-mcp-skill
-  resource: urn:llmwiki:source:src-20260912-ninjarobot-mcp-skill
+- id: src-20260913-ninjarobot-mcp-skill
+  resource: urn:llmwiki:source:src-20260913-ninjarobot-mcp-skill
   title: NinjaRobot_MCP_Skill.md
-  content_hash: sha256:a378ca8b20ecbab88c423690017a12a8a44d3f0e1e591c4538b34432777ba810
-- id: src-20260912-developmentguide
-  resource: urn:llmwiki:source:src-20260912-developmentguide
+  content_hash: sha256:893fd4a9ceb771012ad2c009bfd5d0ded89959a28341fcb301eee361c318b697
+- id: src-20260913-developmentguide
+  resource: urn:llmwiki:source:src-20260913-developmentguide
   title: DevelopmentGuide.md
-  content_hash: sha256:9843060f7eb54f90846eb51f4dac8ab23e1a3d5dae78211a1d2dae4cd198d376
+  content_hash: sha256:f6ae6ee1dfe85488f3db13c1d6cc927802d92610860605bd42229d6a3a1d53bf
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -34,8 +37,8 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-09-12T09:37:00Z'
-  target_hash: sha256:4e1795c24ea92f76120423f4ef4134f0b0ba79079185965e77a81cb1c9501bb5
+  performed_at: '2026-09-13T14:15:00Z'
+  target_hash: sha256:dc5423cfe29313fe39fe5091bfee22258e23bea18d0a13bcf295e19f7ff9bc85
   result: passed
   checks:
     source_support: passed
@@ -44,7 +47,7 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered Phase 3 follow-up evidence; no human verification
+  - Reviewed this page against registered Phase 4 information evidence; no human verification
     is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
     and note pending font repair and monetary spending cap.
@@ -53,15 +56,15 @@ semantic_review:
 # Features, MCP tools, and Agent Skills
 
 The development guide describes conversational and web interfaces, model
-providers, behaviors, memory, device capabilities, and local audio output.
-These are documented implementation areas; use current code and tests to verify
-a specific feature or failure case before changing it.[^src-20260912-developmentguide]
+providers, behaviors, memory, device capabilities, recipes, information services,
+and local audio output. These are documented implementation areas; use current code
+and tests to verify a specific feature or failure case before changing it.[^src-20260913-developmentguide]
 
 MCP (Model Context Protocol) lets an application discover and call external tools.
 The robot tutorial describes allowlisted read-only tools, bounded results,
-timeouts, and untrusted external content. Its examples include Tavily search
-and a read-only Google Calendar server. Agent Skills package reusable workflows;
-they do not grant extra hardware permissions.[^src-20260912-ninjarobot-mcp-skill]
+timeouts, and untrusted external content. Examples include Tavily search and Google
+Calendar access. Agent Skills package reusable workflows; they do not grant extra
+hardware permissions.[^src-20260913-ninjarobot-mcp-skill]
 
 Development wiki skills are a separate coding-tool workflow. This local knowledge
 integration does not install a robot MCP provider or change runtime interfaces.
@@ -70,35 +73,32 @@ guide for developer knowledge updates.[^src-20260907-knowledgeintegration]
 
 [MCP and skills tutorial](/references/mcp-skills-guide.md).
 
-## Local tasks, speech, and command guidance
+## System clock, distance game, and command guidance
 
-In existing chat, `/remind 120 Practice` creates a silent draft. `/tasks confirm ID`
-explicitly schedules the reviewed time and effect. `/tasks`, cancel, and snooze
-controls also appear in the browser Local tasks panel. Snooze needs fresh review.
-Exact dated reminders support daily/weekly repeat, optional reviewed display
-text, buzzer tones, and optional spoken reminder delivery.[^src-20260912-developmentguide]
+The Agent reads the Raspberry Pi OS clock for each turn. The read-only `system.time.get`
+tool and `/time` chat command provide fresh date, time, timezone, and offset without
+requiring model calls. Relative reminders use this reference.[^src-20260913-developmentguide]
 
-Local speech synthesis uses English Piper by default (`en_US-lessac-medium`).
-Mandarin accepts an operator-supplied ONNX model, and Japanese is not implemented.
-Audio output routes through PipeWire to the configured ALSA or Bluetooth speaker sink.
-IDE menu 8 provides an interactive Bluetooth setup wizard that writes `[audio.bluetooth]`
-configuration to `config/ninjarobot_pi5.toml`. Same-stream lead-in silence buffering
-prevents truncated speech from waking Bluetooth speakers.[^src-20260912-developmentguide]
+The optional Refinement Phase 5 distance game (`/game start [seconds]`, `/game stop`,
+`/game status`, and tools `robot.game.distance.run/stop/status`) provides interactive
+distance-based audio feedback using the VL53L0X sensor (5–60 cm range) and buzzer (440/660/880 Hz
+tones). It is bundled in the version-1 `distance-game` skill. The bundled `robot-command-help`
+skill resolves natural-language questions to deterministic `/help <topic>` and `/guide 1..5`
+commands.[^src-20260913-ninjarobot-mcp-skill][^src-20260913-developmentguide]
 
-The bundled `robot-command-help` skill uses `command_help.search` to resolve natural
-language inquiries into deterministic `/help <topic>` and `/guide 1` through `/guide 5`
-instructions. Web interface additions provide Bluetooth speaker status, reconnect
-triggers, and command-help shortcuts. Interrupted turns cleanly cancel active audio
-and repair context without repeating stale actions.[^src-20260912-ninjarobot-mcp-skill][^src-20260912-developmentguide]
+## Recipes, memory, and information assistant
 
-Task progress requires refresh. General requests do not autonomously resume after
-restart. Model calls, tool attempts, input size, requested output, and time are
-bounded; this is not a currency-denominated spending cap. `/memory review`, confirm,
-edit, and forget expose source/confidence and correction. Confirmed structured
-preferences resist contradictory inference; arbitrary natural-language contradiction
-resolution is not comprehensive.[^src-20260912-developmentguide]
+Phase 4 delivers M03 memory ranking and M04 reviewed local read-only recipes (`/recipes list`,
+`show`, `run`, `disable`, and CLI preview/save/rollback). Recipes are owned multi-step
+read workflows; they cannot move hardware or schedule reminders. X05 public project help
+provides `/project <question>` and the version-2 `project-help` bundled skill.[^src-20260913-developmentguide]
+
+Phase 4 information-assistant tools and commands (`/info`) cover:
+- **Calendar planning (T04)**: Google Calendar connect via SSH tunnel loopback, read-only by default, explicit `--write` flag, five-minute exact preview and same-session direct confirmation for writes. Calendar events never silently create local reminders.[^src-20260913-developmentguide][^src-20260913-ninjarobot-mcp-skill]
+- **Research service (T05)**: Allowlisted Tavily search with bounded snippets, three questions within 30 seconds, real source citations, and explicit save-to-note actions.[^src-20260913-ninjarobot-mcp-skill]
+- **Notes, checklists, and briefings (T06)**: Local SQLite storage (migration 7), atomic note commit with consumed approval, on-request briefings using fixed local dates, and optional speech summary. Stale previews (>7 days) are cleaned on service startup; notes persist up to 1,000 records per kind.[^src-20260913-developmentguide]
 
 
-[^src-20260912-ninjarobot-mcp-skill]: NinjaRobot_MCP_Skill.md, source version `refinement-phase3-followup-260912`; registered source `src-20260912-ninjarobot-mcp-skill`.
-[^src-20260912-developmentguide]: DevelopmentGuide.md, source version `refinement-phase3-followup-260912`; registered source `src-20260912-developmentguide`.
+[^src-20260913-ninjarobot-mcp-skill]: NinjaRobot_MCP_Skill.md, source version `refinement-phase4-information-260913`; registered source `src-20260913-ninjarobot-mcp-skill`.
+[^src-20260913-developmentguide]: DevelopmentGuide.md, source version `refinement-phase4-information-260913`; registered source `src-20260913-developmentguide`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

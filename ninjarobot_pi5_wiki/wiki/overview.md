@@ -14,15 +14,15 @@ sources:
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
   content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
-- id: src-20260912-developmentguide
-  resource: urn:llmwiki:source:src-20260912-developmentguide
+- id: src-20260913-developmentguide
+  resource: urn:llmwiki:source:src-20260913-developmentguide
   title: DevelopmentGuide.md
-  content_hash: sha256:9843060f7eb54f90846eb51f4dac8ab23e1a3d5dae78211a1d2dae4cd198d376
+  content_hash: sha256:f6ae6ee1dfe85488f3db13c1d6cc927802d92610860605bd42229d6a3a1d53bf
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-09-12T09:37:00Z'
-  target_hash: sha256:fddef3685444dbdbb5c1d1d7012dd8fc65388c1271cf0c64907b255da9a0e0fa
+  performed_at: '2026-09-13T14:15:00Z'
+  target_hash: sha256:c373fc869943e4029960d393aca1e51ef89c421596f63e3308c8b658730d822f
   result: passed
   checks:
     source_support: passed
@@ -31,7 +31,7 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered Phase 3 follow-up evidence; no human verification
+  - Reviewed this page against registered Phase 4 information evidence; no human verification
     is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
     and note pending font repair and monetary spending cap.
@@ -41,7 +41,7 @@ semantic_review:
 
 NinjaRobotPi5 documents an Agent layer for user/model interaction, an IDE layer
 for coordinating devices, and managed Pi5 libraries for individual devices.
-The development guide describes their permitted ownership boundary.[^src-20260912-developmentguide]
+The development guide describes their permitted ownership boundary.[^src-20260913-developmentguide]
 
 The local wiki is the primary developer knowledge collection. Full manuals are
 versioned under raw source folders; outer README links and the project knowledge
@@ -61,24 +61,25 @@ compare important claims with the current checkout before coding.[^src-20260907-
 - [Development log](references/development-log.md)
 - [MCP and skills tutorial](references/mcp-skills-guide.md)
 
-## Phase 3 follow-up checkpoint
+## Current checkpoint: completed Phase 4 information work
 
-Spoken replies, coordinated output, and Bluetooth speaker integration are implemented
-and software-tested. The existing Agent/IDE/driver boundary remains intact: IDE-owned
-OS audio is an optional output, not a new Agent hardware path. English speech uses
-optional local Piper synthesis, Mandarin accepts an operator-supplied model, and
-Japanese is not implemented. IDE owns PipeWire playback, RobotAssembly speaking
-face coordination, independent speech stop controls, and Bluetooth speaker connections.
-Raspberry Pi OS Lite headless setup uses session lingering (`loginctl enable-linger`),
-WirePlumber headless seat configuration, and an optional systemd audio drop-in.
-The Phase 3 follow-up adds IDE menu 8 (Bluetooth Speaker Connection wizard), saved
-TOML configuration (`[audio.bluetooth]`), a standalone reconnect helper daemon,
-bounded same-stream lead-in silence buffering (`bluetooth_lead_in_ms`), the bundled
-`robot-command-help` skill, CLI `/help` and `/guide` commands, and interrupted-turn
-context repair. Display font repair and monetary spending cap remain pending. Read
-[local tasks and memory](concepts/features-and-tools.md) before treating a saved
-request as delivered.[^src-20260912-developmentguide]
+The project implements full Phase 4 information-assistant capabilities alongside
+Phase 4 foundations (M03 memory ranking, M04 read-only recipes, X01 version-2
+skills, and X05 public project help), Refinement Phase 5 foundations (optional
+distance game and silent expression variations), and system clock access.
+The Agent/IDE/driver boundary remains intact: information services and SQLite
+records belong to the Agent layer, while hardware coordination belongs to the IDE.[^src-20260913-developmentguide]
+
+Information features include T04 Google Calendar planning (read-only default,
+explicit `--write` authorization, SSH tunnel OAuth loopback, exact five-minute previews,
+and direct confirmation), T05 research service (allowlisted Tavily snippets, bounded
+queries, real source citations, and save-to-note), and T06 notes, checklists, and
+requested briefings. Migration 7 adds user-scoped information tables with atomic
+approval consumption, seven-day preview cleanup on startup, and a 1,000-record cap per
+kind. Model calls cannot confirm calendar or note writes. Physical hardware acceptance,
+live account verification, display font repair, and monetary spending caps remain
+explicitly unverified.[^src-20260913-developmentguide]
 
 
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
-[^src-20260912-developmentguide]: DevelopmentGuide.md, source version `refinement-phase3-followup-260912`; registered source `src-20260912-developmentguide`.
+[^src-20260913-developmentguide]: DevelopmentGuide.md, source version `refinement-phase4-information-260913`; registered source `src-20260913-developmentguide`.

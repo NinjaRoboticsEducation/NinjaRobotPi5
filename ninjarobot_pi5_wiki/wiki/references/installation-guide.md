@@ -9,10 +9,10 @@ generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20260912-installationguide
-  resource: urn:llmwiki:source:src-20260912-installationguide
+- id: src-20260913-installationguide
+  resource: urn:llmwiki:source:src-20260913-installationguide
   title: InstallationGuide.md
-  content_hash: sha256:63da8891e70986a964d9c1838c4fc9e54023eb617bf19deb3122a27c90eb9250
+  content_hash: sha256:de52e1ccb7fea5a45497a0babce1648676824783508eb6c37471aa9e662dba27
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -20,8 +20,8 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-09-12T09:37:00Z'
-  target_hash: sha256:ee821bbe393d19b20bb692f656d87be398b71ae297e22c0ff1ffcd7c6b860dea
+  performed_at: '2026-09-13T14:15:00Z'
+  target_hash: sha256:4ba0f4f854e712a90a298f67a5d54cccadfa84b385ce635d3fe787e60d478a79
   result: passed
   checks:
     source_support: passed
@@ -30,7 +30,7 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered Phase 3 follow-up evidence; no human verification
+  - Reviewed this page against registered Phase 4 information evidence; no human verification
     is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
     and note pending font repair and monetary spending cap.
@@ -38,7 +38,7 @@ semantic_review:
 
 # Installation guide
 
-The full guide covers beginner setup, hardware initialization and calibration, startup, and troubleshooting. Hardware commands require stated operator precautions.[^src-20260912-installationguide]
+The full guide covers beginner setup, hardware initialization and calibration, startup, and troubleshooting. Hardware commands require stated operator precautions.[^src-20260913-installationguide]
 
 Use the source identifier below to resolve the complete manual through the raw
 source catalog. The outer wiki README also links directly to the current full
@@ -47,15 +47,15 @@ Read the relevant full section before acting on an abbreviated explanation.[^src
 
 [Return to project overview](/overview.md).
 
-## Current checkpoint
+## Current checkpoint: completed Phase 4 information work
 
-The 12 September source adds Raspberry Pi OS Lite headless setup, PipeWire and
-WirePlumber audio prerequisites, session lingering (`loginctl enable-linger`),
-systemd audio drop-in configuration, IDE menu option 8 (Bluetooth Speaker Connection
-wizard), saved TOML settings (`[audio.bluetooth]`), a standalone reconnect daemon,
-and same-stream lead-in silence buffering. Software tests do not substitute for
-physical hardware validation.[^src-20260912-installationguide]
+The 13 September 2026 revision (`2026-09-13-03`) documents full Phase 4 information
+setup (Google Calendar OAuth setup via SSH tunnel loopback, private database migration 7,
+local notes and briefings), Phase 4 foundations (M03/M04/X01/X05), Refinement Phase 5
+optional distance game configuration (`[distance_game]`), system clock access, and
+headless Lite audio with Bluetooth setup wizard. Software tests do not substitute for
+physical hardware validation.[^src-20260913-installationguide]
 
 
-[^src-20260912-installationguide]: InstallationGuide.md, source version `refinement-phase3-followup-260912`; registered source `src-20260912-installationguide`.
+[^src-20260913-installationguide]: InstallationGuide.md, source version `refinement-phase4-information-260913`; registered source `src-20260913-installationguide`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
