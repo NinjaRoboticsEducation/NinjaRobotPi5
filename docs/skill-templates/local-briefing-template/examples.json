@@ -6,7 +6,7 @@
         "prompt": "success"
       },
       "expected_tools": [
-        "briefing.read"
+        "briefing.build"
       ],
       "simulation_only": true
     },

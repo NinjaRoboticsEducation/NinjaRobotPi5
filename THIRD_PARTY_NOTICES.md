@@ -136,3 +136,22 @@ Browser validation used Playwright 1.55.0 (Apache-2.0) and its Chromium test bui
 in a temporary test environment. Neither is a robot runtime dependency. See the
 [Playwright project](https://github.com/microsoft/playwright) for licenses and
 browser notices. No additional model, cloud service or voice download is added.
+
+## Google Calendar information connector — September 2026
+
+The optional locally owned connector uses Google Calendar API v3 and Google's
+installed Desktop OAuth flow over the existing HTTPX dependency. No Google SDK,
+third-party implementation code or calendar credentials are bundled. Google
+account authorization, administrator policy, service terms and quotas apply.
+Default access is read-only; writes require separate setup and exact user review.
+
+Implementation references:
+[Desktop authorization](https://developers.google.com/identity/protocols/oauth2/native-app),
+[event listing](https://developers.google.com/workspace/calendar/api/v3/reference/events/list),
+[event creation](https://developers.google.com/workspace/calendar/api/v3/reference/events/insert),
+[partial updates](https://developers.google.com/workspace/calendar/api/v3/reference/events/patch),
+and [version handling](https://developers.google.com/workspace/calendar/api/guides/version-resources).
+
+Research retains bounded snippets and citations returned by the already documented
+Tavily provider. It does not add a full-page downloader or redistribute complete
+articles. Provider/model time and call limits do not impose a monetary cap.

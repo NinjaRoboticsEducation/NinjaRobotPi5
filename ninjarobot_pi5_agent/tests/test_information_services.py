@@ -337,3 +337,58 @@ def test_calendar_failure_boundaries(tmp_path: Path, failure: str) -> None:
         await memory.close()
 
     asyncio.run(run())
+
+
+def test_evidence_renderer_qualifies_unsupported_claims_and_rejects_invented_ids(
+    tmp_path: Path,
+) -> None:
+    from ninjarobot_pi5_agent.research_service import ResearchService
+
+    async def run():
+        memory = MemoryStore(tmp_path / "memory.db")
+        await memory.start()
+        user = (await memory.create_profile("Owner")).user_id
+        store = InformationStore(memory.path)
+        record = await store.action(
+            user,
+            "create",
+            kind="research",
+            payload={
+                "complete": False,
+                "sources": [
+                    {
+                        "source_id": "S1",
+                        "title": "Example",
+                        "url": "https://example.org/",
+                        "excerpt": "Battery life varies.",
+                        "retrieved_at": "2026-09-13",
+                        "published_at": None,
+                        "evidence_type": "provider_excerpt",
+                    }
+                ],
+            },
+        )
+
+        async def forbidden(*args):
+            pytest.fail("rendering evidence must not call a provider")
+
+        research = ResearchService(store, NotesService(store), forbidden)
+        with pytest.raises(ValueError, match="unknown citation"):
+            await research.answer(
+                user,
+                record["record_id"],
+                [{"text": "Battery lasts forever", "source_ids": ["S999"]}],
+            )
+        result = await research.answer(
+            user, record["record_id"], [{"text": "Battery lasts forever", "source_ids": ["S1"]}]
+        )
+        assert "do not independently establish" in result["text"]
+        assert result["references"][0]["published_at"] is None
+        assert result["complete"] is False
+        literal = await research.answer(
+            user, record["record_id"], [{"text": "Battery life varies.", "source_ids": ["S1"]}]
+        )
+        assert "not independently verified" in literal["text"]
+        await memory.close()
+
+    asyncio.run(run())

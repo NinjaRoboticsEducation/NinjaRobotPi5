@@ -2,7 +2,11 @@
 
 **Narrowed Phase 4 checkpoint — 13 September 2026:** M03 memory retrieval,
 M04 reviewed read-only recipes, X01 v2 skill compatibility and X05 cited local
-project help are implemented. T04/T05/T06 remain deferred by owner instruction.
+project help are implemented. The owner subsequently authorized T04/T05/T06;
+these information features are now implemented. See the
+[information walkthrough](../docs/validation/refinement_phase4_information_walkthrough_260913.md)
+and [handoff](../docs/validation/refinement_phase4_information_handoff_260913.md).
+Live account and speaker acceptance remain outstanding.
 See the [walkthrough](../docs/validation/refinement_phase4_walkthrough_260913.md)
 and [handoff](../docs/validation/refinement_phase4_handoff_260913.md).
 Documentation is consolidated; wiki ingestion/review remain skipped.
@@ -414,9 +418,9 @@ documentation, interface mockups, and tests with simulated devices can proceed.
 | [ ] T01 (confirmed) | Add a durable task record with plan, current step, owner, approvals, result evidence, and recovery state. | A bounded chat loop is not a restart-safe task manager. | Users can ask “What happened to my request?” and get a dependable answer. | High | P1 |
 | [ ] T02 (confirmed) | Add local timers and reminders with exact due times, repeat rules, snooze, cancellation, and restart recovery. | This is a high-value everyday feature missing from the core task model. | Useful reminders continue without a cloud model once saved. | High | P1 |
 | [ ] T03 (confirmed) | Add task progress, cancellation, outcome summaries, and checks that distinguish queued, completed, failed, and uncertain actions. | Tool acceptance is not proof that the user's goal was met. | Less waiting without explanation and fewer misleading “done” messages. | High | P1 |
-| [ ] T04 (confirmed) | Add schedule planning through authorized calendar reads, then reviewed calendar writes with account/scope preview and verification. | External calendar actions need a stronger contract; ordinary alarms belong to T02. | Plan and save schedules; “wake me at 4 pm” works through local reminders without a calendar account. | High | P1 |
-| [ ] T05 (confirmed) | Make web research a complete workflow: approved search, dated citations, comparison, private note saving, and partial-result reporting. | A search result alone is not a finished information-management task. | Users receive useful, traceable answers they can find again. | Medium | P1 |
-| [ ] T06 (confirmed) | Add simple notes, checklists, and a daily briefing assembled from permitted local tasks and connected sources. | Common assistant tasks should not need a new integration each time. | One place to review priorities and remembered information. | Medium | P2 |
+| [x] T04 (software implemented; manual acceptance pending) | Add schedule planning through authorized calendar reads, then reviewed calendar writes with account/scope preview and verification. | External calendar actions need a stronger contract; ordinary alarms belong to T02. | Plan and save schedules; “wake me at 4 pm” works through local reminders without a calendar account. | High | P1 |
+| [x] T05 (software implemented; manual acceptance pending) | Make web research a complete workflow: approved search, dated citations, comparison, private note saving, and partial-result reporting. | A search result alone is not a finished information-management task. | Users receive useful, traceable answers they can find again. | Medium | P1 |
+| [x] T06 (software implemented; manual acceptance pending) | Add simple notes, checklists, and a daily briefing assembled from permitted local tasks and connected sources. | Common assistant tasks should not need a new integration each time. | One place to review priorities and remembered information. | Medium | P2 |
 | [ ] T07 (confirmed) | Add bounded replanning and recovery policies with time, tool-call, and spending limits. | Retrying everything can duplicate actions or loop indefinitely. | The robot can recover from ordinary failures and knows when to ask for help. | High | P1 |
 | Deferred T08 (deferred) | Add opt-in proactive suggestions with quiet hours, frequency limits, relevance checks, and easy dismissal. | Proactivity is useful only when it respects attention and consent. | Helpful prompts that do not become persistent interruptions. | Medium | P2 |
 

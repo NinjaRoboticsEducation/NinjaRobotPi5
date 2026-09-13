@@ -1,14 +1,16 @@
 {
   "schema_version": 2,
   "id": "cited-research-template",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Cited research template",
   "description": "Cited research template with explicit compatibility requirements and no extra permissions.",
   "activation_examples": [
     "Help me understand this feature"
   ],
   "allowed_tools": [
-    "research.search"
+    "research.search",
+    "research.answer",
+    "research.save_note"
   ],
   "input_schema": {
     "type": "object",
@@ -27,11 +29,14 @@
   "requirements": {
     "minimum_agent_version": "1.0.0",
     "required_capabilities": {
-      "research.search": "1.0.0"
+      "research.search": "1.0.0",
+      "research.answer": "1.0.0",
+      "research.save_note": "1.0.0"
     },
     "optional_capabilities": {},
     "effects": [
-      "read_only"
+      "read_only",
+      "local_write"
     ]
   }
 }

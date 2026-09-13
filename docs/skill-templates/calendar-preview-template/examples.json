@@ -6,7 +6,7 @@
         "prompt": "success"
       },
       "expected_tools": [
-        "calendar.preview"
+        "calendar.propose_change"
       ],
       "simulation_only": true
     },

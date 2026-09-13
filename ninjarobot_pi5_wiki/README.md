@@ -4,17 +4,20 @@ Start here for project documentation, architecture, development history, and
 AI-assisted development. Open this folder in your coding tool for wiki questions,
 or open the parent project for development and implementation verification.
 
-## Latest full manuals — narrowed Phase 4, pending ingestion
+## Latest full manuals — completed Phase 4 information work, pending ingestion
 
 M03 memory retrieval, M04 read-only recipes, X01 compatible skills and X05 public
-help are documented in these new full revisions. Calendar, research and
-notes/briefings remain deferred. No ingestion, review or publication was run:
+help are retained. These new full revisions also document T04 calendar planning,
+T05 research and T06 notes/checklists/requested briefings. No ingestion, review
+or publication was run:
 
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-13-02/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-13-02/DevelopmentGuide.md)
-- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-13-02/NinjaRobot_MCP_Skill.md)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-13-02/DevelopmentLog.md)
-- [Phase 4 walkthrough](../docs/validation/refinement_phase4_walkthrough_260913.md)
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-13-03/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-13-03/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-13-03/NinjaRobot_MCP_Skill.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-13-03/DevelopmentLog.md)
+- [Information-assistant walkthrough](../docs/validation/refinement_phase4_information_walkthrough_260913.md)
+- [Information-assistant handoff](../docs/validation/refinement_phase4_information_handoff_260913.md)
+- [Earlier Phase 4 walkthrough](../docs/validation/refinement_phase4_walkthrough_260913.md)
 - [Phase 4 handoff](../docs/validation/refinement_phase4_handoff_260913.md)
 
 Runtime project help is separate from developer wiki search. It uses a fixed

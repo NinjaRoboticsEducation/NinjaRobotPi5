@@ -185,3 +185,83 @@ def test_large_note_pages_preserve_exact_review_without_chat_overflow(tmp_path: 
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_chat_briefing_keeps_local_text_during_calendar_outage(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    async def run() -> None:
+        runtime = await runtime_for(tmp_path)
+        try:
+            runtime.speech = SimpleNamespace(
+                enabled=True,
+                speak=AsyncMock(return_value={"status": "played", "played": True}),
+                close=AsyncMock(),
+            )
+            reply = await runtime.chat(
+                session_id="one",
+                text='/info briefing.build {"arguments":{"timezone":"Asia/Tokyo",'
+                '"connection_id":"disconnected-test-calendar"}}',
+            )
+            assert "Local reminders" in reply.text
+            assert "calendar: unavailable" in reply.text
+            assert "not a full schedule" in reply.text
+            spoken = runtime.speech.speak.call_args.args[0]
+            assert len(spoken) < 500 and "source coverage" in spoken
+            assert not (await runtime.information.notes.list("local-user"))["notes"]
+        finally:
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_calendar_setup_owner_binding_and_profile_credential_cleanup(tmp_path: Path) -> None:
+    from ninjarobot_pi5_agent.calendar_google import READ_SCOPE
+
+    async def run():
+        runtime = await runtime_for(tmp_path)
+        try:
+            member = await runtime.memory.create_profile("Member")
+            runtime._active_users["setup"] = member.user_id
+            args = {
+                "calendar_id": "test@example.org",
+                "account_label": "Synthetic account",
+                "credential": {
+                    "client_id": "fake",
+                    "client_secret": "fake",
+                    "refresh_token": "fake",
+                    "scope": READ_SCOPE,
+                },
+                "expected_user_id": "local-user",
+            }
+            with pytest.raises(ValueError, match="active user changed"):
+                await information_action(
+                    runtime,
+                    "setup",
+                    {"operation": "calendar.connect", "confirmed": True, "arguments": args},
+                )
+            args["expected_user_id"] = member.user_id
+            connection = await information_action(
+                runtime,
+                "setup",
+                {"operation": "calendar.connect", "confirmed": True, "arguments": args},
+            )
+            assert connection["write_enabled"] is False
+            info = runtime.information
+            record = await info.store.action(
+                member.user_id, "get", record_id=connection["connection_id"]
+            )
+            reference = record["payload"]["secret_ref"]
+            assert info.secrets.contains(reference)
+            runtime._active_users["setup"] = "local-user"
+            await runtime.delete_memory_profile(member.user_id)
+            assert not info.secrets.contains(reference)
+            with pytest.raises(ValueError, match="no longer exists"):
+                await info.store.action(
+                    member.user_id, "get", record_id=connection["connection_id"]
+                )
+        finally:
+            await runtime.close()
+
+    asyncio.run(run())

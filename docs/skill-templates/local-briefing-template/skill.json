@@ -1,14 +1,14 @@
 {
   "schema_version": 2,
   "id": "local-briefing-template",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Local briefing template",
   "description": "Local briefing template with explicit compatibility requirements and no extra permissions.",
   "activation_examples": [
     "Help me understand this feature"
   ],
   "allowed_tools": [
-    "briefing.read"
+    "briefing.build"
   ],
   "input_schema": {
     "type": "object",
@@ -27,11 +27,12 @@
   "requirements": {
     "minimum_agent_version": "1.0.0",
     "required_capabilities": {
-      "briefing.read": "1.0.0"
+      "briefing.build": "1.0.0"
     },
     "optional_capabilities": {},
     "effects": [
-      "read_only"
+      "read_only",
+      "local_write"
     ]
   }
 }

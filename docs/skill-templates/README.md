@@ -2,9 +2,11 @@
 
 These are runtime instruction packages, not developer skills from .agents/skills.
 Use [the working project-help package](../../ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/bundled_skills/project-help/skill.json)
-as the fourth template. Calendar, research and briefing directories intentionally
-require capabilities not implemented in narrowed Phase 4. Their format validates
-offline; they cannot be enabled as working features without those providers.
+as the fourth template. Calendar, research and briefing templates now reference
+the implemented T04/T05/T06 tool contracts. They still require the current Agent
+catalog, a local profile and any explicitly configured external source. Templates
+do not authorize writes or install missing providers. See the
+[information walkthrough](../validation/refinement_phase4_information_walkthrough_260913.md).
 
 Keep exactly skill.json, instructions.md and optional examples.json. Version 2
 declares minimum Agent/tool versions, required capabilities, optional fallbacks

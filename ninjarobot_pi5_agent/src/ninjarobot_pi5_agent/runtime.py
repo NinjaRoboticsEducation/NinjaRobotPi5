@@ -294,7 +294,9 @@ class AgentRuntime:
                         {
                             "task_id": data.get("task_id"),
                             "complete": False,
-                            "notice": "Result is too large for chat. Narrow the read interval or use the local information CLI for the full result. Do not repeat a write.",
+                            "notice": "Result is too large for chat. Narrow the read interval "
+                            "or use the local information CLI for the full result. "
+                            "Do not repeat a write.",
                         }
                     )
                 return await self._identity_reply(

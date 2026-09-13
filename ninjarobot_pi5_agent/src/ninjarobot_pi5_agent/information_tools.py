@@ -458,6 +458,7 @@ class InformationProvider:
         if operation == "calendar.connections":
             page = await self.store.action(user, "list", kind="calendar_connection")
             return {
+                "owner_user_id": user,
                 "connections": [
                     {
                         "connection_id": r["record_id"],
@@ -468,7 +469,7 @@ class InformationProvider:
                         },
                     }
                     for r in page["records"]
-                ]
+                ],
             }
         if not trusted:
             raise PermissionError("this operation requires a direct trusted controller")
@@ -481,6 +482,8 @@ class InformationProvider:
         if operation == "calendar.reconcile":
             return await self.calendar.status(user, reconcile=True, **args)
         if operation == "calendar.connect":
+            if args.get("expected_user_id") != user:
+                raise ValueError("active user changed during setup; start a new authorization")
             calendar_id = args["calendar_id"]
             if not isinstance(calendar_id, str) or "@" not in calendar_id or len(calendar_id) > 300:
                 raise ValueError(

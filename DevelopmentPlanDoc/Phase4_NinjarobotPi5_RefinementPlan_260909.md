@@ -1,15 +1,23 @@
 # Phase 4 implementation plan — Connection information and reusable documentation
 
-**Approved narrowed delivery — 13 September 2026:** Implement only M03, M04,
-X01 and X05. T04 calendar planning, T05 new research and T06 notes/checklists/
-briefings are deferred by the owner. Their original design sections below are
-retained for future planning, not acceptance criteria for this delivery.
+**Completed information delivery — 13 September 2026:** The owner subsequently
+authorized T04, T05 and T06. These are now implemented alongside M03, M04,
+X01 and X05. See the
+[information walkthrough](../docs/validation/refinement_phase4_information_walkthrough_260913.md)
+and [handoff](../docs/validation/refinement_phase4_information_handoff_260913.md)
+for commands, software evidence and required manual account/speaker acceptance.
+Wiki ingestion, review and publication remain skipped.
 
-The four approved areas are implemented. See the
+Implementation follows the design below with small adaptations: one shared
+InformationProvider/controller surface serves notes, calendar and research;
+notes use atomic exact confirmation; calendar updates use version-checked PATCH
+to preserve unrelated fields; reconciliation is explicit and read-only. Existing
+read-only recipes are not expanded to write calendars. All note writes receive
+a review preview, which is stricter than requiring review only for deletion.
+
+The earlier narrowed delivery is preserved in its
 [walkthrough](../docs/validation/refinement_phase4_walkthrough_260913.md) and
-[handoff](../docs/validation/refinement_phase4_handoff_260913.md) for commands,
-validation and practical limits. No account integration or hardware refactor
-was needed. Wiki ingestion, review and publication remain skipped.
+[handoff](../docs/validation/refinement_phase4_handoff_260913.md).
 
 Implementation adaptations for the narrowed scope:
 
@@ -875,21 +883,21 @@ publication state was changed, and the runtime suite was not rerun for this task
 
 ## Completion checklist
 
-- [ ] Deferred by owner: T04 reads, exact previews, scoped writes, verification and uncertain recovery
+- [x] T04 software: reads, exact previews, scoped writes, verification and uncertain recovery
   pass without weakening generic MCP read-only policy.
-- [ ] Deferred by owner: T05 produces dated, supported citations, partial outcomes and requested
+- [x] T05 software: produces dated, supported citations, partial outcomes and requested
   private note saving.
-- [ ] Deferred by owner: T06 provides owned notes/checklists and an on-request, useful offline briefing.
+- [x] T06 software: provides owned notes/checklists and an on-request, useful offline briefing.
 - [x] M03 improves measured retrieval without leaking users or flooding context.
 - [x] M04 supports reviewed versions, bounded runs, feedback and rollback without
   automatic policy learning or repeated uncertain effects.
 - [x] X01 keeps version-1 packages working and verifies version-2 requirements.
 - [x] X05 is bounded, read-only, optional and honest about source publication.
-- [ ] Existing alarms, speech, hardware paths, APIs and driver hashes remain intact.
-- [ ] Every implementation increment has recorded lint, type, test and relevant
+- [x] Existing alarms, speech, hardware paths, APIs and driver hashes pass software regression gates.
+- [x] Implementation has recorded lint, type, test and relevant
   packaging/privacy results; remaining physical/account checks are explicit.
-- [ ] Consolidated documentation and deferred wiki status are accurate. The owner
-  receives a step-by-step walkthrough and accepts the phase before further work.
+- [x] Consolidated documentation and deferred wiki status are accurate; a walkthrough is provided.
+- [ ] Owner completes live account/speaker acceptance before further expansion.
 
 Use the [Phase 3 troubleshooting and setup instructions](../docs/validation/refinement_phase3_walkthrough_260909.md)
 for existing speech issues and the

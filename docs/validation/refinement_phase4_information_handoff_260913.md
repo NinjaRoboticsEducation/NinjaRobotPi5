@@ -57,7 +57,9 @@ The authorize helper binds only 127.0.0.1, checks its one-use state and PKCE
 proof, and closes callback workers on completion/cancellation. It requires a
 Desktop app client file and an explicitly opened SSH tunnel. The implementation
 follows the [installed-app flow](https://developers.google.com/identity/protocols/oauth2/native-app);
-real account and administrator policies still require manual acceptance.
+real account and administrator policies still require manual acceptance. Setup
+checks the live service/profile before opening Google and rejects a changed local
+user before saving credentials.
 
 ResearchService normalizes only actual approved-provider results. It never fetches
 arbitrary URLs. The answer renderer rejects unknown references and labels
@@ -100,7 +102,7 @@ large evidence bundle aloud.
 
 ## Validation evidence
 
-Final software gate results are recorded below after the consolidated check.
+The final consolidated software gate passed on 13 September 2026.
 The checks use the existing frozen environment without reinstalling Pi drivers.
 
 ~~~bash
@@ -115,7 +117,7 @@ node --check ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/app.js
 git diff --check
 ~~~
 
-Checkpoint evidence: 884 tests passed; lint passed; 444 Python files formatted;
+Final evidence: 887 tests passed in 36.69 seconds; lint passed; 444 Python files formatted;
 112 source files passed type checking. Driver verification passed for all 222
 baseline files plus the existing 56 authorized repairs, and all six libraries
 resolve to this checkout. No new driver repairs were needed.
@@ -131,7 +133,14 @@ all-day end dates, calendar pagination, read-only refusal, lost-response recover
 remote-version conflicts, dispatch cancellation, fixed transport hosts, byte
 limits, credential deletion, fake OAuth state/PKCE callbacks, note paging and
 direct chat controls. All network responses and credentials in these tests are
-synthetic. No live robot or account effects were used.
+synthetic. No live robot or account effects were used. Additional checks cover
+qualified versus unsupported evidence claims, offline chat briefings with short
+speech, and profile-bound credential setup/deletion.
+
+All three updated information skill templates passed compatibility checks against
+the implemented catalog. Both new CLI help pages load, and all 31 walkthrough
+Bash blocks pass syntax checks without executing their commands. All 225 checked
+local Markdown file links resolve. Wiki semantic checks were deliberately skipped.
 
 The suite reports the existing Starlette TestClient/httpx deprecation warning.
 It is not a test failure and was present before this delivery.

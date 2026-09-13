@@ -1,6 +1,28 @@
 # Refinement implementation progress — 7 September 2026
 
-## Latest checkpoint — Phase 3, 9 September 2026
+## Latest checkpoint — Phase 4 information assistant, 13 September 2026
+
+T04 calendar planning, T05 research with evidence and T06 notes/checklists/
+requested briefings are implemented after the owner's renewed authorization.
+The previously completed M03/M04/X01/X05 and Phase 5 optional-interaction software
+remain intact. The final gate passes 887 tests, lint, formatting, compilation,
+type checks and unchanged managed-driver verification. Agent source and wheel
+packages build successfully.
+
+See the [information-assistant handoff](refinement_phase4_information_handoff_260913.md)
+and [step-by-step manual tests](refinement_phase4_information_walkthrough_260913.md).
+Google authorization and disposable-calendar effects, configured Tavily use and
+optional speaker acceptance remain manual. No live account or robot action was
+performed during implementation.
+
+Documentation is consolidated in new 2026-09-13-03 full manual sources. Wiki
+ingestion, review, publication and fingerprint promotion remain skipped at the
+owner's request. Usage limits still do not implement T07's monetary spending cap.
+No further deferred refinement is silently enabled.
+
+The earlier checkpoints below are chronological history, not the latest status.
+
+## Historical checkpoint — Phase 3, 9 September 2026
 
 Phase 3 H02/B01 implementation is complete at the software level: optional local
 Piper speech, IDE-owned selected-speaker playback, microphone coordination,

@@ -582,6 +582,14 @@ async def _run(arguments: argparse.Namespace) -> int:
     if arguments.command == "calendar-connect":
         from .calendar_oauth import authorize
 
+        context = await AgentIPCClient(arguments.service_socket).request(
+            {
+                "command": "information",
+                "session_id": arguments.session,
+                "data": {"operation": "calendar.connections"},
+            }
+        )
+        expected_user = context["data"]["owner_user_id"]
         credential = await authorize(
             arguments.client_file, port=arguments.port, write=arguments.write
         )
@@ -595,6 +603,7 @@ async def _run(arguments: argparse.Namespace) -> int:
                     "confirmed": True,
                     "arguments": {
                         "credential": credential,
+                        "expected_user_id": expected_user,
                         "calendar_id": arguments.calendar_id,
                         "account_label": arguments.account_label,
                         "write": arguments.write,

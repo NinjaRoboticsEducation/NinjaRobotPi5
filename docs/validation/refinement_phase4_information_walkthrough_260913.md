@@ -266,6 +266,10 @@ as in section 1 and run:
 nr calendar-connect   --client-file ~/.config/ninjarobot_pi5/google-desktop-client.json   --calendar-id 'COPY_EXACT_CALENDAR_ID'   --account-label 'My test Google account'   --session local-cli
 ~~~
 
+The command first checks that the Agent and local profile are available, and
+binds setup to that user. If the active user changes during login, setup is refused;
+start again under the intended profile.
+
 Open the printed Google URL in your computer's browser and authorize the intended
 account. Keep the tunnel open until the Pi command returns. The helper waits up
 to five minutes. Expected: the browser reports authorization received and the Pi
@@ -293,6 +297,18 @@ If authorization is revoked, expired or prohibited, reads report unavailable.
 Rerun explicit setup when appropriate. The Agent never expands permissions
 automatically. Disconnecting locally does not revoke Google's grant; use your
 Google account's connected-app settings if you also want remote revocation.
+
+### Connection troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| Service or profile unavailable before the browser opens | Start the existing Agent and select an existing profile first. |
+| Callback port is already in use | Choose another unprivileged port, such as 8766, on both sides of the SSH tunnel and pass --port 8766 to calendar-connect. |
+| Browser cannot reach 127.0.0.1 after consent | Keep the SSH tunnel open on the same computer as the browser; confirm both forwarded ports match the helper. |
+| Authorization times out | Restart setup and use the new printed URL; do not reuse an old callback code. |
+| Google denies the grant or a read returns HTTP 401/403 | Check the intended account, app/test-user configuration and administrator policy; explicitly reauthorize only the intended scope. |
+| Calendar result is incomplete or unavailable | Narrow the dates, inspect the unavailable field, and correct connection/network access. Do not treat it as an empty schedule. |
+| Save says the active user changed | Repeat setup under the intended local profile; credentials are not attached to a different user. |
 
 ## 6. Read a schedule and suggest a time
 
