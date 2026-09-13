@@ -103,6 +103,7 @@ class AgentIPCServer:
         writer: asyncio.StreamWriter,
     ) -> None:
         cancellation = CancellationToken()
+        disconnect_watch: asyncio.Task[None] | None = None
         try:
             raw = await reader.readline()
             if not raw or len(raw) > MAX_REQUEST_BYTES:
@@ -110,6 +111,16 @@ class AgentIPCServer:
             payload = json.loads(raw)
             if not isinstance(payload, dict):
                 raise AgentIPCError("request must be a JSON object")
+            if payload.get("command") in {"game", "recipe"} or (
+                payload.get("command") == "chat"
+                and str(payload.get("text", "")).split(maxsplit=1)[0:1] in (["/game"], ["/recipes"])
+            ):
+
+                async def watch_disconnect() -> None:
+                    await reader.read(1)
+                    cancellation.cancel()
+
+                disconnect_watch = asyncio.create_task(watch_disconnect())
             await self._dispatch(payload, writer, cancellation)
         except (BrokenPipeError, ConnectionResetError):
             cancellation.cancel()
@@ -125,6 +136,9 @@ class AgentIPCServer:
             )
         finally:
             cancellation.cancel()
+            if disconnect_watch is not None:
+                disconnect_watch.cancel()
+                await asyncio.gather(disconnect_watch, return_exceptions=True)
             writer.close()
             try:
                 await writer.wait_closed()
@@ -171,6 +185,33 @@ class AgentIPCServer:
                 {
                     "type": "result",
                     "data": await self._runtime.guided_checks(payload.get("step", 0)),
+                },
+            )
+            return
+        if command == "recipe":
+            from .recipe_controls import recipe_action
+
+            data = payload.get("data", {})
+            if not isinstance(data, dict):
+                raise ValueError("recipe data must be an object")
+            await _write_message(
+                writer,
+                {
+                    "type": "result",
+                    "data": await recipe_action(
+                        self._runtime, _required_text(payload, "session_id"), data, cancellation
+                    ),
+                },
+            )
+            return
+        if command == "tool_catalog":
+            await _write_message(
+                writer,
+                {
+                    "type": "result",
+                    "data": [
+                        tool.model_dump(mode="json") for tool in self._runtime.tools.list_tools()
+                    ],
                 },
             )
             return
@@ -363,6 +404,20 @@ class AgentIPCServer:
             await _write_message(
                 writer,
                 {"type": "result", "data": await self._runtime.disable_voice_input()},
+            )
+            return
+        if command == "game":
+            await _write_message(
+                writer,
+                {
+                    "type": "result",
+                    "data": await self._runtime.game_control(
+                        _required_text(payload, "session_id"),
+                        _required_text(payload, "operation"),
+                        payload.get("duration_seconds", 30),
+                        cancellation=cancellation,
+                    ),
+                },
             )
             return
         if command == "speech":

@@ -268,12 +268,38 @@ def _task_kinds(connection: sqlite3.Connection) -> None:
         )
 
 
+def _task_recipes(connection: sqlite3.Connection) -> None:
+    _execute_script(
+        connection,
+        """
+        CREATE TABLE task_recipes (
+            owner_scope TEXT NOT NULL,
+            user_id TEXT REFERENCES users(user_id) ON DELETE CASCADE,
+            recipe_id TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            PRIMARY KEY(owner_scope, recipe_id)
+        );
+        CREATE TABLE task_recipe_versions (
+            owner_scope TEXT NOT NULL,
+            recipe_id TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            record_json TEXT NOT NULL,
+            PRIMARY KEY(owner_scope, recipe_id, version),
+            FOREIGN KEY(owner_scope, recipe_id) REFERENCES task_recipes(owner_scope, recipe_id)
+                ON DELETE CASCADE
+        );
+    """,
+    )
+
+
 _MIGRATIONS: tuple[Migration, ...] = (
     _core_schema,
     _conversation_user_scope,
     _memory_schema,
     _local_tasks,
     _task_kinds,
+    _task_recipes,
 )
 
 

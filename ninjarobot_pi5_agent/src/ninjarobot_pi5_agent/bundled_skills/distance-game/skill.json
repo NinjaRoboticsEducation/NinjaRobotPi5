@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "id": "distance-game",
+  "version": "1.0.0",
+  "name": "Distance game",
+  "description": "Play one explicitly requested, bounded distance-and-sound game through the IDE.",
+  "activation_examples": [
+    "Play the distance game for 10 seconds",
+    "Stop the distance game"
+  ],
+  "allowed_tools": [
+    "robot.game.distance.run",
+    "robot.game.distance.stop",
+    "robot.game.distance.status"
+  ],
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "duration_seconds": {
+        "type": "integer",
+        "minimum": 5,
+        "maximum": 60
+      }
+    },
+    "additionalProperties": false
+  },
+  "limits": {
+    "max_model_turns": 4,
+    "max_tool_calls": 3,
+    "timeout_seconds": 90.0
+  },
+  "safety": {
+    "external_content": "untrusted",
+    "physical_motion": "session_armed"
+  }
+}

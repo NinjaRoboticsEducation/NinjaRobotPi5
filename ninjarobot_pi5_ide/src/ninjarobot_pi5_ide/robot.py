@@ -23,7 +23,9 @@ from .camera import CameraDevice, CameraFactory
 from .config import RobotConfig
 from .display import DisplayDevice, DisplayFactory
 from .distance import SensorFactory, VL53L0XDistanceAdapter
+from .distance_game import DistanceGame
 from .errors import IDEError, describe_hardware_driver_error, is_hardware_driver_error
+from .expression_variants import vary_face
 from .face_renderer import render_emergency_stop
 from .hardware_ownership import HardwareOwnership
 from .microphone import MicrophoneBackendFactory, MicrophoneDevice
@@ -70,6 +72,8 @@ class RobotAssembly:
         undervoltage_provider: UndervoltageProvider = raspberry_pi_undervoltage_active,
         simulated: bool = False,
     ) -> None:
+        self._variations_enabled = config.interaction_variations.enabled
+        self._expression_request = 0
         self.audio: AudioOutput | None = None
         display_config = config.hardware.display
         buzzer_config = config.hardware.buzzer
@@ -199,6 +203,9 @@ class RobotAssembly:
         self.servo.set_motion_guard(self.motion.require_motion_context)
         self.behaviors.set_drive_handler(self.motion.drive)
         self.behaviors.set_failure_handler(self._driver_failure)
+        self.distance_game = DistanceGame(
+            self, enabled=config.distance_game.enabled, volume=config.distance_game.volume
+        )
         self._liveliness_enabled = False
         self._idle_suppressed = False
         self._ambient_face = "idle"
@@ -214,9 +221,12 @@ class RobotAssembly:
             self._hardware_ownership.acquire()
 
     async def _silence_outputs(self) -> None:
-        if self.audio is not None:
-            await self.audio.stop()
-        await self.buzzer.stop()
+        try:
+            await self.distance_game.stop("system_stop")
+        finally:
+            if self.audio is not None:
+                await self.audio.stop()
+            await self.buzzer.stop()
 
     @asynccontextmanager
     async def speech_scene(self) -> AsyncIterator[None]:
@@ -285,6 +295,8 @@ class RobotAssembly:
     def ensure_action_allowed(self, capability: str) -> None:
         """Keep low-level output and sensing calls behind the system stop gate."""
         if capability in {
+            "game.distance.stop",
+            "game.distance.status",
             "behavior.stop",
             "servo.stop",
             "buzzer.stop",
@@ -447,6 +459,8 @@ class RobotAssembly:
         if self.audio is not None and expression not in {"speaking", "idle"}:
             await self.audio.stop()
         face = normalize_face_name(expression)
+        if face != self._ambient_face:
+            self._expression_request += 1
         self._ambient_face = face
         await self._stop_idle()
         await self._start_idle_if_safe()
@@ -466,6 +480,7 @@ class RobotAssembly:
             await self.audio.stop()
         if self.system_safety.stopped:
             return False
+        await self.distance_game.stop("privacy_capture")
         self._ambient_face = "camera"
         await self._stop_idle()
         for count in ("3", "2", "1"):
@@ -598,6 +613,8 @@ class RobotAssembly:
 
     async def resume_system(self, *, confirmed: bool) -> SafetySnapshot:
         """Clear Level 2 only after every configured device reports ready."""
+        if self.distance_game._task is not None:
+            await self.distance_game.stop("system_resume")
         snapshot = await self.system_safety.resume_system(
             confirmed=confirmed,
             health_checks={
@@ -613,6 +630,7 @@ class RobotAssembly:
                 if self._enabled_devices[name]
             },
         )
+        self.distance_game._state = {"state": "idle", "reason": "system_recovered"}
         self._idle_suppressed = False
         await self._start_idle_if_safe()
         return snapshot
@@ -625,21 +643,27 @@ class RobotAssembly:
             self._closing = True
             self._idle_suppressed = True
             try:
+                await self.distance_game.stop("shutdown")
                 if self.audio is not None:
                     await self.audio.close()
                 await self._stop_idle()
                 await self.behaviors.stop()
-                await asyncio.gather(
+                closed_devices = await asyncio.gather(
                     self.servo.close(),
                     self.distance.close(),
                     self.camera.close(),
                     self.microphone.close(),
                     return_exceptions=True,
                 )
+                if isinstance(closed_devices[1], BaseException):
+                    raise RuntimeError(
+                        "distance close unconfirmed; hardware ownership retained"
+                    ) from closed_devices[1]
                 await self.behaviors.close()
                 self._closed = True
             finally:
-                self._hardware_ownership.release()
+                if not self.distance._busy and self.distance._sensor is None:
+                    self._hardware_ownership.release()
 
     async def _driver_failure(self, error: Exception) -> str | None:
         if (
@@ -671,6 +695,7 @@ class RobotAssembly:
     async def _start_idle_if_safe(self) -> None:
         if (
             not self._liveliness_enabled
+            or self.distance_game.status()["state"] == "faulted"
             or self._idle_suppressed
             or self._closing
             or self.system_safety.stopped
@@ -693,7 +718,9 @@ class RobotAssembly:
             )
         await asyncio.sleep(0)
 
-    async def _begin_foreground_behavior(self) -> None:
+    async def _begin_foreground_behavior(self, *, game: bool = False) -> None:
+        if not game:
+            await self.distance_game.stop("foreground_action")
         async with self._idle_lock:
             self._foreground_behaviors += 1
         try:
@@ -757,6 +784,9 @@ class RobotAssembly:
                 for operation in stage.operations
                 if isinstance(operation, FaceOperation)
             )
+        source = vary_face(
+            source, enabled=self._variations_enabled, request_id=str(self._expression_request)
+        )
         return BehaviorDefinition(
             schema_version=1,
             name=f"agent_{expression}",
@@ -864,7 +894,7 @@ class RobotAssembly:
         return await self.servo.health() is ResourceHealth.READY
 
     async def _distance_health(self) -> bool:
-        await self.distance.start()
+        await self.distance.start(recover=True)
         return await self.distance.health() is ResourceHealth.READY
 
     async def _camera_health(self) -> bool:

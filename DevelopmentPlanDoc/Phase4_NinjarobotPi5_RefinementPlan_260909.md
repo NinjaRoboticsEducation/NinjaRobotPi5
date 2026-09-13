@@ -1,15 +1,35 @@
 # Phase 4 implementation plan — Connection information and reusable documentation
 
-This plan explains how to turn the existing local assistant into an assistant
-that can consult a calendar, research a question, keep useful notes, repeat a
-reviewed workflow, and answer questions about NinjaRobotPi5. It extends the
-current framework and preserves all existing robot functions.
+**Approved narrowed delivery — 13 September 2026:** Implement only M03, M04,
+X01 and X05. T04 calendar planning, T05 new research and T06 notes/checklists/
+briefings are deferred by the owner. Their original design sections below are
+retained for future planning, not acceptance criteria for this delivery.
 
-**Status: proposed implementation instructions, prepared 9 September 2026.**
-Writing this plan does not authorize implementation, account connection, calendar
-changes, or wiki publication. The owner must accept the Phase 3 checkpoint and
-authorize Phase 4 before development starts. No Phase 4 feature described here
-is being reported as implemented.
+The four approved areas are implemented. See the
+[walkthrough](../docs/validation/refinement_phase4_walkthrough_260913.md) and
+[handoff](../docs/validation/refinement_phase4_handoff_260913.md) for commands,
+validation and practical limits. No account integration or hardware refactor
+was needed. Wiki ingestion, review and publication remain skipped.
+
+Implementation adaptations for the narrowed scope:
+
+1. M03 reuses the existing memory store and its bounded keyword search.
+2. M04 uses explicit user-authored structured recipes, reviewed versions and
+   existing request receipts. Only seven existing/local read tools are allowed.
+   There is no calendar/research/notes dependency, automatic private-parameter
+   extraction, external write, or background learning.
+3. X01 implements explicit v2 parsing, current catalog checks and optional
+   fallbacks. V1 remains compatible. Deferred-feature templates declare missing
+   capabilities and cannot masquerade as implemented services.
+4. X05 uses a dependency-free fixed public manifest. Existing curated pages and
+   cited sources are pinned to 12 September; draft coverage is labeled. Larger
+   source manuals may be hashed up to 128 KiB, inside the overall 256 KiB budget,
+   but are not returned in full. No wiki subprocess or new publication runs.
+5. The final gate passes 868 tests, lint, types, compilation, driver integrity
+   and packaging. Consolidated documentation and manual acceptance are in the handoff.
+   Physical Phase 5 acceptance remains separate.
+
+The original proposal and technical references follow for design context.
 
 The [master plan](NinjarobotPi5_RefinementPlan_260907.md#7-development-phases-and-acceptance-gates)
 calls this phase **“Connected information and reusable help.”** The title requested
@@ -855,16 +875,16 @@ publication state was changed, and the runtime suite was not rerun for this task
 
 ## Completion checklist
 
-- [ ] T04 reads, exact previews, scoped writes, verification and uncertain recovery
+- [ ] Deferred by owner: T04 reads, exact previews, scoped writes, verification and uncertain recovery
   pass without weakening generic MCP read-only policy.
-- [ ] T05 produces dated, supported citations, partial outcomes and requested
+- [ ] Deferred by owner: T05 produces dated, supported citations, partial outcomes and requested
   private note saving.
-- [ ] T06 provides owned notes/checklists and an on-request, useful offline briefing.
-- [ ] M03 improves measured retrieval without leaking users or flooding context.
-- [ ] M04 supports reviewed versions, bounded runs, feedback and rollback without
+- [ ] Deferred by owner: T06 provides owned notes/checklists and an on-request, useful offline briefing.
+- [x] M03 improves measured retrieval without leaking users or flooding context.
+- [x] M04 supports reviewed versions, bounded runs, feedback and rollback without
   automatic policy learning or repeated uncertain effects.
-- [ ] X01 keeps version-1 packages working and verifies version-2 requirements.
-- [ ] X05 is bounded, read-only, optional and honest about source publication.
+- [x] X01 keeps version-1 packages working and verifies version-2 requirements.
+- [x] X05 is bounded, read-only, optional and honest about source publication.
 - [ ] Existing alarms, speech, hardware paths, APIs and driver hashes remain intact.
 - [ ] Every implementation increment has recorded lint, type, test and relevant
   packaging/privacy results; remaining physical/account checks are explicit.

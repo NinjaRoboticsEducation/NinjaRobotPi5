@@ -1,0 +1,37 @@
+{
+  "schema_version": 2,
+  "id": "local-briefing-template",
+  "version": "1.0.0",
+  "name": "Local briefing template",
+  "description": "Local briefing template with explicit compatibility requirements and no extra permissions.",
+  "activation_examples": [
+    "Help me understand this feature"
+  ],
+  "allowed_tools": [
+    "briefing.read"
+  ],
+  "input_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "required": [
+      "prompt"
+    ]
+  },
+  "requirements": {
+    "minimum_agent_version": "1.0.0",
+    "required_capabilities": {
+      "briefing.read": "1.0.0"
+    },
+    "optional_capabilities": {},
+    "effects": [
+      "read_only"
+    ]
+  }
+}

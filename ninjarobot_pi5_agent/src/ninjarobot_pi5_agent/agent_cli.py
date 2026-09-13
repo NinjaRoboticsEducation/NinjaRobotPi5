@@ -54,7 +54,13 @@ from .remote_access import (
 )
 from .secrets import SecretStore
 from .service_main import run_service
-from .skills import LoadedSkill, SkillRepository, SkillValidationError
+from .skills import (
+    LoadedSkill,
+    SkillManifestV2,
+    SkillRepository,
+    SkillValidationError,
+    compatible_tools,
+)
 from .tools import ToolRegistry, ToolRegistryError
 from .web_app import (
     ensure_local_ca_certificate,
@@ -172,6 +178,32 @@ def build_parser() -> argparse.ArgumentParser:
     chat.add_argument("--confirmed", action="store_true")
 
     commands.add_parser("status", help="Show running service and provider status.")
+    recipe = commands.add_parser("recipe", help="Preview, save and run owned read-only recipes.")
+    recipe.add_argument(
+        "operation",
+        choices=(
+            "list",
+            "preview",
+            "save",
+            "show",
+            "run",
+            "disable",
+            "enable",
+            "delete",
+            "rollback",
+        ),
+    )
+    recipe.add_argument("recipe_id", nargs="?", default="")
+    recipe.add_argument("--file", type=Path)
+    recipe.add_argument("--version", type=int, default=0)
+    recipe.add_argument("--review-hash", default="")
+    recipe.add_argument("--inputs", default="{}")
+    recipe.add_argument("--confirm", action="store_true")
+    recipe.add_argument("--session", default="local-cli")
+    game = commands.add_parser("game", help="Start, stop or inspect the optional distance game.")
+    game.add_argument("operation", choices=("start", "stop", "status"))
+    game.add_argument("--seconds", type=int, default=30)
+    game.add_argument("--session", default="local-cli")
 
     service = commands.add_parser("service", help="Start, inspect, or stop the agent service.")
     service_commands = service.add_subparsers(dest="service_command", required=True)
@@ -382,6 +414,7 @@ def build_parser() -> argparse.ArgumentParser:
     ):
         subparser = skill_commands.add_parser(command, help=help_text)
         subparser.add_argument("path", type=Path)
+        subparser.add_argument("--check-live", action="store_true")
         if command == "simulate-path":
             subparser.add_argument("--input", default="{}")
         if command == "install":
@@ -396,6 +429,7 @@ def build_parser() -> argparse.ArgumentParser:
     ):
         subparser = skill_commands.add_parser(command, help=help_text)
         subparser.add_argument("skill_id")
+        subparser.add_argument("--check-live", action="store_true")
         if command == "simulate":
             subparser.add_argument("--input", default="{}")
     remove_skill = skill_commands.add_parser("remove", help="Remove one user skill.")
@@ -446,6 +480,16 @@ def main(argv: list[str] | None = None) -> None:
 async def _run(arguments: argparse.Namespace) -> int:
     if arguments.command is None:
         return await _interactive(arguments)
+    if arguments.command == "game":
+        return await _service_request(
+            arguments,
+            {
+                "command": "game",
+                "operation": arguments.operation,
+                "session_id": arguments.session,
+                "duration_seconds": arguments.seconds,
+            },
+        )
     if arguments.command == "chat":
         return await _run_chat_command(arguments)
     if arguments.command == "status":
@@ -519,8 +563,47 @@ async def _run(arguments: argparse.Namespace) -> int:
         )
         return 0
 
+    if arguments.command == "recipe":
+        data = {
+            "operation": arguments.operation,
+            "recipe_id": arguments.recipe_id,
+            "version": arguments.version,
+            "review_hash": arguments.review_hash,
+            "inputs": _json_object(arguments.inputs),
+            "confirmed": arguments.confirm,
+        }
+        if arguments.file is not None:
+            with arguments.file.open("rb") as stream:
+                raw = stream.read(16001)
+            if len(raw) > 16000:
+                raise ValueError("recipe file exceeds 16000 bytes")
+            data["recipe"] = json.loads(raw)
+        return await _service_request(
+            arguments, {"command": "recipe", "session_id": arguments.session, "data": data}
+        )
     if arguments.command == "skill":
-        return _run_skill(arguments)
+        definitions = None
+        repository = SkillRepository(arguments.skill_dir)
+        operation = arguments.skill_command
+        if operation in {"install", "enable"} or getattr(arguments, "check_live", False):
+            selected = (
+                repository.load_path(arguments.path)
+                if hasattr(arguments, "path")
+                else repository._find_any(arguments.skill_id)
+            )
+            if isinstance(selected.manifest, SkillManifestV2) or getattr(
+                arguments, "check_live", False
+            ):
+                from .models import ToolDefinition
+
+                catalog = await AgentIPCClient(arguments.service_socket).request(
+                    {"command": "tool_catalog"}
+                )
+                definitions = tuple(
+                    ToolDefinition.model_validate_json(json.dumps(item)) for item in catalog["data"]
+                )
+                compatible_tools(selected, definitions)
+        return _run_skill(arguments, definitions=definitions)
     if arguments.command == "benchmark":
         return await _run_benchmark(arguments)
 
@@ -2103,7 +2186,7 @@ def _benchmark_cases() -> tuple[BenchmarkCase, ...]:
     )
 
 
-def _run_skill(arguments: argparse.Namespace) -> int:
+def _run_skill(arguments: argparse.Namespace, *, definitions: Any = None) -> int:
     repository = SkillRepository(arguments.skill_dir)
     command: str = arguments.skill_command
     if command == "list":
@@ -2125,7 +2208,17 @@ def _run_skill(arguments: argparse.Namespace) -> int:
     if command in {"validate", "inspect-path", "simulate-path", "install"}:
         skill = repository.load_path(arguments.path)
         if command == "validate":
-            _print_json({"valid": True, "skill": skill.manifest.id})
+            _print_json(
+                {
+                    "valid": True,
+                    "skill": skill.manifest.id,
+                    **(
+                        {"live_compatibility_checked": definitions is not None}
+                        if isinstance(skill.manifest, SkillManifestV2) or definitions is not None
+                        else {}
+                    ),
+                }
+            )
             return 0
         if command == "inspect-path":
             _print_json(_skill_inspection(skill))
@@ -2143,6 +2236,7 @@ def _run_skill(arguments: argparse.Namespace) -> int:
             ai_proposed=arguments.ai_proposed,
             confirmed=arguments.confirm,
             simulation_input=simulation_input,
+            definitions=definitions,
         )
         output: dict[str, Any] = {
             "installed": installed.manifest.id,
@@ -2154,7 +2248,7 @@ def _run_skill(arguments: argparse.Namespace) -> int:
         return 0
     if command in {"inspect", "simulate", "enable", "disable", "remove"}:
         if command == "enable":
-            repository.set_enabled(arguments.skill_id, enabled=True)
+            repository.set_enabled(arguments.skill_id, enabled=True, definitions=definitions)
             _print_json({"skill": arguments.skill_id, "enabled": True})
             return 0
         if command == "disable":

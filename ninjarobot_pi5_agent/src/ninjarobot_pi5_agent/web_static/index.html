@@ -59,6 +59,12 @@
             <button id="emergencyButton" class="action-button action-x"><strong>X</strong><span data-i18n="behavior.emergency">Emergency Stop</span></button>
             <button id="resumeButton" class="action-button action-y"><strong>Y</strong><span data-i18n="behavior.resume">Resume</span></button>
           </div>
+          <div class="game-controls" aria-label="Distance game">
+            <button class="small-button" data-game="start" data-i18n="game.start">Play game (30s)</button>
+            <button class="small-button" data-game="stop" data-i18n="game.stop">Stop Game</button>
+            <button class="small-button" data-game="status" data-i18n="game.status">Game status</button>
+          </div>
+          <p id="gameResult" role="status" aria-live="polite"></p>
         </section>
 
         <section class="panel conversation-panel" aria-labelledby="chatTitle">

@@ -1,5 +1,22 @@
 # NinjaRobotPi5 refinement plan — 7 September 2026
 
+**Narrowed Phase 4 checkpoint — 13 September 2026:** M03 memory retrieval,
+M04 reviewed read-only recipes, X01 v2 skill compatibility and X05 cited local
+project help are implemented. T04/T05/T06 remain deferred by owner instruction.
+See the [walkthrough](../docs/validation/refinement_phase4_walkthrough_260913.md)
+and [handoff](../docs/validation/refinement_phase4_handoff_260913.md).
+Documentation is consolidated; wiki ingestion/review remain skipped.
+Earlier checkpoint paragraphs below are historical.
+
+**Implementation checkpoint — 13 September 2026:** The owner approved Phase 5
+before Phase 4. B02/B04 software and B05 hardware evaluation documents are present;
+see the [handoff](../docs/validation/refinement_phase5_handoff_260913.md) and
+[manual walkthrough](../docs/validation/refinement_phase5_walkthrough_260912.md).
+Both optional settings default off. No managed driver or new hardware was changed.
+Physical acceptance remains outstanding; Phase 4 is not started. The original
+planning text below is retained as design history, not a newer status claim.
+
+
 **Implementation checkpoint — 9 September 2026:** Phase 3 H02/B01 software is
 implemented with optional Piper English speech, operator-selected PipeWire output,
 listen-then-speak ownership, independent stop controls, existing-face coordination
@@ -418,10 +435,10 @@ documentation, interface mockups, and tests with simulated devices can proceed.
 | Done / ID | Refinement | Why it is needed | Expected user benefit | Effort | Priority |
 | --- | --- | --- | --- | --- | --- |
 | [x] B01 (software implemented; physical acceptance pending) | Coordinate face, buzzer, and future speech on one IDE-owned timeline with interruption and priority rules. | Separate reactions can conflict or appear late. | A coherent robot response that matches the answer or task. | High | P1 |
-| [ ] B02 (confirmed) | Add small bounded variations to existing safe expressions and sound cues, with stable personality settings. | Repetition feels mechanical, while uncontrolled randomness feels unreliable. | A recognizable character that remains calm and predictable. | Medium | P2 |
+| [x] B02 (software implemented; physical acceptance pending) | Add small bounded variations to existing safe expressions and sound cues, with stable personality settings. | Repetition feels mechanical, while uncontrolled randomness feels unreliable. | A recognizable character that remains calm and predictable. | Medium | P2 |
 | Deferred B03 (deferred) | Introduce an opt-in attention experience using camera observations and animated eyes, with freshness limits and consent. | Reacting to the person can make interaction easier, but stale detections can mislead. | The robot visibly attends to the interaction without moving its wheels. | High | P2 |
-| [ ] B04 (confirmed) | Add an explicit distance-controlled buzzer/display game, selectable through conversation, with bounded duration and stop handling. | A simple sensor-to-feedback loop makes robotics tangible. | Ask “let’s play a game,” then move a hand in front of the sensor to change sound and an existing face or simple graphic. | Medium | P3 |
-| [ ] B05 (confirmed) | Treat future speakers, touch controls, movable heads, and desk-edge sensors as separate evaluated hardware options. | Competitor interactions depend on hardware NinjaRobotPi5 does not currently have. | Hardware additions solve a clear need and do not destabilize existing drivers. | Very High | P3 |
+| [x] B04 (software implemented; physical acceptance pending) | Add an explicit distance-controlled buzzer/display game, selectable through conversation, with bounded duration and stop handling. | A simple sensor-to-feedback loop makes robotics tangible. | Ask “let’s play a game,” then move a hand in front of the sensor to change sound and an existing face or simple graphic. | Medium | P3 |
+| [x] B05 (evaluation documented; prototypes deferred) | Treat future speakers, touch controls, movable heads, and desk-edge sensors as separate evaluated hardware options. | Competitor interactions depend on hardware NinjaRobotPi5 does not currently have. | Hardware additions solve a clear need and do not destabilize existing drivers. | Very High | P3 |
 
 H02 can select a modest approved speaker before the broader optional hardware work
 in B05. B05 does not delay the initial software-only assistant or require a new head.

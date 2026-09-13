@@ -1,18 +1,21 @@
 # NinjaRobotPi5 documentation
 
-Start with the public guides in the repository root. The folders below contain
+Start with the public guides linked below. The folders below contain
 supporting architecture, hardware, historical, and validation records.
 
 ## Public guides
 
 - [Project overview](../README.md)
-- [Installation guide](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/InstallationGuide.md)
-- [MCP and Agent Skills tutorial](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/NinjaRobot_MCP_Skill.md)
-- [Development guide](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-07/DevelopmentGuide.md)
-- [Development log](../ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-07-02/DevelopmentLog.md)
+- [Installation guide](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-13-02/InstallationGuide.md)
+- [MCP and Agent Skills tutorial](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-13-02/NinjaRobot_MCP_Skill.md)
+- [Development guide](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-13-02/DevelopmentGuide.md)
+- [Development log](../ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-13-02/DevelopmentLog.md)
 - [Third-party notices](../THIRD_PARTY_NOTICES.md)
 - [AI development guardrails](../AGENTS.md)
 - [Documentation style guide](markdown-style-guide.md)
+
+- [Phase 4 walkthrough](validation/refinement_phase4_walkthrough_260913.md)
+- [Phase 4 handoff](validation/refinement_phase4_handoff_260913.md)
 
 ## Reference folders
 

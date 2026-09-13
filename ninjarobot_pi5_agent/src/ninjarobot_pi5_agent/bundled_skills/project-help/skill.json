@@ -1,0 +1,42 @@
+{
+  "schema_version": 2,
+  "id": "project-help",
+  "version": "1.0.0",
+  "name": "Read-only project help",
+  "description": "Read-only project help with explicit compatibility requirements and no extra permissions.",
+  "activation_examples": [
+    "Help me understand this feature"
+  ],
+  "allowed_tools": [
+    "project_help.search",
+    "project_help.read",
+    "command_help.search"
+  ],
+  "input_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "required": [
+      "prompt"
+    ]
+  },
+  "requirements": {
+    "minimum_agent_version": "1.0.0",
+    "required_capabilities": {
+      "command_help.search": "1.0.0"
+    },
+    "optional_capabilities": {
+      "project_help.search": "Explain unavailable public documentation; use command help for commands only.",
+      "project_help.read": "Explain that the cited document cannot be opened."
+    },
+    "effects": [
+      "read_only"
+    ]
+  }
+}

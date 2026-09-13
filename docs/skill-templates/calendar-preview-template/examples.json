@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "examples": [
+    {
+      "input": {
+        "prompt": "success"
+      },
+      "expected_tools": [
+        "calendar.preview"
+      ],
+      "simulation_only": true
+    },
+    {
+      "input": {
+        "prompt": "missing capability"
+      },
+      "expected_tools": [],
+      "simulation_only": true
+    },
+    {
+      "input": {
+        "prompt": "cancellation"
+      },
+      "expected_tools": [],
+      "simulation_only": true
+    },
+    {
+      "input": {
+        "prompt": "denied effect"
+      },
+      "expected_tools": [],
+      "simulation_only": true
+    }
+  ]
+}

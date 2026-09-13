@@ -201,6 +201,19 @@ class WebRobotController:
     }
     SPECIAL_BEHAVIORS = {"greeting", "celebrate"}
 
+    async def game_control(
+        self,
+        lease_id: str,
+        operation: str,
+        duration_seconds: int = 30,
+    ) -> dict[str, Any]:
+        return await self._runtime.game_control(
+            self.chat_session(lease_id),
+            operation,
+            duration_seconds,
+            lease_id=lease_id,
+        )
+
     async def speech_control(self, operation: str) -> dict[str, Any]:
         return await self._runtime.speech_control(operation)
 

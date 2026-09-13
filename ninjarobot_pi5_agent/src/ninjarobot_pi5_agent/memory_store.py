@@ -585,6 +585,7 @@ class MemoryStore:
             }
             connection.execute("DELETE FROM memory_fts")
             connection.execute("DELETE FROM local_tasks")
+            connection.execute("DELETE FROM task_recipes")
             connection.execute("DELETE FROM sessions")
             connection.execute("DELETE FROM users")
             connection.execute("DELETE FROM memory_audit_events")
@@ -1186,7 +1187,7 @@ class MemoryStore:
         kinds: tuple[MemoryKind, ...],
         limit: int,
     ) -> tuple[MemoryItem, ...]:
-        tokens = re.findall(r"[\w-]+", query, flags=re.UNICODE)
+        tokens = tuple(dict.fromkeys(re.findall(r"[\w-]+", query[:300], flags=re.UNICODE)))[:12]
         if not tokens:
             return ()
         with self._lock:
@@ -1208,23 +1209,62 @@ class MemoryStore:
                     "WHERE f.memory_fts MATCH ? AND m.user_id = ?"
                 )
                 parameters: list[Any] = [match, user_id]
-                order = " ORDER BY bm25(memory_fts), m.created_at DESC LIMIT ?"
+                order = (
+                    " ORDER BY CASE WHEN m.kind = 'preference' "
+                    "AND json_extract(m.payload_json, '$.inferred') = 0 THEN 0 ELSE 1 END, "
+                    "bm25(memory_fts), m.created_at DESC LIMIT ?"
+                )
             else:
-                clauses = ["LOWER(m.content) LIKE ?" for _ in tokens[:12]]
+                clauses = ["instr(LOWER(m.content), ?) > 0" for _ in tokens]
                 sql = (
                     "SELECT m.* FROM memory_items m WHERE m.user_id = ? AND ("
                     + " OR ".join(clauses)
                     + ")"
                 )
-                parameters = [user_id, *(f"%{token.casefold()}%" for token in tokens[:12])]
-                order = " ORDER BY m.created_at DESC LIMIT ?"
+                parameters = [user_id, *(token.casefold() for token in tokens)]
+                order = (
+                    " ORDER BY CASE WHEN m.kind = 'preference' "
+                    "AND json_extract(m.payload_json, '$.inferred') = 0 THEN 0 ELSE 1 END, "
+                    "m.created_at DESC LIMIT ?"
+                )
             if kind_values:
                 placeholders = ",".join("?" for _ in kind_values)
                 sql += f" AND m.kind IN ({placeholders})"
                 parameters.extend(kind_values)
-            parameters.append(limit)
+            # Exclude private and expired records before candidate ranking/limiting.
+            sql += " AND m.sensitive = 0 AND (m.expires_at IS NULL OR m.expires_at > ?)"
+            parameters.extend((_utc(datetime.now(UTC)), min(100, limit * 5)))
             rows = connection.execute(sql + order, parameters).fetchall()
-        return tuple(_memory_from_row(row) for row in rows)
+            if (
+                not rows
+                and virtual
+                and any(re.search(r"[\u3040-\u30ff\u3400-\u9fff]", token) for token in tokens)
+            ):
+                # Literal substring fallback for unsegmented text; not semantic search.
+                fallback = sql[sql.index("WHERE") :]
+                fallback = fallback.replace(
+                    "f.memory_fts MATCH ?",
+                    "(" + " OR ".join("instr(m.content, ?) > 0" for _ in tokens) + ")",
+                )
+                rows = connection.execute(
+                    "SELECT m.* FROM memory_items m "
+                    + fallback
+                    + " ORDER BY m.updated_at DESC LIMIT ?",
+                    [*tokens, *parameters[1:]],
+                ).fetchall()
+        candidates = tuple(_memory_from_row(row) for row in rows)
+        # Stable sort preserves SQLite's smaller-is-better BM25 order within tiers.
+        return tuple(
+            sorted(
+                candidates,
+                key=lambda item: (
+                    not (
+                        item.kind is MemoryKind.PREFERENCE and item.payload.get("inferred") is False
+                    ),
+                    -sum(token.casefold() in item.content.casefold() for token in tokens),
+                ),
+            )
+        )[:limit]
 
     def _delete_memory_sync(
         self,

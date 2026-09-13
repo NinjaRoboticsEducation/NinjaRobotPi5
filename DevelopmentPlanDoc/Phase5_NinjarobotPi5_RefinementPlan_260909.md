@@ -1,5 +1,14 @@
 # Phase 5 implementation plan — Optional interactions and hardware evaluation
 
+**Implementation checkpoint — 13 September 2026:** The owner approved Phase 5
+before Phase 4. B02/B04 software and B05 hardware evaluation documents are present;
+see the [handoff](../docs/validation/refinement_phase5_handoff_260913.md) and
+[manual walkthrough](../docs/validation/refinement_phase5_walkthrough_260912.md).
+Both optional settings default off. No managed driver or new hardware was changed.
+Physical acceptance remains outstanding; Phase 4 is not started. The original
+planning text below is retained as design history, not a newer status claim.
+
+
 This plan adds gentle variety to existing expressions, an explicitly requested
 distance-and-sound game, and a structured evaluation of possible future hardware.
 The aim is a more engaging robot that stays predictable, easy to stop and useful

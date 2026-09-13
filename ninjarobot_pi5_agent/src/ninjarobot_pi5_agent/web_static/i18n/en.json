@@ -128,5 +128,10 @@
   "speech.disable": "Speech OFF",
   "speech.enabled": "Spoken replies: on",
   "speech.disabled": "Spoken replies: off",
-  "speech.unavailable": "Speech unavailable; type /speech status."
+  "speech.unavailable": "Speech unavailable; type /speech status.",
+  "game.start": "Play game (30s)",
+  "game.stop": "Stop Game",
+  "game.status": "Game status",
+  "game.running": "Game requested. Use Stop Game to end.",
+  "game.disabled": "Game disabled; see /help game."
 }

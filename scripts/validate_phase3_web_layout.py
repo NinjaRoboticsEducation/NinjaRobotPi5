@@ -15,7 +15,7 @@ ROOT = (
 SHIM = """
 Object.defineProperty(navigator, 'standalone', {value:true});
 Object.defineProperty(screen, 'orientation', {value:{type:'portrait-primary'}});
-window.testMessages=[]; window.speechEnabled=false;
+window.testMessages=[]; window.speechEnabled=false; window.gameState="idle";
 class FakeSocket extends EventTarget {
  static OPEN=1; readyState=1;
  constructor(){super();setTimeout(()=>this.emit({type:'lease',lease_id:'test',
@@ -23,6 +23,12 @@ class FakeSocket extends EventTarget {
  emit(value){this.dispatchEvent(new MessageEvent('message',{data:JSON.stringify(value)}));}
  send(raw){const m=JSON.parse(raw);window.testMessages.push(m);setTimeout(()=>{
  let data={};
+ if(m.type==='game'){
+ if(m.operation==='start'){window.gameState='running';this.gameRequest=m;return;}
+ if(m.operation==='stop'){window.gameState='cancelled';
+ if(this.gameRequest){this.emit({type:'result',request_id:this.gameRequest.request_id,
+ data:{data:{enabled:true,state:'cancelled'}}});this.gameRequest=null;}}
+ data={data:{enabled:true,state:window.gameState}};}
  if(m.type==='speech'){
  if(m.operation==='on')window.speechEnabled=true;
  if(m.operation==='off')window.speechEnabled=false;data={enabled:window.speechEnabled};}
@@ -75,6 +81,14 @@ with sync_playwright() as p:
         page.locator("#speechOffButton").click()
         page.wait_for_function(
             "document.querySelector('#speechOffButton').getAttribute('aria-pressed') === 'true'"
+        )
+        page.locator('[data-game="start"]').click()
+        page.wait_for_function("window.gameState === 'running'")
+        page.locator('[data-game="stop"]').click()
+        page.wait_for_function("document.querySelector('#gameResult').textContent === 'cancelled'")
+        page.locator('[data-game="status"]').click()
+        page.wait_for_function(
+            "window.testMessages.some(m => m.type === 'game' && m.operation === 'status')"
         )
         page.locator("#menuButton").click()
         page.locator("#closeMenuButton").click()

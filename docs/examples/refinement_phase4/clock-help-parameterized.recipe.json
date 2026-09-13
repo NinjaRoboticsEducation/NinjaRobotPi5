@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "id": "phase4-clock-help",
+  "name": "Clock and chosen help topic",
+  "purpose": "Refined after user feedback: let the user choose the help topic on each run.",
+  "inputs": {"topic": "string"},
+  "max_seconds": 15,
+  "steps": [
+    {"tool": "system.time.get", "expected": "Current system date and time"},
+    {"tool": "command_help.search", "arguments": {"query": {"$input": "topic"}}, "expected": "Instructions for the chosen topic"}
+  ]
+}

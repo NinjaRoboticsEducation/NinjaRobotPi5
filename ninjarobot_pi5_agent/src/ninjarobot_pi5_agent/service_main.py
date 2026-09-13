@@ -155,6 +155,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
     )
     memory = MemoryStore(arguments.database) if config.memory.enabled else None
     from .command_help_tool import CommandHelpProvider
+    from .project_help import ProjectHelpProvider, checkout_wiki
     from .system_time_tool import SystemTimeProvider
     from .task_service import TaskService
     from .task_tools import TaskToolProvider
@@ -173,6 +174,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
         TaskToolProvider(tasks, lambda session: runtime.task_scope(session)),
         CommandHelpProvider(),
         SystemTimeProvider(),
+        ProjectHelpProvider(checkout_wiki()),
     ]
     if memory is not None:
         providers.append(MemoryMCPProvider(MemoryRetrievalService(memory), store))

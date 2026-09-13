@@ -863,3 +863,6 @@ h2 {
 .chat-messages, .chat-form, .conversation-panel { min-width: 0; }
 .speech-status { font-size: 0.7rem; color: var(--muted); min-height: 1em; }
 .action-button[aria-pressed="true"] { outline: 2px solid white; outline-offset: -4px; }
+
+.game-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+#gameResult { overflow-wrap: anywhere; font-size: 0.8rem; margin: 0.4rem 0; }

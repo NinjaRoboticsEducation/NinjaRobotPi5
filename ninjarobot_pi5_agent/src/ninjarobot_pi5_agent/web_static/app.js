@@ -815,6 +815,21 @@
     });
   });
 
+  document.querySelectorAll("[data-game]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const output = document.querySelector("#gameResult");
+      try {
+        if (button.dataset.game === "start") output.textContent = t("game.running");
+        const result = await send("game", { operation: button.dataset.game, duration_seconds: 30 });
+        const data = result.data || {};
+        output.textContent = result.error || (data.enabled === false ? t("game.disabled")
+          : [data.state, data.reason].filter(Boolean).join(": "));
+      } catch (error) {
+        output.textContent = error.message || String(error);
+      }
+    });
+  });
+
   elements.menuButton.addEventListener("click", openMenu);
   elements.closeMenu.addEventListener("click", () => closeMenu());
   elements.menu.addEventListener("click", (event) => {

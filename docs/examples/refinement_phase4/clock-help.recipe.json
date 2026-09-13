@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "id": "phase4-clock-help",
+  "name": "Clock and speech help",
+  "purpose": "Read the Pi clock and explain spoken reply commands without changing anything.",
+  "max_seconds": 15,
+  "steps": [
+    {"tool": "system.time.get", "expected": "Current system date and time"},
+    {"tool": "command_help.search", "arguments": {"query": "speech"}, "expected": "Instructions for spoken replies"}
+  ]
+}

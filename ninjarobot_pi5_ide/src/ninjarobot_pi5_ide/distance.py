@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import importlib
-from collections.abc import Callable
+import math
+from collections.abc import Awaitable, Callable
 from typing import Any, Protocol, cast
 
 from .errors import IDEError
@@ -91,6 +92,8 @@ class VL53L0XDistanceAdapter:
         self._startup_error: str | None = None
         self._lock = asyncio.Lock()
         self._closed = False
+        self._pending: asyncio.Task[Any] | None = None
+        self._recovery_required = False
 
     @property
     def descriptor(self) -> CapabilityDescriptor:
@@ -102,19 +105,30 @@ class VL53L0XDistanceAdapter:
         """Return sanitized initialization detail for diagnostics."""
         return self._startup_error
 
-    async def start(self) -> None:
+    async def start(self, *, recover: bool = False) -> None:
         """Initialize the sensor once while preserving unavailable health state."""
         async with self._lock:
             if self._closed:
                 raise RuntimeError("distance adapter is closed")
+            self._require_drained()
             if self._sensor is not None:
+                if self._recovery_required:
+                    if not recover:
+                        raise RuntimeError("distance recovery must be explicitly requested")
+                    healthy = await self._owned_call(self._sensor.health_check)
+                    if not healthy:
+                        raise RuntimeError("distance sensor recovery health check failed")
+                    self._recovery_required = False
                 return
             try:
-                self._sensor = await asyncio.to_thread(
-                    self._sensor_factory,
-                    self._i2c_bus,
-                    self._i2c_address,
-                )
+
+                async def initialize() -> None:
+                    self._sensor = await asyncio.to_thread(
+                        self._sensor_factory, self._i2c_bus, self._i2c_address
+                    )
+
+                await self._owned_operation(initialize())
+                self._recovery_required = False
                 self._startup_error = None
             except Exception as exc:
                 self._startup_error = f"{type(exc).__name__}: {exc}"
@@ -131,7 +145,7 @@ class VL53L0XDistanceAdapter:
         async with self._lock:
             sensor = self._require_sensor()
             try:
-                reading = await asyncio.to_thread(sensor.get_data)
+                reading = await self._owned_call(sensor.get_data)
             except Exception as exc:
                 raise self._error(
                     code="DEVICE_READ_FAILED",
@@ -144,10 +158,10 @@ class VL53L0XDistanceAdapter:
     async def health(self) -> ResourceHealth:
         """Check sensor identity without taking a distance measurement."""
         async with self._lock:
-            if self._sensor is None:
+            if self._sensor is None or self._recovery_required or self._busy:
                 return ResourceHealth.UNAVAILABLE
             try:
-                healthy = await asyncio.to_thread(self._sensor.health_check)
+                healthy = await self._owned_call(self._sensor.health_check)
             except Exception:
                 return ResourceHealth.UNAVAILABLE
         return ResourceHealth.READY if healthy else ResourceHealth.DEGRADED
@@ -157,23 +171,69 @@ class VL53L0XDistanceAdapter:
         async with self._lock:
             if self._closed:
                 return
-            sensor, self._sensor = self._sensor, None
+            self._require_drained()
+            sensor = self._sensor
             self._startup_error = None
             if sensor is not None:
-                await asyncio.to_thread(sensor.close)
+
+                async def release() -> None:
+                    await asyncio.to_thread(sensor.close)
+                    self._sensor = None
+
+                await self._owned_operation(release())
 
     async def close(self) -> None:
         """Close the managed sensor safely and idempotently."""
         async with self._lock:
             if self._closed:
                 return
-            sensor, self._sensor = self._sensor, None
-            self._closed = True
+            self._require_drained()
+            sensor = self._sensor
             if sensor is not None:
-                await asyncio.to_thread(sensor.close)
+
+                async def release() -> None:
+                    await asyncio.to_thread(sensor.close)
+                    self._sensor = None
+
+                await self._owned_operation(release())
+
+            self._closed = True
+
+    @property
+    def _busy(self) -> bool:
+        return self._pending is not None and not self._pending.done()
+
+    def _require_drained(self) -> None:
+        if self._busy:
+            raise self._error(
+                code="DEVICE_READ_PENDING",
+                message="Distance sensor work is still pending; device reuse is blocked.",
+                technical_detail=(
+                    "Wait for the worker to drain, then explicitly resume. "
+                    "A stuck worker requires service recovery."
+                ),
+                definitely_not_executed=True,
+            )
+
+    async def _owned_call(self, operation: Callable[[], Any]) -> Any:
+        self._require_drained()
+        return await self._owned_operation(asyncio.to_thread(operation))
+
+    async def _owned_operation(self, operation: Awaitable[Any]) -> Any:
+        # Shield ownership, not the caller: cancelled/timed-out work stays owned
+        # until the actual thread returns. Its late value never becomes a sample.
+        task = asyncio.ensure_future(operation)
+        self._pending = task
+        task.add_done_callback(lambda done: None if done.cancelled() else done.exception())
+        try:
+            return await asyncio.wait_for(asyncio.shield(task), timeout=2.0)
+        except (asyncio.CancelledError, TimeoutError):
+            self._recovery_required = True
+            raise
 
     def _require_sensor(self) -> DistanceSensor:
-        if self._sensor is None:
+        self._require_drained()
+        if self._sensor is None or self._recovery_required or self._closed:
             raise self._error(
                 code="DEVICE_UNAVAILABLE",
                 message="The VL53L0X sensor is unavailable.",
@@ -194,6 +254,7 @@ class VL53L0XDistanceAdapter:
             or isinstance(raw_value, bool)
             or not isinstance(timestamp, (int, float))
             or isinstance(timestamp, bool)
+            or not math.isfinite(timestamp)
         ):
             raise self._invalid_reading(distance, raw_value, valid)
         if raw_value == 8191:

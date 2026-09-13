@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "documents": [
+    {
+      "id": "public-1",
+      "path": "wiki/concepts/installation.md",
+      "title": "Installation and Raspberry Pi OS Lite",
+      "keywords": "bluetooth speaker pairing lite setup install",
+      "content_hash": "sha256:4ce9531823f8430c11b4a072417841205c67da78ff8edc580b4736814b15dede",
+      "source_version": "2026-09-12",
+      "page_state": "draft",
+      "review_state": "Existing AI review: passed; no human or hardware verification",
+      "sources": [
+        {
+          "id": "src-20260912-installationguide",
+          "path": "raw/articles/ninjarobotpi5/2026-09-12/InstallationGuide.md",
+          "content_hash": "sha256:63da8891e70986a964d9c1838c4fc9e54023eb617bf19deb3122a27c90eb9250"
+        },
+        {
+          "id": "src-20260907-knowledgeintegration",
+          "path": "raw/notes/ninjarobotpi5/2026-09-07-02/KnowledgeIntegration.md",
+          "content_hash": "sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622"
+        }
+      ]
+    },
+    {
+      "id": "public-2",
+      "path": "wiki/concepts/features-and-tools.md",
+      "title": "Robot features and commands",
+      "keywords": "speech memory tasks help commands skills",
+      "content_hash": "sha256:b83588d686f0e6785626bca1feadfb7f795b37d39645ed65ad0e9c43b3e4e5ba",
+      "source_version": "2026-09-12",
+      "page_state": "draft",
+      "review_state": "Existing AI review: passed; no human or hardware verification",
+      "sources": [
+        {
+          "id": "src-20260912-ninjarobot-mcp-skill",
+          "path": "raw/articles/ninjarobotpi5/2026-09-12/NinjaRobot_MCP_Skill.md",
+          "content_hash": "sha256:a378ca8b20ecbab88c423690017a12a8a44d3f0e1e591c4538b34432777ba810"
+        },
+        {
+          "id": "src-20260912-developmentguide",
+          "path": "raw/articles/ninjarobotpi5/2026-09-12/DevelopmentGuide.md",
+          "content_hash": "sha256:9843060f7eb54f90846eb51f4dac8ab23e1a3d5dae78211a1d2dae4cd198d376"
+        },
+        {
+          "id": "src-20260907-knowledgeintegration",
+          "path": "raw/notes/ninjarobotpi5/2026-09-07-02/KnowledgeIntegration.md",
+          "content_hash": "sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622"
+        }
+      ]
+    },
+    {
+      "id": "public-3",
+      "path": "wiki/concepts/architecture.md",
+      "title": "Project architecture",
+      "keywords": "agent ide drivers safety",
+      "content_hash": "sha256:01987c2e753d96d83d64325a4d8dcbdeb21f78f90273da6951711358f2524abf",
+      "source_version": "2026-09-12",
+      "page_state": "draft",
+      "review_state": "Existing AI review: passed; no human or hardware verification",
+      "sources": [
+        {
+          "id": "src-20260912-developmentguide",
+          "path": "raw/articles/ninjarobotpi5/2026-09-12/DevelopmentGuide.md",
+          "content_hash": "sha256:9843060f7eb54f90846eb51f4dac8ab23e1a3d5dae78211a1d2dae4cd198d376"
+        }
+      ]
+    },
+    {
+      "id": "public-4",
+      "path": "wiki/concepts/development-workflow.md",
+      "title": "Development workflow",
+      "keywords": "development lint tests skills",
+      "content_hash": "sha256:c24ca5e010e62ef1eff33540d37f70a571dea5366b47ca522a717001c1afad11",
+      "source_version": "2026-09-12",
+      "page_state": "draft",
+      "review_state": "Existing AI review: passed; no human or hardware verification",
+      "sources": [
+        {
+          "id": "src-20260907-knowledgeintegration",
+          "path": "raw/notes/ninjarobotpi5/2026-09-07-02/KnowledgeIntegration.md",
+          "content_hash": "sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622"
+        },
+        {
+          "id": "src-20260912-developmentguide",
+          "path": "raw/articles/ninjarobotpi5/2026-09-12/DevelopmentGuide.md",
+          "content_hash": "sha256:9843060f7eb54f90846eb51f4dac8ab23e1a3d5dae78211a1d2dae4cd198d376"
+        }
+      ]
+    }
+  ],
+  "coverage": "2026-09-12"
+}

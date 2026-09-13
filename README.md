@@ -17,7 +17,7 @@
 > [!NOTE]
 > **v1.0.0 public release.** The project owner completed the Phase 8 manual
 > Raspberry Pi validation. New installations must still follow the safety and
-> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12-02/InstallationGuide.md) because
+> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-13-02/InstallationGuide.md) because
 > wiring and hardware tolerances differ between robots.
 
 ---
@@ -34,21 +34,33 @@ Phase 3 now adds optional local spoken replies, IDE-owned Bluetooth/PipeWire
 output, independent Stop Speech controls and reviewed spoken reminders. Speech
 starts off; English uses Piper, Mandarin accepts a suitable operator-supplied model,
 and Japanese speech is not implemented. Text remains available after audio failure.
-Development is paused before Phase 4 for your acceptance tests. Start with the
-[Phase 3 setup and manual-test walkthrough](docs/validation/refinement_phase3_walkthrough_260909.md)
-and [implementation handoff](docs/validation/refinement_phase3_handoff_260909.md).
-The automated gate passes 772 tests; physical audio and browser acceptance remain
-pending. The owner reports completing the earlier Phase 2 tests.
+Refinement Phase 5 now adds an optional hand-distance game and subtle silent face
+variations. Both start disabled. Use `ninjarobot-agent game start --seconds 5`,
+`game stop` and `game status`, chat `/game` commands or the web game buttons.
+The game uses the existing sensor, buzzer and display; it never commands wheels
+or capture and does not need Bluetooth. See the
+[Phase 5 setup and manual-test walkthrough](docs/validation/refinement_phase5_walkthrough_260912.md)
+and [implementation handoff](docs/validation/refinement_phase5_handoff_260913.md).
+Physical Phase 5 acceptance is still required.
 
-Default reminders remain silent; audible effects require review. The Agent service
-must be running. Usage limits are not a monetary spending cap. Face cleanup is
-already implemented; the separate display-font proposal remains pending.
+Narrowed Phase 4 adds better owned memory retrieval, reviewed local read-only
+recipes, compatible version-2 Agent skills and cited public project help.
+Use /project for documentation and the recipe CLI to preview, save and explicitly
+run versioned workflows. Calendar work, new research, notes/checklists and
+briefings remain deferred. See the
+[Phase 4 walkthrough](docs/validation/refinement_phase4_walkthrough_260913.md) and
+[handoff](docs/validation/refinement_phase4_handoff_260913.md).
+Public-help coverage remains the published 12 September draft checkpoint;
+newer full manuals below remain pending ingestion.
 
-The Installation and Development Guide links now open the corrected **Lite,
-command-line** manual revisions. Wiki ingestion/review remains deferred: the
-curated wiki pages and document map still describe the published earlier checkpoint.
-The new manual files preserve registered originals; use them and the walkthrough
-for Phase 3 setup until wiki publication.
+The [hardware evaluation](DevelopmentPlanDoc/hardware/HardwareOptions_260912.md)
+is a set of proposals and deferrals, not newly installed hardware or fall protection.
+Default reminders remain silent; audible effects require review and the Agent
+service must be running. Usage limits are not a monetary spending cap.
+
+The manual links open new complete source revisions for the latest implementation.
+The previously ingested Phase 3 follow-up remains preserved. Phase 4/5 wiki ingestion
+and review are deferred; read the new manuals directly until publication.
 
 ## What is NinjaRobotPi5?
 
@@ -190,7 +202,7 @@ uv run --frozen --extra hardware ninjarobot-agent
 
 The installer does not download an Ollama model, start the Agent, move a motor,
 open the camera or microphone, or deploy boot startup. Follow the complete
-[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12-02/InstallationGuide.md) for wiring, module initialization,
+[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-13-02/InstallationGuide.md) for wiring, module initialization,
 calibration, model download, and safe first movement.
 
 ---
@@ -252,10 +264,10 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 
 | Document | Purpose |
 |---|---|
-| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12-02/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
-| [MCP and Agent Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12-02/NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
-| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-12-02/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
-| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-12-02/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
+| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-13-02/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
+| [MCP and Agent Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-13-02/NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
+| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-13-02/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
+| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-13-02/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
 | [Documentation Index](docs/README.md) | Public, developer, architecture, history, and validation documents |
 | [Audit Report](docs/project-history/AuditReport_260731.md) | Historical security, reliability, and documentation audit findings |
 | [Implementation Plan](docs/project-history/NinjaRobotPi5V4_ImplementationPlan.md) | Historical phase design and delivery decisions |

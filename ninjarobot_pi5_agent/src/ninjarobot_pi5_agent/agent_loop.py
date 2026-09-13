@@ -37,7 +37,7 @@ from .presentation import (
 from .prompts import PromptComposer
 from .providers import LLMProvider
 from .recovery import RecoveryAction, RecoveryPolicy
-from .skills import LoadedSkill
+from .skills import LoadedSkill, SkillValidationError, compatible_tools
 from .tool_messages import repair_tool_history, tool_message_content
 from .tools import CancellationToken, ToolRegistry
 
@@ -250,12 +250,10 @@ class AgentLoop:
 
         definitions = self._tools.list_tools()
         if skill is not None:
-            allowed = set(skill.manifest.allowed_tools)
-            unavailable = sorted(allowed - {definition.name for definition in definitions})
-            if unavailable:
-                raise AgentLoopError(
-                    f"skill references unavailable tools: {', '.join(unavailable)}"
-                )
+            try:
+                allowed = compatible_tools(skill, definitions)
+            except SkillValidationError as exc:
+                raise AgentLoopError(str(exc)) from exc
             definitions = tuple(
                 definition for definition in definitions if definition.name in allowed
             )

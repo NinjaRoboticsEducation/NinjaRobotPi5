@@ -128,5 +128,10 @@
   "speech.disable": "語音關閉",
   "speech.enabled": "語音回覆：開",
   "speech.disabled": "語音回覆：關",
-  "speech.unavailable": "語音無法使用，請輸入 /speech status。"
+  "speech.unavailable": "語音無法使用，請輸入 /speech status。",
+  "game.start": "玩遊戲 (30秒)",
+  "game.stop": "停止遊戲",
+  "game.status": "遊戲狀態",
+  "game.running": "已請求遊戲。點擊停止遊戲可結束。",
+  "game.disabled": "遊戲未啟用，請參閱 /help game。"
 }

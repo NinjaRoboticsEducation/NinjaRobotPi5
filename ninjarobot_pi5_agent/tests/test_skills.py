@@ -69,8 +69,10 @@ def test_bundled_skills_validate_and_simulate_without_execution(tmp_path) -> Non
     skills = repository.list()
     assert [skill.manifest.id for skill in skills] == [
         "current-web-answer",
+        "distance-game",
         "memory-retrieval",
         "offline-robot-check",
+        "project-help",
         "robot-behavior-generation",
         "robot-command-help",
     ]

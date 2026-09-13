@@ -7,14 +7,21 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
-from .models import ToolName
+from .models import ToolDefinition, ToolName
 
 SkillID = Annotated[
     str,
@@ -114,6 +121,55 @@ class SkillManifest(BaseModel):
         return value
 
 
+class SkillRequirements(BaseModel):
+    """Versioned requirements describe compatibility, never authorization."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+    minimum_agent_version: Version = "1.0.0"
+    required_capabilities: dict[ToolName, Version] = Field(default_factory=dict, max_length=20)
+    optional_capabilities: dict[
+        ToolName, Annotated[str, StringConstraints(min_length=1, max_length=300)]
+    ] = Field(default_factory=dict, max_length=20)
+    effects: tuple[Literal["read_only", "local_write", "external_write", "physical"], ...] = (
+        "read_only",
+    )
+
+
+class SkillManifestV2(SkillManifest):
+    """Explicit v2; v1 parsing and defaults remain unchanged."""
+
+    schema_version: Annotated[int, Field(ge=2, le=2)]
+    requirements: SkillRequirements
+
+    @model_validator(mode="after")
+    def requirements_are_allowlisted(self) -> SkillManifestV2:
+        required = set(self.requirements.required_capabilities)
+        optional = set(self.requirements.optional_capabilities)
+        if required & optional or required | optional != set(self.allowed_tools):
+            raise ValueError(
+                "every allowed tool must be declared exactly once as required or optional"
+            )
+        return self
+
+
+def compatible_tools(skill: LoadedSkill, definitions: tuple[ToolDefinition, ...]) -> set[str]:
+    """Recheck the current catalog on every run; never grant tool access."""
+    catalog = {tool.name: tool for tool in definitions}
+    manifest = skill.manifest
+    SkillRepository._validate_available_tools(skill, set(catalog))
+    if isinstance(manifest, SkillManifestV2):
+        if _version(manifest.requirements.minimum_agent_version) > _version("1.0.0"):
+            raise SkillValidationError("skill requires a newer Agent contract than 1.0.0")
+        for name, minimum in manifest.requirements.required_capabilities.items():
+            if _version(catalog[name].version) < _version(minimum):
+                raise SkillValidationError(f"skill requires {name} version {minimum} or newer")
+    return set(manifest.allowed_tools) & set(catalog)
+
+
+def _version(value: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in value.split("."))
+
+
 class SkillExample(BaseModel):
     """One simulation-only skill scenario."""
 
@@ -145,7 +201,7 @@ class LoadedSkill(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
-    manifest: SkillManifest
+    manifest: SkillManifest | SkillManifestV2
     instructions: str
     examples: SkillExamples | None = None
     path: Path
@@ -234,9 +290,13 @@ class SkillRepository:
             if entry.stat().st_size > _MAX_FILE_BYTES[entry.name]:
                 raise SkillValidationError(f"skill file is too large: {entry.name}")
         try:
-            manifest = SkillManifest.model_validate_json(
-                (directory / "skill.json").read_text(encoding="utf-8")
-            )
+            raw_manifest = (directory / "skill.json").read_text(encoding="utf-8")
+            schema_version = json.loads(raw_manifest).get("schema_version")
+            if type(schema_version) is not int or schema_version not in (1, 2):
+                raise SkillValidationError("unsupported skill schema_version; expected 1 or 2")
+            manifest = (
+                SkillManifestV2 if schema_version == 2 else SkillManifest
+            ).model_validate_json(raw_manifest)
         except (OSError, UnicodeError, ValueError) as exc:
             raise SkillValidationError(f"invalid skill.json: {exc}") from exc
         if directory.name != manifest.id:
@@ -303,6 +363,7 @@ class SkillRepository:
             "matching_examples": matching,
             "warnings": [
                 "No robot hardware or external MCP tool was executed.",
+                "Offline structural preview only; use --check-live to check current capabilities.",
                 "Physical motion would still require an armed session.",
             ],
         }
@@ -314,9 +375,16 @@ class SkillRepository:
         ai_proposed: bool = False,
         confirmed: bool = False,
         simulation_input: dict[str, Any] | None = None,
+        definitions: tuple[ToolDefinition, ...] | None = None,
     ) -> LoadedSkill:
         """Atomically install a validated user skill without overwriting."""
         skill = self.load_path(source)
+        if isinstance(skill.manifest, SkillManifestV2):
+            if definitions is None:
+                raise SkillValidationError(
+                    "v2 installation requires the current service tool catalog"
+                )
+            compatible_tools(skill, definitions)
         if ai_proposed and not confirmed:
             raise PermissionError("AI-proposed skills require explicit approval")
         if ai_proposed:
@@ -343,9 +411,15 @@ class SkillRepository:
             raise
         return self.load_path(destination)
 
-    def set_enabled(self, skill_id: str, *, enabled: bool) -> None:
+    def set_enabled(
+        self, skill_id: str, *, enabled: bool, definitions: tuple[ToolDefinition, ...] | None = None
+    ) -> None:
         """Persist a local enable/disable override."""
-        self._find_any(skill_id)
+        skill = self._find_any(skill_id)
+        if enabled and isinstance(skill.manifest, SkillManifestV2):
+            if definitions is None:
+                raise SkillValidationError("v2 enable requires the current service tool catalog")
+            compatible_tools(skill, definitions)
         disabled = self._disabled_ids()
         if enabled:
             disabled.discard(skill_id)
@@ -379,9 +453,19 @@ class SkillRepository:
         skill: LoadedSkill,
         available_tools: set[str] | None,
     ) -> None:
+        manifest = skill.manifest
+        if isinstance(manifest, SkillManifestV2) and _version(
+            manifest.requirements.minimum_agent_version
+        ) > _version("1.0.0"):
+            raise SkillValidationError("skill requires a newer Agent contract than 1.0.0")
         if available_tools is None:
             return
-        unavailable = sorted(set(skill.manifest.allowed_tools) - available_tools)
+        required = (
+            set(manifest.requirements.required_capabilities)
+            if isinstance(manifest, SkillManifestV2)
+            else set(manifest.allowed_tools)
+        )
+        unavailable = sorted(required - available_tools)
         if unavailable:
             raise SkillValidationError(
                 f"skill references unavailable tools: {', '.join(unavailable)}"

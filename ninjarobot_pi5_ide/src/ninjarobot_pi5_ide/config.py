@@ -434,10 +434,27 @@ class BluetoothSpeakerConfig(ConfigModel):
     auto_reconnect: bool = False
 
 
+class InteractionVariationsConfig(ConfigModel):
+    """Opt-in silent variations; configuration alone produces no output."""
+
+    enabled: bool = False
+
+
+class DistanceGameConfig(ConfigModel):
+    """Opt-in game with a bounded operator-selected buzzer volume."""
+
+    enabled: bool = False
+    volume: Annotated[int, Field(ge=1, le=32)] = 16
+
+
 class RobotConfig(ConfigModel):
     """Top-level V4 configuration schema."""
 
     schema_version: Literal[1] = 1
+    interaction_variations: InteractionVariationsConfig = Field(
+        default_factory=InteractionVariationsConfig
+    )
+    distance_game: DistanceGameConfig = Field(default_factory=DistanceGameConfig)
     hardware: HardwareConfig = Field(default_factory=HardwareConfig)
     behaviors: BehaviorConfig = Field(default_factory=BehaviorConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)

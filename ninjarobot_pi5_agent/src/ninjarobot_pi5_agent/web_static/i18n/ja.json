@@ -128,5 +128,10 @@
   "speech.disable": "音声オフ",
   "speech.enabled": "音声応答：オン",
   "speech.disabled": "音声応答：オフ",
-  "speech.unavailable": "音声を利用できません。/speech status で確認してください。"
+  "speech.unavailable": "音声を利用できません。/speech status で確認してください。",
+  "game.start": "ゲーム (30秒)",
+  "game.stop": "ゲーム停止",
+  "game.status": "ゲーム状態",
+  "game.running": "ゲームを要求しました。「ゲーム停止」で終了できます。",
+  "game.disabled": "ゲームは無効です。/help game を参照してください。"
 }

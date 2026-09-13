@@ -22,6 +22,7 @@ from .display import (
     DisplayShowTextAdapter,
 )
 from .distance import VL53L0XDistanceAdapter
+from .distance_game import DistanceGameAdapter
 from .engine import ExecutionEngine
 from .errors import IDEError
 from .identity import FaceIdentityDevice
@@ -589,6 +590,7 @@ class RobotIDEClient:
         """Activate the single IDE-owned microphone listener."""
         if self._voice_input is None:
             raise VoiceInputError("listener_unavailable")
+        await self.robot.distance_game.stop("voice_input")
         return await self._voice_input.start()
 
     async def stop_voice_input(self) -> dict[str, object]:
@@ -801,6 +803,9 @@ def build_robot_ide_client(
     )
     registry = CapabilityRegistry()
     for adapter in (
+        DistanceGameAdapter(robot.distance_game, "run"),
+        DistanceGameAdapter(robot.distance_game, "stop"),
+        DistanceGameAdapter(robot.distance_game, "status"),
         _BehaviorListAdapter(robot),
         _BehaviorPreviewAdapter(
             robot,
@@ -855,6 +860,7 @@ def build_robot_ide_client(
         registry,
         ActionLedger(ledger_path),
         execution_guard=lambda request: robot.ensure_action_allowed(request.capability),
+        admission=robot.distance_game.admission,
     )
     identity = FaceIdentityDevice(
         robot.camera,

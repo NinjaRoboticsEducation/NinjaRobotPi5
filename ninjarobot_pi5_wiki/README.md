@@ -4,7 +4,38 @@ Start here for project documentation, architecture, development history, and
 AI-assisted development. Open this folder in your coding tool for wiki questions,
 or open the parent project for development and implementation verification.
 
-## Latest full manuals — system time fix, pending ingestion
+## Latest full manuals — narrowed Phase 4, pending ingestion
+
+M03 memory retrieval, M04 read-only recipes, X01 compatible skills and X05 public
+help are documented in these new full revisions. Calendar, research and
+notes/briefings remain deferred. No ingestion, review or publication was run:
+
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-13-02/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-13-02/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-13-02/NinjaRobot_MCP_Skill.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-13-02/DevelopmentLog.md)
+- [Phase 4 walkthrough](../docs/validation/refinement_phase4_walkthrough_260913.md)
+- [Phase 4 handoff](../docs/validation/refinement_phase4_handoff_260913.md)
+
+Runtime project help is separate from developer wiki search. It uses a fixed
+public list pinned to the published 12 September checkpoint and reports
+draft/older coverage. It does not ingest these prepared revisions.
+
+## Previous full manuals — Phase 5, pending ingestion
+
+These revisions cover the optional distance game, silent expression variations,
+sensor ownership repair and evaluation-only hardware proposals. The owner deferred
+wiki ingestion and review. Registered originals and current curated pages remain
+preserved; read these new sources directly for Phase 5:
+
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-13/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-13/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-13/NinjaRobot_MCP_Skill.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-13/DevelopmentLog.md)
+- [Phase 5 walkthrough](../docs/validation/refinement_phase5_walkthrough_260912.md)
+- [Phase 5 handoff](../docs/validation/refinement_phase5_handoff_260913.md)
+
+## Previous full manuals — system time fix, pending ingestion
 
 These new revisions describe `/time`, fresh model clock context and the read-only
 `system.time.get` tool. They have not replaced the ingested sources or review

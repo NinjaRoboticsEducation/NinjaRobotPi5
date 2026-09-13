@@ -1,0 +1,37 @@
+{
+  "schema_version": 2,
+  "id": "cited-research-template",
+  "version": "1.0.0",
+  "name": "Cited research template",
+  "description": "Cited research template with explicit compatibility requirements and no extra permissions.",
+  "activation_examples": [
+    "Help me understand this feature"
+  ],
+  "allowed_tools": [
+    "research.search"
+  ],
+  "input_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "required": [
+      "prompt"
+    ]
+  },
+  "requirements": {
+    "minimum_agent_version": "1.0.0",
+    "required_capabilities": {
+      "research.search": "1.0.0"
+    },
+    "optional_capabilities": {},
+    "effects": [
+      "read_only"
+    ]
+  }
+}

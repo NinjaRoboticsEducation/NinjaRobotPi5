@@ -208,11 +208,17 @@ class MemoryRetrievalService:
             kind=MemoryKind.TASK_RECIPE,
             limit=1,
         )
-        anchored = (*recent_successes, *recent_recipes)
-        anchored_ids = {item.memory_id for item in anchored}
-        selected = (*anchored, *(item for item in relevant if item.memory_id not in anchored_ids))[
-            : settings.retrieval_limit
-        ]
+        anchored = tuple(
+            item for item in (*recent_successes, *recent_recipes) if _retrievable(item)
+        )
+        selected = (
+            *relevant,
+            *(
+                item
+                for item in anchored
+                if item.memory_id not in {match.memory_id for match in relevant}
+            ),
+        )[: settings.retrieval_limit]
         lines = [
             f"Active user: {profile.display_name} ({profile.role.value}).",
             f"Current robot name: {profile.preferred_robot_name or 'NinjaAgent'}.",
@@ -220,7 +226,10 @@ class MemoryRetrievalService:
         if isinstance(preferred_form_of_address, str) and preferred_form_of_address:
             lines.append(f"Preferred form of address: {_single_line(preferred_form_of_address)}.")
         preferences = tuple(
-            sorted(preferences, key=lambda item: item.payload.get("inferred") is not False)
+            sorted(
+                (item for item in preferences if _retrievable(item)),
+                key=lambda item: item.payload.get("inferred") is not False,
+            )
         )[:4]
         lines.extend(
             (
@@ -230,7 +239,8 @@ class MemoryRetrievalService:
             )
             + _single_line(item.content)
             for item in preferences
-            if item.payload.get("preference_key") != "preferred_form_of_address"
+            if not item.sensitive
+            and item.payload.get("preference_key") != "preferred_form_of_address"
         )
         lines.extend(
             f"{item.kind.value}: {_single_line(item.content)}"
@@ -274,6 +284,10 @@ class MemoryRetrievalService:
     ) -> list[dict[str, Any]]:
         items = await self._store.memories(user_id, kind=kind, limit=limit)
         return [_public_memory(item) for item in items if not item.sensitive]
+
+
+def _retrievable(item: MemoryItem) -> bool:
+    return not item.sensitive and (item.expires_at is None or item.expires_at > datetime.now(UTC))
 
 
 def _attempt_status(status: ToolExecutionStatus) -> BehaviorAttemptStatus:
@@ -396,6 +410,11 @@ def _public_memory(item: MemoryItem) -> dict[str, Any]:
         "kind": item.kind.value,
         "content": _single_line(item.content),
         "confidence": item.confidence,
+        "retrieval_reason": (
+            "matched current preference"
+            if item.kind is MemoryKind.PREFERENCE and item.payload.get("inferred") is False
+            else "matched stored content"
+        ),
         "created_at": item.created_at.isoformat(),
         **memory_explanation(item),
     }

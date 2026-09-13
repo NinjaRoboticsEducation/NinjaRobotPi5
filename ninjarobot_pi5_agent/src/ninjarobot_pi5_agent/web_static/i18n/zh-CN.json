@@ -128,5 +128,10 @@
   "speech.disable": "语音关闭",
   "speech.enabled": "语音回复：开",
   "speech.disabled": "语音回复：关",
-  "speech.unavailable": "语音不可用，请输入 /speech status。"
+  "speech.unavailable": "语音不可用，请输入 /speech status。",
+  "game.start": "玩游戏 (30秒)",
+  "game.stop": "停止游戏",
+  "game.status": "游戏状态",
+  "game.running": "已请求游戏。点击停止游戏可结束。",
+  "game.disabled": "游戏未启用，请参阅 /help game。"
 }

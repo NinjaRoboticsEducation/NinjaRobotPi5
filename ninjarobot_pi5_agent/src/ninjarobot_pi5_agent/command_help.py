@@ -5,8 +5,14 @@ from __future__ import annotations
 import re
 
 CHAT_HELP_TEXT = """Available chat commands:
+/project QUESTION
+  Search pinned public documentation; answers include source dates and draft warnings.
+/recipes list|show ID [VERSION]|run ID VERSION|disable ID
+  Review or explicitly run saved read-only recipes. Use the recipe CLI to preview/save.
 /time
   Read the Pi system date, time, UTC offset and timezone without a model call.
+/game start [5-60]|stop|status
+  Play a bounded hand-distance sound game; wheels stay still. Disabled until configured.
 /speech on|off|stop|status|outputs|en|zh
   Control local spoken replies; Stop also cancels queued speech without cancelling chat.
 
@@ -96,6 +102,8 @@ def help_text(query: str = "") -> str:
         "spoken": "speech",
         "speaker": "speech",
         "voice": "speech voice",
+        "distance": "game",
+        "play": "game",
         "scheduled": "tasks",
         "schedule": "tasks",
         "reminder": "tasks remind",
@@ -162,6 +170,7 @@ def wants_command_help(text: str) -> bool:
             "robot",
             "speaker",
             "bluetooth",
+            "game",
         )
     )
     return question and topic

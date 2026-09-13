@@ -144,6 +144,9 @@ class AgentRuntime:
         self._motion_cancellations: dict[str, set[CancellationToken]] = {}
         self._active_users: dict[str, str] = {}
         self._identity_states: dict[str, str] = {}
+        self._game_requests: dict[str, CancellationToken] = {}
+        self._recipe_requests: dict[str, CancellationToken] = {}
+        self._recipe_workers: set[asyncio.Task[Any]] = set()
         self._pending_confirmation_prompts: set[str] = set()
         self._automatic_memory_notices: dict[str, set[str]] = {}
         self._execution_notices: dict[str, list[str]] = {}
@@ -243,6 +246,63 @@ class AgentRuntime:
         self._begin_operation()
         try:
             command = text.split(maxsplit=1)
+            if command and command[0] == "/game":
+                import json
+
+                parts = text.split()
+                operation = parts[1] if len(parts) > 1 else "status"
+                if len(parts) > 3 or (len(parts) == 3 and operation != "start"):
+                    raise ValueError("Use /game start [5-60], /game stop or /game status")
+                duration = int(parts[2]) if len(parts) == 3 else 30
+                result = await self.game_control(
+                    session_id, operation, duration, lease_id=lease_id, cancellation=cancellation
+                )
+                return await self._identity_reply(
+                    session_id,
+                    json.dumps(result, ensure_ascii=False),
+                    on_text_delta=on_text_delta,
+                    persist=False,
+                )
+            if command and command[0] == "/recipes":
+                import json
+
+                from .recipe_controls import recipe_action
+
+                parts = text.split()
+                if len(parts) > 4:
+                    raise ValueError("Use /recipes list, show ID [VERSION], or run ID VERSION")
+                payload: dict[str, Any] = {"operation": parts[1] if len(parts) > 1 else "list"}
+                if len(parts) > 2:
+                    payload["recipe_id"] = parts[2]
+                if len(parts) > 3:
+                    payload["version"] = int(parts[3])
+                if payload["operation"] not in {"list", "show", "run", "disable"}:
+                    raise ValueError("Use the recipe CLI to save, enable, delete or roll back")
+                payload["confirmed"] = payload["operation"] == "run"
+                data = await recipe_action(self, session_id, payload, cancellation)
+                return await self._identity_reply(
+                    session_id,
+                    json.dumps(data, ensure_ascii=False),
+                    on_text_delta=on_text_delta,
+                    persist=False,
+                )
+            if command and command[0] == "/project":
+                import json
+
+                help_result = await self.execute_tool(
+                    tool_name="project_help.search",
+                    arguments={"query": command[1] if len(command) > 1 else "robot features"},
+                    session_id=session_id,
+                    cancellation=cancellation,
+                )
+                return await self._identity_reply(
+                    session_id,
+                    json.dumps(
+                        help_result.data or {"error": help_result.error}, ensure_ascii=False
+                    ),
+                    on_text_delta=on_text_delta,
+                    persist=False,
+                )
             if command and command[0] == "/time":
                 from .system_time import system_time_snapshot
 
@@ -280,6 +340,19 @@ class AgentRuntime:
                     on_text_delta=on_text_delta,
                     persist=False,
                 )
+            if (
+                skill_id is None
+                and re.search(
+                    r"\b(how|explain|where|what)\b.*\b(bluetooth|raspberry|installation|architecture|wiki)\b",
+                    text,
+                    re.IGNORECASE,
+                )
+                and any(
+                    item.manifest.id == "project-help" and item.enabled
+                    for item in self.skills.list()
+                )
+            ):
+                skill_id = "project-help"
             if skill_id is None and wants_command_help(text):
                 available = {tool.name for tool in self.tools.list_tools()}
                 if "command_help.search" in available and any(
@@ -294,6 +367,14 @@ class AgentRuntime:
                         on_text_delta=on_text_delta,
                         persist=False,
                     )
+            if skill_id is None and re.search(
+                r"\bplay\b.*\b(distance|hand)\b.*\bgame\b", text, re.IGNORECASE
+            ):
+                if any(
+                    item.manifest.id == "distance-game" and item.enabled
+                    for item in self.skills.list()
+                ):
+                    skill_id = "distance-game"
             if text.startswith("/speech"):
                 parts = text.split()
                 operation = parts[1] if len(parts) == 2 and parts[0] == "/speech" else "status"
@@ -411,7 +492,81 @@ class AgentRuntime:
             return {"enabled": False, "reason": "speech_not_configured"}
         return await self.speech.control(operation)
 
+    async def game_control(
+        self,
+        session_id: str,
+        operation: str = "status",
+        duration_seconds: int = 30,
+        *,
+        lease_id: str | None = None,
+        cancellation: CancellationToken | None = None,
+    ) -> dict[str, Any]:
+        """Trusted controls use the existing policy, tool ledger and request records."""
+        from ninjarobot_pi5_ide.distance_game import GameRequest
+
+        self._ensure_started()
+        if operation not in {"start", "stop", "status"}:
+            raise ValueError("Use game start, stop or status")
+        args = (
+            GameRequest(duration_seconds=duration_seconds).model_dump()
+            if operation == "start"
+            else {}
+        )
+        task = None
+        token = None
+        cancel = cancellation or CancellationToken()
+        if operation == "start" and self.tasks is not None:
+            user_id = await self._user_for_existing_session(session_id)
+            scope = f"user:{user_id}" if user_id else f"session:{session_id}"
+            task = await self.tasks.begin_request(
+                scope=scope,
+                user_id=user_id,
+                session_id=session_id,
+                title=f"Distance game for {duration_seconds} seconds",
+                limits={"seconds": 63},
+            )
+            token = CURRENT_TASK.set(task)
+            self._game_requests[task.task_id] = cancel
+        try:
+            result = await self.execute_tool(
+                tool_name="robot.game.distance." + ("run" if operation == "start" else operation),
+                arguments=args,
+                session_id=session_id,
+                lease_id=lease_id,
+                requested_by="game-controller",
+                cancellation=cancel,
+            )
+            data = result.data or {}
+            if task is not None and self.tasks is not None:
+                status = (
+                    TaskStatus.CANCELLED
+                    if data.get("state") == "cancelled"
+                    else TaskStatus.COMPLETED
+                    if result.status is ToolExecutionStatus.SUCCEEDED
+                    and data.get("state") == "finished"
+                    else TaskStatus.FAILED
+                )
+                await self.tasks.record_request(task.owner_scope, task.task_id, status=status)
+            return {**result.model_dump(mode="json"), "task_id": task.task_id if task else None}
+        except BaseException:
+            if task is not None and self.tasks is not None:
+                await self.tasks.record_request(
+                    task.owner_scope, task.task_id, status=TaskStatus.UNCERTAIN
+                )
+            raise
+        finally:
+            if task is not None:
+                self._game_requests.pop(task.task_id, None)
+            if token is not None:
+                CURRENT_TASK.reset(token)
+
     def _cancel_request_task(self, task: LocalTask) -> None:
+        recipe = self._recipe_requests.get(task.task_id)
+        if recipe is not None:
+            recipe.cancel()
+        game = self._game_requests.get(task.task_id)
+        if game is not None:
+            game.cancel()
         session = self._request_tasks.get(task.task_id)
         if session is not None:
             self.loop.cancel_session(session)
@@ -1165,6 +1320,12 @@ class AgentRuntime:
                 if result.status is ToolExecutionStatus.SUCCEEDED
                 else (TaskStatus.FAILED if result.definitely_not_executed else TaskStatus.UNCERTAIN)
             )
+            if invocation.call.name == "robot.game.distance.run":
+                game_state = (result.data or {}).get("state")
+                if game_state in {"unavailable", "faulted"}:
+                    status = TaskStatus.FAILED
+                elif game_state == "cancelled":
+                    status = TaskStatus.CANCELLED
             if (result.data or {}).get("completed") is False:
                 status = TaskStatus.FAILED
             await self.tasks.record_request(
@@ -1175,7 +1336,9 @@ class AgentRuntime:
                     status=status,
                     evidence=f"status={result.status.value}; action={result.action_id}; "
                     f"definitely_not_executed={result.definitely_not_executed}; "
-                    f"retry_safety={result.retry_safety.value}",
+                    f"retry_safety={result.retry_safety.value}; "
+                    f"state={(result.data or {}).get('state')}; "
+                    f"reason={str((result.data or {}).get('reason'))[:120]}",
                 ),
             )
         notice: str | None = None
@@ -1821,6 +1984,11 @@ class AgentRuntime:
         if self._closed:
             return
         self._closed = True
+        workers = tuple(self._recipe_workers - {asyncio.current_task()})
+        for worker in workers:
+            worker.cancel()
+        if workers:
+            await asyncio.gather(*workers, return_exceptions=True)
         cleanup: list[Callable[[], Awaitable[object]]] = []
         if self.speech is not None:
             cleanup.append(self.speech.close)

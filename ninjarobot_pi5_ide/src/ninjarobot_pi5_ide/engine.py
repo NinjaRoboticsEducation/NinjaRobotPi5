@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager, nullcontext
 from datetime import UTC, datetime
 
 from .errors import IDEError
@@ -41,6 +42,7 @@ class ExecutionEngine:
         clock: Clock | None = None,
         owns_hardware: bool = False,
         execution_guard: Callable[[ActionRequest], None] | None = None,
+        admission: Callable[[ActionRequest], AbstractAsyncContextManager[None]] | None = None,
     ) -> None:
         self._registry = registry
         self._ledger = ledger
@@ -51,6 +53,7 @@ class ExecutionEngine:
         self._tasks: dict[str, asyncio.Task[ActionResult]] = {}
         self._hardware_ownership = HardwareOwnership() if owns_hardware else None
         self._execution_guard = execution_guard
+        self._admission = admission
 
     @property
     def state(self) -> LifecycleState:
@@ -316,14 +319,21 @@ class ExecutionEngine:
                 )
 
             try:
-                if (
-                    descriptor.name in INTERRUPT_CAPABILITIES
-                    and descriptor.risk is RiskLevel.EMERGENCY
-                    and not request.arguments
-                ):
-                    result = await self._scheduler.interrupt(descriptor.resources, invoke)
-                else:
-                    result = await self._scheduler.run(descriptor.resources, invoke)
+                async with self._admission(request) if self._admission else nullcontext():
+                    if (
+                        descriptor.name in {"game.distance.stop", "game.distance.status"}
+                        and descriptor.idempotent
+                        and not request.arguments
+                    ):
+                        result = await invoke()
+                    elif (
+                        descriptor.name in INTERRUPT_CAPABILITIES
+                        and descriptor.risk is RiskLevel.EMERGENCY
+                        and not request.arguments
+                    ):
+                        result = await self._scheduler.interrupt(descriptor.resources, invoke)
+                    else:
+                        result = await self._scheduler.run(descriptor.resources, invoke)
             except StopInProgressError as exc:
                 result = self._failed_result(
                     request,
@@ -341,6 +351,32 @@ class ExecutionEngine:
                     code="ACTION_QUEUE_FULL",
                     message="The bounded action queue is full.",
                     technical_detail=str(exc),
+                    started_at=started_at,
+                    definitely_not_executed=True,
+                    retry_safety=RetrySafety.SAFE,
+                    status=ActionStatus.REJECTED,
+                )
+            except IDEError as exc:
+                details = exc.details.model_copy(
+                    update={
+                        "capability": request.capability,
+                        "action_id": request.action_id,
+                    }
+                )
+                result = ActionResult(
+                    action_id=request.action_id,
+                    status=ActionStatus.FAILED,
+                    error=details,
+                    started_at=started_at,
+                    finished_at=self._now(),
+                    retry_safety=details.retry_safety,
+                )
+            except Exception as exc:
+                result = self._failed_result(
+                    request,
+                    code="ACTION_ADMISSION_FAILED",
+                    message=str(exc)[:500] or "Action admission failed.",
+                    technical_detail=type(exc).__name__,
                     started_at=started_at,
                     definitely_not_executed=True,
                     retry_safety=RetrySafety.SAFE,
