@@ -72,6 +72,7 @@ class AgentReply(BaseModel):
     text: Annotated[str, StringConstraints(min_length=1, max_length=20_000)]
     model_turns: Annotated[int, Field(ge=0)]
     tool_calls: Annotated[int, Field(ge=0)]
+    spoken_summary: str | None = Field(default=None, exclude=True)
 
 
 class AgentLoopError(RuntimeError):
@@ -281,6 +282,7 @@ class AgentLoop:
         if camera_reply is not None:
             return camera_reply
 
+        spoken_summary: str | None = None
         completed_tool_calls = 0
         seen_call_ids: set[str] = set()
         for model_turn_number in range(1, max_model_turns + 1):
@@ -340,6 +342,7 @@ class AgentLoop:
                     text=turn.text,
                     model_turns=model_turn_number,
                     tool_calls=completed_tool_calls,
+                    spoken_summary=spoken_summary,
                 )
 
             turn = turn.model_copy(
@@ -373,6 +376,10 @@ class AgentLoop:
                     duplicate=call.call_id in seen_call_ids,
                     cancellation=token,
                 )
+                if call.name == "briefing.build" and result.status is ToolExecutionStatus.SUCCEEDED:
+                    summary = (result.data or {}).get("spoken_summary")
+                    if isinstance(summary, str):
+                        spoken_summary = summary[:500]
                 seen_call_ids.add(call.call_id)
                 await self._append(
                     session_id,

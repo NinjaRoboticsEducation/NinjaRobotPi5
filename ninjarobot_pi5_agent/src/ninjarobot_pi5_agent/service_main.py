@@ -180,6 +180,16 @@ async def run_service(arguments: argparse.Namespace) -> None:
         providers.append(MemoryMCPProvider(MemoryRetrievalService(memory), store))
     optional_ids: set[str] = set()
     secrets = SecretStore(arguments.secret_file)
+    from .information_tools import InformationProvider
+
+    information = InformationProvider(
+        store.path,
+        secrets,
+        tasks,
+        lambda session: runtime.task_scope(session),
+        lambda **kwargs: runtime.execute_tool(**kwargs),
+    )
+    providers.append(information)
     for server_config in load_mcp_configuration(arguments.mcp_config).servers:
         if not server_config.enabled:
             continue
@@ -290,6 +300,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
     from .speech import SimulatedSynthesizer, SpeechService
 
     runtime = AgentRuntime(
+        information=information,
         provider=model,
         tools=tools,
         store=store,

@@ -1,14 +1,18 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "id": "current-web-answer",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "name": "Current Web Answer",
   "description": "Search current public information and answer with source links.",
   "activation_examples": [
     "Search the web for the latest Raspberry Pi news"
   ],
   "allowed_tools": [
-    "mcp.tavily.tavily-search"
+    "mcp.tavily.tavily-search",
+    "research.search",
+    "research.answer",
+    "research.save_note",
+    "notes.preview"
   ],
   "input_schema": {
     "type": "object",
@@ -26,11 +30,27 @@
   },
   "limits": {
     "max_model_turns": 4,
-    "max_tool_calls": 3,
-    "timeout_seconds": 300.0
+    "max_tool_calls": 6,
+    "timeout_seconds": 60.0
   },
   "safety": {
     "external_content": "untrusted",
     "physical_motion": "session_armed"
+  },
+  "requirements": {
+    "minimum_agent_version": "1.0.0",
+    "required_capabilities": {
+      "mcp.tavily.tavily-search": "1.0.0"
+    },
+    "optional_capabilities": {
+      "research.search": "Use bounded evidence services when available; otherwise give dated links from direct search and do not claim saved notes.",
+      "research.answer": "Use bounded evidence services when available; otherwise give dated links from direct search and do not claim saved notes.",
+      "research.save_note": "Use bounded evidence services when available; otherwise give dated links from direct search and do not claim saved notes.",
+      "notes.preview": "Use bounded evidence services when available; otherwise give dated links from direct search and do not claim saved notes."
+    },
+    "effects": [
+      "read_only",
+      "local_write"
+    ]
   }
 }

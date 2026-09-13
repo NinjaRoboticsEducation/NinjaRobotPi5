@@ -333,3 +333,50 @@ def test_destination_symlink_cannot_redirect_restore(spec: DeploymentSpec, tmp_p
     with pytest.raises(ValueError, match="symbolic"):
         backup.restore_backup(spec, saved, confirmed=True)
     assert outside.read_text() == "keep"
+
+
+def test_backup_restores_notes_and_expires_calendar_authority(
+    spec: DeploymentSpec, tmp_path: Path
+) -> None:
+    import asyncio
+
+    from ninjarobot_pi5_agent.information_store import InformationStore
+    from ninjarobot_pi5_agent.memory_store import MemoryStore
+    from ninjarobot_pi5_agent.notes_service import NoteChange, NoteContent, NotesService
+
+    async def prepare():
+        memory = MemoryStore(spec.database)
+        await memory.start()
+        user = (await memory.create_profile("Owner")).user_id
+        store = InformationStore(spec.database)
+        notes = NotesService(store)
+        preview = await notes.propose(
+            user, "backup", NoteChange(action="create", content=NoteContent(title="Keep me"))
+        )
+        note = await notes.confirm(
+            user, "backup", preview["record_id"], preview["payload"]["review_hash"]
+        )
+        pending = await store.action(
+            user, "create", kind="calendar_operation", payload={"state": "pending"}
+        )
+        await memory.close()
+        return user, note, pending
+
+    user, note, pending = asyncio.run(prepare())
+    archive = backup.create_backup(spec, tmp_path / "information-backup.tar.gz")
+    with sqlite3.connect(spec.database) as db:
+        db.execute("DELETE FROM assistant_records")
+    db.close()
+    backup.restore_backup(spec, archive, confirmed=True)
+
+    async def verify():
+        store = InformationStore(spec.database)
+        await store.recover()
+        assert (await store.action(user, "get", record_id=note["record_id"]))["payload"][
+            "title"
+        ] == "Keep me"
+        assert (await store.action(user, "get", record_id=pending["record_id"]))["payload"][
+            "state"
+        ] == "expired"
+
+    asyncio.run(verify())

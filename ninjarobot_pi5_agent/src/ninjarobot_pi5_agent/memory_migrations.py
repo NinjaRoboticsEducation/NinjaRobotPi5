@@ -293,6 +293,24 @@ def _task_recipes(connection: sqlite3.Connection) -> None:
     )
 
 
+def _information_records(connection: sqlite3.Connection) -> None:
+    _execute_script(
+        connection,
+        """
+        CREATE TABLE assistant_records (
+            record_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+            kind TEXT NOT NULL,
+            revision INTEGER NOT NULL,
+            payload_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX assistant_records_owner_kind ON assistant_records(user_id,kind,record_id);
+    """,
+    )
+
+
 _MIGRATIONS: tuple[Migration, ...] = (
     _core_schema,
     _conversation_user_scope,
@@ -300,6 +318,7 @@ _MIGRATIONS: tuple[Migration, ...] = (
     _local_tasks,
     _task_kinds,
     _task_recipes,
+    _information_records,
 )
 
 

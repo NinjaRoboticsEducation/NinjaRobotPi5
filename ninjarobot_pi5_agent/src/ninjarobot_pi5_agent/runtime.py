@@ -16,6 +16,7 @@ from ninjarobot_pi5_ide import RiskLevel
 from .agent_loop import AgentLoop, AgentReply, TextDeltaHandler
 from .command_help import help_text, wants_command_help
 from .events import AgentEventType, EventBroker
+from .information_tools import InformationProvider
 from .memory_controls import memory_command
 from .memory_models import MemorySettings, UserProfile
 from .memory_services import (
@@ -98,7 +99,9 @@ class AgentRuntime:
         guide_diagnostics: Callable[[], dict[str, Any]] | None = None,
         tasks: TaskService | None = None,
         speech: SpeechService | None = None,
+        information: InformationProvider | None = None,
     ) -> None:
+        self.information = information
         self.speech = speech
         self.provider = provider
         self.tools = tools
@@ -260,6 +263,43 @@ class AgentRuntime:
                 return await self._identity_reply(
                     session_id,
                     json.dumps(result, ensure_ascii=False),
+                    on_text_delta=on_text_delta,
+                    persist=False,
+                )
+            if command and command[0] == "/info":
+                import json
+
+                from .information_controls import information_action
+
+                parts = text.split(maxsplit=2)
+                if len(parts) < 2:
+                    raise ValueError('Use /info notes.list or /info OPERATION {"arguments":{...}}')
+                info_payload = json.loads(parts[2]) if len(parts) > 2 else {}
+                if not isinstance(info_payload, dict):
+                    raise ValueError("information arguments must be an object")
+                if parts[1] == "calendar.connect":
+                    raise ValueError(
+                        "Use calendar-connect in the local CLI; never paste credentials into chat"
+                    )
+                data = await information_action(
+                    self, session_id, {**info_payload, "operation": parts[1]}, cancellation
+                )
+                visible = (
+                    data["text"]
+                    if parts[1] == "briefing.build"
+                    else json.dumps(data, ensure_ascii=False)
+                )
+                if len(visible) > 19000:
+                    visible = json.dumps(
+                        {
+                            "task_id": data.get("task_id"),
+                            "complete": False,
+                            "notice": "Result is too large for chat. Narrow the read interval or use the local information CLI for the full result. Do not repeat a write.",
+                        }
+                    )
+                return await self._identity_reply(
+                    session_id,
+                    visible,
                     on_text_delta=on_text_delta,
                     persist=False,
                 )
@@ -475,7 +515,7 @@ class AgentRuntime:
                     )
                     reply = reply.model_copy(update={"text": reply.text + suffix})
                 if self.speech is not None and self.speech.enabled:
-                    spoken = await self.speech.speak(reply.text)
+                    spoken = await self.speech.speak(reply.spoken_summary or reply.text)
                     if spoken.get("status") not in {"played", "simulated", "disabled"}:
                         notice = "Spoken output unavailable or stopped; the text reply is retained."
                         await self._append_memory_notice(
@@ -925,6 +965,8 @@ class AgentRuntime:
                     )
                 await self._delete_identity(user_id)
             try:
+                if self.information is not None:
+                    await self.information.disconnect_user(user_id)
                 await memory.delete_profile(
                     user_id,
                     active_user_ids=set(self._active_users.values()),
@@ -966,6 +1008,9 @@ class AgentRuntime:
             token = await self._prepare_identity_reset()
             database_reset = False
             try:
+                if self.information is not None:
+                    for profile in await self._require_memory().profiles():
+                        await self.information.disconnect_user(profile.user_id)
                 deleted = await self._require_memory().reset_all(self._initial_memory_settings)
                 database_reset = True
             except BaseException as error:

@@ -178,6 +178,22 @@ def build_parser() -> argparse.ArgumentParser:
     chat.add_argument("--confirmed", action="store_true")
 
     commands.add_parser("status", help="Show running service and provider status.")
+    information = commands.add_parser(
+        "information", help="Owned notes, reviewed calendar actions, research and briefings."
+    )
+    information.add_argument("operation")
+    information.add_argument("--arguments", default="{}")
+    information.add_argument("--confirm", action="store_true")
+    information.add_argument("--session", default="local-cli")
+    calendar = commands.add_parser(
+        "calendar-connect", help="Explicit Google Desktop OAuth setup over an SSH loopback tunnel."
+    )
+    calendar.add_argument("--client-file", type=Path, required=True)
+    calendar.add_argument("--calendar-id", required=True)
+    calendar.add_argument("--account-label", required=True)
+    calendar.add_argument("--write", action="store_true")
+    calendar.add_argument("--port", type=int, default=8765)
+    calendar.add_argument("--session", default="local-cli")
     recipe = commands.add_parser("recipe", help="Preview, save and run owned read-only recipes.")
     recipe.add_argument(
         "operation",
@@ -563,6 +579,44 @@ async def _run(arguments: argparse.Namespace) -> int:
         )
         return 0
 
+    if arguments.command == "calendar-connect":
+        from .calendar_oauth import authorize
+
+        credential = await authorize(
+            arguments.client_file, port=arguments.port, write=arguments.write
+        )
+        return await _service_request(
+            arguments,
+            {
+                "command": "information",
+                "session_id": arguments.session,
+                "data": {
+                    "operation": "calendar.connect",
+                    "confirmed": True,
+                    "arguments": {
+                        "credential": credential,
+                        "calendar_id": arguments.calendar_id,
+                        "account_label": arguments.account_label,
+                        "write": arguments.write,
+                    },
+                },
+            },
+        )
+    if arguments.command == "information":
+        if arguments.operation == "calendar.connect":
+            raise ValueError("Use calendar-connect; do not put tokens in shell arguments")
+        return await _service_request(
+            arguments,
+            {
+                "command": "information",
+                "session_id": arguments.session,
+                "data": {
+                    "operation": arguments.operation,
+                    "arguments": _json_object(arguments.arguments),
+                    "confirmed": arguments.confirm,
+                },
+            },
+        )
     if arguments.command == "recipe":
         data = {
             "operation": arguments.operation,

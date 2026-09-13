@@ -111,9 +111,10 @@ class AgentIPCServer:
             payload = json.loads(raw)
             if not isinstance(payload, dict):
                 raise AgentIPCError("request must be a JSON object")
-            if payload.get("command") in {"game", "recipe"} or (
+            if payload.get("command") in {"game", "recipe", "information"} or (
                 payload.get("command") == "chat"
-                and str(payload.get("text", "")).split(maxsplit=1)[0:1] in (["/game"], ["/recipes"])
+                and str(payload.get("text", "")).split(maxsplit=1)[0:1]
+                in (["/game"], ["/recipes"], ["/info"])
             ):
 
                 async def watch_disconnect() -> None:
@@ -185,6 +186,22 @@ class AgentIPCServer:
                 {
                     "type": "result",
                     "data": await self._runtime.guided_checks(payload.get("step", 0)),
+                },
+            )
+            return
+        if command == "information":
+            from .information_controls import information_action
+
+            data = payload.get("data", {})
+            if not isinstance(data, dict):
+                raise ValueError("information data must be an object")
+            await _write_message(
+                writer,
+                {
+                    "type": "result",
+                    "data": await information_action(
+                        self._runtime, _required_text(payload, "session_id"), data, cancellation
+                    ),
                 },
             )
             return

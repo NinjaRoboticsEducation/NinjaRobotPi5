@@ -176,7 +176,7 @@ def test_conversation_migration_backfills_user_scope(tmp_path: Path) -> None:
     ).fetchall()
     connection.close()
     assert row == ("legacy-user", "[]")
-    assert versions == [(1,), (2,), (3,), (4,), (5,), (6,)]
+    assert versions == [(1,), (2,), (3,), (4,), (5,), (6,), (7,)]
 
 
 def test_configured_defaults_initialize_once_without_overwriting_cli_settings(
@@ -319,4 +319,4 @@ def test_failed_migration_rolls_back_schema_and_version(
     ).fetchall()
     connection.close()
     assert partial is None
-    assert versions == [(1,), (2,), (3,), (4,), (5,), (6,)]
+    assert versions == [(1,), (2,), (3,), (4,), (5,), (6,), (7,)]

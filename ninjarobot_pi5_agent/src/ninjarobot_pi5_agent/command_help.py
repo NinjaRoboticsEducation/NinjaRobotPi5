@@ -5,6 +5,12 @@ from __future__ import annotations
 import re
 
 CHAT_HELP_TEXT = """Available chat commands:
+/info OPERATION {"arguments":{...},"confirmed":true}
+  Read notes.list, notes.read, calendar.connections, calendar.list_events;
+  preview notes.create/update/delete or calendar.propose_change, then confirm
+  the exact preview in this same session with notes.confirm or calendar.confirm.
+  Use research.search, research.answer, research.save_note or briefing.build.
+  Calendar setup uses the terminal calendar-connect command; never paste tokens.
 /project QUESTION
   Search pinned public documentation; answers include source dates and draft warnings.
 /recipes list|show ID [VERSION]|run ID VERSION|disable ID
