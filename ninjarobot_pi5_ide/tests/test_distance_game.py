@@ -326,6 +326,65 @@ def test_unavailable_game_does_not_block_existing_outputs(tmp_path):
     asyncio.run(exercise())
 
 
+@pytest.mark.parametrize("healthy", [True, False])
+def test_game_recovers_cancelled_sensor_without_manual_resume(tmp_path, healthy):
+    import threading
+    import time
+
+    from ninjarobot_pi5_ide.distance import VL53L0XDistanceAdapter
+
+    async def exercise():
+        client = client_for(tmp_path, enabled=False)
+        await client.start()
+        original = client.robot.distance
+        entered, release = threading.Event(), threading.Event()
+
+        class Sensor:
+            def get_data(self):
+                entered.set()
+                assert release.wait(2)
+                return dict(distance_mm=200, raw_value=200, timestamp=time.time(), is_valid=True)
+
+            def health_check(self):
+                assert release.is_set(), "health check overlapped the abandoned read"
+                return healthy
+
+            def close(self):
+                assert release.is_set()
+
+        sensor = VL53L0XDistanceAdapter(sensor_factory=lambda *_: Sensor())
+        client.robot.distance = sensor
+        await sensor.start()
+        read = asyncio.create_task(sensor.execute({}))
+        try:
+            while not entered.is_set():
+                await asyncio.sleep(0.001)
+            read.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await read
+            release.set()
+            game = client.robot.distance_game
+            game._loop = AsyncMock()
+            result = await client.execute(request("game.distance.run", "recover"))
+            assert result.data["enabled"] is True
+            assert result.data["state"] == ("finished" if healthy else "unavailable")
+            if healthy:
+                game._loop.assert_awaited_once()
+            else:
+                game._loop.assert_not_awaited()
+                assert "distance" in result.data["device_errors"]
+            assert not client.robot.safety_state.read().system_latched
+        finally:
+            release.set()
+            while sensor._busy:
+                await asyncio.sleep(0.001)
+            await sensor.close()
+            client.robot.distance = original
+            await client.close()
+
+    asyncio.run(exercise())
+
+
 def test_only_full_successful_recovery_clears_game_fault(tmp_path):
     async def exercise():
         client = client_for(tmp_path)

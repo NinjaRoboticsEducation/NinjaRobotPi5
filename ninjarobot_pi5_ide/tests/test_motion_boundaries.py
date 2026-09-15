@@ -97,6 +97,72 @@ def test_direct_move_uses_controller_and_finishes_with_zero_output(tmp_path, mon
     asyncio.run(exercise())
 
 
+def test_direct_obstacle_feedback_and_clearance_without_resume(tmp_path, monkeypatch):
+    import time
+    from unittest.mock import AsyncMock
+
+    async def exercise():
+        client = client_for(tmp_path)
+        await client.start()
+        distance = 40
+
+        async def read(_arguments):
+            return dict(distance_mm=distance, raw_value=distance, sensor_timestamp=time.time())
+
+        monkeypatch.setattr(client.robot.distance, "execute", read)
+        monkeypatch.setattr("ninjarobot_pi5_ide.robot.OBSTACLE_WARNING_SECONDS", 0.01)
+        original = client.robot.servo.move
+        spy = AsyncMock(wraps=original)
+        monkeypatch.setattr(client.robot.servo, "move", spy)
+        try:
+            result = await client.execute(action("blocked"))
+            assert result.status is ActionStatus.SUCCEEDED
+            assert result.data["interrupted"]
+            assert result.data["requires_resume"] is False
+            assert "clear the obstacle" in result.data["user_message"]
+            spy.assert_not_awaited()
+            face = client.robot._obstacle_warning_definition().stages[0].operations[0]
+            assert face.expression == "confusing"
+            distance = 200
+            result = await client.execute(action("clear"))
+            assert result.status is ActionStatus.SUCCEEDED
+            assert not result.data["interrupted"]
+            spy.assert_awaited_once()
+        finally:
+            await client.close()
+
+    asyncio.run(exercise())
+
+
+def test_normal_stop_during_group_ramp_does_not_latch(tmp_path, monkeypatch):
+    async def exercise():
+        client = client_for(tmp_path)
+        await client.start()
+        entered = asyncio.Event()
+
+        async def ramp(_group, _targets, speed_mode="S"):
+            entered.set()
+            while not client.robot.motion._stop_event.is_set():
+                await asyncio.sleep(0.001)
+            return False
+
+        monkeypatch.setattr(SimulatedServoGroup, "move_all_async", ramp)
+        try:
+            moving = asyncio.create_task(
+                client.execute(action("moving", "behavior.run", {"name": "move_forward"}))
+            )
+            await asyncio.wait_for(entered.wait(), 1)
+            stop = await client.execute(action("stop", "servo.stop", {}))
+            assert stop.status is ActionStatus.SUCCEEDED
+            await asyncio.wait_for(moving, 1)
+            assert not client.robot.safety_state.read().motion_latched
+            assert not client.robot.system_safety.stopped
+        finally:
+            await client.close()
+
+    asyncio.run(exercise())
+
+
 def test_other_task_cannot_borrow_active_motion_context(tmp_path, monkeypatch):
     async def exercise():
         client = client_for(tmp_path)

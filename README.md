@@ -17,7 +17,7 @@
 > [!NOTE]
 > **v1.0.0 public release.** The project owner completed the Phase 8 manual
 > Raspberry Pi validation. New installations must still follow the safety and
-> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-13-03/InstallationGuide.md) because
+> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-15-02/InstallationGuide.md) because
 > wiring and hardware tolerances differ between robots.
 
 ---
@@ -42,8 +42,11 @@ The game uses the existing sensor, buzzer and display; it never commands wheels
 or capture and does not need Bluetooth. See the
 [Phase 5 setup and manual-test walkthrough](docs/validation/refinement_phase5_walkthrough_260912.md)
 and [implementation handoff](docs/validation/refinement_phase5_handoff_260913.md).
-The [15 September fix validation](docs/validation/servo_chat_game_fixes_260915.md)
-records the updated software gate and safe manual checks. Physical Phase 5
+The [servo/sensor recovery walkthrough](docs/validation/servo_sensor_recovery_walkthrough_260915.md)
+records the latest repair, validation limitations, and step-by-step manual checks.
+The linked full manuals include these follow-up changes; wiki ingestion and
+semantic review are deferred, so the registered wiki map still describes the
+earlier published checkpoint. Physical Phase 5
 acceptance is still required.
 
 Narrowed Phase 4 adds better owned memory retrieval, reviewed local read-only
@@ -175,9 +178,16 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
   both their cause and confirmed recovery step
 - **Normal servo stop** — transition, disarm, and controller-loss stops interrupt
   wheel pulses immediately without being classified as a Level 2 Emergency Stop
-- **Obstacle interruption** — three consecutive guarded readings at or below
-  50 mm stop only the current behavior, show a scary face, and return to Idle
-  without creating an Emergency Stop latch
+- **Obstacle interruption** — fresh readings at or below the configured threshold
+  (default 50 mm, three consecutive samples) stop or prevent servo movement,
+  including backward and direct endpoint commands. A confusing face and message
+  ask you to clear the obstacle. A new command works after clearance without
+  Resume; the old command never restarts itself. The front sensor cannot see
+  hazards behind or beside the robot.
+- **Sensor recovery** — cancelled distance reads recover on the next request
+  after owned work drains and health checks pass; games need no manual enablement.
+- **Clear stop causes** — explicit operator stops use Emergency Stop; genuine
+  hardware faults retain protective stopping with a fault explanation.
 - **Watchdog** — a background thread stops the motors if the main loop freezes
 - **AI is sandboxed** — the AI model proposes actions; the IDE safety layer executes or refuses them
 
@@ -212,7 +222,7 @@ uv run --frozen --extra hardware ninjarobot-agent
 
 The installer does not download an Ollama model, start the Agent, move a motor,
 open the camera or microphone, or deploy boot startup. Follow the complete
-[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-13-03/InstallationGuide.md) for wiring, module initialization,
+[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-15-02/InstallationGuide.md) for wiring, module initialization,
 calibration, model download, and safe first movement.
 
 ---
@@ -274,10 +284,10 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 
 | Document | Purpose |
 |---|---|
-| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-13-03/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
-| [MCP and Agent Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-13-03/NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
-| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-13-03/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
-| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-13-03/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
+| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-15-02/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
+| [MCP and Agent Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-15-02/NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
+| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-15-02/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
+| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-15-02/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
 | [Documentation Index](docs/README.md) | Public, developer, architecture, history, and validation documents |
 | [Audit Report](docs/project-history/AuditReport_260731.md) | Historical security, reliability, and documentation audit findings |
 | [Implementation Plan](docs/project-history/NinjaRobotPi5V4_ImplementationPlan.md) | Historical phase design and delivery decisions |

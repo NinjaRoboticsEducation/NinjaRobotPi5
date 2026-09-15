@@ -337,11 +337,21 @@ class RobotAssembly:
             await self.audio.stop()
         await self._begin_foreground_behavior()
         try:
-            return await self.motion.move_endpoint(
+            result = await self.motion.move_endpoint(
                 endpoint=endpoint,
                 target_angle=target_angle,
                 speed_mode=speed_mode,
             )
+            if result.get("stop_reason") == "front_obstacle":
+                result.update(await self._obstacle_feedback())
+            elif result.get("latched"):
+                result.update(
+                    requires_resume=True,
+                    user_message=(
+                        f"{result.get('cause')} Recovery: {result.get('recovery_instruction')}"
+                    ),
+                )
+            return result
         except Exception as exc:
             await self._driver_failure(exc)
             raise
@@ -400,31 +410,12 @@ class RobotAssembly:
                 and isinstance(interruption, dict)
                 and interruption.get("stop_reason") == "front_obstacle"
             ):
-                message = (
-                    "An obstacle was detected inside the configured safety distance, so "
-                    "the current movement was stopped."
-                )
-                recovery = (
-                    "No safety resume is required. Check and clear the robot's path, then "
-                    "issue a new command. The interrupted behavior will not restart "
-                    "automatically."
-                )
-                LOGGER.warning(
-                    "Behavior interrupted by obstacle: behavior=%s cause=%s recovery=%s",
-                    definition.name,
-                    message,
-                    recovery,
-                )
-                await self.behaviors.run(self._obstacle_warning_definition())
-                result = {
-                    **result,
-                    "cause": message,
-                    "recovery_instruction": recovery,
-                    "user_message": f"{message} {recovery}",
-                    "requires_resume": False,
-                    "next_state": "idle",
-                }
-            elif result.get("interrupted") is True and isinstance(interruption, dict):
+                result.update(await self._obstacle_feedback())
+            elif (
+                result.get("interrupted") is True
+                and isinstance(interruption, dict)
+                and interruption.get("latched")
+            ):
                 persistent_cause = interruption.get("cause")
                 persistent_recovery = interruption.get("recovery_instruction")
                 if not isinstance(persistent_cause, str) or not isinstance(
@@ -451,6 +442,24 @@ class RobotAssembly:
         finally:
             await self._end_foreground_behavior()
         return result
+
+    async def _obstacle_feedback(self) -> dict[str, Any]:
+        message = "Something dangerously close was detected, so I stopped the servo movement."
+        recovery = (
+            "Please clear the obstacle, then issue a new movement command. "
+            "No safety resume is required and no extra confirmation is needed. "
+            "The old movement will not restart."
+        )
+        LOGGER.warning("Temporary obstacle stop: %s %s", message, recovery)
+        if not self.system_safety.stopped and not self.safety_state.read().motion_latched:
+            await self.behaviors.run(self._obstacle_warning_definition())
+        return dict(
+            cause=message,
+            recovery_instruction=recovery,
+            user_message=f"{message} {recovery}",
+            requires_resume=False,
+            next_state="idle",
+        )
 
     async def show_agent_face(self, expression: str) -> bool:
         """Loop one silent agent face unless safety or a foreground action has priority."""
@@ -799,8 +808,8 @@ class RobotAssembly:
         )
 
     def _obstacle_warning_definition(self) -> BehaviorDefinition:
-        """Show one bounded scary face without extending the stopped movement."""
-        configured = self.assets.load("scary")
+        """Show one bounded confusing face without extending the stopped movement."""
+        configured = self.assets.load("confusing")
         source = next(
             operation
             for stage in configured.stages
@@ -814,7 +823,7 @@ class RobotAssembly:
             category="expression",
             stages=(
                 BehaviorStage(
-                    name="scary_obstacle_face",
+                    name="confusing_obstacle_face",
                     operations=(
                         source.model_copy(update={"hold_seconds": OBSTACLE_WARNING_SECONDS}),
                     ),
@@ -825,6 +834,13 @@ class RobotAssembly:
     async def _show_system_stopped(self) -> dict[str, Any]:
         if not self.display.enabled:
             return {"display_skipped": "disabled by configuration"}
+        if self.safety_state.read().reason not in {None, "operator_stop"}:
+            return await self.display.show_text(
+                text="PROTECTIVE STOP\nCHECK FAULT\nRESUME REQUIRED",
+                font_size=24,
+                foreground="#FFFFFF",
+                background="#8B0018",
+            )
         try:
             width, height = await self.display.dimensions()
             image = render_emergency_stop(width=width, height=height)

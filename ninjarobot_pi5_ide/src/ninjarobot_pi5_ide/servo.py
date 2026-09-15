@@ -753,6 +753,13 @@ class ServoMoveAdapter:
                 "speed_mode": {"type": "string"},
                 "interrupted": {"type": "boolean"},
                 "simulated": {"type": "boolean"},
+                "stop_reason": {"type": ["string", "null"]},
+                "latched": {"type": "boolean"},
+                "cause": {"type": "string"},
+                "recovery_instruction": {"type": "string"},
+                "user_message": {"type": "string"},
+                "requires_resume": {"type": "boolean"},
+                "next_state": {"type": "string"},
             },
             "required": [
                 "endpoint",
@@ -854,8 +861,14 @@ class ServoStopAdapter:
         confirmation_required=False,
     )
 
-    def __init__(self, device: ServoDevice) -> None:
+    def __init__(
+        self,
+        device: ServoDevice,
+        *,
+        stop_handler: Callable[[], Awaitable[dict[str, Any]]] | None = None,
+    ) -> None:
         self._device = device
+        self._stop = stop_handler or device.stop
 
     async def start(self) -> None:
         await self._device.start()
@@ -866,7 +879,7 @@ class ServoStopAdapter:
                 f"servo.stop does not accept arguments: {sorted(arguments)}",
                 capability="servo.stop",
             )
-        return await self._device.stop()
+        return await self._stop()
 
     async def health(self) -> ResourceHealth:
         return await self._device.health()

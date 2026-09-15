@@ -774,7 +774,7 @@ def build_guarded_servo_engine(config: RobotConfig, *, ledger_path: str | Path) 
         [
             ServoMoveAdapter(servo, move_handler=motion.move_endpoint),
             ServoStatusAdapter(servo),
-            ServoStopAdapter(servo),
+            ServoStopAdapter(servo, stop_handler=motion.stop),
             distance,
         ]
     )
@@ -834,7 +834,7 @@ def build_robot_ide_client(
         BuzzerStopAdapter(robot.buzzer),
         ServoStatusAdapter(robot.servo),
         ServoMoveAdapter(robot.servo, move_handler=robot.move_servo_endpoint),
-        ServoStopAdapter(robot.servo),
+        ServoStopAdapter(robot.servo, stop_handler=robot.motion.stop),
         CameraStatusAdapter(robot.camera),
         CameraCaptureAdapter(robot.camera),
         CameraPreviewAdapter(robot.camera),

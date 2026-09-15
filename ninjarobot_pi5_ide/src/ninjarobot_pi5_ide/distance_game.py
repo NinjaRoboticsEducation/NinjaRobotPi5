@@ -229,15 +229,43 @@ class DistanceGame:
             if not self.robot.display.enabled or not self.robot.buzzer.enabled:
                 self._state.update(state="unavailable", reason="display_or_buzzer_disabled")
                 return self.status()
-            if any(
-                value is not ResourceHealth.READY
-                for value in await asyncio.gather(
-                    self.robot.distance.health(),
-                    self.robot.buzzer.health(),
-                    self.robot.display.health(),
+            try:
+                await self.robot.distance.prepare()
+            except Exception as exc:
+                self._state.update(
+                    state="unavailable",
+                    reason="distance_recovery_failed",
+                    device_errors={"distance": f"{type(exc).__name__}: {exc}"[:300]},
+                    user_message="The distance sensor could not safely finish recovery. "
+                    "No manual game enablement is needed. Check the reported sensor fault.",
                 )
-            ):
-                self._state.update(state="unavailable", reason="required_device_unavailable")
+                return self.status()
+            self.robot.ensure_action_allowed("game.distance.run")
+            health = dict(
+                zip(
+                    ("distance", "buzzer", "display"),
+                    await asyncio.gather(
+                        self.robot.distance.health(),
+                        self.robot.buzzer.health(),
+                        self.robot.display.health(),
+                    ),
+                    strict=True,
+                )
+            )
+            unavailable = {
+                name: value.value
+                for name, value in health.items()
+                if value is not ResourceHealth.READY
+            }
+            if unavailable:
+                self._state.update(
+                    state="unavailable",
+                    reason="required_device_unavailable",
+                    device_errors=unavailable,
+                    user_message="The distance game needs ready devices. Unavailable: "
+                    + ", ".join(unavailable)
+                    + ". No manual game enablement is needed.",
+                )
                 return self.status()
             await self.robot._begin_foreground_behavior(game=True)
             foreground = True

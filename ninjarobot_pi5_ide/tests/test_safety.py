@@ -66,6 +66,9 @@ class FakeDistance:
     async def start(self) -> None:
         self.start_calls += 1
 
+    async def prepare(self) -> None:
+        await self.start()
+
     async def execute(self, _arguments: dict[str, Any]) -> dict[str, Any]:
         item = self.readings[min(self.index, len(self.readings) - 1)]
         self.index += 1
@@ -155,6 +158,108 @@ def controller(
     return motion, servo, distance, state
 
 
+@pytest.mark.parametrize(
+    "reason", ["front_obstacle", "normal_stop", "operator_stop", "undervoltage"]
+)
+@pytest.mark.parametrize("preparing", [False, True])
+def test_expected_ramp_abort_preserves_stop_cause(tmp_path, reason, preparing):
+    async def exercise():
+        motion, servo, _distance, state = controller(tmp_path, readings=[200])
+        entered = asyncio.Event()
+
+        async def ramp(**_kwargs):
+            entered.set()
+            while not motion._stop_event.is_set():
+                await asyncio.sleep(0.001)
+            if preparing:
+                raise IDEError(
+                    ErrorDetails(
+                        code="SERVO_INTERRUPTED",
+                        message="Stopped during preparation.",
+                        definitely_not_executed=False,
+                        retry_safety=RetrySafety.UNKNOWN,
+                    )
+                )
+            return {"interrupted": True}
+
+        servo.move_group = ramp
+        task = asyncio.create_task(motion.drive(drive_operation(), "move_forward"))
+        await asyncio.wait_for(entered.wait(), 1)
+        if reason == "normal_stop":
+            from ninjarobot_pi5_ide.servo import ServoStopAdapter
+
+            adapter = ServoStopAdapter(cast(ServoDevice, servo), stop_handler=motion.stop)
+            assert (await adapter.execute({}))["stopped"]
+        else:
+            await motion.stop_motion(reason, latch=reason == "undervoltage")
+        result = await asyncio.wait_for(task, 1)
+        assert result["stop_reason"] == reason
+        assert state.read().motion_latched is (reason == "undervoltage")
+
+    asyncio.run(exercise())
+
+
+def test_obstacle_during_realistic_ramp_recovers_without_resume(tmp_path):
+    async def exercise():
+        motion, servo, distance, state = controller(tmp_path, readings=[200, 40, 40, 40])
+
+        async def ramp(**_kwargs):
+            while not motion._stop_event.is_set():
+                await asyncio.sleep(0.001)
+            return {"interrupted": True}
+
+        original = servo.move_group
+        servo.move_group = ramp
+        result = await asyncio.wait_for(motion.drive(drive_operation(), "move_forward"), 1)
+        assert result["stop_reason"] == "front_obstacle"
+        assert not state.read().motion_latched
+        servo.move_group = original
+        distance.readings, distance.index = [RuntimeError("no fresh reading")], 0
+        blocked = await motion.drive(drive_operation(), "move_forward")
+        assert blocked["stop_reason"] == "front_obstacle"
+        assert not servo.move_calls
+        distance.readings, distance.index = [200], 0
+        resumed = await motion.drive(drive_operation(hold_seconds=0.05), "move_forward")
+        assert resumed["stop_reason"] == "movement_duration_complete"
+        assert len(servo.move_calls) == 1
+
+    asyncio.run(exercise())
+
+
+def test_unexplained_driver_abort_still_requires_recovery(tmp_path):
+    async def exercise():
+        motion, servo, _distance, state = controller(tmp_path, readings=[200])
+
+        async def ramp(**_kwargs):
+            return {"interrupted": True}
+
+        servo.move_group = ramp
+        result = await motion.drive(drive_operation(), "move_forward")
+        assert result["stop_reason"] == "driver_interrupted"
+        assert state.read().motion_latched
+
+    asyncio.run(exercise())
+
+
+def test_motion_latch_cannot_replace_operator_system_stop(tmp_path):
+    state = SafetyStateStore(tmp_path / "safety.json")
+    original = state.latch_system("operator_stop", fault_detail="Operator requested stop")
+    assert state.latch_motion("driver_interrupted") == original
+    assert state.read() == original
+
+
+def test_legacy_warn_only_and_direct_endpoint_obey_obstacle_guard(tmp_path):
+    async def exercise():
+        motion, servo, _distance, state = controller(tmp_path, readings=[40])
+        result = await motion.drive(drive_operation(obstacle_policy="warn_only"), "move_backward")
+        assert result["stop_reason"] == "front_obstacle"
+        endpoint = await motion.move_endpoint(endpoint="gpio12", target_angle=45, speed_mode="S")
+        assert endpoint["interrupted"] and endpoint["stop_reason"] == "front_obstacle"
+        assert not servo.move_calls and not state.read().motion_latched
+
+    asyncio.run(exercise())
+
+
 def test_safety_state_is_private_atomic_and_corruption_fails_closed(tmp_path: Path) -> None:
     path = tmp_path / "state" / "safety.json"
     state = SafetyStateStore(path)
@@ -173,7 +278,7 @@ def test_safety_state_is_private_atomic_and_corruption_fails_closed(tmp_path: Pa
 
 
 @pytest.mark.parametrize("behavior_name", ["move_forward", "turn_left", "turn_right"])
-def test_guarded_motion_starts_immediately_and_stops_after_three_low_readings(
+def test_near_obstacle_blocks_initial_and_repeated_ramps_without_latching(
     tmp_path: Path,
     behavior_name: str,
 ) -> None:
@@ -185,14 +290,14 @@ def test_guarded_motion_starts_immediately_and_stops_after_three_low_readings(
 
         result = await motion.drive(drive_operation(), behavior_name)
 
-        assert servo.move_calls == [({"gpio12": 45.0, "gpio13": -45.0}, "M")]
+        assert servo.move_calls == []
         assert result["stop_reason"] == "front_obstacle"
         assert result["warnings"] == []
         assert state.read().motion_latched is False
         assert state.read().system_latched is False
         second = await motion.drive(drive_operation(), "move_forward")
         assert second["stop_reason"] == "front_obstacle"
-        assert len(servo.move_calls) == 2
+        assert servo.move_calls == []
         assert state.read().motion_latched is False
 
     asyncio.run(exercise())

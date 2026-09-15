@@ -33,6 +33,9 @@ class DistanceReader(Protocol):
     async def start(self) -> None:
         """Initialize ranging."""
 
+    async def prepare(self) -> None:
+        """Prepare ranging after any abandoned device work drains."""
+
     async def execute(self, arguments: dict[str, Any]) -> dict[str, Any]:
         """Read one validated distance."""
 
@@ -152,6 +155,8 @@ class SafetyStateStore:
     def latch_motion(self, reason: str) -> SafetySnapshot:
         """Persist a Level 1 motion latch."""
         current = self.read()
+        if current.system_latched:
+            return current
         snapshot = SafetySnapshot(
             motion_latched=True,
             system_latched=current.system_latched,
@@ -306,6 +311,7 @@ class MotionController:
         self._stop_generation = 0
         self._motion_context: ContextVar[object | None] = ContextVar("motion_owner", default=None)
         self._active_owner: object | None = None
+        self._obstacle_blocked = False
 
     @property
     def active(self) -> bool:
@@ -316,12 +322,10 @@ class MotionController:
         """Run one existing guarded drive without changing its hold policy."""
         targets = self._resolve_targets(operation)
         async with self._guarded_motion(operation, behavior_name) as watchdog:
-            movement = await self._servo.move_group(
-                targets=targets,
-                speed_mode=operation.speed_mode,
-            )
-            if movement["interrupted"]:
-                await self.stop_motion("driver_interrupted", latch=True)
+            if not self._stop_event.is_set():
+                await self._run_ramp(
+                    self._servo.move_group(targets=targets, speed_mode=operation.speed_mode)
+                )
             if operation.hold_seconds is None:
                 while not self._stop_event.is_set():
                     watchdog.beat()
@@ -361,6 +365,32 @@ class MotionController:
         else:
             result["latched"] = False
         return result
+
+    async def _run_ramp(self, ramp: Coroutine[Any, Any, dict[str, Any]]) -> dict[str, Any]:
+        """Distinguish an intentional abort from an unexplained driver interruption."""
+        try:
+            result = await ramp
+        except IDEError as exc:
+            if not self._stop_event.is_set() or exc.details.code not in {
+                "SERVO_INTERRUPTED",
+                "MOTION_REQUIRES_CONTROLLER",
+                "MOTION_STOPPED",
+                "SYSTEM_STOPPED",
+            }:
+                raise
+            result = {"interrupted": True}
+        if (
+            result.get("interrupted")
+            and not self._stop_event.is_set()
+            and self._stop_reason is None
+        ):
+            await self.stop_motion("driver_interrupted", latch=True)
+        return result
+
+    async def stop(self) -> dict[str, Any]:
+        """Keep the public servo.stop result while recording normal stop intent."""
+        result = await self.stop_motion("normal_stop", latch=False)
+        return dict(result["servo"])
 
     def _check_stop_state(self) -> None:
         snapshot = self._state.read()
@@ -407,7 +437,7 @@ class MotionController:
         async with self._motion_lock:
             self._check_stop_state()
             generation = self._stop_generation
-            await asyncio.gather(self._servo.start(), self._distance.start())
+            await asyncio.gather(self._servo.start(), self._distance.prepare())
             self._check_stop_state()
             if generation != self._stop_generation:
                 raise MotionSafetyError("Movement was stopped during device preparation.")
@@ -425,11 +455,27 @@ class MotionController:
             )
             monitor_tasks = [
                 asyncio.create_task(self._watchdog_heartbeat(watchdog)),
-                asyncio.create_task(self._distance_monitor(operation)),
                 asyncio.create_task(self._undervoltage_monitor()),
             ]
             watchdog.start()
             try:
+                # Check before energizing a ramp, including repeated commands and
+                # legacy warn_only behaviors. The front sensor cannot see behind us.
+                for _ in range(self._config.obstacle_consecutive_readings):
+                    if self._stop_event.is_set():
+                        break
+                    near = await self._near_obstacle()
+                    if near is False:
+                        self._obstacle_blocked = False
+                        break
+                    if near is None:
+                        if self._obstacle_blocked:
+                            await self.stop_motion("front_obstacle", latch=False)
+                        break
+                else:
+                    await self.stop_motion("front_obstacle", latch=False)
+                if not self._stop_event.is_set():
+                    monitor_tasks.append(asyncio.create_task(self._distance_monitor(operation)))
                 yield watchdog
             except asyncio.CancelledError:
                 await self.stop_motion("cancelled", latch=False)
@@ -458,21 +504,40 @@ class MotionController:
     ) -> dict[str, Any]:
         """Run a bounded single-endpoint ramp with the same safety monitors."""
         operation = DriveOperation(kind="drive", targets={"direct_servo": target_angle})
+        result: dict[str, Any] = dict(
+            endpoint=endpoint,
+            target_angle=target_angle,
+            speed_mode=speed_mode,
+            interrupted=True,
+            simulated=self._servo.simulated,
+        )
         async with self._guarded_motion(operation, "direct_servo"):
-            async with asyncio.timeout(9.0):
-                result = await self._servo.move(
-                    endpoint=endpoint,
-                    target_angle=target_angle,
-                    speed_mode=speed_mode,
-                )
+            if not self._stop_event.is_set():
+                async with asyncio.timeout(9.0):
+                    result.update(
+                        await self._run_ramp(
+                            self._servo.move(
+                                endpoint=endpoint,
+                                target_angle=target_angle,
+                                speed_mode=speed_mode,
+                            )
+                        )
+                    )
             if self._fatal_error is not None:
                 raise self._fatal_error
             result["interrupted"] = result["interrupted"] or self._stop_event.is_set()
+        snapshot = self._state.read()
+        result.update(stop_reason=self._stop_reason, latched=snapshot.motion_latched)
+        if snapshot.motion_latched:
+            guidance = stop_guidance(snapshot.reason, fault_detail=snapshot.fault_detail)
+            result.update(cause=guidance.cause, recovery_instruction=guidance.recovery_instruction)
         return result
 
     async def stop_motion(self, reason: str, *, latch: bool) -> dict[str, Any]:
         """Stop both motors and optionally persist a Level 1 restart gate."""
         self._stop_generation += 1
+        if reason == "front_obstacle":
+            self._obstacle_blocked = True
         guidance = stop_guidance(reason)
         if latch:
             self._state.latch_motion(reason)
@@ -482,7 +547,11 @@ class MotionController:
                 guidance.cause,
                 guidance.recovery_instruction,
             )
-        self._stop_reason = reason
+        # A normal cleanup or completed driver abort must not replace the cause.
+        if (not self._stop_event.is_set() or latch or reason == "operator_stop") and (
+            self._stop_reason != "operator_stop" or reason == "operator_stop"
+        ):
+            self._stop_reason = reason
         self._stop_event.set()
         servo_result = await self._servo.stop()
         return {
@@ -507,37 +576,25 @@ class MotionController:
     async def _distance_monitor(self, operation: DriveOperation) -> None:
         below_count = 0
         while not self._stop_event.is_set():
-            try:
-                reading = await self._distance.execute({})
-            except IDEError as exc:
-                below_count = 0
-                if exc.details.code != "DEVICE_OUT_OF_RANGE":
-                    await self._warn("distance reading unavailable; movement continues")
-            except Exception:
-                below_count = 0
-                await self._warn("distance reading unavailable; movement continues")
-            else:
-                if not _fresh(reading):
-                    below_count = 0
-                    await self._warn("distance reading stale; movement continues")
-                elif reading["distance_mm"] <= self._config.obstacle_threshold_mm:
-                    below_count += 1
-                    if (
-                        operation.obstacle_policy == "front_guarded"
-                        and below_count >= self._config.obstacle_consecutive_readings
-                    ):
-                        LOGGER.warning(
-                            "Obstacle interrupted behavior movement: distance_mm=%s "
-                            "threshold_mm=%s consecutive_readings=%s; no safety latch was set.",
-                            reading["distance_mm"],
-                            self._config.obstacle_threshold_mm,
-                            below_count,
-                        )
-                        await self.stop_motion("front_obstacle", latch=False)
-                        return
-                else:
-                    below_count = 0
+            below_count = below_count + 1 if await self._near_obstacle() else 0
+            if below_count >= self._config.obstacle_consecutive_readings:
+                await self.stop_motion("front_obstacle", latch=False)
+                return
             await asyncio.sleep(self._config.distance_poll_interval_seconds)
+
+    async def _near_obstacle(self) -> bool | None:
+        try:
+            reading = await self._distance.execute({})
+        except IDEError as exc:
+            if exc.details.code != "DEVICE_OUT_OF_RANGE":
+                await self._warn("distance reading unavailable; movement continues")
+        except Exception:
+            await self._warn("distance reading unavailable; movement continues")
+        else:
+            if _fresh(reading):
+                return bool(reading["distance_mm"] <= self._config.obstacle_threshold_mm)
+            await self._warn("distance reading stale; movement continues")
+        return None
 
     async def _undervoltage_monitor(self) -> None:
         while not self._stop_event.is_set():

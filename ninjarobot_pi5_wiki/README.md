@@ -25,19 +25,22 @@ for source versions and provenance:
 - [Phase 5 handoff](../docs/validation/refinement_phase5_handoff_260913.md)
 - [Clock fix and manual tests](../docs/validation/system_time_fix_260912.md)
 
-## Pending full manuals — 15 September fixes
+## Pending full manuals — approved servo and sensor recovery follow-up
 
-These complete successor sources document normal servo-stop classification,
-rolling chat context, and default distance-game availability. They are not
-registered, ingested, normalized, or semantically reviewed yet, at the project
-owner's request. The current document map above remains authoritative until the
-owner completes that workflow:
+These complete successor sources include the 15 September follow-up repair,
+normal-stop and obstacle recovery rules, automatic sensor recovery, and chat
+budget validation. They are not registered, ingested, normalized, or semantically
+reviewed. The current document map above remains the published checkpoint.
 
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-15/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-15/DevelopmentGuide.md)
-- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-15/NinjaRobot_MCP_Skill.md)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-15/DevelopmentLog.md)
-- [Validation and Raspberry Pi checklist](../docs/validation/servo_chat_game_fixes_260915.md)
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-15-02/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-15-02/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-15-02/NinjaRobot_MCP_Skill.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-15-02/DevelopmentLog.md)
+- [Repair walkthrough and manual tests](../docs/validation/servo_sensor_recovery_walkthrough_260915.md)
+- [Approved audit and implementation plan](../docs/validation/servo_chat_game_followup_260915.md)
+
+The earlier 15 September sources remain preserved under their original date
+folders. The root README links directly to these latest full manuals.
 
 Runtime project help is separate from developer wiki search. It uses a fixed
 public list pinned to the published 12 September checkpoint and reports

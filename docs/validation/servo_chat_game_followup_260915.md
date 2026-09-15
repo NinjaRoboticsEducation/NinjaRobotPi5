@@ -1,5 +1,12 @@
 # Servo, chat, and distance-game follow-up audit
 
+Update after owner approval: the follow-up is implemented. See the
+[walkthrough and validation results](servo_sensor_recovery_walkthrough_260915.md)
+for the changed behavior, 906 passing root tests and one existing wiki-checkpoint
+failure, the 457 passing driver tests, and remaining physical acceptance.
+The audit below records the pre-repair findings; its approval request has been
+satisfied. Wiki ingestion and review remain deferred.
+
 This report records the defects reproduced on 15 September 2026 and the proposed
 repair plan. The reviewed checkout was `6796531`. No runtime code, private
 configuration, saved safety state, or managed driver has been changed by this

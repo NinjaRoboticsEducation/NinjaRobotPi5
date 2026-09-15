@@ -26,7 +26,7 @@ def test_optional_variants_preserve_meaning_and_exclude_state_faces() -> None:
     assert vary_face(source, enabled=True, request_id="1") == source
 
 
-def test_cancelled_sensor_read_keeps_ownership_until_explicit_recovery() -> None:
+def test_cancelled_sensor_read_keeps_ownership_then_recovers_on_next_read() -> None:
     async def exercise() -> None:
         entered = threading.Event()
         release = threading.Event()
@@ -68,12 +68,9 @@ def test_cancelled_sensor_read_keeps_ownership_until_explicit_recovery() -> None
             release.set()
             while adapter._busy:
                 await asyncio.sleep(0.001)
-        with pytest.raises(IDEError):
-            await adapter.execute({})
         assert await adapter.health() is ResourceHealth.UNAVAILABLE
-        await adapter.start(recover=True)
-        assert await adapter.health() is ResourceHealth.READY
         assert (await adapter.execute({}))["distance_mm"] == 100
+        assert await adapter.health() is ResourceHealth.READY
         await adapter.close()
         assert closes == 1
 

@@ -142,6 +142,8 @@ class VL53L0XDistanceAdapter:
                 technical_detail=f"Unexpected argument keys: {sorted(arguments)}",
                 definitely_not_executed=True,
             )
+        if self._recovery_required:
+            await self.prepare()
         async with self._lock:
             sensor = self._require_sensor()
             try:
@@ -154,6 +156,24 @@ class VL53L0XDistanceAdapter:
                     definitely_not_executed=False,
                 ) from exc
         return self._validate_reading(reading)
+
+    async def prepare(self) -> None:
+        """Recover abandoned work on demand without overlapping the device worker."""
+        async with self._lock:
+            if self._busy:
+                assert self._pending is not None
+                try:
+                    await asyncio.wait_for(asyncio.shield(self._pending), timeout=2.0)
+                except TimeoutError:
+                    self._require_drained()
+                    raise
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    # An abandoned result is never reused. A health check below
+                    # decides whether a fresh operation may proceed.
+                    pass
+        await self.start(recover=True)
 
     async def health(self) -> ResourceHealth:
         """Check sensor identity without taking a distance measurement."""
@@ -209,7 +229,7 @@ class VL53L0XDistanceAdapter:
                 code="DEVICE_READ_PENDING",
                 message="Distance sensor work is still pending; device reuse is blocked.",
                 technical_detail=(
-                    "Wait for the worker to drain, then explicitly resume. "
+                    "The next request can recover after the worker drains. "
                     "A stuck worker requires service recovery."
                 ),
                 definitely_not_executed=True,

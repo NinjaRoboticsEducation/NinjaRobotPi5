@@ -282,7 +282,10 @@ class BehaviorRunner:
             if self._drive_handler is None:
                 raise ValueError("drive operations require the Phase 4.3 motion controller")
             result = await self._drive_handler(operation, behavior_name)
-            if result.get("stop_reason") == "front_obstacle" or result.get("latched") is True:
+            if (
+                result.get("stop_reason") not in {None, "movement_duration_complete"}
+                or result.get("latched") is True
+            ):
                 raise BehaviorInterrupted(result)
             return result
         raise TypeError(f"unsupported behavior operation: {type(operation).__name__}")

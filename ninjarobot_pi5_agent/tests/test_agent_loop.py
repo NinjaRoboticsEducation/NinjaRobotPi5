@@ -1336,6 +1336,32 @@ def test_input_budget_rejects_before_provider_or_tool_calls(tmp_path) -> None:
     asyncio.run(exercise())
 
 
+def test_short_turn_recovers_after_oversized_turn_without_erasing_history(tmp_path):
+    async def exercise():
+        loop, store, registry, ide = await build_loop(
+            tmp_path,
+            [ModelTurn(request_id="id-4", text="Recovered", finish_reason=FinishReason.STOP)],
+            config=AgentLoopConfig(max_prompt_characters=4096),
+        )
+        loop._prompts = PromptComposer(safety_prompt="Safety.", identity_prompt="Identity.")
+        try:
+            with pytest.raises(AgentLoopError, match="model-input budget"):
+                await loop.chat(session_id="recover", text="x" * 5000)
+            assert loop._provider.requests == []
+            reply = await loop.chat(session_id="recover", text="hello")
+            assert reply.text == "Recovered"
+            sent = loop._provider.requests[0]
+            assert len(sent.model_dump_json()) <= 4096
+            assert any(m.content == "hello" for m in sent.messages)
+            assert (await store.messages("recover"))[0].message.content == "x" * 5000
+            assert ide.requests == []
+        finally:
+            await registry.close()
+            await store.close()
+
+    asyncio.run(exercise())
+
+
 def test_long_chat_uses_recent_turns_without_deleting_transcript(tmp_path) -> None:
     async def exercise() -> None:
         loop, store, registry, _ide = await build_loop(
