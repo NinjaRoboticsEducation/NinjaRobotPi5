@@ -179,10 +179,9 @@ address = ""
 adapter = "hci0"
 auto_reconnect = false
 
-# Optional Phase 5 interactions: settings alone never start output.
+# Phase 5 interaction settings: settings alone never start output.
 [interaction_variations]
 enabled = false
 
 [distance_game]
-enabled = false
 volume = 16 # Operator setting, 1–32. Uses the passive buzzer, not Bluetooth.

@@ -7,9 +7,9 @@ at any time. No microphone or Bluetooth speaker is required.
 
 Use the strict game tools only. A run lasts 5–60 whole seconds (default 30).
 Do not implement a sensor-reading loop, move wheels, capture media or change
-configuration. If disabled, explain that the operator must set
-`[distance_game] enabled = true` in the robot configuration and restart the
-existing service. Enabling it never starts a game.
+configuration. The supported game is available by default; do not ask the user
+to enable a feature flag. Required-device health, resource admission and system
+safety checks remain authoritative, and availability never starts a game.
 
 Status reads do not touch devices. Stop is independent of a busy conversation.
 Explain unavailable/faulted/cancelled outcomes honestly. A successful tool call

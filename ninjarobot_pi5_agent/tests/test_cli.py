@@ -78,7 +78,7 @@ def test_phase_two_capabilities_are_hardware_free(capsys) -> None:
     assert capabilities["servo.status"]["risk"] == "read_only"
     assert capabilities["servo.move"]["risk"] == "motion"
     assert capabilities["servo.move"]["confirmation_required"] is True
-    assert capabilities["servo.stop"]["risk"] == "emergency"
+    assert capabilities["servo.stop"]["risk"] == "low"
     assert capabilities["camera.status"]["risk"] == "read_only"
     assert capabilities["camera.capture"]["risk"] == "privacy"
     assert capabilities["camera.capture"]["resources"] == ["camera"]

@@ -132,6 +132,5 @@
   "game.start": "玩游戏 (30秒)",
   "game.stop": "停止游戏",
   "game.status": "游戏状态",
-  "game.running": "已请求游戏。点击停止游戏可结束。",
-  "game.disabled": "游戏未启用，请参阅 /help game。"
+  "game.running": "已请求游戏。点击停止游戏可结束。"
 }

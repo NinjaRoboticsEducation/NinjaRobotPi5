@@ -23,11 +23,14 @@ from ninjarobot_pi5_agent import (
     EventBroker,
     FinishReason,
     IDEToolProvider,
+    MessageRole,
+    ModelMessage,
     ModelRequest,
     ModelStreamEvent,
     ModelTurn,
     MotionArmManager,
     PolicyEngine,
+    PromptComposer,
     ProviderCapabilities,
     ProviderHealth,
     ProviderHealthStatus,
@@ -1326,6 +1329,84 @@ def test_input_budget_rejects_before_provider_or_tool_calls(tmp_path) -> None:
                 await loop.chat(session_id="budget", text="x" * 5000)
             assert loop._provider.requests == []
             assert ide.requests == []
+        finally:
+            await registry.close()
+            await store.close()
+
+    asyncio.run(exercise())
+
+
+def test_long_chat_uses_recent_turns_without_deleting_transcript(tmp_path) -> None:
+    async def exercise() -> None:
+        loop, store, registry, _ide = await build_loop(
+            tmp_path,
+            [ModelTurn(request_id="id-2", text="new answer", finish_reason=FinishReason.STOP)],
+            config=AgentLoopConfig(max_prompt_characters=9000),
+        )
+        loop._prompts = PromptComposer(safety_prompt="Safety.", identity_prompt="Identity.")
+        await store.create_session("long-chat")
+        history = (
+            ModelMessage(role=MessageRole.USER, content="old question " + "x" * 5000),
+            ModelMessage(role=MessageRole.ASSISTANT, content="old answer " + "y" * 5000),
+            ModelMessage(role=MessageRole.USER, content="recent question"),
+            ModelMessage(role=MessageRole.ASSISTANT, content="recent answer"),
+        )
+        for index, message in enumerate(history):
+            await store.append_message("long-chat", message, message_id=f"history-{index}")
+        try:
+            reply = await loop.chat(session_id="long-chat", text="current question")
+            request = loop._provider.requests[0]
+            contents = [message.content for message in request.messages]
+            assert reply.text == "new answer"
+            assert any("Older conversation messages were omitted" in item for item in contents)
+            assert "recent question" in contents
+            assert "recent answer" in contents
+            assert "current question" in contents
+            assert not any(item.startswith("old question") for item in contents)
+            stored = await store.messages("long-chat")
+            assert [item.message for item in stored[:4]] == list(history)
+            assert stored[-1].message.content == "new answer"
+        finally:
+            await registry.close()
+            await store.close()
+
+    asyncio.run(exercise())
+
+
+def test_context_trimming_keeps_tool_call_and_result_together(tmp_path) -> None:
+    async def exercise() -> None:
+        loop, store, registry, _ide = await build_loop(
+            tmp_path,
+            [ModelTurn(request_id="id-2", text="continued", finish_reason=FinishReason.STOP)],
+            config=AgentLoopConfig(max_prompt_characters=9000),
+        )
+        loop._prompts = PromptComposer(safety_prompt="Safety.", identity_prompt="Identity.")
+        await store.create_session("tool-history")
+        call = ToolCall(call_id="historical-call", name="distance.read", arguments={})
+        history = (
+            ModelMessage(role=MessageRole.USER, content="old " + "x" * 5000),
+            ModelMessage(role=MessageRole.ASSISTANT, content="old " + "y" * 5000),
+            ModelMessage(role=MessageRole.USER, content="check distance"),
+            ModelMessage(role=MessageRole.ASSISTANT, content="", tool_calls=(call,)),
+            ModelMessage(
+                role=MessageRole.TOOL,
+                content='{"status":"succeeded","distance_mm":200}',
+                name="distance.read",
+                tool_call_id="historical-call",
+            ),
+            ModelMessage(role=MessageRole.ASSISTANT, content="The distance was 200 mm."),
+        )
+        for index, message in enumerate(history):
+            await store.append_message("tool-history", message, message_id=f"tool-history-{index}")
+        try:
+            await loop.chat(session_id="tool-history", text="what happened next?")
+            messages = loop._provider.requests[0].messages
+            call_messages = [message for message in messages if message.tool_calls]
+            result_messages = [
+                message for message in messages if message.tool_call_id == "historical-call"
+            ]
+            assert len(call_messages) == 1
+            assert len(result_messages) == 1
         finally:
             await registry.close()
             await store.close()

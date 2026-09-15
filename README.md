@@ -34,14 +34,17 @@ Phase 3 now adds optional local spoken replies, IDE-owned Bluetooth/PipeWire
 output, independent Stop Speech controls and reviewed spoken reminders. Speech
 starts off; English uses Piper, Mandarin accepts a suitable operator-supplied model,
 and Japanese speech is not implemented. Text remains available after audio failure.
-Refinement Phase 5 now adds an optional hand-distance game and subtle silent face
-variations. Both start disabled. Use `ninjarobot-agent game start --seconds 5`,
+Refinement Phase 5 adds a hand-distance game and optional subtle silent face
+variations. The supported game is available by default; face variations remain
+opt-in. Use `ninjarobot-agent game start --seconds 5`,
 `game stop` and `game status`, chat `/game` commands or the web game buttons.
 The game uses the existing sensor, buzzer and display; it never commands wheels
 or capture and does not need Bluetooth. See the
 [Phase 5 setup and manual-test walkthrough](docs/validation/refinement_phase5_walkthrough_260912.md)
 and [implementation handoff](docs/validation/refinement_phase5_handoff_260913.md).
-Physical Phase 5 acceptance is still required.
+The [15 September fix validation](docs/validation/servo_chat_game_fixes_260915.md)
+records the updated software gate and safe manual checks. Physical Phase 5
+acceptance is still required.
 
 Narrowed Phase 4 adds better owned memory retrieval, reviewed local read-only
 recipes, compatible version-2 Agent skills and cited public project help.
@@ -143,6 +146,7 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 - **Face-verified switching** — `/switch user` changes the active profile only after the camera matches the selected user's registered face; every failure keeps the original user
 - **Bounded retrieval** — profile/preferences plus recent successful behaviors and task recipes are always available within a strict cap; query matches add only relevant success/failure context
 - **Provider continuity** — changing the AI provider/model does not replace the active user's profile, long-term memory, or current transcript
+- **Rolling conversation context** — long transcripts remain stored and visible, while each model request keeps the newest complete turns that fit its bounded input; tool calls and results are never split
 - **Interface isolation with shared memory** — terminal and browser transcripts and selected-user state stay independent; after each interface selects the same user, both read that user's same long-term memory
 - **Read-only model access** — four `memory.*` MCP tools can read only the active user's data; models have no memory mutation tool
 - **Deterministic management** — the interactive **Manage Memory** menu and `ninjarobot-agent memory` CLI perform confirmed deletes, face recovery, retention changes, and a separately confirmed full reset
@@ -169,6 +173,8 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 - **Hardware lock** — only one process can own the robot at a time (OS file lock)
 - **Two-level stop** — genuine motion and system faults stop safely and explain
   both their cause and confirmed recovery step
+- **Normal servo stop** — transition, disarm, and controller-loss stops interrupt
+  wheel pulses immediately without being classified as a Level 2 Emergency Stop
 - **Obstacle interruption** — three consecutive guarded readings at or below
   50 mm stop only the current behavior, show a scary face, and return to Idle
   without creating an Emergency Stop latch

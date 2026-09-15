@@ -821,12 +821,16 @@ class ServoMoveAdapter:
 
 
 class ServoStopAdapter:
-    """Expose confirmation-free emergency zero-pulse shutdown."""
+    """Expose a priority normal stop for servo outputs only."""
 
     descriptor = CapabilityDescriptor(
         name="servo.stop",
         version="1.0.0",
-        description="Abort movement and set all six servo pulse outputs to zero.",
+        description=(
+            "Immediately abort servo movement and set all six pulse outputs to zero. "
+            "This is a normal motion stop and does not activate the Level 2 system "
+            "Emergency Stop."
+        ),
         input_schema={
             "type": "object",
             "properties": {},
@@ -842,7 +846,7 @@ class ServoStopAdapter:
             "required": ["stopped", "driver_available", "simulated"],
             "additionalProperties": False,
         },
-        risk=RiskLevel.EMERGENCY,
+        risk=RiskLevel.LOW,
         resources=SERVO_RESOURCES,
         default_timeout_seconds=2.0,
         idempotent=True,

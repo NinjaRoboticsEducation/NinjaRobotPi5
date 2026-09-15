@@ -1,4 +1,4 @@
-"""Finite, opt-in distance game; all device work remains owned by the IDE."""
+"""Finite distance game; all device work remains owned by the IDE."""
 
 from __future__ import annotations
 
@@ -107,7 +107,6 @@ class DistanceGame:
         self,
         robot: RobotAssembly,
         *,
-        enabled: bool,
         volume: int,
         clock: Callable[[], float] = time.monotonic,
         wall_clock: Callable[[], float] = time.time,
@@ -115,7 +114,7 @@ class DistanceGame:
     ) -> None:
         self._clock, self._wall_clock, self._sleep = clock, wall_clock, sleep
         self.robot = robot
-        self.enabled = enabled
+        self.enabled = True
         self.volume = volume
         self._admission = asyncio.Lock()
         self._other_actions = 0
@@ -146,8 +145,6 @@ class DistanceGame:
             GameRequest.model_validate(request.arguments)
         async with self._admission:
             if is_game:
-                if not self.enabled:
-                    raise RuntimeError("distance game disabled; enable distance_game.enabled first")
                 if (
                     self._reserved
                     or self._other_actions
@@ -212,7 +209,7 @@ class DistanceGame:
 
     async def run(self, arguments: dict[str, Any]) -> dict[str, Any]:
         request = GameRequest.model_validate(arguments)
-        if not self.enabled or self._reserved is None or self._task is not None:
+        if self._reserved is None or self._task is not None:
             raise RuntimeError("game requires one admitted request")
         if self._cancel_requested:
             return {"state": "cancelled", "reason": "stopped_before_start"}
@@ -372,11 +369,7 @@ class DistanceGameAdapter:
         pass  # RobotAssembly owns the session and closes before devices.
 
     async def health(self) -> ResourceHealth:
-        return (
-            ResourceHealth.READY
-            if self.operation != "run" or self.game.enabled
-            else ResourceHealth.NOT_CONFIGURED
-        )
+        return ResourceHealth.READY
 
     async def execute(self, arguments: dict[str, Any]) -> dict[str, Any]:
         if self.operation == "run":

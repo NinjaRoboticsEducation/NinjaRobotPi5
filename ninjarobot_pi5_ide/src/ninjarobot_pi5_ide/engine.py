@@ -21,7 +21,6 @@ from .models import (
     LifecycleState,
     ResourceHealth,
     RetrySafety,
-    RiskLevel,
 )
 from .registry import CapabilityRegistry
 from .scheduler import QueueCapacityError, ResourceScheduler, StopInProgressError
@@ -326,11 +325,7 @@ class ExecutionEngine:
                         and not request.arguments
                     ):
                         result = await invoke()
-                    elif (
-                        descriptor.name in INTERRUPT_CAPABILITIES
-                        and descriptor.risk is RiskLevel.EMERGENCY
-                        and not request.arguments
-                    ):
+                    elif descriptor.name in INTERRUPT_CAPABILITIES and not request.arguments:
                         result = await self._scheduler.interrupt(descriptor.resources, invoke)
                     else:
                         result = await self._scheduler.run(descriptor.resources, invoke)

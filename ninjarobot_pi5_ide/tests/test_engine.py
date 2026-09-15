@@ -242,7 +242,7 @@ def test_stop_bypasses_full_queue_and_cancels_conflicting_work(tmp_path: Path) -
         ordinary = ControlledAdapter(delay=30, timeout=60)
         stop = ControlledAdapter(delay=0.02)
         stop._descriptor = stop.descriptor.model_copy(
-            update={"name": "servo.stop", "risk": RiskLevel.EMERGENCY}
+            update={"name": "servo.stop", "risk": RiskLevel.LOW}
         )
         engine = ExecutionEngine(
             CapabilityRegistry([ordinary, stop]),

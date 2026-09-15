@@ -338,7 +338,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_servo_hold_option(servo_move_parser)
     servo_stop_parser = servo_subcommands.add_parser(
         "stop",
-        help="Request emergency zero pulse on all servo endpoints.",
+        help="Immediately request a normal zero-pulse stop on all servo endpoints.",
     )
     _add_backend_options(servo_stop_parser)
     _add_action_identity_options(servo_stop_parser)

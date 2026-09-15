@@ -22,6 +22,7 @@ from .models import (
     ModelTurn,
     StreamEventType,
     ToolCall,
+    ToolDefinition,
     ToolExecutionResult,
     ToolExecutionStatus,
     ToolInvocation,
@@ -48,6 +49,12 @@ MemoryContextProvider = Callable[[str, str], Awaitable[str]]
 ToolResultObserver = Callable[[ToolInvocation, ToolExecutionResult], Awaitable[None]]
 TextDeltaHandler = Callable[[str], Awaitable[None]]
 TOOL_BUDGET: ContextVar[list[int] | None] = ContextVar("request_tool_budget", default=None)
+CONTEXT_OMISSION_NOTICE = (
+    "Older conversation messages were omitted from this model request to stay within "
+    "the configured input budget. The complete transcript remains stored and visible "
+    "to the user. Use the bounded user memory above for durable facts, and do not infer "
+    "missing tool outcomes or repeat an earlier action."
+)
 
 
 class AgentLoopConfig(BaseModel):
@@ -295,27 +302,18 @@ class AgentLoop:
                     user_id=self._active_user(session_id),
                 )
             )
-            request_id = self._id_factory()
             history = repair_tool_history(history)
-            request = ModelRequest(
+            request_id = self._id_factory()
+            request = self._bounded_request(
                 request_id=request_id,
                 session_id=session_id,
-                messages=self._prompts.compose(
-                    runtime_state=self._runtime_state(session_id, lease_id),
-                    memory_context=memory_context,
-                    skill=skill,
-                    conversation=history,
-                ),
-                tools=definitions,
-                max_output_tokens=self._config.max_output_tokens,
-                timeout_seconds=self._config.model_inactivity_timeout_seconds,
+                lease_id=lease_id,
+                memory_context=memory_context,
+                skill=skill,
+                conversation=history,
+                definitions=definitions,
                 allow_provider_fallback=(model_turn_number == 1 and completed_tool_calls == 0),
             )
-            if len(request.model_dump_json()) > self._config.max_prompt_characters:
-                raise AgentLoopError(
-                    "request exceeds the local model-input budget; start a new chat "
-                    "or review and clear this transcript before retrying"
-                )
             log_lifecycle("thinking", reason="model_requested")
             turn = await self._model_turn(
                 request,
@@ -391,6 +389,77 @@ class AgentLoop:
                     ),
                 )
         raise AgentLoopError("agent exceeded the configured model-turn limit")
+
+    def _bounded_request(
+        self,
+        *,
+        request_id: str,
+        session_id: str,
+        lease_id: str | None,
+        memory_context: str | None,
+        skill: LoadedSkill | None,
+        conversation: tuple[ModelMessage, ...],
+        definitions: tuple[ToolDefinition, ...],
+        allow_provider_fallback: bool,
+    ) -> ModelRequest:
+        """Keep the newest complete user turns that fit without rewriting history."""
+
+        def compose(selected: tuple[ModelMessage, ...], *, omitted: int) -> ModelRequest:
+            context = selected
+            if omitted:
+                context = (
+                    ModelMessage(
+                        role=MessageRole.SYSTEM,
+                        content=f"{CONTEXT_OMISSION_NOTICE} Omitted messages: {omitted}.",
+                    ),
+                    *context,
+                )
+            return ModelRequest(
+                request_id=request_id,
+                session_id=session_id,
+                messages=self._prompts.compose(
+                    runtime_state=self._runtime_state(session_id, lease_id),
+                    memory_context=memory_context,
+                    skill=skill,
+                    conversation=context,
+                ),
+                tools=definitions,
+                max_output_tokens=self._config.max_output_tokens,
+                timeout_seconds=self._config.model_inactivity_timeout_seconds,
+                allow_provider_fallback=allow_provider_fallback,
+            )
+
+        request = compose(conversation, omitted=0)
+        if self._request_fits(request):
+            return request
+
+        segments = _conversation_turns(conversation)
+        best_request: ModelRequest | None = None
+        low = 1
+        high = len(segments)
+        while low <= high:
+            retained_turns = (low + high) // 2
+            selected = tuple(
+                message for segment in segments[-retained_turns:] for message in segment
+            )
+            candidate = repair_tool_history(selected)
+            omitted = len(conversation) - len(selected)
+            candidate_request = compose(candidate, omitted=omitted)
+            if self._request_fits(candidate_request):
+                best_request = candidate_request
+                low = retained_turns + 1
+            else:
+                high = retained_turns - 1
+
+        if best_request is not None:
+            return best_request
+        raise AgentLoopError(
+            "the current message plus required safety context exceeds the model-input "
+            "budget; shorten this message or select a model with a larger context window"
+        )
+
+    def _request_fits(self, request: ModelRequest) -> bool:
+        return len(request.model_dump_json()) <= self._config.max_prompt_characters
 
     async def _handle_deterministic_camera_request(
         self,
@@ -820,6 +889,22 @@ def _normalize_behavior_tool_call(
     ):
         return call.model_copy(update={"name": movement_tool})
     return call
+
+
+def _conversation_turns(
+    messages: tuple[ModelMessage, ...],
+) -> tuple[tuple[ModelMessage, ...], ...]:
+    """Group stored messages at user boundaries so tool exchanges stay atomic."""
+    turns: list[tuple[ModelMessage, ...]] = []
+    current: list[ModelMessage] = []
+    for message in messages:
+        if message.role is MessageRole.USER and current:
+            turns.append(tuple(current))
+            current = []
+        current.append(message)
+    if current:
+        turns.append(tuple(current))
+    return tuple(turns)
 
 
 def _contains_explicit_motion(value: Any) -> bool:

@@ -216,7 +216,7 @@ def build_parser() -> argparse.ArgumentParser:
     recipe.add_argument("--inputs", default="{}")
     recipe.add_argument("--confirm", action="store_true")
     recipe.add_argument("--session", default="local-cli")
-    game = commands.add_parser("game", help="Start, stop or inspect the optional distance game.")
+    game = commands.add_parser("game", help="Start, stop or inspect the distance game.")
     game.add_argument("operation", choices=("start", "stop", "status"))
     game.add_argument("--seconds", type=int, default=30)
     game.add_argument("--session", default="local-cli")

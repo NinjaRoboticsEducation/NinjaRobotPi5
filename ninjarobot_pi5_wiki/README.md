@@ -25,6 +25,20 @@ for source versions and provenance:
 - [Phase 5 handoff](../docs/validation/refinement_phase5_handoff_260913.md)
 - [Clock fix and manual tests](../docs/validation/system_time_fix_260912.md)
 
+## Pending full manuals — 15 September fixes
+
+These complete successor sources document normal servo-stop classification,
+rolling chat context, and default distance-game availability. They are not
+registered, ingested, normalized, or semantically reviewed yet, at the project
+owner's request. The current document map above remains authoritative until the
+owner completes that workflow:
+
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-15/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-15/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-15/NinjaRobot_MCP_Skill.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-15/DevelopmentLog.md)
+- [Validation and Raspberry Pi checklist](../docs/validation/servo_chat_game_fixes_260915.md)
+
 Runtime project help is separate from developer wiki search. It uses a fixed
 public list pinned to the published 12 September checkpoint and reports
 draft/older coverage.

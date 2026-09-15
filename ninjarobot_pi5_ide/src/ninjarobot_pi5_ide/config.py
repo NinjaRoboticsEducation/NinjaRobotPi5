@@ -441,9 +441,12 @@ class InteractionVariationsConfig(ConfigModel):
 
 
 class DistanceGameConfig(ConfigModel):
-    """Opt-in game with a bounded operator-selected buzzer volume."""
+    """Always-available game settings with a bounded operator-selected volume."""
 
-    enabled: bool = False
+    # Retained so existing private TOML files continue to parse. Game admission no
+    # longer uses this former feature flag; explicit start and device safety gates
+    # remain authoritative.
+    enabled: bool = True
     volume: Annotated[int, Field(ge=1, le=32)] = 16
 
 

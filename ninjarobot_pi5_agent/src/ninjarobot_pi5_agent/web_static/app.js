@@ -822,8 +822,7 @@
         if (button.dataset.game === "start") output.textContent = t("game.running");
         const result = await send("game", { operation: button.dataset.game, duration_seconds: 30 });
         const data = result.data || {};
-        output.textContent = result.error || (data.enabled === false ? t("game.disabled")
-          : [data.state, data.reason].filter(Boolean).join(": "));
+        output.textContent = result.error || [data.state, data.reason].filter(Boolean).join(": ");
       } catch (error) {
         output.textContent = error.message || String(error);
       }

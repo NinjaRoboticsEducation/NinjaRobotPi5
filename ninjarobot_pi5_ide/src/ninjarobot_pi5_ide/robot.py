@@ -203,9 +203,7 @@ class RobotAssembly:
         self.servo.set_motion_guard(self.motion.require_motion_context)
         self.behaviors.set_drive_handler(self.motion.drive)
         self.behaviors.set_failure_handler(self._driver_failure)
-        self.distance_game = DistanceGame(
-            self, enabled=config.distance_game.enabled, volume=config.distance_game.volume
-        )
+        self.distance_game = DistanceGame(self, volume=config.distance_game.volume)
         self._liveliness_enabled = False
         self._idle_suppressed = False
         self._ambient_face = "idle"

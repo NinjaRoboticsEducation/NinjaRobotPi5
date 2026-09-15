@@ -199,14 +199,14 @@ def test_incoming_output_cancels_game_before_waiting_for_locks(tmp_path):
     asyncio.run(exercise())
 
 
-def test_disabled_game_is_additive_and_never_reads_sensor(tmp_path):
+def test_legacy_disabled_flag_does_not_hide_supported_game(tmp_path):
     async def exercise():
         client = client_for(tmp_path, enabled=False)
         await client.start()
-        client.robot.distance.execute = AsyncMock(side_effect=AssertionError("unexpected read"))
-        result = await client.execute(request("game.distance.run"))
-        assert result.status is ActionStatus.REJECTED
-        client.robot.distance.execute.assert_not_awaited()
+        game = client.robot.distance_game
+        assert game.status()["enabled"] is True
+        health = await client.health()
+        assert health.capabilities["game.distance.run"].status.value == "ready"
         await client.close()
 
     asyncio.run(exercise())
@@ -241,7 +241,6 @@ def test_loop_enforces_pulse_volume_duration_and_silence_bounds():
         )
         game = DistanceGame(
             robot,
-            enabled=True,
             volume=16,
             clock=lambda: now[0],
             wall_clock=lambda: 1000 + now[0],

@@ -357,7 +357,7 @@ def test_group_move_requires_gate_and_centers_both_endpoints(tmp_path: Path) -> 
     asyncio.run(exercise())
 
 
-def test_emergency_stop_interrupts_without_servo_resource_lock(tmp_path: Path) -> None:
+def test_priority_servo_stop_interrupts_without_servo_resource_lock(tmp_path: Path) -> None:
     async def exercise() -> None:
         group = FakeServoGroup()
         group.block_movement = True
@@ -395,6 +395,14 @@ def test_emergency_stop_interrupts_without_servo_resource_lock(tmp_path: Path) -
         await engine.close()
 
     asyncio.run(exercise())
+
+
+def test_servo_stop_is_priority_normal_stop_not_system_emergency() -> None:
+    descriptor = ServoStopAdapter.descriptor
+
+    assert descriptor.risk.value == "low"
+    assert "normal motion stop" in descriptor.description
+    assert "does not activate" in descriptor.description
 
 
 def test_cancellation_aborts_and_turns_every_servo_off(tmp_path: Path) -> None:
@@ -491,7 +499,7 @@ def test_unavailable_backend_is_structured_and_stop_remains_callable(
     asyncio.run(exercise())
 
 
-def test_servo_descriptors_encode_motion_and_emergency_policy() -> None:
+def test_servo_descriptors_encode_motion_and_priority_stop_policy() -> None:
     assert ServoMoveAdapter.descriptor.risk.value == "motion"
     assert ServoMoveAdapter.descriptor.confirmation_required is True
     assert ServoMoveAdapter.descriptor.idempotent is False
@@ -502,7 +510,7 @@ def test_servo_descriptors_encode_motion_and_emergency_policy() -> None:
         "i2c1",
         "dfr0566",
     )
-    assert ServoStopAdapter.descriptor.risk.value == "emergency"
+    assert ServoStopAdapter.descriptor.risk.value == "low"
     assert ServoStopAdapter.descriptor.resources == ServoMoveAdapter.descriptor.resources
     assert ServoStopAdapter.descriptor.confirmation_required is False
 
