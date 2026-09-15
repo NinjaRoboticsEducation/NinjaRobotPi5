@@ -11,6 +11,14 @@ configuration. The supported game is available by default; do not ask the user
 to enable a feature flag. Required-device health, resource admission and system
 safety checks remain authoritative, and availability never starts a game.
 
+On a new explicit request, use the run tool once and report its current result.
+An older unavailable result in conversation or game status is historical, not
+proof of a current device fault. Normal game cleanup releases the buzzer, and
+the next run silently initializes it and safely recovers completed sensor work
+before checking health. Do not refuse a new request solely because the previous
+game reported an unavailable device. Do not bypass a current safety refusal,
+perform system Resume yourself, or automatically retry the same failed request.
+
 Status reads do not touch devices. Stop is independent of a busy conversation.
 Explain unavailable/faulted/cancelled outcomes honestly. A successful tool call
 is not proof that a person heard a tone. Never retry a run automatically after

@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from .agent_loop import AgentReply, TextDeltaHandler
+from .events import AgentEventType
+from .models import ToolExecutionResult, ToolExecutionStatus
 from .runtime import AgentRuntime
 from .tools import CancellationToken
 
@@ -278,7 +280,7 @@ class WebRobotController:
             await self._stop_motion_unlocked(lease_id)
             token = CancellationToken()
             task = asyncio.create_task(
-                self._runtime.execute_tool(
+                self._execute_movement(
                     tool_name="robot.behavior.run",
                     arguments={"name": behavior},
                     session_id=self.control_session(lease_id),
@@ -292,6 +294,27 @@ class WebRobotController:
                 self._movement = (lease_id, token, task)
             task.add_done_callback(self._consume_background_result)
         return {"started": True, "direction": direction}
+
+    async def _execute_movement(self, **arguments: Any) -> ToolExecutionResult:
+        """Report background admission/device failures instead of hiding them."""
+        try:
+            result = await self._runtime.execute_tool(**arguments)
+        except Exception as exc:
+            await self._runtime.events.publish(
+                AgentEventType.ERROR,
+                f"Movement failed: {type(exc).__name__}: {exc}"[:1000],
+                session_id=arguments["session_id"],
+                data={"kind": "web_movement_failed"},
+            )
+            raise
+        if result.status not in {ToolExecutionStatus.SUCCEEDED, ToolExecutionStatus.CANCELLED}:
+            await self._runtime.events.publish(
+                AgentEventType.ERROR,
+                f"Movement did not start or complete: {result.error or result.status.value}"[:1000],
+                session_id=arguments["session_id"],
+                data={"kind": "web_movement_failed"},
+            )
+        return result
 
     async def stop_motion(self, lease_id: str) -> dict[str, Any]:
         async with self._motion_command_lock:

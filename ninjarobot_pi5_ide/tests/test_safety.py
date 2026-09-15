@@ -248,6 +248,57 @@ def test_motion_latch_cannot_replace_operator_system_stop(tmp_path):
     assert state.read() == original
 
 
+@pytest.mark.parametrize("cancelled", [True, False])
+def test_responsive_cleanup_outlasting_watchdog_does_not_latch(tmp_path, cancelled):
+    async def exercise():
+        motion, servo, _distance, state = controller(tmp_path, readings=[200])
+        original = servo.stop
+
+        async def slow_stop():
+            await asyncio.sleep(0.18)  # Longer than this fixture's 0.1 s watchdog.
+            return await original()
+
+        servo.stop = slow_stop
+        task = asyncio.create_task(
+            motion.drive(drive_operation(hold_seconds=None if cancelled else 0.05), "move_forward")
+        )
+        if cancelled:
+            while not motion.active:
+                await asyncio.sleep(0.001)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        else:
+            result = await task
+            assert result["stop_reason"] == "movement_duration_complete"
+        assert servo.stop_calls >= 1
+        assert servo.emergency_calls == 0
+        assert not state.read().motion_latched
+        assert not motion.active
+
+    asyncio.run(exercise())
+
+
+def test_actual_control_loop_stall_still_triggers_watchdog(tmp_path):
+    async def exercise():
+        motion, servo, _distance, state = controller(tmp_path, readings=[200])
+
+        async def stalled_ramp(**_kwargs):
+            # Deliberately block only this simulated test loop. Never do this
+            # in a live hardware test.
+            time.sleep(0.25)
+            return {"interrupted": True}
+
+        servo.move_group = stalled_ramp
+        result = await motion.drive(drive_operation(), "move_forward")
+        assert state.read().reason == "software_watchdog"
+        assert state.read().motion_latched
+        assert result["stop_reason"] == "software_watchdog"
+        assert servo.emergency_calls == 1
+
+    asyncio.run(exercise())
+
+
 def test_legacy_warn_only_and_direct_endpoint_obey_obstacle_guard(tmp_path):
     async def exercise():
         motion, servo, _distance, state = controller(tmp_path, readings=[40])

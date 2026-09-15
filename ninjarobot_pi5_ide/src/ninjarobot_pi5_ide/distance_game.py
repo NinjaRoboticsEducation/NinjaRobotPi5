@@ -165,9 +165,9 @@ class DistanceGame:
             if not is_game:
                 if name != "system.resume":
                     await self.stop("incoming_action")
-                if name in {"servo.move", "behavior.execute_movement", "behavior.run"}:
-                    if self.robot.distance._recovery_required:
-                        raise RuntimeError("distance recovery required before movement")
+                # MotionController prepares and recovers the sensor under its
+                # motion lock. Rejecting its transient recovery flag here would
+                # prevent that recovery after an ordinary cancelled movement.
             yield
         finally:
             async with self._admission:
@@ -240,6 +240,11 @@ class DistanceGame:
                     "No manual game enablement is needed. Check the reported sensor fault.",
                 )
                 return self.status()
+            self.robot.ensure_action_allowed("game.distance.run")
+            # Buzzer.off() intentionally releases its backend and marks it
+            # uninitialized. Reopen silently before admission on every session,
+            # just as BuzzerDevice.play() does before a normal tone.
+            await self.robot.buzzer.start()
             self.robot.ensure_action_allowed("game.distance.run")
             health = dict(
                 zip(
@@ -372,7 +377,10 @@ class DistanceGameAdapter:
             version="1.0.0",
             description=(
                 "Explicitly play a finite hand-distance sound game. No wheels or capture. "
-                "Closer hand means higher tone; stop independently with game.distance.stop."
+                "Closer hand means higher tone; stop independently with game.distance.stop. "
+                "Each new user request performs fresh device preparation and health checks, "
+                "including reopening a normally stopped buzzer. An older unavailable result "
+                "is not a current refusal. Do not automatically retry the same failed request."
             )
             if operation == "run"
             else f"{operation.title()} the distance game without starting hardware.",

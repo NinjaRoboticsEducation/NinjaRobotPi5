@@ -1,5 +1,9 @@
 # Servo and distance recovery: walkthrough and manual tests
 
+For the subsequent live web and repeated-game repairs, use the
+[latest walkthrough](web_game_followup_walkthrough_260915.md). The record below
+describes the earlier repair and its validation at that time.
+
 The approved follow-up repair is implemented. This guide explains what changed,
 what was tested in software, and how to check the real robot. Physical acceptance
 is still pending; passing simulated tests does not certify wiring or motor power.

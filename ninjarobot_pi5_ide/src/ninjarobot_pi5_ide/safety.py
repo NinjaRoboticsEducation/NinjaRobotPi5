@@ -622,7 +622,12 @@ class MotionController:
 
     async def _watchdog_heartbeat(self, watchdog: _WatchdogThread) -> None:
         interval = max(self._config.watchdog_timeout_seconds / 4, 0.01)
-        while not self._stop_event.is_set():
+        # A requested motor stop is not an event-loop failure. Device cleanup
+        # can legitimately outlast one heartbeat timeout. The owning context
+        # closes the watchdog and cancels this task only after cleanup exits.
+        # If the event loop actually stalls, this task cannot beat and the
+        # independent watchdog still cuts motor output.
+        while True:
             watchdog.beat()
             await asyncio.sleep(interval)
 

@@ -97,6 +97,44 @@ def test_direct_move_uses_controller_and_finishes_with_zero_output(tmp_path, mon
     asyncio.run(exercise())
 
 
+def test_movement_admission_allows_owned_sensor_recovery(tmp_path, monkeypatch):
+    import threading
+
+    async def exercise():
+        client = client_for(tmp_path)
+        await client.start()
+        sensor = client.robot.distance._sensor
+        original = sensor.get_data
+        entered, release = threading.Event(), threading.Event()
+
+        def slow_read():
+            entered.set()
+            assert release.wait(2)
+            return original()
+
+        monkeypatch.setattr(sensor, "get_data", slow_read)
+        reading = asyncio.create_task(client.robot.distance.execute({}))
+        try:
+            while not entered.is_set():
+                await asyncio.sleep(0.001)
+            reading.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await reading
+            release.set()
+            # Exercise admission, not just MotionController in isolation.
+            result = await client.execute(action("after-cancelled-read"))
+            assert result.status is ActionStatus.SUCCEEDED
+            assert not result.data["interrupted"]
+            assert not client.robot.safety_state.read().motion_latched
+        finally:
+            release.set()
+            while client.robot.distance._busy:
+                await asyncio.sleep(0.001)
+            await client.close()
+
+    asyncio.run(exercise())
+
+
 def test_direct_obstacle_feedback_and_clearance_without_resume(tmp_path, monkeypatch):
     import time
     from unittest.mock import AsyncMock

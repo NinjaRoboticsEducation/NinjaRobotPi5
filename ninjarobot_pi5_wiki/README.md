@@ -28,15 +28,16 @@ for source versions and provenance:
 ## Pending full manuals — approved servo and sensor recovery follow-up
 
 These complete successor sources include the 15 September follow-up repair,
-normal-stop and obstacle recovery rules, automatic sensor recovery, and chat
-budget validation. They are not registered, ingested, normalized, or semantically
+normal-stop and obstacle recovery rules, automatic sensor recovery, repeated-game
+buzzer preparation, visible web errors, and chat guidance. They are not registered,
+ingested, normalized, or semantically
 reviewed. The current document map above remains the published checkpoint.
 
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-15-02/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-15-02/DevelopmentGuide.md)
-- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-15-02/NinjaRobot_MCP_Skill.md)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-15-02/DevelopmentLog.md)
-- [Repair walkthrough and manual tests](../docs/validation/servo_sensor_recovery_walkthrough_260915.md)
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-15-03/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-15-03/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-15-03/NinjaRobot_MCP_Skill.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-15-03/DevelopmentLog.md)
+- [Repair walkthrough and manual tests](../docs/validation/web_game_followup_walkthrough_260915.md)
 - [Approved audit and implementation plan](../docs/validation/servo_chat_game_followup_260915.md)
 
 The earlier 15 September sources remain preserved under their original date

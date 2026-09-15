@@ -326,6 +326,60 @@ def test_unavailable_game_does_not_block_existing_outputs(tmp_path):
     asyncio.run(exercise())
 
 
+@pytest.mark.parametrize("fail_restart", [False, True])
+def test_game_reopens_buzzer_released_by_previous_game(tmp_path, fail_restart):
+    """The real buzzer off() releases resources, unlike the old game substitute."""
+
+    class ReleasedBuzzer:
+        is_initialized = True
+        volume = 16
+        initialize_calls = 0
+        tones = 0
+
+        def initialize(self):
+            self.initialize_calls += 1
+            if fail_restart:
+                raise OSError("test GPIO reopen failure")
+            self.is_initialized = True
+
+        def off(self):
+            self.is_initialized = False
+
+        def play_sound(self, frequency, duration):
+            assert self.is_initialized
+            self.tones += 1
+
+    async def exercise():
+        client = client_for(tmp_path)
+        await client.start()
+        driver = ReleasedBuzzer()
+        client.robot.buzzer._driver = driver
+
+        async def play(*_args):
+            await client.robot.buzzer.play(frequency_hz=440, duration_seconds=0.01, volume=16)
+
+        client.robot.distance_game._loop = play
+        try:
+            first = await client.execute(request("game.distance.run", "first"))
+            assert first.data["state"] == "finished"
+            assert not driver.is_initialized
+            await client.execute(request("game.distance.stop", "stop"))
+            second = await client.execute(request("game.distance.run", "second"))
+            assert driver.initialize_calls == 1
+            if fail_restart:
+                assert second.data["state"] == "unavailable"
+                assert "buzzer" in second.data["device_errors"]
+                assert driver.tones == 1
+            else:
+                assert second.data["state"] == "finished"
+                assert driver.tones == 2
+            assert not client.robot.safety_state.read().system_latched
+        finally:
+            await client.close()
+
+    asyncio.run(exercise())
+
+
 @pytest.mark.parametrize("healthy", [True, False])
 def test_game_recovers_cancelled_sensor_without_manual_resume(tmp_path, healthy):
     import threading

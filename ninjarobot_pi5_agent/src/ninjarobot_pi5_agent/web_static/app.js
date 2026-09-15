@@ -337,6 +337,9 @@
           state: event.data.state,
         });
       }
+      if (event.data?.kind === "web_movement_failed") {
+        toast(event.message || t("error.requestFailed"));
+      }
       log(event.message || t("status.agentEvent"), event.event_type === "error" ? "error" : "info");
       return;
     }

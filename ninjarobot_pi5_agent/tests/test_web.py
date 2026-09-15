@@ -179,6 +179,37 @@ def test_pointer_release_cannot_race_a_pending_movement_start() -> None:
     asyncio.run(exercise())
 
 
+@pytest.mark.parametrize("raises", [False, True])
+def test_background_movement_failure_is_visible_to_browser(raises):
+    async def exercise():
+        class Runtime:
+            events = EventBroker()
+
+            async def execute_tool(self, **arguments):
+                if raises:
+                    raise RuntimeError("test admission failed")
+                return ToolExecutionResult(
+                    call_id="denied",
+                    tool_name="robot.behavior.run",
+                    status=ToolExecutionStatus.DENIED,
+                    error="test admission failed",
+                )
+
+        runtime = Runtime()
+        controller = WebRobotController(cast(AgentRuntime, runtime))
+        if raises:
+            with pytest.raises(RuntimeError):
+                await controller._execute_movement(session_id="web-control-test")
+        else:
+            await controller._execute_movement(session_id="web-control-test")
+        events = await runtime.events.history()
+        assert len(events) == 1
+        assert events[0].data["kind"] == "web_movement_failed"
+        assert "test admission failed" in events[0].message
+
+    asyncio.run(exercise())
+
+
 def test_web_resume_disarms_ai_and_reactivates_direct_control_only_after_success() -> None:
     async def exercise() -> None:
         runtime = _ResumeRuntime()
