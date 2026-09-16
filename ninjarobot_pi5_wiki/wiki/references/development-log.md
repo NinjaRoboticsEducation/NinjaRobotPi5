@@ -9,10 +9,10 @@ generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20260913-developmentlog
-  resource: urn:llmwiki:source:src-20260913-developmentlog
+- id: src-20260916-developmentlog
+  resource: urn:llmwiki:source:src-20260916-developmentlog
   title: DevelopmentLog.md
-  content_hash: sha256:663fc7ad61d10421ed4d2fc1fa67a1db8ec4d2d8c96240ee49742433982e2c29
+  content_hash: sha256:a1ed4916684874da26db673b76e31fde29634bee7dbe9c0db7ac1fd0f87e0d7a
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -20,8 +20,8 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-09-13T14:15:00Z'
-  target_hash: sha256:5a8d64fafe6d2d7f32df300314054122145d8f973427ee2c791a92b21a25dda1
+  performed_at: '2026-09-16T00:26:00Z'
+  target_hash: sha256:edaeaba5cc3514edb7eefcd68cb6a18964ab068aa2307b562cf5dcf86dd7ffa6
   result: passed
   checks:
     source_support: passed
@@ -30,15 +30,15 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered Phase 4 information evidence; no human verification
-    is claimed.
+  - Reviewed this page against registered 16 September distance game and follow-up
+    evidence; no human verification is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
     and note pending font repair and monetary spending cap.
 ---
 
 # Development log
 
-The complete log preserves dated implementation decisions and validation reports. Historical test results describe their recorded checkout and date; they are not fresh verification.[^src-20260913-developmentlog]
+The complete log preserves dated implementation decisions and validation reports. Historical test results describe their recorded checkout and date; they are not fresh verification.[^src-20260916-developmentlog]
 
 Use the source identifier below to resolve the complete manual through the raw
 source catalog. The outer wiki README also links directly to the current full
@@ -47,13 +47,16 @@ Read the relevant full section before acting on an abbreviated explanation.[^src
 
 [Return to project overview](/overview.md).
 
-## Current checkpoint: completed Phase 4 information work
+## Current checkpoint: distance game hand-placement correction and follow-up repairs
 
-The 13 September 2026 entry records completion of the Phase 4 information assistant
-(calendar, research, notes, briefings), the earlier narrowed Phase 4 update (recipes,
-memory, v2 skills, project help), Refinement Phase 5 software and hardware evaluation,
-and system clock access. All test gates pass without live hardware movement.[^src-20260913-developmentlog]
+The 16 September 2026 entry records the distance game hand-placement timing correction
+(pre-answer game start, web chat notification, out-of-range silent waiting, `no_target_detected`,
+sample metrics), alongside 15 September repairs (servo stop priority allowlist with LOW risk rating,
+rolling chat context in `AgentLoop`, default-enabled distance game, stop cause preservation,
+bounded distance preparation/recovery, repeated-game buzzer preparation, watchdog heartbeat
+during cleanup), Phase 4 information assistant completion (calendar, research, notes, briefings),
+narrowed Phase 4 foundations, Phase 5 evaluation, and system clock access.[^src-20260916-developmentlog]
 
 
-[^src-20260913-developmentlog]: DevelopmentLog.md, source version `refinement-phase4-information-260913`; registered source `src-20260913-developmentlog`.
+[^src-20260916-developmentlog]: DevelopmentLog.md, source version `distance-game-hand-placement-260916`; registered source `src-20260916-developmentlog`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

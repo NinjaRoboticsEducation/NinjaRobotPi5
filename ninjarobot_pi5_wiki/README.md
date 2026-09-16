@@ -4,19 +4,24 @@ Start here for project documentation, architecture, development history, and
 AI-assisted development. Open this folder in your coding tool for wiki questions,
 or open the parent project for development and implementation verification.
 
-## Current full manuals — completed Phase 4 information work
+## Current full manuals — distance game hand-placement correction
 
 These current source revisions are ingested into the wiki knowledge base.
-M03 memory retrieval, M04 read-only recipes, X01 compatible skills, and X05 public
-help are retained alongside T04 calendar planning, T05 research, and T06
-notes/checklists/requested briefings. System clock access and Refinement Phase 5
-foundations are also consolidated here. Use [the current document map](project-knowledge.json)
-for source versions and provenance:
+The 16 September 2026 hand-placement correction and 15 September follow-up repairs
+(normal-stop and obstacle recovery rules, automatic sensor recovery, repeated-game
+buzzer preparation, visible web errors, chat guidance, rolling context in AgentLoop,
+and default distance game enablement) are consolidated alongside completed Phase 4
+information work (T04 calendar planning, T05 research, and T06 notes/checklists/requested
+briefings), Phase 4 foundations, and system clock access.
+Use [the current document map](project-knowledge.json) for source versions and provenance:
 
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-13-03/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-13-03/DevelopmentGuide.md)
-- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-13-03/NinjaRobot_MCP_Skill.md)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-13-03/DevelopmentLog.md)
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-16/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-16/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-16/NinjaRobot_MCP_Skill.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-16/DevelopmentLog.md)
+- [Distance game hand-placement repair and tests](../docs/validation/distance_game_web_hand_260916.md)
+- [Web and game follow-up walkthrough](../docs/validation/web_game_followup_walkthrough_260915.md)
+- [Servo and sensor recovery repair](../docs/validation/servo_sensor_recovery_walkthrough_260915.md)
 - [Information-assistant walkthrough](../docs/validation/refinement_phase4_information_walkthrough_260913.md)
 - [Information-assistant handoff](../docs/validation/refinement_phase4_information_handoff_260913.md)
 - [Earlier Phase 4 walkthrough](../docs/validation/refinement_phase4_walkthrough_260913.md)
@@ -25,29 +30,20 @@ for source versions and provenance:
 - [Phase 5 handoff](../docs/validation/refinement_phase5_handoff_260913.md)
 - [Clock fix and manual tests](../docs/validation/system_time_fix_260912.md)
 
-## Pending full manuals — approved servo and sensor recovery follow-up
-
-These complete successor sources include the 16 September hand-placement correction
-and the 15 September follow-up repair,
-normal-stop and obstacle recovery rules, automatic sensor recovery, repeated-game
-buzzer preparation, visible web errors, and chat guidance. They are not registered,
-ingested, normalized, or semantically
-reviewed. The current document map above remains the published checkpoint.
-
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-16/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-16/DevelopmentGuide.md)
-- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-16/NinjaRobot_MCP_Skill.md)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-16/DevelopmentLog.md)
-- [Repair walkthrough and manual tests](../docs/validation/web_game_followup_walkthrough_260915.md)
-- [Distance game hand-placement repair and tests](../docs/validation/distance_game_web_hand_260916.md)
-- [Approved audit and implementation plan](../docs/validation/servo_chat_game_followup_260915.md)
-
 The earlier 15 September sources remain preserved under their original date
 folders. The root README links directly to these latest full manuals.
 
 Runtime project help is separate from developer wiki search. It uses a fixed
 public list pinned to the published 12 September checkpoint and reports
 draft/older coverage.
+
+## Historical full manuals — earlier checkpoints
+
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-13-03/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-13-03/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-13-03/NinjaRobot_MCP_Skill.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-13-03/DevelopmentLog.md)
+- [Information-assistant walkthrough](../docs/validation/refinement_phase4_information_walkthrough_260913.md)
 
 ## Historical full manuals — earlier checkpoints
 

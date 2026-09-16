@@ -1,5 +1,9 @@
 # Wiki Update Log
 
+## 2026-09-16
+
+* **Update**: Applied plan `distance-game-hand-placement-260916` — Ingest 2026-09-16 distance game hand-placement correction manuals and update eleven knowledge pages with 15-16 September repairs, rolling chat context, and distance game sensor timing.. Sources: `src-20260907-knowledgeintegration`, `src-20260916-developmentguide`, `src-20260916-installationguide`, `src-20260916-ninjarobot-mcp-skill`, `src-20260916-developmentlog`.
+
 ## 2026-09-13
 
 * **Update**: Applied plan `refinement-phase4-information-260913` — Ingest 2026-09-13-03 Phase 4 information manuals and update eleven knowledge pages with calendar planning, research service, notes/checklists/briefings, Phase 4 foundations, Phase 5 distance game, and system clock access.. Sources: `src-20260907-knowledgeintegration`, `src-20260913-developmentguide`, `src-20260913-installationguide`, `src-20260913-ninjarobot-mcp-skill`, `src-20260913-developmentlog`.
