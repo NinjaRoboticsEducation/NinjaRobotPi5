@@ -465,6 +465,12 @@ class MCPToolProvider:
             if status is ProviderHealthStatus.READY
             else f"Unavailable ({self._last_error or 'not started'})."
         )
+        if status is ProviderHealthStatus.READY and not self._definitions:
+            status = ProviderHealthStatus.DEGRADED
+            detail = (
+                "Connected, but no tools are exposed. Check allowed_tools and the locally "
+                "reviewed read_only_tools declaration; external writes remain blocked."
+            )
         return ProviderHealth(
             provider=self.provider_id,
             status=status,

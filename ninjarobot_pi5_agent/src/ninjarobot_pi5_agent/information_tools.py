@@ -64,6 +64,7 @@ class InformationProvider:
         self.calendar = CalendarService(self.store, self.google)
         self.research = ResearchService(self.store, self.notes, self._search)
         self.briefing = BriefingService(self.notes, tasks, self.calendar, self.research)
+        self._connection_lock = asyncio.Lock()
         self._active: set[asyncio.Task[Any]] = set()
         self._owners: dict[asyncio.Task[Any], str] = {}
 
@@ -498,29 +499,50 @@ class InformationProvider:
             scope = WRITE_SCOPE if args.get("write") is True else READ_SCOPE
             if credential.get("scope") != scope:
                 raise ValueError("credential scope does not match selected mode")
-            reference = "NINJA_CAL_" + uuid.uuid4().hex.upper()
-            self.secrets.set(reference, json.dumps(credential))
-            try:
-                record = await self.store.action(
-                    user,
-                    "create",
-                    kind="calendar_connection",
-                    payload={
-                        "calendar_id": calendar_id,
-                        "account_label": str(args["account_label"])[:200],
-                        "secret_ref": reference,
-                        "enabled": True,
-                        "write_enabled": args.get("write") is True,
-                    },
-                )
-            except BaseException:
-                self.secrets.delete(reference)
-                raise
-            return {
-                "connection_id": record["record_id"],
-                "calendar_id": calendar_id,
-                "write_enabled": args.get("write") is True,
-            }
+            async with self._connection_lock:
+                previous = None
+                after = ""
+                while True:
+                    page = await self.store.action(
+                        user, "list", kind="calendar_connection", after=after, limit=100
+                    )
+                    previous = next(
+                        (r for r in page["records"] if r["payload"]["calendar_id"] == calendar_id),
+                        None,
+                    )
+                    if previous or not page["next_after"]:
+                        break
+                    after = page["next_after"]
+                reference = "NINJA_CAL_" + uuid.uuid4().hex.upper()
+                self.secrets.set(reference, json.dumps(credential))
+                try:
+                    record = await self.store.action(
+                        user,
+                        "update" if previous else "create",
+                        kind="calendar_connection",
+                        record_id=previous["record_id"] if previous else "",
+                        revision=previous["revision"] if previous else 0,
+                        payload={
+                            "calendar_id": calendar_id,
+                            "account_label": str(args["account_label"])[:200],
+                            "secret_ref": reference,
+                            "enabled": True,
+                            "write_enabled": args.get("write") is True,
+                        },
+                    )
+                except BaseException:
+                    self.secrets.delete(reference)
+                    raise
+                if previous:
+                    old_reference = previous["payload"]["secret_ref"]
+                    self.google.forget(old_reference)
+                    self.secrets.delete(old_reference)
+                return {
+                    "connection_id": record["record_id"],
+                    "calendar_id": calendar_id,
+                    "write_enabled": args.get("write") is True,
+                    "reconnected": previous is not None,
+                }
         if operation == "calendar.disconnect":
             record = await self.calendar.connection(user, args["connection_id"])
             await self.store.action(

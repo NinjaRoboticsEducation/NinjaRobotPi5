@@ -265,3 +265,49 @@ def test_calendar_setup_owner_binding_and_profile_credential_cleanup(tmp_path: P
             await runtime.close()
 
     asyncio.run(run())
+
+
+def test_calendar_reconnect_preserves_id_and_replaces_private_grant(tmp_path):
+    from ninjarobot_pi5_agent.calendar_google import READ_SCOPE, WRITE_SCOPE
+
+    async def run():
+        runtime = await runtime_for(tmp_path)
+        try:
+            args = dict(
+                calendar_id="test@example.org",
+                account_label="Test",
+                credential=dict(
+                    client_id="fake", client_secret="fake", refresh_token="fake", scope=READ_SCOPE
+                ),
+                expected_user_id="local-user",
+            )
+
+            async def connect():
+                return await information_action(
+                    runtime,
+                    "setup",
+                    dict(operation="calendar.connect", confirmed=True, arguments=args),
+                )
+
+            first = await connect()
+            record = await runtime.information.store.action(
+                "local-user", "get", record_id=first["connection_id"]
+            )
+            args["write"] = True
+            args["credential"]["scope"] = WRITE_SCOPE
+            second = await connect()
+            assert first["connection_id"] == second["connection_id"]
+            assert second["reconnected"] and second["write_enabled"]
+            assert not runtime.information.secrets.contains(record["payload"]["secret_ref"])
+            page = await runtime.information.store.action(
+                "local-user", "list", kind="calendar_connection"
+            )
+            assert len(page["records"]) == 1
+            assert page["records"][0]["revision"] == 2
+            args["credential"]["scope"] = READ_SCOPE
+            with pytest.raises(ValueError, match="scope"):
+                await connect()
+        finally:
+            await runtime.close()
+
+    asyncio.run(run())

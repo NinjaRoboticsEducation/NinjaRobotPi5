@@ -16,7 +16,9 @@ import httpx
 from .calendar_google import READ_SCOPE, WRITE_SCOPE, bounded_request
 
 
-async def authorize(client_file: Path, *, port: int = 8765, write: bool = False) -> dict[str, Any]:
+async def authorize(
+    client_file: Path, *, port: int = 8765, write: bool = False, discover_primary: bool = False
+) -> dict[str, Any]:
     if not 1024 <= port <= 65535:
         raise ValueError("choose a local callback port from 1024 through 65535")
     with client_file.open("rb") as stream:
@@ -35,6 +37,9 @@ async def authorize(client_file: Path, *, port: int = 8765, write: bool = False)
     )
     redirect = f"http://127.0.0.1:{port}/"
     scope = WRITE_SCOPE if write else READ_SCOPE
+    requested_scopes = scope
+    if discover_primary:
+        requested_scopes += " https://www.googleapis.com/auth/calendar.calendarlist.readonly"
     future: asyncio.Future[str] = asyncio.get_running_loop().create_future()
 
     workers: set[asyncio.Task[Any]] = set()
@@ -102,7 +107,7 @@ async def authorize(client_file: Path, *, port: int = 8765, write: bool = False)
                 "client_id": client["client_id"],
                 "redirect_uri": redirect,
                 "response_type": "code",
-                "scope": scope,
+                "scope": requested_scopes,
                 "access_type": "offline",
                 "prompt": "consent",
                 "state": state,
@@ -134,17 +139,19 @@ async def authorize(client_file: Path, *, port: int = 8765, write: bool = False)
                         "grant_type": "authorization_code",
                     },
                 )
-        if (
-            not isinstance(token.get("refresh_token"), str)
-            or scope not in token.get("scope", "").split()
-        ):
+        if not isinstance(token.get("refresh_token"), str) or not set(
+            requested_scopes.split()
+        ) <= set(token.get("scope", "").split()):
             raise ValueError("the requested offline calendar permission was not granted")
-        return {
+        result = {
             "client_id": client["client_id"],
             "client_secret": client["client_secret"],
             "refresh_token": token["refresh_token"],
             "scope": scope,
         }
+        if discover_primary:
+            result.update(await primary_calendar(token, write=write))
+        return result
     finally:
         server.close()
         await server.wait_closed()
@@ -153,3 +160,29 @@ async def authorize(client_file: Path, *, port: int = 8765, write: bool = False)
             worker.cancel()
         if pending:
             await asyncio.gather(*pending, return_exceptions=True)
+
+
+async def primary_calendar(token: dict[str, Any], *, write: bool) -> dict[str, str]:
+    """Resolve the primary alias to a stable ID before storing a connection."""
+    access = token.get("access_token")
+    if not isinstance(access, str) or not 1 <= len(access) <= 8192:
+        raise ValueError("Google did not return a valid access token")
+    async with asyncio.timeout(15):
+        async with httpx.AsyncClient(timeout=10, follow_redirects=False, trust_env=False) as http:
+            _, calendar = await bounded_request(
+                http,
+                "GET",
+                "https://www.googleapis.com/calendar/v3/users/me/calendarList/primary",
+                headers={"Authorization": "Bearer " + access},
+                limit=65536,
+            )
+    ident = calendar.get("id")
+    if (
+        not isinstance(ident, str)
+        or "@" not in ident
+        or len(ident) > 300
+        or calendar.get("primary") is not True
+        or calendar.get("accessRole") not in ({"owner"} if write else {"owner", "writer", "reader"})
+    ):
+        raise ValueError("Google primary calendar identity or permission could not be verified")
+    return {"calendar_id": ident, "account_label": ident[:200]}

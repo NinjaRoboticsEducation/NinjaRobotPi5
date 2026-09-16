@@ -88,8 +88,9 @@ def test_real_public_checkpoint_and_missing_checkout():
     provider = ProjectHelpProvider(checkout_wiki())
     result = provider.lookup("Bluetooth")
     assert result["results"]
-    assert "2026-09-12" in result["warnings"][0]
-    assert all(item["page_state"] == "draft" for item in result["results"])
+    assert all(item["page_state"] in {"source", "unpublished"} for item in result["results"])
+    assert all(item["source_path"].startswith("raw/") for item in result["results"])
+    assert all(item["source_version"] >= "2026-09-16" for item in result["results"])
     assert ProjectHelpProvider().lookup("Bluetooth")["results"] == []
 
 

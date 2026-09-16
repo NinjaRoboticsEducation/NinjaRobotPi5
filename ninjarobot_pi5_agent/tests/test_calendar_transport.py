@@ -72,7 +72,10 @@ def test_transport_fixed_hosts_scope_revocation_and_response_budget(tmp_path):
     asyncio.run(run())
 
 
-def test_oauth_pkce_state_loopback_and_cleanup_without_live_network(tmp_path, monkeypatch):
+@pytest.mark.parametrize("discover", [False, True])
+def test_oauth_pkce_state_loopback_and_cleanup_without_live_network(
+    tmp_path, monkeypatch, discover
+):
     from ninjarobot_pi5_agent import calendar_oauth
 
     async def run():
@@ -128,6 +131,11 @@ def test_oauth_pkce_state_loopback_and_cleanup_without_live_network(tmp_path, mo
                 spawned.append(asyncio.create_task(send()))
 
         def respond(request):
+            if request.url.host == "www.googleapis.com":
+                assert discover
+                return httpx.Response(
+                    200, json={"id": "primary@example.org", "primary": True, "accessRole": "owner"}
+                )
             assert request.url.host == "oauth2.googleapis.com"
             values = parse_qs(request.content.decode())
             challenge = (
@@ -139,7 +147,14 @@ def test_oauth_pkce_state_loopback_and_cleanup_without_live_network(tmp_path, mo
             )
             assert challenge == authorization["code_challenge"][0]
             assert values["redirect_uri"] == ["http://127.0.0.1:8765/"]
-            return httpx.Response(200, json={"refresh_token": "fake-refresh", "scope": READ_SCOPE})
+            return httpx.Response(
+                200,
+                json={
+                    "refresh_token": "fake-refresh",
+                    "scope": authorization["scope"][0],
+                    "access_token": "fake-access",
+                },
+            )
 
         original_client = httpx.AsyncClient
         monkeypatch.setattr(calendar_oauth.asyncio, "start_server", start_server)
@@ -149,11 +164,56 @@ def test_oauth_pkce_state_loopback_and_cleanup_without_live_network(tmp_path, mo
             "AsyncClient",
             lambda **kwargs: original_client(**kwargs, transport=httpx.MockTransport(respond)),
         )
-        result = await calendar_oauth.authorize(client_file)
+        result = await calendar_oauth.authorize(client_file, discover_primary=discover)
+        if discover:
+            assert result["calendar_id"] == "primary@example.org"
+            assert "calendar.calendarlist.readonly" in authorization["scope"][0]
         await asyncio.gather(*spawned)
         assert result["refresh_token"] == "fake-refresh"
         assert responses[0].startswith(b"HTTP/1.1 400")
         assert responses[1].startswith(b"HTTP/1.1 200")
         assert server.closed
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(
+    "write,role,primary,expected",
+    [
+        (True, "owner", True, True),
+        (True, "writer", True, False),
+        (False, "reader", True, True),
+        (False, "owner", False, False),
+    ],
+)
+def test_primary_discovery_requires_verified_identity(
+    tmp_path, monkeypatch, write, role, primary, expected
+):
+    from ninjarobot_pi5_agent import calendar_oauth
+
+    async def run():
+        def respond(request):
+            assert (
+                str(request.url)
+                == "https://www.googleapis.com/calendar/v3/users/me/calendarList/primary"
+            )
+            assert request.headers["Authorization"] == "Bearer fake"
+            return httpx.Response(
+                200, json={"id": "owner@example.org", "accessRole": role, "primary": primary}
+            )
+
+        original = httpx.AsyncClient
+        monkeypatch.setattr(
+            calendar_oauth.httpx,
+            "AsyncClient",
+            lambda **kwargs: original(**kwargs, transport=httpx.MockTransport(respond)),
+        )
+        if expected:
+            assert (await calendar_oauth.primary_calendar({"access_token": "fake"}, write=write))[
+                "calendar_id"
+            ] == "owner@example.org"
+        else:
+            with pytest.raises(ValueError, match="identity or permission"):
+                await calendar_oauth.primary_calendar({"access_token": "fake"}, write=write)
 
     asyncio.run(run())

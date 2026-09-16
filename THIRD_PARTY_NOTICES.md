@@ -144,6 +144,11 @@ installed Desktop OAuth flow over the existing HTTPX dependency. No Google SDK,
 third-party implementation code or calendar credentials are bundled. Google
 account authorization, administrator policy, service terms and quotas apply.
 Default access is read-only; writes require separate setup and exact user review.
+Guided primary-calendar discovery additionally requests calendar-list read access.
+The compatibility setup wrapper selects reviewed-write authorization unless
+`--read-only` is supplied; Google consent and exact event confirmation still apply.
+No dependency was added for this refinement. Primary IDs are resolved using
+[CalendarList.get](https://developers.google.com/workspace/calendar/api/v3/reference/calendarList/get).
 
 Implementation references:
 [Desktop authorization](https://developers.google.com/identity/protocols/oauth2/native-app),

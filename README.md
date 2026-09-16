@@ -17,7 +17,7 @@
 > [!NOTE]
 > **v1.0.0 public release.** The project owner completed the Phase 8 manual
 > Raspberry Pi validation. New installations must still follow the safety and
-> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-16/InstallationGuide.md) because
+> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-17/InstallationGuide.md) because
 > wiring and hardware tolerances differ between robots.
 
 ---
@@ -66,8 +66,12 @@ Google setup is optional and read-only by default; direct confirmation is requir
 for writes. Local notes and briefings need no conversation model. See the earlier
 [Phase 4 walkthrough](docs/validation/refinement_phase4_walkthrough_260913.md) and
 [handoff](docs/validation/refinement_phase4_handoff_260913.md).
-Public-help coverage remains the published 12 September draft checkpoint;
-newer full manuals below remain pending ingestion.
+`calendar-connect --write` now discovers and registers the primary calendar after
+Google consent; calendar ID and account label are optional. Event creation still
+requires review and direct confirmation. Public help searches current full manuals
+and follows section continuations, labeling unpublished sources honestly.
+See the [Calendar and project-help setup/tests](docs/validation/calendar_wiki_walkthrough_260917.md).
+The new full manuals remain pending wiki ingestion and review.
 
 The [hardware evaluation](DevelopmentPlanDoc/hardware/HardwareOptions_260912.md)
 is a set of proposals and deferrals, not newly installed hardware or fall protection.
@@ -228,7 +232,7 @@ uv run --frozen --extra hardware ninjarobot-agent
 
 The installer does not download an Ollama model, start the Agent, move a motor,
 open the camera or microphone, or deploy boot startup. Follow the complete
-[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-16/InstallationGuide.md) for wiring, module initialization,
+[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-17/InstallationGuide.md) for wiring, module initialization,
 calibration, model download, and safe first movement.
 
 ---
@@ -290,10 +294,10 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 
 | Document | Purpose |
 |---|---|
-| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-16/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
-| [MCP and Agent Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-16/NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
-| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-16/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
-| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-16/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
+| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-17/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
+| [MCP and Agent Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-17/NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
+| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-17/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
+| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-17/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
 | [Documentation Index](docs/README.md) | Public, developer, architecture, history, and validation documents |
 | [Audit Report](docs/project-history/AuditReport_260731.md) | Historical security, reliability, and documentation audit findings |
 | [Implementation Plan](docs/project-history/NinjaRobotPi5V4_ImplementationPlan.md) | Historical phase design and delivery decisions |

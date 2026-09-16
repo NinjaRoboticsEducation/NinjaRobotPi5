@@ -188,9 +188,17 @@ def build_parser() -> argparse.ArgumentParser:
     calendar = commands.add_parser(
         "calendar-connect", help="Explicit Google Desktop OAuth setup over an SSH loopback tunnel."
     )
-    calendar.add_argument("--client-file", type=Path, required=True)
-    calendar.add_argument("--calendar-id", required=True)
-    calendar.add_argument("--account-label", required=True)
+    calendar.add_argument(
+        "--client-file",
+        type=Path,
+        default=Path("~/.config/ninjarobot_pi5/google-calendar/credentials.json"),
+    )
+    calendar.add_argument(
+        "--calendar-id", help="Optional explicit calendar ID; default: discover primary."
+    )
+    calendar.add_argument(
+        "--account-label", help="Optional display label; default: resolved calendar ID."
+    )
     calendar.add_argument("--write", action="store_true")
     calendar.add_argument("--port", type=int, default=8765)
     calendar.add_argument("--session", default="local-cli")
@@ -582,17 +590,30 @@ async def _run(arguments: argparse.Namespace) -> int:
     if arguments.command == "calendar-connect":
         from .calendar_oauth import authorize
 
-        context = await AgentIPCClient(arguments.service_socket).request(
-            {
-                "command": "information",
-                "session_id": arguments.session,
-                "data": {"operation": "calendar.connections"},
-            }
-        )
+        try:
+            context = await AgentIPCClient(arguments.service_socket).request(
+                {
+                    "command": "information",
+                    "session_id": arguments.session,
+                    "data": {"operation": "calendar.connections"},
+                }
+            )
+        except (AgentIPCError, OSError) as exc:
+            raise ValueError(
+                "Start the NinjaRobot Agent before Calendar setup, then rerun calendar-connect. "
+                "No authorization or connection was changed."
+            ) from exc
         expected_user = context["data"]["owner_user_id"]
         credential = await authorize(
-            arguments.client_file, port=arguments.port, write=arguments.write
+            arguments.client_file.expanduser(),
+            port=arguments.port,
+            write=arguments.write,
+            discover_primary=not arguments.calendar_id,
         )
+        resolved_id = credential.pop("calendar_id", None)
+        resolved_label = credential.pop("account_label", None)
+        calendar_id = arguments.calendar_id or resolved_id
+        account_label = arguments.account_label or resolved_label or calendar_id
         return await _service_request(
             arguments,
             {
@@ -604,8 +625,8 @@ async def _run(arguments: argparse.Namespace) -> int:
                     "arguments": {
                         "credential": credential,
                         "expected_user_id": expected_user,
-                        "calendar_id": arguments.calendar_id,
-                        "account_label": arguments.account_label,
+                        "calendar_id": calendar_id,
+                        "account_label": account_label,
                         "write": arguments.write,
                     },
                 },

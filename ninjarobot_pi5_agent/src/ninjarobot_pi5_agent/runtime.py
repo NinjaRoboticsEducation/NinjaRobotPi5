@@ -385,7 +385,9 @@ class AgentRuntime:
             if (
                 skill_id is None
                 and re.search(
-                    r"\b(how|explain|where|what)\b.*\b(bluetooth|raspberry|installation|architecture|wiki)\b",
+                    r"\b(how|explain|where|what|instructions|documentation|troubleshoot|setup)\b"
+                    r".*\b(bluetooth|raspberry|installation|architecture|wiki|calendar|"
+                    r"configure|authorize|features|sensor|speech|memory)\b",
                     text,
                     re.IGNORECASE,
                 )

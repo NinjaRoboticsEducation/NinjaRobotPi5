@@ -1,6 +1,7 @@
 # Calendar connection and project help repair plan
 
-Status: researched; awaiting the owner's approval before implementation.
+Status: approved by the owner on 17 September 2026; implemented. See the
+[walkthrough and validation record](calendar_wiki_walkthrough_260917.md).
 Date: 17 September 2026. No runtime, private configuration, credentials, or
 calendar events were changed during diagnosis. The running Agent was not restarted.
 

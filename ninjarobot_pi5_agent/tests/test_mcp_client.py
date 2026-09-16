@@ -228,6 +228,10 @@ def test_custom_tool_requires_local_effect_review(tmp_path) -> None:
             await provider.start()
             definitions = await provider.list_tools()
             assert bool(definitions) is reviewed
+            health = await provider.health()
+            assert health.status.value == ("ready" if reviewed else "degraded")
+            if not reviewed:
+                assert "read_only_tools" in health.detail
             if reviewed:
                 assert not definitions[0].idempotent
             else:
