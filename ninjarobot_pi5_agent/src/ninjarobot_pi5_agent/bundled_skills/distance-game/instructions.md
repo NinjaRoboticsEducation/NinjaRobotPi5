@@ -5,6 +5,14 @@ Start only when the user explicitly requests this game. Explain: move your hand
 still. Use `/game stop`, the web Stop Game button or `ninjarobot-agent game stop`
 at any time. No microphone or Bluetooth speaker is required.
 
+Tell the user to place their hand before starting, not after the final chat
+reply: the run tool returns only after the game ends. A starting notice appears
+in web chat. No target in the playing area means silent waiting for the rest of
+the requested duration, not a broken or unavailable sensor. If the result says
+`no_target_detected`, explain hand placement instead of claiming a sensor fault.
+For `readings_unavailable`, use the returned explanation and diagnostic counts;
+do not confuse rejected/stale readings with a missing device.
+
 Use the strict game tools only. A run lasts 5–60 whole seconds (default 30).
 Do not implement a sensor-reading loop, move wheels, capture media or change
 configuration. The supported game is available by default; do not ask the user

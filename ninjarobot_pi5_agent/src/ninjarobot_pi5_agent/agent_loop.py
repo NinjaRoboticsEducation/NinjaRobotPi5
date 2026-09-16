@@ -768,6 +768,16 @@ class AgentLoop:
                 if budget[0] <= 0:
                     raise AgentLoopError("tool execution budget exhausted, including retries")
                 budget[0] -= 1
+            if call.name == "robot.game.distance.run":
+                await self._events.publish(
+                    AgentEventType.TOOL,
+                    "Starting the distance game. Hold your hand 5–60 cm in front of the sensor "
+                    "now; do not wait for the final reply. No hand means silence. "
+                    "Use Stop Game or /game stop to stop.",
+                    session_id=session_id,
+                    correlation_id=call.call_id,
+                    data={"tool": call.name, "kind": "distance_game_starting"},
+                )
             result = await self._tools.call(invocation, cancellation)
             recovery = self._recovery.decide(
                 definition,

@@ -340,6 +340,9 @@
       if (event.data?.kind === "web_movement_failed") {
         toast(event.message || t("error.requestFailed"));
       }
+      if (event.data?.kind === "distance_game_starting") {
+        addMessage("assistant", event.message);
+      }
       log(event.message || t("status.agentEvent"), event.event_type === "error" ? "error" : "info");
       return;
     }

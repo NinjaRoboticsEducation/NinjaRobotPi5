@@ -17,7 +17,7 @@
 > [!NOTE]
 > **v1.0.0 public release.** The project owner completed the Phase 8 manual
 > Raspberry Pi validation. New installations must still follow the safety and
-> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-15-03/InstallationGuide.md) because
+> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-16/InstallationGuide.md) because
 > wiring and hardware tolerances differ between robots.
 
 ---
@@ -39,6 +39,10 @@ variations. The supported game is available by default; face variations remain
 opt-in. Use `ninjarobot-agent game start --seconds 5`,
 `game stop` and `game status`, chat `/game` commands or the web game buttons.
 Each game silently reopens the buzzer after the previous game releases it.
+Place your hand 5–60 cm in front of the sensor when starting, rather than waiting
+for the final chat answer. Web chat shows a starting instruction. No target means
+silent waiting until the timer ends, not an unavailable sensor. See the
+[hand-placement repair and tests](docs/validation/distance_game_web_hand_260916.md).
 The game uses the existing sensor, buzzer and display; it never commands wheels
 or capture and does not need Bluetooth. See the
 [Phase 5 setup and manual-test walkthrough](docs/validation/refinement_phase5_walkthrough_260912.md)
@@ -224,7 +228,7 @@ uv run --frozen --extra hardware ninjarobot-agent
 
 The installer does not download an Ollama model, start the Agent, move a motor,
 open the camera or microphone, or deploy boot startup. Follow the complete
-[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-15-03/InstallationGuide.md) for wiring, module initialization,
+[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-16/InstallationGuide.md) for wiring, module initialization,
 calibration, model download, and safe first movement.
 
 ---
@@ -286,10 +290,10 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 
 | Document | Purpose |
 |---|---|
-| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-15-03/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
-| [MCP and Agent Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-15-03/NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
-| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-15-03/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
-| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-15-03/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
+| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-16/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
+| [MCP and Agent Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-16/NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
+| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-16/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
+| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-16/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
 | [Documentation Index](docs/README.md) | Public, developer, architecture, history, and validation documents |
 | [Audit Report](docs/project-history/AuditReport_260731.md) | Historical security, reliability, and documentation audit findings |
 | [Implementation Plan](docs/project-history/NinjaRobotPi5V4_ImplementationPlan.md) | Historical phase design and delivery decisions |

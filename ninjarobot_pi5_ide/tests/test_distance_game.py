@@ -257,7 +257,8 @@ def test_loop_enforces_pulse_volume_duration_and_silence_bounds():
         assert game._state["tone_seconds"] <= 10
         assert robot.display.show_text.await_count == 1
 
-        # Out-of-area input clears feedback and finishes after two seconds.
+        # Malformed raw sentinel data (the real adapter raises a typed error)
+        # still clears feedback and stops after two seconds.
         async def invalid(_):
             return dict(distance_mm=8191, raw_value=8191, sensor_timestamp=1000 + now[0])
 
@@ -492,5 +493,69 @@ def test_failed_silence_blocks_conflicting_actions_and_reports_fault(tmp_path):
         client.robot.buzzer.stop = original
         await client.robot.resume_system(confirmed=True)
         await client.close()
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("source", ["near", "far", "sentinel", "driver_failure", "cached"])
+@pytest.mark.parametrize("hand_arrives", [False, True])
+def test_waiting_for_hand_is_not_sensor_failure(source, hand_arrives):
+    from types import SimpleNamespace
+
+    from ninjarobot_pi5_ide.distance import VL53L0XDistanceAdapter
+    from ninjarobot_pi5_ide.distance_game import DistanceGame
+
+    async def exercise():
+        now = [0.0]
+
+        async def sleep(seconds):
+            now[0] += seconds
+            await asyncio.sleep(0)
+
+        async def read(_):
+            if hand_arrives and now[0] >= 3:
+                return dict(distance_mm=100, raw_value=100, sensor_timestamp=1000 + now[0])
+            if source in {"sentinel", "driver_failure"}:
+                raise VL53L0XDistanceAdapter._error(
+                    code="DEVICE_OUT_OF_RANGE" if source == "sentinel" else "DEVICE_READ_FAILED",
+                    message="test",
+                    technical_detail=None,
+                    definitely_not_executed=False,
+                )
+            distance = 20 if source == "near" else 900
+            return dict(
+                distance_mm=distance,
+                raw_value=distance,
+                sensor_timestamp=1000 if source == "cached" else 1000 + now[0],
+            )
+
+        robot = SimpleNamespace(
+            ensure_action_allowed=lambda _: None,
+            distance=SimpleNamespace(execute=read),
+            buzzer=SimpleNamespace(play=AsyncMock(), stop=AsyncMock()),
+            display=SimpleNamespace(show_text=AsyncMock()),
+        )
+        game = DistanceGame(
+            robot, volume=16, clock=lambda: now[0], wall_clock=lambda: 1000 + now[0], sleep=sleep
+        )
+        game._state.update(valid_samples=0, invalid_samples=0, tone_seconds=0.0)
+        await game._loop(GameRequest(duration_seconds=5), 0)
+        if source in {"driver_failure", "cached"}:
+            assert game._state["reason"] == "readings_unavailable"
+            assert now[0] < 2.5
+            assert "two seconds" in game._state["user_message"]
+            robot.buzzer.play.assert_not_awaited()
+        else:
+            assert now[0] == pytest.approx(5)
+            assert game._state["no_target_samples"] >= 10
+            assert "no_target_in_play_area" in game._state["rejection_counts"]
+            if hand_arrives:
+                assert game._state["valid_samples"] > 0
+                assert game._state["reason"] is None
+                assert robot.buzzer.play.await_count > 0
+            else:
+                assert game._state["reason"] == "no_target_detected"
+                assert "does not mean the sensor is unavailable" in game._state["user_message"]
+                robot.buzzer.play.assert_not_awaited()
 
     asyncio.run(exercise())

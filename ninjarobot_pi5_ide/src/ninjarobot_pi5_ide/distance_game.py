@@ -14,6 +14,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .errors import IDEError
 from .models import ActionRequest, CapabilityDescriptor, ResourceHealth, RiskLevel
 
 if TYPE_CHECKING:
@@ -49,6 +50,7 @@ class SampleFilter:
         self.band: Band | None = None
         self.last_stamp: float | None = None
         self.last_completed: float | None = None
+        self.rejection_reason: str | None = None
 
     def clear(self) -> None:
         self.values.clear()
@@ -63,6 +65,7 @@ class SampleFilter:
         wall_started: float,
         wall_completed: float,
     ) -> Band | None:
+        self.rejection_reason = "invalid_sample"
         distance = sample.get("distance_mm")
         raw = sample.get("raw_value")
         stamp = sample.get("sensor_timestamp")
@@ -78,7 +81,7 @@ class SampleFilter:
             return None
         valid = (
             type(distance) is int
-            and 50 <= distance <= 600
+            and 0 < distance < 8190
             and type(raw) is int
             and 0 < raw < 8190
             and type(stamp) in {float, int}
@@ -91,12 +94,21 @@ class SampleFilter:
         if not valid:
             self.clear()
             return None
+        # A fresh measurement outside the playing area is not a failed sensor.
+        # Advance freshness even while waiting, so repeated cached readings
+        # cannot masquerade as healthy clear space.
+        self.last_stamp = stamp
+        if not 50 <= distance <= 600:
+            self.clear()
+            self.rejection_reason = "no_target_in_play_area"
+            return None
         if self.last_completed is not None and completed - self.last_completed > 0.4:
             self.clear()
         self.last_completed = completed
         self.last_stamp = stamp
         self.values.append(distance)
         self.band = next_band(median(self.values), self.band)
+        self.rejection_reason = None
         return self.band
 
 
@@ -222,6 +234,8 @@ class DistanceGame:
             reason=None,
             valid_samples=0,
             invalid_samples=0,
+            no_target_samples=0,
+            rejection_counts={},
             tone_seconds=0.0,
         )
         foreground = False
@@ -311,7 +325,7 @@ class DistanceGame:
 
     async def _loop(self, request: GameRequest, started: float) -> None:
         samples = SampleFilter()
-        last_valid = self._clock()
+        last_healthy = self._clock()
         last_pulse = -math.inf
         shown: str | None = None
         deadline = started + request.duration_seconds
@@ -319,6 +333,7 @@ class DistanceGame:
             self.robot.ensure_action_allowed("game.distance.run")
             tick, wall = self._clock(), self._wall_clock()
             band = None
+            issue: str | None = None
             try:
                 async with asyncio.timeout(min(0.25, max(0.001, deadline - tick))):
                     sample = await self.robot.distance.execute({})
@@ -329,17 +344,41 @@ class DistanceGame:
                     wall_started=wall,
                     wall_completed=self._wall_clock(),
                 )
+                issue = samples.rejection_reason
+            except IDEError as exc:
+                samples.clear()
+                issue = (
+                    "no_target_in_play_area"
+                    if exc.details.code == "DEVICE_OUT_OF_RANGE"
+                    else str(exc.details.code)
+                )
+            except TimeoutError:
+                samples.clear()
+                issue = "read_timeout"
             except Exception:
                 samples.clear()
+                issue = "read_failed"
             if band is None:
                 self._state["invalid_samples"] += 1
+                counts = self._state.setdefault("rejection_counts", {})
+                counts[issue or "invalid_sample"] = counts.get(issue or "invalid_sample", 0) + 1
+                self._state["last_sample_issue"] = issue
                 await self.robot.buzzer.stop()
                 label = "Hand: 5-60 cm\nStop: /game stop"
-                if self._clock() - last_valid >= 2:
-                    self._state["reason"] = "readings_unavailable"
+                if issue == "no_target_in_play_area":
+                    last_healthy = self._clock()
+                    self._state["no_target_samples"] = self._state.get("no_target_samples", 0) + 1
+                elif self._clock() - last_healthy >= 2:
+                    self._state.update(
+                        reason="readings_unavailable",
+                        user_message="The game stopped because fresh distance readings could not "
+                        f"be obtained for two seconds ({issue}). Check the sensor connection "
+                        "and retry with a new request; no automatic retry was performed.",
+                    )
                     return
             else:
-                last_valid = self._clock()
+                last_healthy = self._clock()
+                self._state["last_sample_issue"] = None
                 self._state["valid_samples"] += 1
                 label = f"{band.upper()}\nStop: /game stop"
             if label != shown:
@@ -366,6 +405,17 @@ class DistanceGame:
                     volume=self.volume,
                 )
             await self._sleep(max(0, min(deadline - self._clock(), 0.2 - (self._clock() - tick))))
+        if (
+            not self._cancel_requested
+            and self._state["valid_samples"] == 0
+            and self._state.get("no_target_samples", 0) > 0
+        ):
+            self._state.update(
+                reason="no_target_detected",
+                user_message="The game finished without a hand detected in the 5–60 cm playing "
+                "area. This does not mean the sensor is unavailable. Place your hand in front "
+                "of the sensor before asking to play again; do not wait for the final chat reply.",
+            )
 
 
 class DistanceGameAdapter:
@@ -376,11 +426,12 @@ class DistanceGameAdapter:
             name=f"game.distance.{operation}",
             version="1.0.0",
             description=(
-                "Explicitly play a finite hand-distance sound game. No wheels or capture. "
-                "Closer hand means higher tone; stop independently with game.distance.stop. "
-                "Each new user request performs fresh device preparation and health checks, "
-                "including reopening a normally stopped buzzer. An older unavailable result "
-                "is not a current refusal. Do not automatically retry the same failed request."
+                "Play a finite hand-distance sound game; no wheels or capture. "
+                "Place your hand 5–60 cm ahead now; the final reply arrives after play. "
+                "No target means silent waiting, not device failure. Closer means higher tone. "
+                "Stop with game.distance.stop. Each new request prepares devices, reopens the "
+                "buzzer and checks health. An older unavailable result is not a current refusal. "
+                "Never automatically retry the same failed request."
             )
             if operation == "run"
             else f"{operation.title()} the distance game without starting hardware.",

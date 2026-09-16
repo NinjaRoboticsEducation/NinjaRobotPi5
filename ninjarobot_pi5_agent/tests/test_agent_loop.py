@@ -1438,3 +1438,51 @@ def test_context_trimming_keeps_tool_call_and_result_together(tmp_path) -> None:
             await store.close()
 
     asyncio.run(exercise())
+
+
+def test_game_start_instruction_precedes_blocking_tool_result(tmp_path):
+    from unittest.mock import AsyncMock
+
+    from ninjarobot_pi5_agent.models import ToolExecutionResult, ToolExecutionStatus
+    from ninjarobot_pi5_agent.tools import CancellationToken
+
+    async def exercise():
+        loop, store, registry, _ = await build_loop(
+            tmp_path,
+            [],
+            capability_name="game.distance.run",
+            risk=RiskLevel.LOW,
+        )
+
+        async def call(invocation, cancellation):
+            notices = [
+                e
+                for e in await loop._events.history()
+                if e.data.get("kind") == "distance_game_starting"
+            ]
+            assert len(notices) == 1
+            assert notices[0].session_id == "web-test"
+            assert "do not wait for the final reply" in notices[0].message
+            return ToolExecutionResult(
+                call_id=invocation.call.call_id,
+                tool_name=invocation.call.name,
+                status=ToolExecutionStatus.SUCCEEDED,
+                data={"state": "finished", "reason": "no_target_detected"},
+            )
+
+        registry.call = AsyncMock(side_effect=call)
+        try:
+            await loop._execute_call(
+                ToolCall(call_id="game-cue", name="robot.game.distance.run", arguments={}),
+                session_id="web-test",
+                lease_id=None,
+                confirmed=False,
+                duplicate=False,
+                cancellation=CancellationToken(),
+            )
+            registry.call.assert_awaited_once()
+        finally:
+            await registry.close()
+            await store.close()
+
+    asyncio.run(exercise())
