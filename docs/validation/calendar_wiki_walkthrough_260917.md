@@ -114,27 +114,12 @@ Google's new consent is required to add write permissions. Existing read-only
 credentials are not upgraded silently. The default primary calendar requires
 ownership for the selected write permission.
 
-## Test 3: preview and explicitly confirm an event
+## Test 3: preview and confirm an event
 
-This test can create a real event only at step 3. Choose a harmless future test
-appointment and check the calendar and time zone carefully.
-
-1. Ask: “Prepare a Calendar event titled NinjaRobot manual test for [date], from
-   [start] to [end] in Asia/Tokyo. Show me the preview first.” Supply real times.
-2. Check the preview's title, account, calendar ID, time zone, start and end. Verify
-   the event has not yet appeared in Google Calendar. Keep its operation ID and
-   review hash (the fingerprint of the exact preview).
-3. Only if you approve the preview, enter this in the same chat session:
-
-   ```text
-   /info calendar.confirm {"arguments":{"operation_id":"PASTE_OPERATION_ID","review_hash":"PASTE_REVIEW_HASH"}}
-   ```
-
-   Expect a verified result and exactly one event in Google Calendar. Previews
-   expire after five minutes; if expired, prepare and review a new one.
-4. If the result is uncertain, ask for that operation's status or use the existing
-   reconciliation control. Do not ask for a second creation to compensate for an
-   unknown result. Remove your test event in Google Calendar when finished.
+Follow the newer [Calendar CONFIRM walkthrough](calendar_confirm_walkthrough_260917.md).
+Ask for a preview, check its exact account/title/date/times/timezone, then type
+CONFIRM in the same chat. CANCEL discards it. Do not copy operation IDs or review
+hashes for normal chat approval. The older explicit API remains supported.
 
 ## Test 4: complete project instructions in both chat interfaces
 

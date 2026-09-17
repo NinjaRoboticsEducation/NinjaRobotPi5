@@ -14,6 +14,7 @@ from typing import Any, Protocol
 from ninjarobot_pi5_ide import RiskLevel
 
 from .agent_loop import AgentLoop, AgentReply, TextDeltaHandler
+from .calendar_chat import CalendarChat
 from .command_help import help_text, wants_command_help
 from .events import AgentEventType, EventBroker
 from .information_tools import InformationProvider
@@ -144,6 +145,7 @@ class AgentRuntime:
         self._active_operations = 0
         self._switching_model = False
         self._chat_lock = asyncio.Lock()
+        self._calendar_chat = CalendarChat()
         self._motion_cancellations: dict[str, set[CancellationToken]] = {}
         self._active_users: dict[str, str] = {}
         self._identity_states: dict[str, str] = {}
@@ -246,6 +248,8 @@ class AgentRuntime:
     ) -> AgentReply:
         """Run one chat through the bounded loop."""
         self._ensure_started()
+        if text.strip().upper() not in {"CONFIRM", "CANCEL"}:
+            self._calendar_chat.clear(session_id)
         self._begin_operation()
         try:
             command = text.split(maxsplit=1)
@@ -284,6 +288,14 @@ class AgentRuntime:
                 data = await information_action(
                     self, session_id, {**info_payload, "operation": parts[1]}, cancellation
                 )
+                if parts[1] == "calendar.propose_change":
+                    async with self._chat_lock:
+                        await self._calendar_chat.capture(self, session_id, data)
+                        preview = await self._calendar_chat.deliver(self, session_id, on_text_delta)
+                    if preview:
+                        return AgentReply(
+                            session_id=session_id, text=preview, model_turns=0, tool_calls=1
+                        )
                 visible = (
                     data["text"]
                     if parts[1] == "briefing.build"
@@ -454,6 +466,13 @@ class AgentRuntime:
                         persist=False,
                     )
             async with self._chat_lock:
+                if text.strip().upper() == "CONFIRM" or (
+                    text.strip().upper() == "CANCEL" and session_id in self._calendar_chat.pending
+                ):
+                    return await self._calendar_chat.respond(
+                        self, session_id, text.strip().upper(), on_text_delta, cancellation
+                    )
+                self._calendar_chat.clear(session_id)
                 identity_reply = await self._handle_identity_chat(
                     session_id,
                     text,
@@ -491,6 +510,9 @@ class AgentRuntime:
                     on_text_delta=on_text_delta,
                 )
                 notices: list[str] = []
+                preview = await self._calendar_chat.deliver(self, session_id, on_text_delta)
+                if preview:
+                    reply = reply.model_copy(update={"text": reply.text + preview})
                 if isinstance(preference, PersonalizationCaptureOutcome):
                     if preference.robot_name is not None:
                         notices.append(f"Memory saved: robot name is {preference.robot_name}.")
@@ -527,7 +549,11 @@ class AgentRuntime:
                         )
                         reply = reply.model_copy(update={"text": reply.text + "\n\n" + notice})
                 return reply
+        except BaseException:
+            self._calendar_chat.clear(session_id)
+            raise
         finally:
+            self._calendar_chat.drafts.pop(session_id, None)
             self._end_operation()
 
     async def speech_control(self, operation: str = "status") -> dict[str, Any]:
@@ -1362,6 +1388,17 @@ class AgentRuntime:
         invocation: ToolInvocation,
         result: ToolExecutionResult,
     ) -> None:
+        if (
+            invocation.call.name == "calendar.propose_change"
+            and result.status is not ToolExecutionStatus.SUCCEEDED
+        ):
+            self._calendar_chat.clear(invocation.session_id)
+        if (
+            invocation.call.name == "calendar.propose_change"
+            and result.status is ToolExecutionStatus.SUCCEEDED
+            and isinstance(result.data, dict)
+        ):
+            await self._calendar_chat.capture(self, invocation.session_id, result.data)
         task = CURRENT_TASK.get()
         if task is not None and self.tasks is not None:
             status = (
@@ -2033,6 +2070,7 @@ class AgentRuntime:
         if self._closed:
             return
         self._closed = True
+        self._calendar_chat = CalendarChat()
         workers = tuple(self._recipe_workers - {asyncio.current_task()})
         for worker in workers:
             worker.cancel()

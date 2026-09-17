@@ -11,11 +11,12 @@ from pathlib import Path
 from typing import Any
 
 from jsonschema import Draft202012Validator
+from jsonschema.exceptions import ValidationError as SchemaValidationError
 
 from ninjarobot_pi5_ide import RiskLevel
 
 from .briefing_service import BriefingService
-from .calendar_google import READ_SCOPE, WRITE_SCOPE, GoogleCalendarBackend
+from .calendar_google import READ_SCOPE, WRITE_SCOPE, CalendarHTTPError, GoogleCalendarBackend
 from .calendar_service import CalendarChange, CalendarService
 from .information_store import InformationStore
 from .models import (
@@ -269,8 +270,12 @@ class InformationProvider:
                         "Nothing is reserved; supply interval, zone and duration."
                     ),
                     "calendar.propose_change": "Preview one exact event create/update/cancel; no "
-                    "attendees/recurrence. Only the user's direct "
-                    "confirmation dispatches.",
+                    "attendees/recurrence. event requires title, start, end, timezone "
+                    "(e.g. Asia/Tokyo). "
+                    "Use full ISO dates with matching offsets; get system date for today. "
+                    "Correct missing fields after validation errors. The runtime shows the exact "
+                    "creation preview and accepts CONFIRM; updates/cancellations retain explicit "
+                    "/info calendar.confirm. Never confirm through model tools.",
                     "calendar.operation_status": "Read the saved result of a reviewed calendar "
                     "operation. Never repeat an uncertain write.",
                     "research.search": "Search one to three explicit public queries within 30 "
@@ -348,6 +353,34 @@ class InformationProvider:
                 status=ToolExecutionStatus.CANCELLED,
                 error="Information request cancelled; no further dispatch.",
             )
+        except SchemaValidationError as exc:
+            errors: list[str] = []
+            pending = [exc]
+            while pending and len(errors) < 8:
+                item = pending.pop(0)
+                if item.context:
+                    pending.extend(item.context)
+                    continue
+                path = ".".join(map(str, item.absolute_path)) or "arguments"
+                if item.validator == "required" and isinstance(item.instance, dict):
+                    for field in (
+                        item.validator_value if isinstance(item.validator_value, list) else []
+                    ):
+                        if field not in item.instance:
+                            errors.append(f"{path}.{field}: required field is missing")
+                elif item.validator_value != "null":
+                    expected = (
+                        f"; expected {item.validator_value}" if item.validator == "type" else ""
+                    )
+                    errors.append(f"{path}: invalid {item.validator}{expected}")
+            return ToolExecutionResult(
+                call_id=call.call_id,
+                tool_name=call.name,
+                status=ToolExecutionStatus.FAILED,
+                error="Invalid tool arguments; nothing executed. " + "; ".join(errors)[:600],
+                data={"validation_errors": errors[:8], "executed": False},
+                definitely_not_executed=True,
+            )
         except Exception as exc:
             return ToolExecutionResult(
                 call_id=call.call_id,
@@ -356,8 +389,9 @@ class InformationProvider:
                 error=f"Information request refused ({type(exc).__name__}): "
                 + (
                     str(exc)[:400]
-                    if isinstance(exc, (ValueError, KeyError, PermissionError))
-                    else "Source unavailable."
+                    if isinstance(exc, (ValueError, KeyError, PermissionError, CalendarHTTPError))
+                    else "Local or provider operation failed; this alone does not establish "
+                    "a disconnected account. No automatic write retry is permitted."
                 ),
                 definitely_not_executed=False,
             )

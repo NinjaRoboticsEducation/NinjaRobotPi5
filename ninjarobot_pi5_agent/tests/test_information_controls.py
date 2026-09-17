@@ -311,3 +311,216 @@ def test_calendar_reconnect_preserves_id_and_replaces_private_grant(tmp_path):
             await runtime.close()
 
     asyncio.run(run())
+
+
+async def calendar_fixture(runtime):
+    from unittest.mock import AsyncMock
+
+    record = await runtime.information.store.action(
+        "local-user",
+        "create",
+        kind="calendar_connection",
+        payload=dict(
+            enabled=True,
+            write_enabled=True,
+            calendar_id="fake@example.org",
+            account_label="Fake",
+            secret_ref="FAKE",
+        ),
+    )
+    saved = {}
+    writes = []
+
+    async def request(connection, method, **kwargs):
+        if method == "POST":
+            writes.append(kwargs["body"])
+            saved.update(kwargs["body"])
+        return saved.copy()
+
+    runtime.information.calendar.backend.request = AsyncMock(side_effect=request)
+    return dict(
+        action="create",
+        connection_id=record["record_id"],
+        event=dict(
+            title="NinjaRobot manual test",
+            start="2100-09-17T15:00:00+09:00",
+            end="2100-09-17T16:00:00+09:00",
+            timezone="Asia/Tokyo",
+        ),
+    ), writes
+
+
+def test_missing_timezone_reports_field_without_provider_call(tmp_path):
+    from ninjarobot_pi5_agent.models import ToolCall, ToolInvocation
+
+    async def run():
+        runtime = await runtime_for(tmp_path)
+        try:
+            args, writes = await calendar_fixture(runtime)
+            del args["event"]["timezone"]
+            invocation = ToolInvocation(
+                session_id="web-test",
+                call=ToolCall(call_id="preview", name="calendar.propose_change", arguments=args),
+            )
+            result = await runtime.information.call(invocation, CancellationToken())
+            assert result.definitely_not_executed
+            assert "event.timezone" in result.error
+            assert "Source unavailable" not in result.error
+            assert not writes
+            runtime.information.calendar.backend.request.assert_not_awaited()
+            args["event"]["timezone"] = "Asia/Tokyo"
+            result = await runtime.information.call(invocation, CancellationToken())
+            assert result.status.value == "succeeded"
+            assert result.data["payload"]["state"] == "pending"
+            runtime.information.calendar.backend.request.assert_not_awaited()
+        finally:
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    [
+        "confirm",
+        "cancel",
+        "other_session",
+        "expired",
+        "user_changed",
+        "connection_changed",
+        "delivery_failed",
+        "superseded",
+        "double",
+        "uncertain",
+    ],
+)
+def test_calendar_plain_confirmation_is_bound_to_delivered_preview(tmp_path, scenario):
+    from unittest.mock import AsyncMock
+
+    async def run():
+        runtime = await runtime_for(tmp_path)
+        try:
+            args, writes = await calendar_fixture(runtime)
+            prompt = "/info calendar.propose_change " + json.dumps({"arguments": args})
+            shown = []
+
+            async def output(text):
+                shown.append(text)
+                if scenario == "delivery_failed":
+                    raise RuntimeError("browser disconnected")
+
+            if scenario == "delivery_failed":
+                with pytest.raises(RuntimeError):
+                    await runtime.chat(session_id="web-test", text=prompt, on_text_delta=output)
+            else:
+                reply = await runtime.chat(session_id="web-test", text=prompt, on_text_delta=output)
+                assert "Reply CONFIRM" in reply.text and "Asia/Tokyo" in reply.text
+                assert "review_hash" not in reply.text
+                assert "NinjaRobot manual test" in shown[-1]
+            assert not writes
+            if scenario in {"expired", "connection_changed"}:
+                user, ident, _ = runtime._calendar_chat.pending["web-test"]
+                record = await runtime.information.store.action(
+                    user, "get", record_id=ident if scenario == "expired" else args["connection_id"]
+                )
+                payload = record["payload"].copy()
+                if scenario == "expired":
+                    payload["expires_at"] = "2000-01-01T00:00:00+00:00"
+                await runtime.information.store.action(
+                    user,
+                    "update",
+                    record_id=record["record_id"],
+                    revision=record["revision"],
+                    payload=payload,
+                )
+            if scenario == "user_changed":
+                member = await runtime.memory.create_profile("Other")
+                runtime._active_users["web-test"] = member.user_id
+            if scenario == "superseded":
+                await runtime.chat(session_id="web-test", text="/help")
+            if scenario == "uncertain":
+                runtime.information.calendar.backend.request = AsyncMock(side_effect=TimeoutError())
+            if scenario == "double":
+                replies = await asyncio.gather(
+                    *[runtime.chat(session_id="web-test", text="CONFIRM") for _ in range(2)]
+                )
+                assert len(writes) == 1
+                assert any("No current" in r.text for r in replies)
+            else:
+                reply = await runtime.chat(
+                    session_id="other" if scenario == "other_session" else "web-test",
+                    text="CANCEL" if scenario == "cancel" else "CONFIRM",
+                )
+                if scenario == "confirm":
+                    assert "verified" in reply.text and len(writes) == 1
+                elif scenario == "uncertain":
+                    assert "uncertain" in reply.text
+                    assert (
+                        "No current"
+                        in (await runtime.chat(session_id="web-test", text="CONFIRM")).text
+                    )
+                else:
+                    assert not writes
+            assert "calendar.confirm" not in {t.name for t in runtime.tools.list_tools()}
+        finally:
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_model_can_correct_preview_then_plain_confirm_without_model_authority(tmp_path):
+    from ninjarobot_pi5_agent import FinishReason, ModelTurn, ToolCall
+
+    async def run():
+        runtime = await runtime_for(tmp_path)
+        try:
+            args, writes = await calendar_fixture(runtime)
+            bad = json.loads(json.dumps(args))
+            del bad["event"]["timezone"]
+
+            class MatchingProvider(FakeProvider):
+                async def generate(self, request):
+                    self.requests.append(request)
+                    return self._turns.popleft().model_copy(
+                        update={"request_id": request.request_id}
+                    )
+
+            runtime.loop._provider = MatchingProvider(
+                [
+                    ModelTurn(
+                        request_id="one",
+                        finish_reason=FinishReason.TOOL_CALLS,
+                        tool_calls=(
+                            ToolCall(call_id="bad", name="calendar.propose_change", arguments=bad),
+                        ),
+                    ),
+                    ModelTurn(
+                        request_id="two",
+                        finish_reason=FinishReason.TOOL_CALLS,
+                        tool_calls=(
+                            ToolCall(
+                                call_id="good", name="calendar.propose_change", arguments=args
+                            ),
+                        ),
+                    ),
+                    ModelTurn(
+                        request_id="three",
+                        text="Here is the draft.",
+                        finish_reason=FinishReason.STOP,
+                    ),
+                ]
+            )
+            reply = await runtime.chat(
+                session_id="web-natural", text="Prepare a calendar event; show a preview first."
+            )
+            assert "Reply CONFIRM" in reply.text
+            assert "Asia/Tokyo" in reply.text
+            assert not writes
+            # The fake model has no remaining turns; confirmation must bypass it.
+            confirmed = await runtime.chat(session_id="web-natural", text=" confirm ")
+            assert "verified" in confirmed.text
+            assert len(writes) == 1
+        finally:
+            await runtime.close()
+
+    asyncio.run(run())

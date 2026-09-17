@@ -67,7 +67,10 @@ def test_ordinary_chat_selects_help_skill_but_task_queries_do_not(tmp_path):
     from ninjarobot_pi5_agent.runtime import AgentRuntime
 
     async def exercise():
+        from ninjarobot_pi5_agent.calendar_chat import CalendarChat
+
         runtime = Mock(spec=AgentRuntime)
+        runtime._calendar_chat = CalendarChat()
         runtime._chat_lock = asyncio.Lock()
         runtime._handle_identity_chat = AsyncMock(return_value=None)
         runtime._handle_behavior_confirmation = AsyncMock(return_value=None)

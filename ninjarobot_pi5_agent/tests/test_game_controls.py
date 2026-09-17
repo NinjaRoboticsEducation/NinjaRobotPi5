@@ -28,7 +28,10 @@ def test_game_cli_and_version_one_skill(tmp_path):
 
 def test_game_chat_commands_bypass_model_chat():
     async def exercise():
+        from ninjarobot_pi5_agent.calendar_chat import CalendarChat
+
         runtime = Mock(spec=AgentRuntime)
+        runtime._calendar_chat = CalendarChat()
         runtime.game_control = AsyncMock(return_value={"data": {"state": "cancelled"}})
         runtime._identity_reply = AsyncMock()
         runtime._chat_with_task = AsyncMock()
@@ -65,7 +68,10 @@ def test_web_routes_game_to_shared_runtime_with_bound_session():
 
 def test_game_direct_control_checks_types_before_tools():
     async def exercise():
+        from ninjarobot_pi5_agent.calendar_chat import CalendarChat
+
         runtime = Mock(spec=AgentRuntime)
+        runtime._calendar_chat = CalendarChat()
         runtime.tasks = None
         runtime.execute_tool = AsyncMock()
         for duration in (True, "5", 4, 61):

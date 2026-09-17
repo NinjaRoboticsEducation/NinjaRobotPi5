@@ -83,7 +83,10 @@ def test_clock_tool_is_fresh_cancellable_and_rejects_mutation_arguments(monkeypa
 
 def test_time_command_reads_without_model_or_scheduler(monkeypatch):
     async def exercise():
+        from ninjarobot_pi5_agent.calendar_chat import CalendarChat
+
         runtime = Mock(spec=AgentRuntime)
+        runtime._calendar_chat = CalendarChat()
         runtime._identity_reply = AsyncMock(return_value="clock reply")
         monkeypatch.setattr(
             system_time,
