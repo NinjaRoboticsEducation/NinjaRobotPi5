@@ -259,6 +259,7 @@ class CalendarService:
         connection = await self.connection(user, change.connection_id, write=True)
         event_id = uuid.uuid4().hex if change.action == "create" else change.event_id
         etag = None
+        before: dict[str, Any] = {}
         if change.action != "create":
             # A remote marker alone does not prove this integration created the event.
             known = await self.store.action(user, "list", kind="calendar_operation", limit=100)
@@ -288,6 +289,22 @@ class CalendarService:
             etag = remote.get("etag")
             if not isinstance(etag, str) or not etag:
                 raise ValueError("remote event version unavailable; cannot preview a safe change")
+            # Save only the fields users need to review, never the full remote response.
+            for key, limit in (("summary", 200), ("location", 300), ("description", 2000)):
+                value = remote.get(key, "")
+                if not isinstance(value, str) or len(value) > limit:
+                    raise ValueError("event details exceed supported preview limits")
+                before[key] = value
+            for key in ("start", "end"):
+                value = remote.get(key, {})
+                if not isinstance(value, dict):
+                    raise ValueError("event dates unavailable for preview")
+                fields = {k: value[k] for k in ("date", "dateTime", "timeZone") if k in value}
+                if not fields or any(
+                    not isinstance(v, str) or len(v) > 100 for v in fields.values()
+                ):
+                    raise ValueError("event dates unavailable for preview")
+                before[key] = fields
         body = change.event.google() if change.event else {}
         payload = {
             "action": change.action,
@@ -297,6 +314,7 @@ class CalendarService:
             "account_label": connection["payload"]["account_label"],
             "event_id": event_id,
             "body": body,
+            "before": before,
             "etag": etag,
             "session": session,
             "state": "pending",
@@ -307,8 +325,8 @@ class CalendarService:
         return {
             **result,
             "executed": False,
-            "instruction": "Review account, calendar, exact change and expiry; only direct "
-            "calendar confirm can dispatch.",
+            "instruction": "Review account, calendar, exact change and expiry; "
+            "reply CONFIRM in the same chat to dispatch.",
         }
 
     async def confirm(
@@ -357,6 +375,7 @@ class CalendarService:
         body = dict(data["body"])
         if data["action"] == "create":
             body["id"] = data["event_id"]
+        write_returned = False
         try:
             current = await self.status(user, operation_id)
             current_connection = await self.connection(user, data["connection_id"], write=True)
@@ -373,10 +392,16 @@ class CalendarService:
                 body=body if method != "DELETE" else None,
                 etag=data["etag"],
             )
+            write_returned = True
             verified = await self._verify(connection["payload"], data)
             state = "verified" if verified else "uncertain"
         except BaseException as exc:
-            state = "uncertain"
+            # Google's failed If-Match rejects this write; a new preview is required.
+            state = (
+                "rejected"
+                if not write_returned and isinstance(exc, CalendarHTTPError) and exc.status == 412
+                else "uncertain"
+            )
             try:
                 await self.store.action(
                     user,
@@ -392,8 +417,12 @@ class CalendarService:
             return {
                 "operation_id": operation_id,
                 "state": state,
-                "warning": "An external effect may have occurred. Reconcile the saved ID; "
-                "do not repeat the write.",
+                "warning": (
+                    "The event changed after preview. Request a fresh preview."
+                    if state == "rejected"
+                    else "An external effect may have occurred. Reconcile the saved ID; "
+                    "do not repeat the write."
+                ),
             }
         return await self.store.action(
             user,

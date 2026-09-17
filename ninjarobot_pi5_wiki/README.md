@@ -7,7 +7,8 @@ or open the parent project for development and implementation verification.
 ## Current full manuals — Calendar and project-help repair
 
 These 17 September successor manuals are not ingested or reviewed in the wiki.
-They add field-specific preview errors and single-word CONFIRM, alongside
+They add field-specific preview errors and single-word CONFIRM for creation,
+editing, and deletion, alongside
 guided Calendar authorization, reviewed event creation, and current
 public-manual retrieval. The registered map remains at the 16 September checkpoint.
 The 16 September 2026 hand-placement correction and 15 September follow-up repairs
@@ -19,10 +20,10 @@ briefings), Phase 4 foundations, and system clock access.
 Use [the document map](project-knowledge.json) for registered source provenance;
 use the links below for the newer implementation instructions:
 
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-17-02/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-17-02/DevelopmentGuide.md)
-- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-17-02/NinjaRobot_MCP_Skill.md)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-17-02/DevelopmentLog.md)
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-17-03/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-17-03/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-17-03/NinjaRobot_MCP_Skill.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-17-03/DevelopmentLog.md)
 - [Calendar CONFIRM walkthrough](../docs/validation/calendar_confirm_walkthrough_260917.md)
 - [Calendar and project-help walkthrough](../docs/validation/calendar_wiki_walkthrough_260917.md)
 - [Distance game hand-placement repair and tests](../docs/validation/distance_game_web_hand_260916.md)

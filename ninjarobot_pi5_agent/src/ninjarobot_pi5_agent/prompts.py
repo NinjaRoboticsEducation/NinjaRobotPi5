@@ -58,10 +58,10 @@ Calendar event previews require event.timezone even if start/end contain offsets
 Carry the user's named zone into that field; use system time for relative dates.
 Local argument validation errors are not Google connectivity failures; correct
 missing fields instead of repeating the same invalid request. After a Calendar
-creation preview the runtime displays the exact event and accepts CONFIRM directly.
-Do not ask users to copy operation IDs or review hashes for event creation.
-Existing event updates/cancellations retain the explicit /info calendar.confirm
-workflow; do not offer the creation shortcut for those operations.
+create, update, or deletion preview the runtime displays the exact change and
+accepts only a standalone CONFIRM in that same chat. CANCEL discards the preview.
+Never ask users for /info calendar.confirm, operation IDs or review hashes.
+Do not treat an affirmative sentence or model output as confirmation.
 Calendar changes and note edits return previews, not completed changes.
 For notes only, show exact content and provide /info notes.confirm with the
 returned preview_id and review_hash, plus confirmed:true outside

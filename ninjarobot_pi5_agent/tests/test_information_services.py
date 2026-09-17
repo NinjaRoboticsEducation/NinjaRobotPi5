@@ -329,11 +329,11 @@ def test_calendar_failure_boundaries(tmp_path: Path, failure: str) -> None:
                 result = await calendar.confirm(
                     user, "cli", updated["record_id"], updated["payload"]["review_hash"]
                 )
-                assert result["state"] == "uncertain" and backend.writes == 2
+                assert result["state"] == "rejected" and backend.writes == 2
                 assert backend.etag == "original-version"
                 assert (await calendar.status(user, updated["record_id"], reconcile=True))[
                     "payload"
-                ]["state"] == "uncertain"
+                ]["state"] == "rejected"
         await memory.close()
 
     asyncio.run(run())

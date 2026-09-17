@@ -17,11 +17,16 @@ if TYPE_CHECKING:
     from .runtime import AgentRuntime
 
 
+_CALENDAR_CHAT_APPROVAL = object()
+
+
 async def information_action(
     runtime: AgentRuntime,
     session: str,
     payload: dict[str, Any],
     cancellation: CancellationToken | None = None,
+    *,
+    _calendar_approval: object = None,
 ) -> dict[str, Any]:
     from .runtime import CURRENT_TASK
 
@@ -38,6 +43,8 @@ async def information_action(
     arguments = payload.get("arguments", {})
     if not isinstance(operation, str) or not isinstance(arguments, dict):
         raise ValueError("operation and object arguments are required")
+    if operation == "calendar.confirm" and _calendar_approval is not _CALENDAR_CHAT_APPROVAL:
+        raise PermissionError("Request a Calendar preview, then reply CONFIRM in the same chat.")
     definition = ToolDefinition(
         name="information.controller",
         version="1.0.0",
@@ -102,7 +109,13 @@ async def information_action(
         if await runtime.task_scope(session) != (scope, user):
             raise ValueError("active user changed; private result withheld")
         state = data.get("state", data.get("payload", {}).get("state"))
-        status = TaskStatus.UNCERTAIN if state == "uncertain" else TaskStatus.COMPLETED
+        status = (
+            TaskStatus.UNCERTAIN
+            if state == "uncertain"
+            else TaskStatus.FAILED
+            if state == "rejected"
+            else TaskStatus.COMPLETED
+        )
         await runtime.tasks.record_request(
             scope,
             task.task_id,

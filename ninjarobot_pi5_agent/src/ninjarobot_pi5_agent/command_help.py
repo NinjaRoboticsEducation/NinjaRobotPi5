@@ -8,7 +8,8 @@ CHAT_HELP_TEXT = """Available chat commands:
 /info OPERATION {"arguments":{...},"confirmed":true}
   Read notes.list, notes.read, calendar.connections, calendar.list_events;
   preview notes.create/update/delete or calendar.propose_change, then confirm
-  the exact preview in this same session with notes.confirm or calendar.confirm.
+  notes with notes.confirm; Calendar create/update/delete previews require a
+  standalone CONFIRM in the same chat. CANCEL discards the Calendar preview.
   Use research.search, research.answer, research.save_note or briefing.build.
   Calendar setup uses the terminal calendar-connect command; never paste tokens.
 /project QUESTION

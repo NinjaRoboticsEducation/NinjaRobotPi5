@@ -313,7 +313,7 @@ def test_calendar_reconnect_preserves_id_and_replaces_private_grant(tmp_path):
     asyncio.run(run())
 
 
-async def calendar_fixture(runtime):
+async def calendar_fixture(runtime, action="create"):
     from unittest.mock import AsyncMock
 
     record = await runtime.information.store.action(
@@ -335,10 +335,19 @@ async def calendar_fixture(runtime):
         if method == "POST":
             writes.append(kwargs["body"])
             saved.update(kwargs["body"])
+            saved["etag"] = "version-1"
+        elif method == "PATCH":
+            assert kwargs["etag"] == saved["etag"]
+            writes.append(kwargs["body"])
+            saved.update(kwargs["body"])
+        elif method == "DELETE":
+            assert kwargs["etag"] == saved["etag"]
+            writes.append({"deleted": kwargs["event_id"]})
+            saved["status"] = "cancelled"
         return saved.copy()
 
     runtime.information.calendar.backend.request = AsyncMock(side_effect=request)
-    return dict(
+    args = dict(
         action="create",
         connection_id=record["record_id"],
         event=dict(
@@ -347,7 +356,20 @@ async def calendar_fixture(runtime):
             end="2100-09-17T16:00:00+09:00",
             timezone="Asia/Tokyo",
         ),
-    ), writes
+    )
+    if action != "create":
+        await runtime.chat(
+            session_id="seed",
+            text="/info calendar.propose_change " + json.dumps({"arguments": args}),
+        )
+        await runtime.chat(session_id="seed", text="CONFIRM")
+        writes.clear()
+        args.update(action=action, event_id=saved["id"])
+        if action == "cancel":
+            args.pop("event")
+        else:
+            args["event"]["title"] = "Updated manual test"
+    return args, writes
 
 
 def test_missing_timezone_reports_field_without_provider_call(tmp_path):
@@ -394,13 +416,14 @@ def test_missing_timezone_reports_field_without_provider_call(tmp_path):
         "uncertain",
     ],
 )
-def test_calendar_plain_confirmation_is_bound_to_delivered_preview(tmp_path, scenario):
+@pytest.mark.parametrize("action", ["create", "update", "cancel"])
+def test_calendar_plain_confirmation_is_bound_to_delivered_preview(tmp_path, scenario, action):
     from unittest.mock import AsyncMock
 
     async def run():
         runtime = await runtime_for(tmp_path)
         try:
-            args, writes = await calendar_fixture(runtime)
+            args, writes = await calendar_fixture(runtime, action)
             prompt = "/info calendar.propose_change " + json.dumps({"arguments": args})
             shown = []
 
@@ -417,6 +440,10 @@ def test_calendar_plain_confirmation_is_bound_to_delivered_preview(tmp_path, sce
                 assert "Reply CONFIRM" in reply.text and "Asia/Tokyo" in reply.text
                 assert "review_hash" not in reply.text
                 assert "NinjaRobot manual test" in shown[-1]
+                if action == "update":
+                    assert "Existing event:" in reply.text and "Updated manual test" in reply.text
+                elif action == "cancel":
+                    assert "DELETE event" in reply.text and "Existing event:" in reply.text
             assert not writes
             if scenario in {"expired", "connection_changed"}:
                 user, ident, _ = runtime._calendar_chat.pending["web-test"]
@@ -520,6 +547,95 @@ def test_model_can_correct_preview_then_plain_confirm_without_model_authority(tm
             confirmed = await runtime.chat(session_id="web-natural", text=" confirm ")
             assert "verified" in confirmed.text
             assert len(writes) == 1
+        finally:
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("action", ["create", "update", "cancel"])
+def test_calendar_legacy_controller_cannot_authorize_write(tmp_path, action):
+    async def run():
+        runtime = await runtime_for(tmp_path)
+        try:
+            args, writes = await calendar_fixture(runtime, action)
+            await runtime.chat(
+                session_id="web-test",
+                text="/info calendar.propose_change " + json.dumps({"arguments": args}),
+            )
+            _, ident, review_hash = runtime._calendar_chat.pending["web-test"]
+            with pytest.raises(PermissionError, match="reply CONFIRM"):
+                await information_action(
+                    runtime,
+                    "web-test",
+                    {
+                        "operation": "calendar.confirm",
+                        "confirmed": True,
+                        "arguments": {"operation_id": ident, "review_hash": review_hash},
+                    },
+                )
+            assert not writes
+            reply = await runtime.chat(session_id="web-test", text="CONFIRM")
+            assert "verified" in reply.text and len(writes) == 1
+        finally:
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("action", ["update", "cancel"])
+def test_calendar_changed_remote_event_requires_fresh_preview(tmp_path, action):
+    from unittest.mock import AsyncMock
+
+    from ninjarobot_pi5_agent.calendar_google import CalendarHTTPError
+
+    async def run():
+        runtime = await runtime_for(tmp_path)
+        try:
+            args, writes = await calendar_fixture(runtime, action)
+            await runtime.chat(
+                session_id="web-test",
+                text="/info calendar.propose_change " + json.dumps({"arguments": args}),
+            )
+            backend = runtime.information.calendar.backend
+            backend.request = AsyncMock(side_effect=CalendarHTTPError(412))
+            reply = await runtime.chat(session_id="web-test", text="CONFIRM")
+            assert "fresh preview" in reply.text
+            assert backend.request.call_count == 1
+            assert backend.request.call_args.kwargs["etag"] == "version-1"
+            assert not writes
+            assert "No current" in (await runtime.chat(session_id="web-test", text="CONFIRM")).text
+            assert backend.request.call_count == 1
+        finally:
+            await runtime.close()
+
+    asyncio.run(run())
+
+
+def test_calendar_verification_failure_does_not_claim_write_rejected(tmp_path):
+    from unittest.mock import AsyncMock
+
+    from ninjarobot_pi5_agent.calendar_google import CalendarHTTPError
+
+    async def run():
+        runtime = await runtime_for(tmp_path)
+        try:
+            args, writes = await calendar_fixture(runtime)
+            await runtime.chat(
+                session_id="web-test",
+                text="/info calendar.propose_change " + json.dumps({"arguments": args}),
+            )
+            backend = runtime.information.calendar.backend
+            original = backend.request
+
+            async def request(connection, method, **kwargs):
+                if method == "GET":
+                    raise CalendarHTTPError(412)
+                return await original(connection, method, **kwargs)
+
+            backend.request = AsyncMock(side_effect=request)
+            reply = await runtime.chat(session_id="web-test", text="CONFIRM")
+            assert "uncertain" in reply.text and len(writes) == 1
         finally:
             await runtime.close()
 

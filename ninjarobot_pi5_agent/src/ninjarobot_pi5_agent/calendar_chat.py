@@ -25,7 +25,7 @@ class CalendarChat:
         if (
             runtime.information is None
             or result.get("kind") != "calendar_operation"
-            or result.get("payload", {}).get("action") != "create"
+            or result.get("payload", {}).get("action") not in {"create", "update", "cancel"}
         ):
             return
         self.drafts[session] = (await runtime.information.user(session), result["record_id"])
@@ -42,16 +42,33 @@ class CalendarChat:
         data = record["payload"]
         if data["state"] != "pending" or data["session"] != session:
             return ""
-        body = data["body"]
-        start, end = body.get("start", {}), body.get("end", {})
+
+        def describe(body: dict[str, Any]) -> str:
+            start, end = body.get("start", {}), body.get("end", {})
+            return (
+                f"Title: {body.get('summary', '(untitled event)')}\n"
+                f"Start: {start.get('dateTime', start.get('date', 'unspecified'))}\n"
+                f"End: {end.get('dateTime', end.get('date', 'unspecified'))}\n"
+                f"Time zone: {start.get('timeZone', 'see date/time above')}\n"
+                f"Location: {body.get('location', '')}\n"
+                f"Description: {body.get('description', '')}\n"
+            )
+
+        action = data["action"]
+        if action != "create" and not data.get("before"):
+            return ""  # Legacy previews need a fresh readable target before approval.
+        details = (
+            describe(data["body"])
+            if action == "create"
+            else ("Existing event:\n" + describe(data["before"]))
+        )
+        if action == "update":
+            details += "Proposed replacement details:\n" + describe(data["body"])
         text = (
-            "\n\nCalendar preview — nothing has been sent to Google.\n"
-            f"Action: {data['action']}\nAccount: {data['account_label']}\n"
-            f"Calendar: {data['calendar_id']}\nTitle: {body.get('summary', '(existing event)')}\n"
-            f"Start: {start.get('dateTime', start.get('date', 'unchanged'))}\n"
-            f"End: {end.get('dateTime', end.get('date', 'unchanged'))}\n"
-            f"Time zone: {start.get('timeZone', 'all-day calendar date')}\n"
-            f"Location: {body.get('location', '')}\nDescription: {body.get('description', '')}\n"
+            "\n\nCalendar preview — no change has been sent to Google.\n"
+            f"Action: {'DELETE event' if action == 'cancel' else action}\n"
+            f"Account: {data['account_label']}\nCalendar: {data['calendar_id']}\n"
+            f"Event ID: {data['event_id']}\n{details}"
             "Reply CONFIRM to apply this exact change, or CANCEL to discard this preview. "
             f"Expires: {data['expires_at']}. Any other message discards this confirmation."
         )
@@ -66,7 +83,7 @@ class CalendarChat:
     async def respond(
         self, runtime: AgentRuntime, session: str, word: str, callback: Any, cancellation: Any
     ) -> AgentReply:
-        from .information_controls import information_action
+        from .information_controls import _CALENDAR_CHAT_APPROVAL, information_action
 
         selected = self.pending.pop(session, None)
         self.drafts.pop(session, None)
@@ -85,7 +102,7 @@ class CalendarChat:
                     },
                     cancellation,
                 )
-                text = "Calendar confirmation discarded. No event was sent to Google."
+                text = "Calendar confirmation discarded. No Calendar change was sent to Google."
             else:
                 try:
                     result = await information_action(
@@ -97,14 +114,17 @@ class CalendarChat:
                             "arguments": {"operation_id": ident, "review_hash": review_hash},
                         },
                         cancellation,
+                        _calendar_approval=_CALENDAR_CHAT_APPROVAL,
                     )
                     state = result.get("payload", result).get("state")
                     text = (
                         "Calendar change verified in Google Calendar."
                         if state == "verified"
-                        else "Calendar result is uncertain. Do not repeat the creation; inspect "
+                        else "Calendar result is uncertain. Do not repeat the change; inspect "
                         f"the saved operation {ident} before taking further action."
                     )
+                    if state == "rejected":
+                        text = "The Calendar event changed after preview. Request a fresh preview."
                 except (ValueError, KeyError, PermissionError) as exc:
                     text = (
                         f"Calendar confirmation refused: {str(exc)[:400]}. Request a new preview."

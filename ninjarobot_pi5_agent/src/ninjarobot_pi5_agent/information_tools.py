@@ -274,8 +274,9 @@ class InformationProvider:
                     "(e.g. Asia/Tokyo). "
                     "Use full ISO dates with matching offsets; get system date for today. "
                     "Correct missing fields after validation errors. The runtime shows the exact "
-                    "creation preview and accepts CONFIRM; updates/cancellations retain explicit "
-                    "/info calendar.confirm. Never confirm through model tools.",
+                    "create/update/delete preview and accepts only standalone CONFIRM in the "
+                    "same chat. CANCEL discards it. Never request a confirmation command "
+                    "or confirm through model tools.",
                     "calendar.operation_status": "Read the saved result of a reviewed calendar "
                     "operation. Never repeat an uncertain write.",
                     "research.search": "Search one to three explicit public queries within 30 "
