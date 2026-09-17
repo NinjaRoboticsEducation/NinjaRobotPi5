@@ -1,5 +1,5 @@
 version: 2
-generated_at: '2026-09-16T00:27:49Z'
+generated_at: '2026-09-17T06:45:56Z'
 sources:
 - id: src-20260906-developmentguide
   title: DevelopmentGuide.md
@@ -289,5 +289,65 @@ sources:
 - id: src-20260916-ninjarobot-mcp-skill
   title: Ninjarobot Mcp Skill
   path: raw/articles/ninjarobotpi5/2026-09-16/NinjaRobot_MCP_Skill.md
+  kind: text
+  state: ingested
+- id: src-20260917-developmentguide-2
+  title: Developmentguide
+  path: raw/articles/ninjarobotpi5/2026-09-17/DevelopmentGuide.md
+  kind: text
+  state: pending
+- id: src-20260917-developmentguide-3
+  title: Developmentguide
+  path: raw/articles/ninjarobotpi5/2026-09-17-02/DevelopmentGuide.md
+  kind: text
+  state: pending
+- id: src-20260917-developmentguide
+  title: Developmentguide
+  path: raw/articles/ninjarobotpi5/2026-09-17-03/DevelopmentGuide.md
+  kind: text
+  state: ingested
+- id: src-20260917-developmentlog-2
+  title: Developmentlog
+  path: raw/notes/ninjarobotpi5/2026-09-17/DevelopmentLog.md
+  kind: text
+  state: pending
+- id: src-20260917-developmentlog-3
+  title: Developmentlog
+  path: raw/notes/ninjarobotpi5/2026-09-17-02/DevelopmentLog.md
+  kind: text
+  state: pending
+- id: src-20260917-developmentlog
+  title: Developmentlog
+  path: raw/notes/ninjarobotpi5/2026-09-17-03/DevelopmentLog.md
+  kind: text
+  state: ingested
+- id: src-20260917-installationguide-2
+  title: Installationguide
+  path: raw/articles/ninjarobotpi5/2026-09-17/InstallationGuide.md
+  kind: text
+  state: pending
+- id: src-20260917-installationguide-3
+  title: Installationguide
+  path: raw/articles/ninjarobotpi5/2026-09-17-02/InstallationGuide.md
+  kind: text
+  state: pending
+- id: src-20260917-installationguide
+  title: Installationguide
+  path: raw/articles/ninjarobotpi5/2026-09-17-03/InstallationGuide.md
+  kind: text
+  state: ingested
+- id: src-20260917-ninjarobot-mcp-skill-2
+  title: Ninjarobot Mcp Skill
+  path: raw/articles/ninjarobotpi5/2026-09-17/NinjaRobot_MCP_Skill.md
+  kind: text
+  state: pending
+- id: src-20260917-ninjarobot-mcp-skill-3
+  title: Ninjarobot Mcp Skill
+  path: raw/articles/ninjarobotpi5/2026-09-17-02/NinjaRobot_MCP_Skill.md
+  kind: text
+  state: pending
+- id: src-20260917-ninjarobot-mcp-skill
+  title: Ninjarobot Mcp Skill
+  path: raw/articles/ninjarobotpi5/2026-09-17-03/NinjaRobot_MCP_Skill.md
   kind: text
   state: ingested

@@ -6,11 +6,11 @@ or open the parent project for development and implementation verification.
 
 ## Current full manuals — Calendar and project-help repair
 
-These 17 September successor manuals are not ingested or reviewed in the wiki.
+These 17 September successor manuals are ingested and semantically reviewed in the wiki.
 They add field-specific preview errors and single-word CONFIRM for creation,
 editing, and deletion, alongside
 guided Calendar authorization, reviewed event creation, and current
-public-manual retrieval. The registered map remains at the 16 September checkpoint.
+public-manual retrieval. The registered document map is updated to the 17 September checkpoint.
 The 16 September 2026 hand-placement correction and 15 September follow-up repairs
 (normal-stop and obstacle recovery rules, automatic sensor recovery, repeated-game
 buzzer preparation, visible web errors, chat guidance, rolling context in AgentLoop,
@@ -18,7 +18,7 @@ and default distance game enablement) are consolidated alongside completed Phase
 information work (T04 calendar planning, T05 research, and T06 notes/checklists/requested
 briefings), Phase 4 foundations, and system clock access.
 Use [the document map](project-knowledge.json) for registered source provenance;
-use the links below for the newer implementation instructions:
+use the links below for the full manuals:
 
 - [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-17-03/InstallationGuide.md)
 - [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-17-03/DevelopmentGuide.md)

@@ -13,6 +13,7 @@ tags:
 - issues
 - phase4
 - phase5
+- calendar
 generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
@@ -21,15 +22,14 @@ sources:
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
   content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
-- id: src-20260916-developmentguide
-  resource: urn:llmwiki:source:src-20260916-developmentguide
+- id: src-20260917-developmentguide
+  resource: urn:llmwiki:source:src-20260917-developmentguide
   title: DevelopmentGuide.md
-  content_hash: sha256:3630ca96f9314ad2d253476a2131e1160f87fe3c0bdae3f10ed5c89f85ae21e0
+  content_hash: sha256:55b061c1a72d4b5f81693f83f2ae39200ff8ed7ea992645e83e661ac5efcd0f0
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-09-16T00:26:00Z'
-  target_hash: sha256:f146b8a135d153a054b0f14831e617d3d03e65725b5a5bd1c4ef9bad604379e3
+  performed_at: '2026-09-17T15:40:00Z'
   result: passed
   checks:
     source_support: passed
@@ -38,10 +38,11 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered 16 September distance game and follow-up
-    evidence; no human verification is claimed.
+  - Reviewed this page against registered 17 September calendar CONFIRM flow, guided
+    authorization, and project help evidence; no human verification is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
     and note pending font repair and monetary spending cap.
+  target_hash: sha256:f73097d6914154c141e9366afc2dd9fe01a14198ce93ead4ab1e7dfef3d61c8c
 ---
 
 # Knowledge limitations and verification
@@ -61,20 +62,21 @@ not expose parent robot code.[^src-20260907-knowledgeintegration]
 The development guide's older quality-gate example uses narrower lint paths than
 the current root policy. Follow the root operating policy for the current full
 checks, and preserve the source's historical context rather than silently treating
-an older example as the complete current gate.[^src-20260916-developmentguide][^src-20260907-knowledgeintegration]
+an older example as the complete current gate.[^src-20260917-developmentguide][^src-20260907-knowledgeintegration]
 
 [Project overview](/overview.md).
 
-## Limits of recent checkpoints (Phase 4 and Phase 5 follow-up)
+## Limits of recent checkpoints (Phase 4, Phase 5, and Calendar follow-up)
 
-The current manual checkpoint (`2026-09-16`) consolidates system time access,
-Phase 4 information work, and 15–16 September distance game and servo repairs.
-Software validation is not physical acceptance:[^src-20260916-developmentguide]
-- **Clock**: `system.time.get` reads local OS clock; it does not set the clock or verify NTP synchronization.[^src-20260916-developmentguide]
-- **Distance game hand placement**: Tested against unit and mock suites; hand placement timing (5–60 cm immediately at request time, before final chat response) and buzzer audibility require live physical verification. Hardware proposals (movable head, edge sensors, touch) are uninstalled concepts.[^src-20260916-developmentguide]
-- **Phase 4 calendar and research**: Google Calendar requires user SSH loopback OAuth; read-only default; write operations require explicit user confirmation. Tavily search snippet citations provide evidence links but do not certify external factual truth.[^src-20260916-developmentguide]
-- **Model boundaries**: Rolling transcript suffix truncation preserves safety context and fits provider request character caps, but does not enforce a currency-denominated spending cap. Display font repair and physical acceptance remain open.[^src-20260916-developmentguide]
+The current manual checkpoint (`2026-09-17-03`) consolidates system time access,
+Phase 4 information work, 15–16 September distance game/servo repairs, and 17 September
+Google Calendar setup and unified CONFIRM flow. Software validation is not physical acceptance:[^src-20260917-developmentguide]
+- **Clock**: `system.time.get` reads local OS clock; it does not set the clock or verify NTP synchronization.[^src-20260917-developmentguide]
+- **Distance game hand placement**: Tested against unit and mock suites; hand placement timing (5–60 cm immediately at request time, before final chat response) and buzzer audibility require live physical verification. Hardware proposals (movable head, edge sensors, touch) are uninstalled concepts.[^src-20260917-developmentguide]
+- **Phase 4 calendar and research**: Google Calendar requires user SSH loopback OAuth (port 8765); read-only default; write operations require `--write` and plain single-word `CONFIRM`. Preparing a create preview does not perform Google write operations; software mock gates do not guarantee Google API acceptance or handle account-level quota issues. Tavily search snippet citations provide evidence links but do not certify external factual truth.[^src-20260917-developmentguide]
+- **Project help**: Runtime document section hashes ensure published section integrity, but cannot guarantee factual perfection of upstream documentation.[^src-20260917-developmentguide]
+- **Model boundaries**: Rolling transcript suffix truncation preserves safety context and fits provider request character caps, but does not enforce a currency-denominated spending cap. Display font repair and physical acceptance remain open.[^src-20260917-developmentguide]
 
 
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
-[^src-20260916-developmentguide]: DevelopmentGuide.md, source version `distance-game-hand-placement-260916`; registered source `src-20260916-developmentguide`.
+[^src-20260917-developmentguide]: DevelopmentGuide.md, source version `calendar-confirm-260917`; registered source `src-20260917-developmentguide`.

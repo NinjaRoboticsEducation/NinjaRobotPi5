@@ -1,5 +1,9 @@
 # Wiki Update Log
 
+## 2026-09-17
+
+* **Update**: Applied plan `calendar-confirm-260917` — Ingest 2026-09-17 Google Calendar guided setup and unified CONFIRM manuals, updating eleven knowledge pages with calendar discovery, plain CONFIRM/CANCEL flow, field-specific preview errors, and hash-checked project help.. Sources: `src-20260907-knowledgeintegration`, `src-20260917-developmentguide`, `src-20260917-installationguide`, `src-20260917-ninjarobot-mcp-skill`, `src-20260917-developmentlog`.
+
 ## 2026-09-16
 
 * **Update**: Applied plan `distance-game-hand-placement-260916` — Ingest 2026-09-16 distance game hand-placement correction manuals and update eleven knowledge pages with 15-16 September repairs, rolling chat context, and distance game sensor timing.. Sources: `src-20260907-knowledgeintegration`, `src-20260916-developmentguide`, `src-20260916-installationguide`, `src-20260916-ninjarobot-mcp-skill`, `src-20260916-developmentlog`.
