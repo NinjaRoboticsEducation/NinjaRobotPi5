@@ -19,7 +19,14 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+)
 from fastapi.staticfiles import StaticFiles
 
 from .events import AgentEvent
@@ -409,8 +416,16 @@ def create_web_app(
         return response
 
     @app.get("/", include_in_schema=False)
-    async def index() -> FileResponse:
-        return FileResponse(static_root / "index.html")
+    async def index() -> RedirectResponse:
+        return RedirectResponse("/agent", status_code=307)
+
+    @app.get("/gamepad", include_in_schema=False)
+    async def gamepad() -> FileResponse:
+        return FileResponse(static_root / "gamepad.html")
+
+    @app.get("/agent", include_in_schema=False)
+    async def agent() -> FileResponse:
+        return FileResponse(static_root / "agent.html")
 
     @app.get("/health", include_in_schema=False)
     async def health() -> dict[str, Any]:

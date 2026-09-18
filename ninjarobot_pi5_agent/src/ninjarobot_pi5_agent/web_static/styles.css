@@ -295,29 +295,38 @@ h2 {
 .action-button {
   aspect-ratio: 1;
   min-height: 54px;
-  border: 0;
+  border: 2px solid white;
   border-radius: 50%;
   display: grid;
   place-content: center;
   gap: 1px;
-  color: #031018;
+  color: white;
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+  transition: color 100ms ease, border-color 100ms ease, transform 60ms ease;
 }
 
 .action-button strong {
   font-size: clamp(1.05rem, 5vw, 1.55rem);
+  color: inherit;
 }
 
 .action-button span {
   font-size: clamp(0.5rem, 2.2vw, 0.65rem);
   font-weight: 850;
   line-height: 1.05;
+  color: inherit;
 }
 
 .action-a { background: #4de2a4; }
-.action-b { color: white; background: #3478ff; }
+.action-b { background: #3478ff; }
 .action-x { background: #ff526d; }
 .action-y { background: #ffc843; }
+
+.action-button.pressing,
+.action-button:active {
+  color: black;
+  border-color: black;
+}
 
 .action-button[aria-pressed="true"] { outline: 2px solid white; outline-offset: -4px; }
 
@@ -418,13 +427,20 @@ h2 {
 .play-button {
   width: 44px;
   height: 44px;
-  border: 0;
+  border: 1px solid var(--line);
   border-radius: 10px;
-  color: white;
-  background: var(--cyan);
+  color: var(--cyan);
+  background: #06111e;
   font-size: 1.2rem;
   display: grid;
   place-items: center;
+  transition: background-color 100ms ease, transform 60ms ease;
+}
+
+.play-button.pressing,
+.play-button:active:not(:disabled) {
+  background: #0a2e52;
+  color: var(--cyan);
 }
 
 .play-button:disabled {
@@ -510,11 +526,19 @@ h2 {
 
 .chat-form button {
   min-width: 62px;
-  border: 0;
+  border: 2px solid transparent;
   border-radius: 11px;
-  color: #031018;
+  color: white;
   background: var(--cyan);
   font-weight: 850;
+  transition: color 100ms ease, background 100ms ease, border-color 100ms ease;
+}
+
+.chat-form button.pressing,
+.chat-form button:active {
+  color: black;
+  background: #0a2e52;
+  border-color: black;
 }
 
 .chat-messages, .chat-form, .conversation-panel { min-width: 0; }
@@ -574,7 +598,7 @@ h2 {
 .activity-content {
   height: 100%;
   display: grid;
-  grid-template-rows: auto minmax(600px, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 7px;
 }
 

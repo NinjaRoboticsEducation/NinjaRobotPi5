@@ -23,6 +23,7 @@
   "camera.previewAlt": "Latest temporary robot camera capture",
   "camera.previewDialog": "Temporary camera preview",
   "camera.previewTitle": "Temporary preview",
+  "camera.takePhoto": "Take photo",
   "camera.title": "CAMERA",
   "chat.cameraGranted": "AI camera grant #{sequence} is ready for one temporary photo. Ask me to take a photo. You can use /camera again after it succeeds.",
   "chat.clear": "Clear view",

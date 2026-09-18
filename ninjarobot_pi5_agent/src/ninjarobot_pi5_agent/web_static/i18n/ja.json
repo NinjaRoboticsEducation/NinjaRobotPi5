@@ -23,6 +23,7 @@
   "camera.previewAlt": "ロボットカメラの最新一時撮影",
   "camera.previewDialog": "一時カメラプレビュー",
   "camera.previewTitle": "一時プレビュー",
+  "camera.takePhoto": "写真撮影",
   "camera.title": "カメラ",
   "chat.cameraGranted": "AIカメラ許可 #{sequence} は一時写真1枚に使用できます。写真を撮るよう依頼してください。成功後は /camera を再度使用できます。",
   "chat.clear": "表示を消去",

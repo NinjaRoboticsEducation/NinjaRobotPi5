@@ -462,14 +462,14 @@ def test_remote_http_and_websocket_require_one_use_pairing_cookie() -> None:
         bootstrap = client.get("/", headers=remote_headers)
         assert bootstrap.status_code == 200
         assert "NinjaRobot Pairing" in bootstrap.text
-        assert client.get("/assets/app.js", headers=remote_headers).status_code == 401
+        assert client.get("/assets/app-shared.js", headers=remote_headers).status_code == 401
         with pytest.raises(WebSocketDenialResponse) as denial:
             with client.websocket_connect(
                 "/ws",
                 headers={"origin": "https://robot.example", **remote_headers},
             ):
                 pass
-        assert denial.value.status_code == 401
+            assert denial.value.status_code == 401
         wrong_origin = client.post(
             "/pair",
             json={"token": token},
@@ -487,7 +487,7 @@ def test_remote_http_and_websocket_require_one_use_pairing_cookie() -> None:
         assert "HttpOnly" in cookie
         assert "SameSite=strict" in cookie
         assert "Path=/" in cookie
-        assert "NINJA ROBOT PI5" in client.get("/", headers=remote_headers).text
+        assert "NINJA ROBOT PI5" in client.get("/agent", headers=remote_headers).text
 
         with client.websocket_connect(
             "/ws?browser_chat_id=paired-browser",
@@ -540,7 +540,9 @@ def test_remote_pairing_gate_denies_unknown_public_host_and_preserves_lan() -> N
         )
     with TestClient(app, base_url="https://192.168.1.20:8443") as local:
         assert local.get("/").status_code == 200
-        assert local.get("/assets/app.js").status_code == 200
+        assert local.get("/", follow_redirects=False).status_code == 307
+        assert local.get("/agent").status_code == 200
+        assert local.get("/assets/app-shared.js").status_code == 200
 
 
 def test_remote_access_mode_blocks_direct_local_http_until_fallback() -> None:
@@ -573,6 +575,8 @@ def test_remote_access_mode_blocks_direct_local_http_until_fallback() -> None:
 
         access.enable_local_fallback()
         assert client.get("/").status_code == 200
+        assert client.get("/", follow_redirects=False).status_code == 307
+        assert client.get("/agent").status_code == 200
 
 
 def test_web_access_state_does_not_silently_restore_local_after_remote_stop() -> None:
@@ -657,7 +661,7 @@ def test_onboarding_requires_local_pairing_before_websocket_acceptance() -> None
 
     with TestClient(app, base_url="https://127.0.0.1:8443") as client:
         assert "NinjaRobot Pairing" in client.get("/").text
-        assert client.get("/assets/app.js").status_code == 401
+        assert client.get("/assets/app-shared.js").status_code == 401
         with pytest.raises(WebSocketDenialResponse) as denial:
             with client.websocket_connect(
                 "/ws",
@@ -671,7 +675,9 @@ def test_onboarding_requires_local_pairing_before_websocket_acceptance() -> None
             headers={"origin": "https://127.0.0.1:8443"},
         )
         assert exchanged.status_code == 200
-        assert "NINJA ROBOT PI5" in client.get("/").text
+        assert client.get("/").status_code == 200
+        assert client.get("/", follow_redirects=False).status_code == 307
+        assert "NINJA ROBOT PI5" in client.get("/agent").text
         with client.websocket_connect(
             "/ws?browser_chat_id=paired-local-browser",
             headers={
@@ -742,11 +748,16 @@ def test_existing_leaf_only_certificate_is_upgraded_without_replacing_key(
 
 def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> None:
     static = Path(__file__).resolve().parents[1] / "src" / "ninjarobot_pi5_agent" / "web_static"
-    html = (static / "index.html").read_text(encoding="utf-8")
+    gamepad_html = (static / "gamepad.html").read_text(encoding="utf-8")
+    agent_html = (static / "agent.html").read_text(encoding="utf-8")
+    html = agent_html + "\n" + gamepad_html
     css = (static / "styles.css").read_text(encoding="utf-8")
-    javascript = (static / "app.js").read_text(encoding="utf-8")
+    shared_js = (static / "app-shared.js").read_text(encoding="utf-8")
+    gamepad_js = (static / "app-gamepad.js").read_text(encoding="utf-8")
+    agent_js = (static / "app-agent.js").read_text(encoding="utf-8")
+    javascript = "\n".join([shared_js, gamepad_js, agent_js])
     english = (static / "i18n" / "en.json").read_text(encoding="utf-8")
-    recognition_handler = javascript.split("recognition.onresult =", maxsplit=1)[1].split(
+    recognition_handler = agent_js.split("recognition.onresult =", maxsplit=1)[1].split(
         "recognition.onerror =",
         maxsplit=1,
     )[0]
@@ -781,11 +792,13 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert "requestFullscreen" in javascript
     assert "webkitRequestFullscreen" in javascript
     assert 'window.matchMedia("(display-mode: standalone)")' in javascript
-    assert 'id="usbMicButton"' in html
-    assert html.index('id="usbMicButton"') < html.index('id="robotMenu"')
+    assert 'id="usbMicButton"' in agent_html
+    assert agent_html.index('id="usbMicButton"') < agent_html.index('id="robotMenu"')
     assert 'id="usbRecordButton"' not in html
-    assert 'id="gamepadView"' in html
-    assert 'id="agentView"' in html
+    assert 'id="gamepadView"' in gamepad_html
+    assert 'id="agentView"' in agent_html
+    assert 'id="gamepadView"' not in agent_html
+    assert 'id="agentView"' not in gamepad_html
     assert 'id="connectionBadge" class="badge badge-wait" data-i18n=' not in html
     assert 'connectionKey: "connection.offline"' in javascript
     assert "renderConnection();" in javascript
@@ -798,7 +811,7 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert "certificate-status" in english
     assert 'if (text === "/resume")' in javascript
     assert 'send("resume", { confirmed: true })' in javascript
-    assert 'id="armAiCameraButton"' in html
+    assert 'id="armAiCameraButton"' in agent_html
     assert 'if (text === "/camera")' in javascript
     assert 'send("grant_chat_camera", { confirmed: true })' in javascript
     assert "data.grant_sequence" in javascript
@@ -815,6 +828,44 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert "trapDialogFocus" in javascript
     assert 'localStorage.setItem("ninjarobotLocale"' in javascript
     assert (static / "manifest.webmanifest").is_file()
+    assert (static / "gamepad.html").is_file()
+    assert (static / "agent.html").is_file()
+    assert (static / "app-shared.js").is_file()
+    assert (static / "app-gamepad.js").is_file()
+    assert (static / "app-agent.js").is_file()
+    assert not (static / "index.html").exists()
+    assert not (static / "app.js").exists()
+
+
+def test_web_routes_redirect_to_agent_and_serve_independent_pages() -> None:
+    runtime = _FakeRuntime()
+    controller = _FakeController()
+    leases = ControllerLeaseManager(on_revoke=controller.lease_revoked)
+    static = Path(__file__).resolve().parents[1] / "src" / "ninjarobot_pi5_agent" / "web_static"
+    app = create_web_app(
+        runtime=cast(AgentRuntime, runtime),
+        controller=cast(WebRobotController, controller),
+        leases=leases,
+        static_directory=static,
+    )
+    with TestClient(app, base_url="https://ninjarobotpi5.local:8443") as client:
+        redirect = client.get("/", follow_redirects=False)
+        assert redirect.status_code == 307
+        assert redirect.headers["location"] == "/agent"
+
+        followed = client.get("/")
+        assert followed.status_code == 200
+        assert 'id="agentView"' in followed.text
+
+        agent_page = client.get("/agent")
+        assert agent_page.status_code == 200
+        assert 'id="agentView"' in agent_page.text
+        assert 'id="gamepadView"' not in agent_page.text
+
+        gamepad_page = client.get("/gamepad")
+        assert gamepad_page.status_code == 200
+        assert 'id="gamepadView"' in gamepad_page.text
+        assert 'id="agentView"' not in gamepad_page.text
 
 
 def test_emergency_stop_revokes_before_dispatch_without_motion_queue() -> None:

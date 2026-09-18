@@ -343,8 +343,13 @@ def test_all_web_locales_have_identical_keys_and_cover_markup_and_script() -> No
         all(str(value).strip() for value in messages.values()) for messages in locales.values()
     )
 
-    html = (static / "index.html").read_text(encoding="utf-8")
-    javascript = (static / "app.js").read_text(encoding="utf-8")
+    html = "\n".join(
+        (static / name).read_text(encoding="utf-8") for name in ("gamepad.html", "agent.html")
+    )
+    javascript = "\n".join(
+        (static / name).read_text(encoding="utf-8")
+        for name in ("app-shared.js", "app-gamepad.js", "app-agent.js")
+    )
     markup_keys = set(re.findall(r'data-i18n(?:-placeholder|-aria|-alt)?="([A-Za-z0-9.]+)"', html))
     script_keys = set(re.findall(r'\bt\("([A-Za-z0-9.]+)"', javascript))
     assert markup_keys | script_keys <= english_keys

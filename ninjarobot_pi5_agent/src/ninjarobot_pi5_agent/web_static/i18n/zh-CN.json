@@ -23,6 +23,7 @@
   "camera.previewAlt": "机器人相机最新临时照片",
   "camera.previewDialog": "临时相机预览",
   "camera.previewTitle": "临时预览",
+  "camera.takePhoto": "拍照",
   "camera.title": "相机",
   "chat.cameraGranted": "AI 相机授权 #{sequence} 可拍摄一张临时照片。请要求我拍照；成功后可再次使用 /camera。",
   "chat.clear": "清除画面",

@@ -23,6 +23,7 @@
   "camera.previewAlt": "機器人相機最新暫存照片",
   "camera.previewDialog": "暫存相機預覽",
   "camera.previewTitle": "暫存預覽",
+  "camera.takePhoto": "拍照",
   "camera.title": "相機",
   "chat.cameraGranted": "AI 相機授權 #{sequence} 可拍攝一張暫存照片。請要求我拍照；成功後可再次使用 /camera。",
   "chat.clear": "清除畫面",

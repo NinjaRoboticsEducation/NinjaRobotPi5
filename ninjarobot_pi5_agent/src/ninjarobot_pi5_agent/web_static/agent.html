@@ -21,39 +21,7 @@
         </button>
       </header>
 
-      <!-- ── Game Pad View ─────────────────────────────────── -->
-      <main id="gamepadView" class="dashboard gamepad-view" hidden>
-        <section class="panel controls-panel" aria-label="Direct robot controls" data-i18n-aria="controls.direct">
-          <div class="dpad" aria-label="Movement controls" data-i18n-aria="controls.movement">
-            <button class="dpad-button up" data-direction="forward" draggable="false" aria-label="Move forward" data-i18n-aria="motion.forward">▲</button>
-            <button class="dpad-button left" data-direction="left" draggable="false" aria-label="Turn left" data-i18n-aria="motion.left">◀</button>
-            <span class="dpad-center" aria-hidden="true">●</span>
-            <button class="dpad-button right" data-direction="right" draggable="false" aria-label="Turn right" data-i18n-aria="motion.right">▶</button>
-            <button class="dpad-button down" data-direction="backward" draggable="false" aria-label="Move backward" data-i18n-aria="motion.backward">▼</button>
-          </div>
-
-          <div class="action-pad" aria-label="Special robot controls" data-i18n-aria="controls.special">
-            <button data-behavior="greeting" class="action-button action-a"><strong>A</strong><span data-i18n="behavior.greeting">Greeting</span></button>
-            <button id="gamepadCameraButton" class="action-button action-b"><strong>B</strong><span data-i18n="camera.arm">AI camera</span></button>
-            <button data-action="emergency" class="action-button action-x"><strong>X</strong><span data-i18n="behavior.emergency">Emergency Stop</span></button>
-            <button data-action="resume" class="action-button action-y"><strong>Y</strong><span data-i18n="behavior.resume">Resume</span></button>
-          </div>
-
-          <div class="behavior-selector" aria-label="User-created behaviors" data-i18n-aria="behavior.user.title">
-            <h3 data-i18n="behavior.user.title">User Created Behaviors</h3>
-            <p data-i18n="behavior.user.detail">Executing user created robot behaviors</p>
-            <div class="behavior-row">
-              <select id="userBehaviorSelect" aria-label="User-created behavior list" data-i18n-aria="behavior.user.title">
-                <option value="" data-i18n="behavior.user.empty">No user behaviors</option>
-              </select>
-              <button id="playBehaviorButton" class="play-button" type="button" aria-label="Run selected behavior" data-i18n-aria="behavior.user.play" disabled>▶</button>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      <!-- ── Agent Interface View ──────────────────────────── -->
-      <main id="agentView" class="dashboard agent-view" hidden>
+      <main id="agentView" class="dashboard agent-view">
         <section class="panel conversation-panel" aria-labelledby="chatTitle">
           <div class="panel-heading">
             <div>
@@ -180,6 +148,7 @@
       </div>
     </div>
     <div id="toast" class="toast hidden" role="status"></div>
-    <script src="/assets/app.js" defer></script>
+    <script src="/assets/app-shared.js" type="module"></script>
+    <script src="/assets/app-agent.js" type="module"></script>
   </body>
 </html>

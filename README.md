@@ -168,7 +168,7 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 - **Default retention** — raw conversations 7 days, failed behaviors 180 days, profiles and confirmed successes until manual deletion
 
 ### HTTPS web controller
-- **Two switchable views** — dedicated **Game Pad** (large touch D-pad, action buttons, user-created behavior selector) and **Agent Interface** (flexible conversation, composer, audio controls) with seamless switching and persistent view preference
+- **Two independent web pages** — separate **Game Pad** (`/gamepad`: large touch D-pad, action buttons, user-created behavior selector) and **Agent Interface** (`/agent`: flexible conversation, composer, audio controls) with a startup flow through the hamburger menu and persistent interface preference
 - **Phone-friendly** — full D-pad, AI chat, and live camera from any browser on your local network
 - **Exclusive controller lease** — only one browser controls the robot at a time
 - **Stable browser chat identity** — controller lease renewal or reconnect keeps that browser's chat session without switching terminal sessions or other browsers

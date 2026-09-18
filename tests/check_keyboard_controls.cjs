@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
-const code = fs.readFileSync('ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/app.js','utf8');
+const code = fs.readFileSync('ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/app-gamepad.js','utf8');
 function target() { return {events:{},addEventListener(n,f){this.events[n]=f;}}; }
 const button = Object.assign(target(),{dataset:{direction:'forward'},classList:{add(){},remove(){}}});
 const document = Object.assign(target(),{querySelectorAll(){return [button];},hidden:false});
@@ -9,7 +9,7 @@ const window = Object.assign(target(),{PointerEvent:true});
 const calls=[], rejects=[];
 const state={activeMoveButton:null};
 const context={state,window,document,log(){},send(type){calls.push(type);return new Promise((resolve,reject)=>rejects.push(reject));}};
-vm.runInNewContext(code.slice(code.indexOf('  let movementGeneration'),code.indexOf('  document.querySelector("#emergencyButton")')),context);
+vm.runInNewContext(code.slice(code.indexOf('let movementGeneration'),code.indexOf('/* ── Game Pad Greeting Button (A)')).replace(/export /g, ''),context);
 const event=(key,repeat=false)=>({key,repeat,preventDefault(){}});
 button.events.keydown(event('x')); assert.equal(calls.length,0);
 button.events.keydown(event(' ')); button.events.keydown(event(' ',true)); assert.deepEqual(calls,['move_start']);
