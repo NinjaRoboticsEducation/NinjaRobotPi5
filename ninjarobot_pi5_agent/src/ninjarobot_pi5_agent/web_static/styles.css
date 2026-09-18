@@ -328,7 +328,42 @@ h2 {
   border-color: black;
 }
 
-.action-button[aria-pressed="true"] { outline: 2px solid white; outline-offset: -4px; }
+/* ── Agent Interface Action Buttons (Toggle State) ────── */
+.agent-controls-section .action-button {
+  color: black;
+  border: 2px solid black;
+  outline: none;
+}
+
+.agent-controls-section .action-button strong,
+.agent-controls-section .action-button span {
+  color: inherit;
+}
+
+.agent-controls-section .action-button[aria-pressed="true"],
+.agent-controls-section .action-button.enabled {
+  color: white;
+  border: 2px solid white;
+  outline: none;
+}
+
+.agent-controls-section .action-button.pressing,
+.agent-controls-section .action-button:active {
+  color: inherit;
+  border-color: inherit;
+}
+
+.agent-controls-section .action-button[aria-pressed="true"].pressing,
+.agent-controls-section .action-button[aria-pressed="true"]:active {
+  color: white;
+  border-color: white;
+}
+
+.agent-controls-section .action-button[aria-pressed="false"].pressing,
+.agent-controls-section .action-button[aria-pressed="false"]:active {
+  color: black;
+  border-color: black;
+}
 
 /* ── Audio Controls (Agent View) ───────────────────────── */
 
@@ -338,7 +373,57 @@ h2 {
   gap: 6px;
 }
 
-.media-button,
+/* Media buttons: WEB MICROPHONE, VOICE INPUT, SPEECH ON */
+/* Disabled style (default / OFF): White font color with 50% opacity white border */
+.media-button {
+  min-height: 45px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 12px;
+  padding: 7px 9px;
+  text-align: left;
+  background: rgba(3, 12, 21, 0.93);
+  display: grid;
+  gap: 2px;
+  color: #ffffff;
+  transition: color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 60ms ease;
+}
+
+.media-button strong {
+  color: #ffffff;
+  font-size: clamp(0.58rem, 2.3vw, 0.72rem);
+}
+
+.media-button small {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: clamp(0.5rem, 2vw, 0.63rem);
+}
+
+.media-button:active {
+  transform: scale(0.98);
+}
+
+/* Enabled style (ON): Blue font color with 50% opacity blue button border */
+.media-button[aria-pressed="true"],
+.media-button.enabled,
+.media-button.recording {
+  color: var(--cyan);
+  border-color: rgba(0, 163, 255, 0.5);
+  box-shadow: 0 0 10px rgba(0, 163, 255, 0.25);
+}
+
+.media-button[aria-pressed="true"] strong,
+.media-button.enabled strong,
+.media-button.recording strong {
+  color: var(--cyan);
+}
+
+.media-button[aria-pressed="true"] small,
+.media-button.enabled small,
+.media-button.recording small {
+  color: var(--cyan);
+}
+
+/* Language field in menu */
 .language-field {
   min-height: 45px;
   border: 1px solid var(--line);
@@ -346,27 +431,13 @@ h2 {
   padding: 7px 9px;
   text-align: left;
   background: rgba(3, 12, 21, 0.93);
-}
-
-.media-button {
   display: grid;
-  gap: 2px;
+  gap: 3px;
 }
 
-.media-button strong {
-  color: var(--cyan);
-  font-size: clamp(0.58rem, 2.3vw, 0.72rem);
-}
-
-.media-button small,
 .language-field span {
   color: var(--muted);
   font-size: clamp(0.5rem, 2vw, 0.63rem);
-}
-
-.language-field {
-  display: grid;
-  gap: 3px;
 }
 
 .language-field select {
@@ -375,11 +446,6 @@ h2 {
   color: var(--ink);
   background: transparent;
   font-size: 0.72rem;
-}
-
-.recording {
-  border-color: var(--red);
-  box-shadow: 0 0 0 2px rgba(255, 77, 103, 0.18);
 }
 
 /* ── User-created Behavior Selector ────────────────────── */

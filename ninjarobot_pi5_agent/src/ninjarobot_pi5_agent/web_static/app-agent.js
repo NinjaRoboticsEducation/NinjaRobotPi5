@@ -141,6 +141,69 @@ if (elements.armAiCamera) {
   });
 }
 
+/* ── Special Robot Controls (X Emergency, Y Resume) ───── */
+
+export function updateEmergencyStop(active) {
+  const button = elements.emergencyStop || document.querySelector("#emergencyStopButton");
+  if (!button) return;
+  button.setAttribute("aria-pressed", String(active));
+}
+
+export function updateResumeMovement(active) {
+  const button = elements.resumeMovement || document.querySelector("#resumeMovementButton");
+  if (!button) return;
+  button.setAttribute("aria-pressed", String(active));
+}
+
+const emergencyBtn = elements.emergencyStop || document.querySelector("#emergencyStopButton");
+if (emergencyBtn) {
+  emergencyBtn.addEventListener("click", async () => {
+    const isAlreadyStopped = emergencyBtn.getAttribute("aria-pressed") === "true";
+    if (isAlreadyStopped) {
+      try {
+        const resumed = await resumeRobot(true);
+        if (resumed) {
+          updateEmergencyStop(false);
+          updateResumeMovement(true);
+        }
+      } catch {
+        // cancelled or failed
+      }
+      return;
+    }
+    try {
+      await send("emergency_stop");
+      updateEmergencyStop(true);
+      updateResumeMovement(false);
+      updateAiMotion(false);
+      updateAiCamera(false);
+      toast(t("behavior.emergencyComplete"));
+    } catch {
+      // error handled by send
+    }
+  });
+}
+
+const resumeBtn = elements.resumeMovement || document.querySelector("#resumeMovementButton");
+if (resumeBtn) {
+  resumeBtn.addEventListener("click", async () => {
+    const isAlreadyResumed = resumeBtn.getAttribute("aria-pressed") === "true";
+    if (isAlreadyResumed) {
+      updateResumeMovement(false);
+      return;
+    }
+    try {
+      const resumed = await resumeRobot(true);
+      if (resumed) {
+        updateResumeMovement(true);
+        updateEmergencyStop(false);
+      }
+    } catch {
+      // cancelled or failed
+    }
+  });
+}
+
 /* ── Voice Input (USB Mic) ───────────────────────────── */
 
 export function updateVoiceInput(status = {}) {
@@ -188,9 +251,12 @@ export function configureSpeechRecognition() {
   recognition.continuous = false;
   recognition.onstart = () => {
     state.recognitionActive = true;
-    elements.webMic.classList.add("recording");
-    const strong = elements.webMic.querySelector("strong");
-    if (strong) strong.textContent = t("speech.stop");
+    if (elements.webMic) {
+      elements.webMic.setAttribute("aria-pressed", "true");
+      elements.webMic.classList.add("recording");
+      const strong = elements.webMic.querySelector("strong");
+      if (strong) strong.textContent = t("speech.stop");
+    }
   };
   recognition.onresult = (event) => {
     let transcript = "";
@@ -218,9 +284,12 @@ export function configureSpeechRecognition() {
   };
   recognition.onend = () => {
     state.recognitionActive = false;
-    elements.webMic.classList.remove("recording");
-    const strong = elements.webMic.querySelector("strong");
-    if (strong) strong.textContent = t("browserMic.title");
+    if (elements.webMic) {
+      elements.webMic.setAttribute("aria-pressed", "false");
+      elements.webMic.classList.remove("recording");
+      const strong = elements.webMic.querySelector("strong");
+      if (strong) strong.textContent = t("browserMic.title");
+    }
   };
   state.recognition = recognition;
   elements.webMic.addEventListener("click", () => {
@@ -259,6 +328,7 @@ export function showSpeechState(result) {
   const enabled = data.enabled === true;
   if (elements.speechOn) {
     elements.speechOn.setAttribute("aria-pressed", String(enabled));
+    elements.speechOn.dataset.speech = enabled ? "on" : "off";
     const detail = elements.speechOn.querySelector("small");
     if (detail) detail.textContent = enabled ? t("speech.enabled") : t("speech.disabled");
   }
@@ -296,8 +366,12 @@ registerMessageHandlers({
   onEmergencyStop: () => {
     updateAiMotion(false);
     updateAiCamera(false);
+    updateEmergencyStop(true);
+    updateResumeMovement(false);
   },
   onChatResumeSuccess: (message) => {
+    updateEmergencyStop(false);
+    updateResumeMovement(true);
     updateAiMotion(false);
     addMessage("assistant", message);
   },

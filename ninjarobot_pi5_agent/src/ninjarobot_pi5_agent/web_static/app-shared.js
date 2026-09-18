@@ -96,6 +96,8 @@ export const elements = {
   playBehavior: document.querySelector("#playBehaviorButton"),
   gamepadCamera: document.querySelector("#gamepadCameraButton"),
   speechOn: document.querySelector("#speechOnButton"),
+  emergencyStop: document.querySelector("#emergencyStopButton"),
+  resumeMovement: document.querySelector("#resumeMovementButton"),
 };
 
 export function t(key, replacements = {}) {

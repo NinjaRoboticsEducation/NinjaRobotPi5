@@ -43,13 +43,13 @@
 
         <section class="agent-controls-section">
           <div class="audio-controls">
-            <button id="webMicButton" class="media-button">
+            <button id="webMicButton" class="media-button" aria-pressed="false">
               <strong data-i18n="browserMic.title">WEB MICROPHONE</strong><small data-i18n="browserMic.detail">Fill the message box</small>
             </button>
             <button id="usbMicButton" class="media-button" aria-pressed="false">
               <strong data-i18n="voice.title">VOICE INPUT</strong><small data-i18n="voice.off">Always-on Ninja: Off</small>
             </button>
-            <button id="speechOnButton" data-speech="on" aria-pressed="false" class="media-button">
+            <button id="speechOnButton" data-speech="off" aria-pressed="false" class="media-button">
               <strong data-i18n="speech.enable">Speech ON</strong><small id="speechOnDetail" data-i18n="speech.disabled">Spoken replies: off</small>
             </button>
           </div>
@@ -57,8 +57,8 @@
           <div class="action-pad" aria-label="Special robot controls" data-i18n-aria="controls.special">
             <button id="armAiButton" class="action-button action-a" aria-pressed="false"><strong>A</strong><span data-i18n="motion.arm">Arm AI motion</span></button>
             <button id="armAiCameraButton" class="action-button action-b" aria-pressed="false"><strong>B</strong><span data-i18n="camera.arm">AI camera</span></button>
-            <button data-action="emergency" class="action-button action-x"><strong>X</strong><span data-i18n="behavior.emergency">Emergency Stop</span></button>
-            <button data-action="resume" class="action-button action-y"><strong>Y</strong><span data-i18n="behavior.resume">Resume</span></button>
+            <button id="emergencyStopButton" class="action-button action-x" aria-pressed="false"><strong>X</strong><span data-i18n="behavior.emergency">Emergency Stop</span></button>
+            <button id="resumeMovementButton" class="action-button action-y" aria-pressed="false"><strong>Y</strong><span data-i18n="behavior.resume">Resume</span></button>
           </div>
         </section>
       </main>

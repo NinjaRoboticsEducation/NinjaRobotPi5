@@ -1053,3 +1053,44 @@ def test_websocket_dispatches_user_behaviors() -> None:
         )
         res2 = websocket.receive_json()
         assert res2["data"]["status"] == "succeeded"
+
+
+def test_agent_interface_button_styles_and_initial_states() -> None:
+    static = Path(__file__).resolve().parents[1] / "src" / "ninjarobot_pi5_agent" / "web_static"
+    agent_html = (static / "agent.html").read_text(encoding="utf-8")
+    css = (static / "styles.css").read_text(encoding="utf-8")
+
+    # 1. Verify Agent action buttons A, B, X, Y start disabled (aria-pressed="false")
+    assert 'id="armAiButton"' in agent_html
+    assert 'id="armAiCameraButton"' in agent_html
+    assert 'id="emergencyStopButton"' in agent_html
+    assert 'id="resumeMovementButton"' in agent_html
+    assert 'id="armAiButton" class="action-button action-a" aria-pressed="false"' in agent_html
+    assert (
+        'id="armAiCameraButton" class="action-button action-b" aria-pressed="false"' in agent_html
+    )
+    assert (
+        'id="emergencyStopButton" class="action-button action-x" aria-pressed="false"' in agent_html
+    )
+    assert (
+        'id="resumeMovementButton" class="action-button action-y" aria-pressed="false"'
+        in agent_html
+    )
+
+    # 2. Verify Agent media buttons WEB, VOICE, SPEECH start disabled (aria-pressed="false")
+    assert 'id="webMicButton" class="media-button" aria-pressed="false"' in agent_html
+    assert 'id="usbMicButton" class="media-button" aria-pressed="false"' in agent_html
+    assert (
+        'id="speechOnButton" data-speech="off" aria-pressed="false" class="media-button"'
+        in agent_html
+    )
+
+    # 3. Verify CSS styling rules for Agent action buttons
+    assert ".agent-controls-section .action-button" in css
+    assert "border: 2px solid black" in css
+    assert '.agent-controls-section .action-button[aria-pressed="true"]' in css
+    assert "border: 2px solid white" in css
+
+    # 4. Verify CSS styling rules for media buttons (WEB/VOICE/SPEECH)
+    assert "rgba(255, 255, 255, 0.5)" in css  # 50% opacity white border
+    assert "rgba(0, 163, 255, 0.5)" in css  # 50% opacity blue border
