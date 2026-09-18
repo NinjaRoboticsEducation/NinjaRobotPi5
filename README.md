@@ -168,11 +168,14 @@ NinjaRobotPi5 solves all three problems. It gives you a **safe, tested AI robot*
 - **Default retention** — raw conversations 7 days, failed behaviors 180 days, profiles and confirmed successes until manual deletion
 
 ### HTTPS web controller
+- **Two switchable views** — dedicated **Game Pad** (large touch D-pad, action buttons, user-created behavior selector) and **Agent Interface** (flexible conversation, composer, audio controls) with seamless switching and persistent view preference
 - **Phone-friendly** — full D-pad, AI chat, and live camera from any browser on your local network
 - **Exclusive controller lease** — only one browser controls the robot at a time
 - **Stable browser chat identity** — controller lease renewal or reconnect keeps that browser's chat session without switching terminal sessions or other browsers
 - **Live events panel** — see service and tool activity in real time
-- **Four-language browser speech** — English, Japanese, Traditional Chinese, and Simplified Chinese on supported browsers
+- **Four-language interface and speech** — full UI and speech recognition in English, Japanese, Traditional Chinese, and Simplified Chinese
+- **User-created behaviors** — run saved custom behaviors directly from the Game Pad dropdown with clear confirmation and motion protection
+- **Retained command access** — distance game (`/game start 10`, `/game stop`, `/game status`), local reminders (`/tasks`), and guided checks (`/guide`) remain fully accessible via chat commands
 - **Fullscreen on mobile** — add the controller to your iPhone Home Screen for a standalone app view
 
 ### Expression and sound
@@ -245,7 +248,7 @@ Bluetooth or volume menu. Use an SSH terminal logged in as the Agent's normal
 Linux account and follow the [complete command-line setup](docs/validation/refinement_phase3_walkthrough_260909.md#pair-and-select-the-bluetooth-speaker):
 
 1. Follow the Lite prerequisites below if audio services are not installed.
-2. Run `uv run --frozen --no-sync ninjarobot-ide-tool bluetooth connect`, or choose IDE menu **8**.
+2. Run `uv run --frozen --no-sync ninjarobot-ide-tool bluetooth connect`, or choose IDE menu **5**.
 3. Select the speaker number; the wizard pairs, trusts, connects and saves its output.
 4. Review and enable the independent reconnect service if desired. It works with the Agent running or stopped; boot/logout support requires user lingering.
 5. Configure the optional local Piper voice, then restart an existing Agent safely to load the saved output.

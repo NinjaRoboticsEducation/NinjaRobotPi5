@@ -650,6 +650,13 @@ async def _dispatch_web_message(
             lease_id,
             _required_string(message, "name"),
         )
+    if kind == "user_behaviors_list":
+        return await controller.list_user_behaviors(lease_id)
+    if kind == "user_behavior_run":
+        return await controller.run_user_behavior(
+            lease_id,
+            _required_string(message, "name"),
+        )
     if kind == "emergency_stop":
         return await controller.emergency_stop(lease_id)
     if kind == "resume":

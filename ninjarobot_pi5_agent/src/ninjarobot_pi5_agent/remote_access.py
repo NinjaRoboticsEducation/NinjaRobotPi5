@@ -92,7 +92,7 @@ class PyngrokTunnelBackend:
             raise RemoteAccessError("authtoken_unavailable")
         _write_private_ngrok_config(config_file, token=token)
         try:
-            from pyngrok import conf, ngrok  # type: ignore[import-untyped]
+            from pyngrok import conf, ngrok  # type: ignore[import-not-found]
 
             logging.getLogger("pyngrok").setLevel(logging.WARNING)
             pyngrok_config = conf.PyngrokConfig(

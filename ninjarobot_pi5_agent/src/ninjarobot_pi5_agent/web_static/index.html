@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#07111f">
+    <meta name="theme-color" content="#03080c">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/assets/manifest.webmanifest">
@@ -14,22 +14,16 @@
     <div class="app-shell">
       <header class="topbar">
         <p class="eyebrow">NINJA ROBOT PI5</p>
+        <span id="connectionBadge" class="badge badge-wait">Not connected</span>
         <button id="menuButton" class="menu-button" type="button" aria-expanded="false" aria-controls="robotMenu" data-i18n-aria="menu.open">
           <span aria-hidden="true"></span><span aria-hidden="true"></span><span aria-hidden="true"></span>
           <span class="sr-only" data-i18n="menu.open">Open robot menu</span>
         </button>
       </header>
 
-      <main class="dashboard">
+      <!-- ── Game Pad View ─────────────────────────────────── -->
+      <main id="gamepadView" class="dashboard gamepad-view" hidden>
         <section class="panel controls-panel" aria-label="Direct robot controls" data-i18n-aria="controls.direct">
-          <div class="control-status">
-            <span id="connectionBadge" class="badge badge-wait">Not connected</span>
-            <div class="ai-permissions">
-              <button id="armAiButton" class="small-button motion-arm" aria-pressed="false" data-i18n="motion.arm">Arm AI motion</button>
-              <button id="armAiCameraButton" class="small-button camera-arm" aria-pressed="false" data-i18n="camera.arm">AI camera</button>
-            </div>
-          </div>
-
           <div class="dpad" aria-label="Movement controls" data-i18n-aria="controls.movement">
             <button class="dpad-button up" data-direction="forward" draggable="false" aria-label="Move forward" data-i18n-aria="motion.forward">▲</button>
             <button class="dpad-button left" data-direction="left" draggable="false" aria-label="Turn left" data-i18n-aria="motion.left">◀</button>
@@ -38,35 +32,28 @@
             <button class="dpad-button down" data-direction="backward" draggable="false" aria-label="Move backward" data-i18n-aria="motion.backward">▼</button>
           </div>
 
-          <div class="media-controls">
-            <button id="cameraButton" class="media-button">
-              <strong data-i18n="camera.title">CAMERA</strong><small data-i18n="camera.preview">Temporary photo preview</small>
-            </button>
-            <button id="webMicButton" class="media-button">
-              <strong data-i18n="browserMic.title">WEB MICROPHONE</strong><small data-i18n="browserMic.detail">Fill the message box</small>
-            </button>
-            <button id="usbMicButton" class="media-button" aria-pressed="false">
-              <strong data-i18n="voice.title">VOICE INPUT</strong><small data-i18n="voice.off">Always-on Ninja: Off</small>
-            </button>
-            <button id="usbRecordButton" class="media-button">
-              <strong data-i18n="record.title">RECORD ONCE</strong><small data-i18n="record.detail">Record 5 seconds locally</small>
-            </button>
-          </div>
-
           <div class="action-pad" aria-label="Special robot controls" data-i18n-aria="controls.special">
-            <button id="speechOnButton" data-speech="on" aria-pressed="false" class="action-button action-a"><strong>A</strong><span data-i18n="speech.enable">Speech ON</span></button>
-            <button id="speechOffButton" data-speech="off" aria-pressed="false" class="action-button action-b"><strong>B</strong><span data-i18n="speech.disable">Speech OFF</span></button>
-            <button id="emergencyButton" class="action-button action-x"><strong>X</strong><span data-i18n="behavior.emergency">Emergency Stop</span></button>
-            <button id="resumeButton" class="action-button action-y"><strong>Y</strong><span data-i18n="behavior.resume">Resume</span></button>
+            <button data-behavior="greeting" class="action-button action-a"><strong>A</strong><span data-i18n="behavior.greeting">Greeting</span></button>
+            <button id="gamepadCameraButton" class="action-button action-b"><strong>B</strong><span data-i18n="camera.arm">AI camera</span></button>
+            <button data-action="emergency" class="action-button action-x"><strong>X</strong><span data-i18n="behavior.emergency">Emergency Stop</span></button>
+            <button data-action="resume" class="action-button action-y"><strong>Y</strong><span data-i18n="behavior.resume">Resume</span></button>
           </div>
-          <div class="game-controls" aria-label="Distance game">
-            <button class="small-button" data-game="start" data-i18n="game.start">Play game (30s)</button>
-            <button class="small-button" data-game="stop" data-i18n="game.stop">Stop Game</button>
-            <button class="small-button" data-game="status" data-i18n="game.status">Game status</button>
-          </div>
-          <p id="gameResult" role="status" aria-live="polite"></p>
-        </section>
 
+          <div class="behavior-selector" aria-label="User-created behaviors" data-i18n-aria="behavior.user.title">
+            <h3 data-i18n="behavior.user.title">User Created Behaviors</h3>
+            <p data-i18n="behavior.user.detail">Executing user created robot behaviors</p>
+            <div class="behavior-row">
+              <select id="userBehaviorSelect" aria-label="User-created behavior list" data-i18n-aria="behavior.user.title">
+                <option value="" data-i18n="behavior.user.empty">No user behaviors</option>
+              </select>
+              <button id="playBehaviorButton" class="play-button" type="button" aria-label="Run selected behavior" data-i18n-aria="behavior.user.play" disabled>▶</button>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- ── Agent Interface View ──────────────────────────── -->
+      <main id="agentView" class="dashboard agent-view" hidden>
         <section class="panel conversation-panel" aria-labelledby="chatTitle">
           <div class="panel-heading">
             <div>
@@ -74,7 +61,7 @@
               <h2 id="chatTitle" data-i18n="chat.title">Talk to NinjaRobot</h2>
               <p id="speechResult" class="speech-status" role="status" aria-live="polite"></p>
             </div>
-            <button id="clearChatButton" class="small-button" data-i18n="chat.clear">Clear view</button>
+            <button id="clearChatButton" class="small-button" data-i18n="chat.clearMessage">Clear Message</button>
           </div>
           <div id="chatMessages" class="chat-messages" aria-live="polite">
             <div class="message assistant" data-i18n="chat.ready">Hello. NinjaRobotAgent is ready.</div>
@@ -84,6 +71,27 @@
             <textarea id="chatInput" rows="2" maxlength="20000" placeholder="Ask NinjaRobot, or use /new user, /switch user, /identify…" data-i18n-placeholder="chat.placeholder"></textarea>
             <button type="submit" data-i18n="chat.send">Send</button>
           </form>
+        </section>
+
+        <section class="agent-controls-section">
+          <div class="audio-controls">
+            <button id="webMicButton" class="media-button">
+              <strong data-i18n="browserMic.title">WEB MICROPHONE</strong><small data-i18n="browserMic.detail">Fill the message box</small>
+            </button>
+            <button id="usbMicButton" class="media-button" aria-pressed="false">
+              <strong data-i18n="voice.title">VOICE INPUT</strong><small data-i18n="voice.off">Always-on Ninja: Off</small>
+            </button>
+            <button id="speechOnButton" data-speech="on" aria-pressed="false" class="media-button">
+              <strong data-i18n="speech.enable">Speech ON</strong><small id="speechOnDetail" data-i18n="speech.disabled">Spoken replies: off</small>
+            </button>
+          </div>
+
+          <div class="action-pad" aria-label="Special robot controls" data-i18n-aria="controls.special">
+            <button id="armAiButton" class="action-button action-a" aria-pressed="false"><strong>A</strong><span data-i18n="motion.arm">Arm AI motion</span></button>
+            <button id="armAiCameraButton" class="action-button action-b" aria-pressed="false"><strong>B</strong><span data-i18n="camera.arm">AI camera</span></button>
+            <button data-action="emergency" class="action-button action-x"><strong>X</strong><span data-i18n="behavior.emergency">Emergency Stop</span></button>
+            <button data-action="resume" class="action-button action-y"><strong>Y</strong><span data-i18n="behavior.resume">Resume</span></button>
+          </div>
         </section>
       </main>
     </div>
@@ -145,16 +153,12 @@
             </select>
           </label>
         </section>
-        <section class="menu-section" aria-labelledby="connectionTitle">
-          <h3 id="connectionTitle" data-i18n="menu.connection">Connection</h3>
-          <p id="remoteStatus" class="menu-status" data-i18n="remote.local">Local secure controller</p>
-        </section>
-        <section class="menu-section" aria-labelledby="tasksTitle">
-          <h3 id="tasksTitle" data-i18n="tasks.title">Local tasks</h3>
-          <p data-i18n="tasks.help">In chat, use /remind 60 Practice to preview a silent reminder. Review its exact time and effect before confirming.</p>
-          <button id="tasksRefresh" class="small-button" type="button" data-i18n="tasks.refresh">Refresh tasks</button>
-          <p id="tasksNotice" role="status"></p>
-          <div id="tasksList"></div>
+        <section class="menu-section" aria-labelledby="interfaceTitle">
+          <h3 id="interfaceTitle" data-i18n="interface.title">Control Interface</h3>
+          <p data-i18n="interface.gamepadDetail">Using the game pad controller, you can control the robot's movements without the AI assistant.</p>
+          <button id="switchToGamepad" class="interface-button" type="button" data-i18n="interface.gamepad">Game Pad</button>
+          <p data-i18n="interface.agentDetail">The chat interface allows you to control the robot by prompting the Ninjarobot Agent.</p>
+          <button id="switchToAgent" class="interface-button" type="button" data-i18n="interface.agent">Agent Interface</button>
         </section>
         <section class="menu-section danger-section" aria-labelledby="powerTitle">
           <h3 id="powerTitle" data-i18n="power.title">System power</h3>

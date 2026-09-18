@@ -79,6 +79,14 @@ class _FakeController:
     async def lease_revoked(self, lease_id: str, reason: str) -> None:
         self.revoked.append((lease_id, reason))
 
+    async def list_user_behaviors(self, lease_id: str) -> dict[str, Any]:
+        return {"behaviors": [{"name": "my_dance", "description": "Fun", "contains_motion": True}]}
+
+    async def run_user_behavior(self, lease_id: str, name: str) -> dict[str, Any]:
+        if name == "my_dance":
+            return {"status": "succeeded", "name": name}
+        raise ValueError(f"unknown or deleted user behavior: {name}")
+
 
 class _FakePoweroff:
     def __init__(self) -> None:
@@ -708,8 +716,9 @@ def test_local_ca_certificate_is_reused_named_and_private(tmp_path: Path) -> Non
         ).value.get_values_for_type(x509.IPAddress)
     }
     hostname = socket.gethostname().rstrip(".")
+    mdns = hostname if hostname.endswith(".local") else f"{hostname}.local"
     assert server.issuer == authority.subject
-    assert {hostname, f"{hostname}.local", "localhost"} <= names
+    assert {hostname, mdns, "localhost"} <= names
     assert {"127.0.0.1", "::1"} <= addresses
     assert authority.extensions.get_extension_for_class(x509.BasicConstraints).value.ca is True
     assert os.stat(ca_key).st_mode & 0o777 == 0o600
@@ -756,7 +765,7 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert "-webkit-touch-callout: none" in css
     assert "overscroll-behavior: none" in css
     assert "max(44px, calc(env(safe-area-inset-bottom) + 38px))" in css
-    assert "grid-template-rows: auto minmax(0, 1fr) auto auto" in css
+    assert "grid-template-rows: minmax(0, 1fr) auto auto" in css
     assert "height: 100%" in css
     assert "grid-template-rows: repeat(3, minmax(0, 1fr))" in css
     assert "clamp(43px, 12.5vh, 66px)" not in css
@@ -774,7 +783,9 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert 'window.matchMedia("(display-mode: standalone)")' in javascript
     assert 'id="usbMicButton"' in html
     assert html.index('id="usbMicButton"') < html.index('id="robotMenu"')
-    assert html.index('id="usbRecordButton"') < html.index('id="robotMenu"')
+    assert 'id="usbRecordButton"' not in html
+    assert 'id="gamepadView"' in html
+    assert 'id="agentView"' in html
     assert 'id="connectionBadge" class="badge badge-wait" data-i18n=' not in html
     assert 'connectionKey: "connection.offline"' in javascript
     assert "renderConnection();" in javascript
@@ -884,3 +895,110 @@ def test_speech_stop_bypasses_busy_web_connection_operation_lock():
         assert stopped.is_set()
         assert all(item["type"] == "result" for item in messages)
         assert {item["request_id"] for item in messages} == {"chat", "stop"}
+
+
+def test_web_user_behaviors_list_and_run() -> None:
+    class UserBehaviorRuntime(_ResumeRuntime):
+        def __init__(self) -> None:
+            super().__init__()
+            self.executed: list[dict[str, Any]] = []
+
+        async def execute_tool(self, **arguments: Any) -> ToolExecutionResult:
+            self.executed.append(arguments)
+            if arguments["tool_name"] == "robot.behavior.list":
+                assert arguments["arguments"] == {"source": "user"}
+                return ToolExecutionResult(
+                    call_id="call-1",
+                    tool_name="robot.behavior.list",
+                    status=ToolExecutionStatus.SUCCEEDED,
+                    data={
+                        "behaviors": [
+                            {
+                                "name": "custom_spin",
+                                "description": "Spins in circle",
+                                "contains_motion": True,
+                                "extra_internal_field": "secret",
+                            }
+                        ]
+                    },
+                )
+            if arguments["tool_name"] == "robot.behavior.run":
+                return ToolExecutionResult(
+                    call_id="call-2",
+                    tool_name="robot.behavior.run",
+                    status=ToolExecutionStatus.SUCCEEDED,
+                    data={"completed": True},
+                )
+            if arguments["tool_name"] == "robot.servo.stop":
+                return ToolExecutionResult(
+                    call_id="call-3",
+                    tool_name="robot.servo.stop",
+                    status=ToolExecutionStatus.SUCCEEDED,
+                    data={"stopped": True},
+                )
+            raise ValueError(f"unexpected tool: {arguments['tool_name']}")
+
+    async def exercise() -> None:
+        runtime = UserBehaviorRuntime()
+        controller = WebRobotController(cast(AgentRuntime, runtime))
+
+        # List user behaviors
+        listed = await controller.list_user_behaviors("lease-test")
+        assert listed == {
+            "behaviors": [
+                {
+                    "name": "custom_spin",
+                    "description": "Spins in circle",
+                    "contains_motion": True,
+                }
+            ]
+        }
+
+        # Run valid user behavior
+        ran = await controller.run_user_behavior("lease-test", "custom_spin")
+        assert ran["status"] == "succeeded"
+
+        # Reject path traversal / invalid names
+        with pytest.raises(ValueError, match="invalid behavior name"):
+            await controller.run_user_behavior("lease-test", "../secret")
+
+        # Reject unknown user behavior
+        with pytest.raises(ValueError, match="unknown or deleted user behavior"):
+            await controller.run_user_behavior("lease-test", "nonexistent")
+
+    asyncio.run(exercise())
+
+
+def test_websocket_dispatches_user_behaviors() -> None:
+    runtime, controller = _FakeRuntime(), _FakeController()
+    leases = ControllerLeaseManager(on_revoke=controller.lease_revoked)
+    static = Path(__file__).resolve().parents[1] / "src" / "ninjarobot_pi5_agent" / "web_static"
+    app = create_web_app(
+        runtime=cast(AgentRuntime, runtime),
+        controller=cast(WebRobotController, controller),
+        leases=leases,
+        static_directory=static,
+    )
+    with TestClient(app) as client, client.websocket_connect("/ws") as websocket:
+        lease = websocket.receive_json()["lease_id"]
+        websocket.receive_json()
+        websocket.receive_json()
+
+        websocket.send_json(
+            {"type": "user_behaviors_list", "request_id": "req-1", "lease_id": lease}
+        )
+        res1 = websocket.receive_json()
+        assert res1["data"]["behaviors"] == [
+            {"name": "my_dance", "description": "Fun", "contains_motion": True}
+        ]
+
+        websocket.send_json(
+            {
+                "type": "user_behavior_run",
+                "request_id": "req-2",
+                "lease_id": lease,
+                "name": "my_dance",
+            }
+        )
+        res2 = websocket.receive_json()
+        assert res2["data"]["status"] == "succeeded"

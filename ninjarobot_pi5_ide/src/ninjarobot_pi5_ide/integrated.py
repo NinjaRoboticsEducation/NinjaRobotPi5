@@ -314,7 +314,12 @@ class _BehaviorListAdapter:
                     "type": "string",
                     "enum": ["all", "expression", "movement"],
                     "default": "all",
-                }
+                },
+                "source": {
+                    "type": "string",
+                    "enum": ["all", "user"],
+                    "default": "all",
+                },
             },
             "additionalProperties": False,
         },
@@ -337,12 +342,14 @@ class _BehaviorListAdapter:
         category = arguments.get("category", "all")
         if category not in {"all", "expression", "movement"}:
             raise ValueError("category must be all, expression, or movement")
-        return {
-            "behaviors": [
-                definition.model_dump(mode="json")
-                for definition in self._robot.assets.list(category)
-            ]
-        }
+        source = arguments.get("source", "all")
+        if source not in {"all", "user"}:
+            raise ValueError("source must be all or user")
+        if source == "user":
+            definitions = self._robot.assets.list_user(category)
+        else:
+            definitions = self._robot.assets.list(category)
+        return {"behaviors": [definition.model_dump(mode="json") for definition in definitions]}
 
     async def health(self) -> ResourceHealth:
         return ResourceHealth.READY

@@ -205,12 +205,12 @@ def test_interactive_menu_can_exit_without_hardware(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "NinjaRobotPi5 Interactive Tool" in result.output
     assert "Hardware Configurations" in result.output
-    assert "Run Robot Behaviors" in result.output
-    assert "Create Robot Behavior" in result.output
-    assert "Run User-Created Behaviors" in result.output
-    assert "Delete User-Created Behaviors" in result.output
     assert "Simulation" in result.output
-    assert "EMERGENCY STOP" in result.output
+    assert "Run Robot Behaviors" in result.output
+    assert "User-created Behaviors" in result.output
+    assert "Bluetooth Speaker Connection" in result.output
+    assert "Q. Quit" in result.output
+    assert "EMERGENCY STOP" not in result.output
 
 
 def test_interactive_submenus_explain_creation_simulation_and_support_back(
@@ -219,11 +219,11 @@ def test_interactive_submenus_explain_creation_simulation_and_support_back(
     result = invoke(
         CliRunner(),
         private_config(tmp_path),
-        input="3\nb\n6\nb\n2\n1\nb\nb\n7\n",
+        input="4\nb\n2\nb\n3\n1\nb\nb\nq\n",
     )
 
     assert result.exit_code == 0
-    assert "nothing physical runs during the preview" in result.output
+    assert "Create, run, or delete private user-created behaviors" in result.output
     assert "fake display, buzzer, servo, and distance devices" in result.output
     assert "Face Expressions" in result.output
     assert result.output.count("B. Back") >= 4
@@ -233,7 +233,7 @@ def test_interactive_hardware_page_is_configuration_only(tmp_path: Path) -> None
     result = invoke(
         CliRunner(),
         private_config(tmp_path),
-        input="1\n1\n\nb\n7\n",
+        input="1\n\nq\n",
     )
 
     assert result.exit_code == 0

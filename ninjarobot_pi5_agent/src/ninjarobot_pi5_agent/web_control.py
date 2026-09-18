@@ -351,6 +351,48 @@ class WebRobotController:
         )
         return result.model_dump(mode="json")
 
+    async def list_user_behaviors(self, lease_id: str) -> dict[str, Any]:
+        result = await self._runtime.execute_tool(
+            tool_name="robot.behavior.list",
+            arguments={"source": "user"},
+            session_id=self.control_session(lease_id),
+            lease_id=lease_id,
+            requested_by="web-controller",
+        )
+        if result.status != ToolExecutionStatus.SUCCEEDED:
+            return {"behaviors": []}
+        data = result.data if isinstance(result.data, dict) else {}
+        raw_list = data.get("behaviors", [])
+        behaviors: list[dict[str, Any]] = []
+        if isinstance(raw_list, list):
+            for item in raw_list:
+                if isinstance(item, dict) and "name" in item:
+                    behaviors.append(
+                        {
+                            "name": str(item["name"]),
+                            "description": str(item.get("description", "")),
+                            "contains_motion": bool(item.get("contains_motion", False)),
+                        }
+                    )
+        return {"behaviors": behaviors}
+
+    async def run_user_behavior(self, lease_id: str, name: str) -> dict[str, Any]:
+        if not isinstance(name, str) or not name or any(c in name for c in "/\\.\x00"):
+            raise ValueError(f"invalid behavior name: {name}")
+        behaviors = await self.list_user_behaviors(lease_id)
+        user_names = {item["name"] for item in behaviors.get("behaviors", [])}
+        if name not in user_names:
+            raise ValueError(f"unknown or deleted user behavior: {name}")
+        await self.stop_motion(lease_id)
+        result = await self._runtime.execute_tool(
+            tool_name="robot.behavior.run",
+            arguments={"name": name},
+            session_id=self.control_session(lease_id),
+            lease_id=lease_id,
+            requested_by="web-controller",
+        )
+        return result.model_dump(mode="json")
+
     async def emergency_stop(self, lease_id: str) -> dict[str, Any]:
         self._runtime.disarm_motion(self.control_session(lease_id))
         self._runtime.disarm_motion(self.chat_session(lease_id))

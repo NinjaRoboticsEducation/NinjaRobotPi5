@@ -1,26 +1,21 @@
 :focus-visible {
   outline: 3px solid #ffffff;
   outline-offset: 3px;
-  box-shadow: 0 0 0 6px #07111f;
-}
-
-#tasksList pre {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font-size: 1rem;
+  box-shadow: 0 0 0 6px #03080c;
 }
 
 :root {
   color-scheme: dark;
   --app-height: 100dvh;
-  --ink: #eef8ff;
-  --muted: #91a7b8;
-  --panel: rgba(7, 22, 37, 0.96);
-  --line: rgba(75, 202, 255, 0.22);
-  --cyan: #37d5f5;
+  --ink: #f2f6fa;
+  --muted: #bdc4ca;
+  --panel: rgba(6, 19, 27, 0.96);
+  --line: rgba(0, 163, 255, 0.22);
+  --cyan: #00a3ff;
   --green: #4de2a4;
-  --amber: #ffd166;
-  --red: #ff4d67;
+  --amber: #ffc843;
+  --red: #ff526d;
+  --power-orange: #ff8a00;
   --shadow: 0 16px 44px rgba(0, 0, 0, 0.38);
 }
 
@@ -35,7 +30,7 @@ body {
   margin: 0;
   overflow: hidden;
   overscroll-behavior: none;
-  background: #040a12;
+  background: #03080c;
 }
 
 body.modal-open {
@@ -46,8 +41,8 @@ body {
   color: var(--ink);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background:
-    radial-gradient(circle at 15% 5%, rgba(34, 124, 255, 0.23), transparent 31rem),
-    linear-gradient(165deg, #07182a, #03070c 72%);
+    radial-gradient(circle at 15% 5%, rgba(0, 163, 255, 0.18), transparent 31rem),
+    linear-gradient(165deg, #06131b, #03080c 72%);
   -webkit-text-size-adjust: 100%;
   touch-action: manipulation;
 }
@@ -80,6 +75,8 @@ p {
   margin: 0;
 }
 
+/* ── App Shell ─────────────────────────────────────────── */
+
 .app-shell {
   width: min(100%, 600px);
   height: var(--app-height);
@@ -100,9 +97,12 @@ p {
   min-height: 30px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   padding: 0 3px;
+}
+
+.topbar .badge {
+  margin-right: auto;
 }
 
 .menu-button {
@@ -114,6 +114,7 @@ p {
   display: grid;
   align-content: space-between;
   background: rgba(3, 11, 18, 0.88);
+  flex-shrink: 0;
 }
 
 .menu-button > span:not(.sr-only) {
@@ -139,30 +140,6 @@ h2 {
   letter-spacing: 0.15em;
 }
 
-.status-stack {
-  display: grid;
-  justify-items: end;
-  gap: 3px;
-}
-
-.motion-arm[aria-pressed="true"] {
-  border-color: rgba(77, 226, 164, 0.64);
-  color: #031018;
-  background: var(--green);
-}
-
-.camera-arm[aria-pressed="true"] {
-  border-color: rgba(0, 191, 255, 0.72);
-  color: #031018;
-  background: var(--cyan);
-}
-
-.ai-permissions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 5px;
-}
-
 .badge {
   max-width: 45vw;
   overflow: hidden;
@@ -182,16 +159,11 @@ h2 {
 }
 
 .badge-wait {
-  border-color: rgba(255, 209, 102, 0.48);
+  border-color: rgba(255, 200, 67, 0.48);
   color: var(--amber);
 }
 
-.dashboard {
-  min-height: 600px;
-  display: grid;
-  grid-template-rows: minmax(0, 1.58fr) minmax(0, 0.82fr);
-  gap: 7px;
-}
+/* ── Shared Panel ──────────────────────────────────────── */
 
 .panel {
   min-width: 0;
@@ -205,27 +177,6 @@ h2 {
   -webkit-backdrop-filter: blur(14px);
 }
 
-.controls-panel {
-  padding: clamp(8px, 2.2vw, 13px);
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
-  gap: clamp(6px, 1.5vh, 10px);
-}
-
-.control-status,
-.panel-heading,
-.activity-heading,
-.preview-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.control-status {
-  min-height: 30px;
-}
-
 .small-button {
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -235,12 +186,42 @@ h2 {
   font-size: 0.65rem;
 }
 
+/* ── Game Pad View ─────────────────────────────────────── */
+
+.gamepad-view {
+  display: grid;
+  grid-template-rows: 1fr;
+  gap: 7px;
+}
+
+.gamepad-view .controls-panel {
+  padding: clamp(8px, 2.2vw, 13px);
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  gap: clamp(10px, 2vh, 16px);
+}
+
+/* ── Agent Interface View ──────────────────────────────── */
+
+.agent-view {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+
+.agent-controls-section {
+  display: grid;
+  gap: clamp(8px, 1.5vh, 12px);
+}
+
+/* ── D-pad ─────────────────────────────────────────────── */
+
 .dpad {
   place-self: center;
   width: auto;
   height: 100%;
-  max-width: min(62vw, 216px);
-  max-height: 216px;
+  max-width: min(62vw, 240px);
+  max-height: 240px;
   aspect-ratio: 1;
   min-height: 0;
   display: grid;
@@ -256,7 +237,7 @@ h2 {
 .dpad-center {
   display: grid;
   place-items: center;
-  border: 1px solid rgba(53, 216, 255, 0.34);
+  border: 1px solid rgba(0, 163, 255, 0.34);
   background: linear-gradient(145deg, #10283d, #081522);
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.08), 0 7px 16px rgba(0, 0, 0, 0.25);
 }
@@ -288,7 +269,7 @@ h2 {
 .dpad-center {
   grid-column: 2;
   grid-row: 2;
-  color: rgba(53, 216, 255, 0.43);
+  color: rgba(0, 163, 255, 0.43);
 }
 
 .dpad .right {
@@ -303,55 +284,7 @@ h2 {
   border-radius: 3px 3px 14px 14px;
 }
 
-.media-controls {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-}
-
-.media-button,
-.language-field {
-  min-height: 45px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 7px 9px;
-  text-align: left;
-  background: rgba(3, 12, 21, 0.93);
-}
-
-.media-button {
-  display: grid;
-  gap: 2px;
-}
-
-.media-button strong {
-  color: var(--cyan);
-  font-size: clamp(0.63rem, 2.5vw, 0.78rem);
-}
-
-.media-button small,
-.language-field span {
-  color: var(--muted);
-  font-size: clamp(0.53rem, 2.2vw, 0.68rem);
-}
-
-.language-field {
-  display: grid;
-  gap: 3px;
-}
-
-.language-field select {
-  width: 100%;
-  border: 0;
-  color: var(--ink);
-  background: transparent;
-  font-size: 0.72rem;
-}
-
-.recording {
-  border-color: var(--red);
-  box-shadow: 0 0 0 2px rgba(255, 77, 103, 0.18);
-}
+/* ── Action Pad (A/B/X/Y) ─────────────────────────────── */
 
 .action-pad {
   display: grid;
@@ -384,7 +317,122 @@ h2 {
 .action-a { background: #4de2a4; }
 .action-b { color: white; background: #3478ff; }
 .action-x { background: #ff526d; }
-.action-y { background: #ffd166; }
+.action-y { background: #ffc843; }
+
+.action-button[aria-pressed="true"] { outline: 2px solid white; outline-offset: -4px; }
+
+/* ── Audio Controls (Agent View) ───────────────────────── */
+
+.audio-controls {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.media-button,
+.language-field {
+  min-height: 45px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 7px 9px;
+  text-align: left;
+  background: rgba(3, 12, 21, 0.93);
+}
+
+.media-button {
+  display: grid;
+  gap: 2px;
+}
+
+.media-button strong {
+  color: var(--cyan);
+  font-size: clamp(0.58rem, 2.3vw, 0.72rem);
+}
+
+.media-button small,
+.language-field span {
+  color: var(--muted);
+  font-size: clamp(0.5rem, 2vw, 0.63rem);
+}
+
+.language-field {
+  display: grid;
+  gap: 3px;
+}
+
+.language-field select {
+  width: 100%;
+  border: 0;
+  color: var(--ink);
+  background: transparent;
+  font-size: 0.72rem;
+}
+
+.recording {
+  border-color: var(--red);
+  box-shadow: 0 0 0 2px rgba(255, 77, 103, 0.18);
+}
+
+/* ── User-created Behavior Selector ────────────────────── */
+
+.behavior-selector {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: rgba(3, 12, 21, 0.72);
+}
+
+.behavior-selector h3 {
+  margin: 0;
+  color: var(--cyan);
+  font-size: 0.78rem;
+}
+
+.behavior-selector p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.66rem;
+  line-height: 1.35;
+}
+
+.behavior-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.behavior-row select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 7px 9px;
+  color: var(--ink);
+  background: #06111e;
+  font-size: 0.76rem;
+}
+
+.play-button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 10px;
+  color: white;
+  background: var(--cyan);
+  font-size: 1.2rem;
+  display: grid;
+  place-items: center;
+}
+
+.play-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Conversation Panel ────────────────────────────────── */
 
 .conversation-panel {
   padding: clamp(8px, 2.2vw, 13px);
@@ -393,13 +441,22 @@ h2 {
   gap: 6px;
 }
 
+.panel-heading,
+.activity-heading,
+.preview-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .chat-messages,
 .system-log {
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  scrollbar-color: rgba(53, 216, 255, 0.4) transparent;
+  scrollbar-color: rgba(0, 163, 255, 0.4) transparent;
 }
 
 .chat-messages {
@@ -418,6 +475,8 @@ h2 {
   line-height: 1.38;
   -webkit-user-select: text;
   user-select: text;
+  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .message.user {
@@ -458,6 +517,11 @@ h2 {
   font-weight: 850;
 }
 
+.chat-messages, .chat-form, .conversation-panel { min-width: 0; }
+.speech-status { font-size: 0.7rem; color: var(--muted); min-height: 1em; }
+
+/* ── Activity Drawer ───────────────────────────────────── */
+
 .activity-drawer {
   --drawer-height: min(42vh, 360px);
   position: fixed;
@@ -477,6 +541,64 @@ h2 {
   touch-action: pan-y;
 }
 
+.activity-drawer.open {
+  transform: translate(-50%, 0);
+}
+
+.activity-tab {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 150px;
+  height: 34px;
+  transform: translateX(-50%);
+  border: 1px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+  color: var(--cyan);
+  background: #081a29;
+  font-size: 0.7rem;
+  font-weight: 800;
+  touch-action: none;
+}
+
+.drawer-grip {
+  display: block;
+  width: 34px;
+  height: 3px;
+  margin: 0 auto 3px;
+  border-radius: 999px;
+  background: rgba(0, 163, 255, 0.56);
+}
+
+.activity-content {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(600px, 1fr);
+  gap: 7px;
+}
+
+.system-log {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.66rem;
+  line-height: 1.45;
+}
+
+.log-entry {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  gap: 6px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(0, 163, 255, 0.07);
+}
+
+.log-error {
+  color: #ff8798;
+}
+
+/* ── Start Overlay ─────────────────────────────────────── */
+
 .start-overlay {
   position: fixed;
   z-index: 120;
@@ -489,8 +611,8 @@ h2 {
     max(20px, env(safe-area-inset-bottom))
     max(20px, env(safe-area-inset-left));
   background:
-    radial-gradient(circle at 50% 22%, rgba(34, 124, 255, 0.3), transparent 24rem),
-    #040a12;
+    radial-gradient(circle at 50% 22%, rgba(0, 163, 255, 0.25), transparent 24rem),
+    #03080c;
 }
 
 .start-overlay.started {
@@ -524,61 +646,7 @@ h2 {
   font-weight: 850;
 }
 
-.activity-drawer.open {
-  transform: translate(-50%, 0);
-}
-
-.activity-tab {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 150px;
-  height: 34px;
-  transform: translateX(-50%);
-  border: 1px solid var(--line);
-  border-top: 0;
-  border-radius: 0 0 12px 12px;
-  color: var(--cyan);
-  background: #081a29;
-  font-size: 0.7rem;
-  font-weight: 800;
-  touch-action: none;
-}
-
-.drawer-grip {
-  display: block;
-  width: 34px;
-  height: 3px;
-  margin: 0 auto 3px;
-  border-radius: 999px;
-  background: rgba(53, 216, 255, 0.56);
-}
-
-.activity-content {
-  height: 100%;
-  display: grid;
-  grid-template-rows: auto minmax(600px, 1fr);
-  gap: 7px;
-}
-
-.system-log {
-  color: var(--muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.66rem;
-  line-height: 1.45;
-}
-
-.log-entry {
-  display: grid;
-  grid-template-columns: 58px 1fr;
-  gap: 6px;
-  padding: 3px 0;
-  border-bottom: 1px solid rgba(108, 206, 255, 0.07);
-}
-
-.log-error {
-  color: #ff8798;
-}
+/* ── Camera Preview Dialog ─────────────────────────────── */
 
 .camera-preview {
   position: fixed;
@@ -619,6 +687,8 @@ h2 {
   font-size: 1.5rem;
 }
 
+/* ── Orientation Blocker ───────────────────────────────── */
+
 .orientation-blocker {
   display: none;
   position: fixed;
@@ -628,7 +698,7 @@ h2 {
   gap: 8px;
   padding: 28px;
   text-align: center;
-  background: #050d16;
+  background: #03080c;
 }
 
 .orientation-blocker strong {
@@ -639,6 +709,8 @@ h2 {
 .orientation-blocker span {
   color: var(--muted);
 }
+
+/* ── Toast ─────────────────────────────────────────────── */
 
 .toast {
   position: fixed;
@@ -654,6 +726,8 @@ h2 {
   box-shadow: var(--shadow);
   font-size: 0.72rem;
 }
+
+/* ── Menu Overlay and Hamburger Sheet ──────────────────── */
 
 .menu-overlay,
 .confirm-overlay {
@@ -741,23 +815,17 @@ h2 {
   min-height: 58px;
 }
 
-.menu-tools {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
 .danger-section {
   border-color: rgba(255, 77, 103, 0.34);
 }
 
 .power-button {
   min-height: 44px;
-  border: 1px solid rgba(255, 77, 103, 0.7);
+  border: 1px solid rgba(255, 138, 0, 0.7);
   border-radius: 11px;
   padding: 8px 14px;
   color: white;
-  background: #b51f39;
+  background: var(--power-orange);
   font-weight: 800;
 }
 
@@ -766,11 +834,34 @@ h2 {
   opacity: 0.46;
 }
 
+/* ── Interface Buttons (Menu) ──────────────────────────── */
+
+.interface-button {
+  min-height: 44px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 8px 14px;
+  color: var(--cyan);
+  background: rgba(3, 12, 21, 0.72);
+  font-weight: 800;
+  font-size: 0.88rem;
+  text-align: center;
+}
+
+.interface-button.active {
+  color: #031018;
+  background: var(--cyan);
+  border-color: var(--cyan);
+}
+
+/* ── Power-off Confirm ─────────────────────────────────── */
+
 .confirm-card {
   width: min(100%, 430px);
   display: grid;
   gap: 16px;
-  border: 1px solid rgba(255, 77, 103, 0.5);
+  border: 1px solid rgba(255, 138, 0, 0.5);
   border-radius: 18px;
   padding: clamp(20px, 6vw, 30px);
   background: #10141c;
@@ -805,6 +896,22 @@ h2 {
   border: 0;
 }
 
+/* ── Motion Permission States ──────────────────────────── */
+
+.motion-arm[aria-pressed="true"] {
+  border-color: rgba(77, 226, 164, 0.64);
+  color: #031018;
+  background: var(--green);
+}
+
+.camera-arm[aria-pressed="true"] {
+  border-color: rgba(0, 163, 255, 0.72);
+  color: #031018;
+  background: var(--cyan);
+}
+
+/* ── Responsive: Landscape Blocker ─────────────────────── */
+
 @media (orientation: landscape) and (max-height: 600px) and (pointer: coarse) {
   body.physical-landscape .orientation-blocker {
     display: grid;
@@ -827,14 +934,8 @@ h2 {
     gap: 4px;
   }
 
-  .dashboard {
-    grid-template-rows: minmax(0, 1.72fr) minmax(0, 0.68fr);
-    gap: 4px;
-  }
-
-  .controls-panel {
-    grid-template-rows: auto minmax(0, 1fr) auto auto;
-    gap: 4px;
+  .gamepad-view .controls-panel {
+    gap: 6px;
   }
 
   .media-button,
@@ -856,13 +957,3 @@ h2 {
     transition: none !important;
   }
 }
-
-/* Keep long replies inside the transcript and preserve control geometry while
-   a mobile keyboard reduces the available height. The shell can scroll. */
-.message { flex: 0 0 auto; min-width: 0; }
-.chat-messages, .chat-form, .conversation-panel { min-width: 0; }
-.speech-status { font-size: 0.7rem; color: var(--muted); min-height: 1em; }
-.action-button[aria-pressed="true"] { outline: 2px solid white; outline-offset: -4px; }
-
-.game-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-#gameResult { overflow-wrap: anywhere; font-size: 0.8rem; margin: 0.4rem 0; }

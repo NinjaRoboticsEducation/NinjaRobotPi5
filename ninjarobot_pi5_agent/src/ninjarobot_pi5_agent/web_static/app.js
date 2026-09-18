@@ -14,6 +14,11 @@
     return "en";
   }
 
+  function preferredInterface() {
+    const stored = localStorage.getItem("ninjarobotInterface");
+    return stored === "gamepad" ? "gamepad" : "agent";
+  }
+
   function persistentBrowserChatId() {
     const stored = localStorage.getItem("ninjarobotBrowserChatId");
     if (stored && /^[A-Za-z0-9_-]{16,128}$/.test(stored)) {
@@ -35,7 +40,6 @@
     requestCounter: 0,
     pending: new Map(),
     activeAssistant: new Map(),
-    usbRecording: false,
     voiceEnabled: false,
     recognition: null,
     recognitionActive: false,
@@ -46,6 +50,7 @@
     controllerStarted: false,
     certificateHelpLogged: false,
     locale: preferredLocale(),
+    interfaceMode: preferredInterface(),
     messages: {},
     englishMessages: {},
     poweroffEnabled: false,
@@ -55,6 +60,7 @@
     previousFocus: null,
     connectionKey: "connection.offline",
     connectionClass: "badge-wait",
+    displayGeneration: 0,
   };
 
   const elements = {
@@ -67,7 +73,6 @@
     log: document.querySelector("#systemLog"),
     toast: document.querySelector("#toast"),
     voiceInput: document.querySelector("#usbMicButton"),
-    usbRecord: document.querySelector("#usbRecordButton"),
     webMic: document.querySelector("#webMicButton"),
     language: document.querySelector("#languageSelect"),
     preview: document.querySelector("#cameraPreview"),
@@ -79,12 +84,19 @@
     menuButton: document.querySelector("#menuButton"),
     menu: document.querySelector("#robotMenu"),
     closeMenu: document.querySelector("#closeMenuButton"),
-    remoteStatus: document.querySelector("#remoteStatus"),
     powerOff: document.querySelector("#powerOffButton"),
     powerAvailability: document.querySelector("#powerOffAvailability"),
     powerDialog: document.querySelector("#powerOffDialog"),
     cancelPowerOff: document.querySelector("#cancelPowerOffButton"),
     confirmPowerOff: document.querySelector("#confirmPowerOffButton"),
+    gamepadView: document.querySelector("#gamepadView"),
+    agentView: document.querySelector("#agentView"),
+    switchToGamepad: document.querySelector("#switchToGamepad"),
+    switchToAgent: document.querySelector("#switchToAgent"),
+    userBehaviorSelect: document.querySelector("#userBehaviorSelect"),
+    playBehavior: document.querySelector("#playBehaviorButton"),
+    gamepadCamera: document.querySelector("#gamepadCameraButton"),
+    speechOn: document.querySelector("#speechOnButton"),
   };
 
   function t(key, replacements = {}) {
@@ -109,12 +121,16 @@
     document.querySelectorAll("[data-i18n-alt]").forEach((node) => {
       node.setAttribute("alt", t(node.dataset.i18nAlt));
     });
-    updateAiMotion(elements.armAi.dataset.armed === "true");
-    updateAiCamera(elements.armAiCamera.dataset.granted === "true");
+    if (elements.armAi) {
+      updateAiMotion(elements.armAi.dataset.armed === "true");
+    }
+    if (elements.armAiCamera) {
+      updateAiCamera(elements.armAiCamera.dataset.granted === "true");
+    }
     updateVoiceInput({ enabled: state.voiceEnabled, state: elements.voiceInput.dataset.state });
     renderConnection();
-    updateConnectionDetail();
     updatePoweroffAvailability();
+    updateInterfaceButtons();
   }
 
   async function setLocale(locale) {
@@ -144,6 +160,35 @@
     elements.language.value = state.locale;
     applyTranslations();
   }
+
+  /* ── View Switching ──────────────────────────────────── */
+
+  function switchView(mode) {
+    if (mode !== "gamepad" && mode !== "agent") mode = "agent";
+    stopMovement();
+    state.interfaceMode = mode;
+    localStorage.setItem("ninjarobotInterface", mode);
+
+    const isGamepad = mode === "gamepad";
+    elements.gamepadView.hidden = !isGamepad;
+    elements.agentView.hidden = isGamepad;
+    updateInterfaceButtons();
+    closeMenu();
+  }
+
+  function updateInterfaceButtons() {
+    if (elements.switchToGamepad) {
+      elements.switchToGamepad.classList.toggle("active", state.interfaceMode === "gamepad");
+    }
+    if (elements.switchToAgent) {
+      elements.switchToAgent.classList.toggle("active", state.interfaceMode === "agent");
+    }
+  }
+
+  elements.switchToGamepad.addEventListener("click", () => switchView("gamepad"));
+  elements.switchToAgent.addEventListener("click", () => switchView("agent"));
+
+  /* ── Logging and Toast ───────────────────────────────── */
 
   function log(message, kind = "info") {
     const row = document.createElement("div");
@@ -177,14 +222,19 @@
     renderConnection();
   }
 
+  /* ── Chat Messages ───────────────────────────────────── */
+
   function addMessage(role, text = "") {
     const node = document.createElement("div");
     node.className = `message ${role}`;
     node.textContent = text;
+    node.dataset.generation = String(state.displayGeneration);
     elements.chatMessages.append(node);
     elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
     return node;
   }
+
+  /* ── WebSocket ───────────────────────────────────────── */
 
   function send(type, payload = {}) {
     if (!state.socket || state.socket.readyState !== WebSocket.OPEN || !state.leaseId) {
@@ -277,8 +327,8 @@
       sessionStorage.setItem("ninjarobotReconnectToken", state.reconnectToken);
       setConnection("connection.active", "badge-ok");
       log(t("connection.owned"));
-      updateConnectionDetail();
       refreshSpeechState();
+      loadUserBehaviors();
       const interval = Math.max(1000, Number(message.heartbeat_seconds) * 1000);
       window.clearInterval(state.heartbeatTimer);
       state.heartbeatTimer = window.setInterval(() => {
@@ -340,9 +390,6 @@
       if (event.data?.kind === "web_movement_failed") {
         toast(event.message || t("error.requestFailed"));
       }
-      if (event.data?.kind === "distance_game_starting") {
-        addMessage("assistant", event.message);
-      }
       log(event.message || t("status.agentEvent"), event.event_type === "error" ? "error" : "info");
       return;
     }
@@ -351,6 +398,10 @@
       if (!node) {
         node = addMessage("assistant");
         state.activeAssistant.set(message.request_id, node);
+      }
+      // Skip update if the node was cleared (belongs to a previous display generation).
+      if (Number(node.dataset.generation) < state.displayGeneration) {
+        return;
       }
       node.textContent += message.text || "";
       elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
@@ -380,6 +431,8 @@
     if (succeeded) pending.resolve(value);
     else pending.reject(value);
   }
+
+  /* ── D-pad Movement ──────────────────────────────────── */
 
   let movementGeneration = 0;
 
@@ -448,14 +501,18 @@
     if (document.hidden) stopMovement();
   });
 
-  document.querySelector("#emergencyButton").addEventListener("click", () => {
-    send("emergency_stop")
-      .then(() => {
-        updateAiMotion(false);
-        updateAiCamera(false);
-        toast(t("behavior.emergencyComplete"));
-      })
-      .catch(() => {});
+  /* ── Emergency Stop and Resume (shared) ──────────────── */
+
+  document.querySelectorAll("[data-action='emergency']").forEach((button) => {
+    button.addEventListener("click", () => {
+      send("emergency_stop")
+        .then(() => {
+          updateAiMotion(false);
+          updateAiCamera(false);
+          toast(t("behavior.emergencyComplete"));
+        })
+        .catch(() => {});
+    });
   });
 
   function resumeRobot(showInChat = false) {
@@ -479,70 +536,96 @@
       });
   }
 
-  document.querySelector("#resumeButton").addEventListener("click", () => {
-    resumeRobot().catch(() => {});
+  document.querySelectorAll("[data-action='resume']").forEach((button) => {
+    button.addEventListener("click", () => {
+      resumeRobot().catch(() => {});
+    });
   });
 
-  document.querySelector("#armAiButton").addEventListener("click", (event) => {
-    const armed = event.currentTarget.dataset.armed === "true";
-    if (armed) {
-      send("disarm_chat_motion")
-        .then(() => updateAiMotion(false))
+  /* ── AI Motion and Camera (Agent View) ───────────────── */
+
+  if (elements.armAi) {
+    elements.armAi.addEventListener("click", (event) => {
+      const armed = event.currentTarget.dataset.armed === "true";
+      if (armed) {
+        send("disarm_chat_motion")
+          .then(() => updateAiMotion(false))
+          .catch(() => {});
+        return;
+      }
+      if (!window.confirm(t("motion.armConfirm"))) {
+        return;
+      }
+      send("arm_chat_motion", { confirmed: true })
+        .then(() => updateAiMotion(true))
         .catch(() => {});
-      return;
-    }
-    if (
-      !window.confirm(t("motion.armConfirm"))
-    ) {
-      return;
-    }
-    send("arm_chat_motion", { confirmed: true })
-      .then(() => updateAiMotion(true))
-      .catch(() => {});
-  });
+    });
+  }
 
   function updateAiMotion(armed) {
     const button = elements.armAi;
+    if (!button) return;
     button.dataset.armed = String(armed);
-    button.textContent = armed ? t("motion.disarm") : t("motion.arm");
+    const label = document.createElement("span");
+    label.dataset.i18n = armed ? "motion.disarm" : "motion.arm";
+    label.textContent = armed ? t("motion.disarm") : t("motion.arm");
+    const strong = button.querySelector("strong");
+    const existingSpan = button.querySelector("span");
+    if (existingSpan) existingSpan.textContent = armed ? t("motion.disarm") : t("motion.arm");
     button.setAttribute("aria-pressed", String(armed));
   }
 
-  document.querySelector("#armAiCameraButton").addEventListener("click", (event) => {
-    const granted = event.currentTarget.dataset.granted === "true";
-    if (granted) {
-      send("revoke_chat_camera")
-        .then(() => updateAiCamera(false))
+  if (elements.armAiCamera) {
+    elements.armAiCamera.addEventListener("click", (event) => {
+      const granted = event.currentTarget.dataset.granted === "true";
+      if (granted) {
+        send("revoke_chat_camera")
+          .then(() => updateAiCamera(false))
+          .catch(() => {});
+        return;
+      }
+      if (!window.confirm(t("camera.armConfirm"))) {
+        return;
+      }
+      send("grant_chat_camera", { confirmed: true })
+        .then((data) => {
+          updateAiCamera(true);
+          toast(t("chat.cameraGranted", { sequence: data.grant_sequence }));
+        })
         .catch(() => {});
-      return;
-    }
-    if (
-      !window.confirm(t("camera.armConfirm"))
-    ) {
-      return;
-    }
-    send("grant_chat_camera", { confirmed: true })
-      .then((data) => {
-        updateAiCamera(true);
-        toast(t("chat.cameraGranted", { sequence: data.grant_sequence }));
-      })
-      .catch(() => {});
-  });
+    });
+  }
 
   function updateAiCamera(granted) {
     const button = elements.armAiCamera;
+    if (!button) return;
     button.dataset.granted = String(granted);
-    button.textContent = granted ? t("camera.armed") : t("camera.arm");
+    const span = button.querySelector("span");
+    if (span) span.textContent = granted ? t("camera.armed") : t("camera.arm");
     button.setAttribute("aria-pressed", String(granted));
   }
 
-  document.querySelector("#cameraButton").addEventListener("click", () => {
-    send("camera")
-      .then((data) => {
-        showCameraPreview(data.jpeg_base64);
-      })
-      .catch(() => {});
+  /* ── Game Pad Camera Button (B) ──────────────────────── */
+
+  if (elements.gamepadCamera) {
+    elements.gamepadCamera.addEventListener("click", () => {
+      send("camera")
+        .then((data) => {
+          showCameraPreview(data.jpeg_base64);
+        })
+        .catch(() => {});
+    });
+  }
+
+  /* ── Game Pad Greeting Button (A) ────────────────────── */
+
+  document.querySelectorAll("[data-behavior]").forEach((button) => {
+    button.addEventListener("click", () => {
+      send("behavior", { name: button.dataset.behavior }).catch(() => {});
+    });
   });
+
+  /* ── Camera Preview ──────────────────────────────────── */
 
   function showCameraPreview(jpegBase64) {
     elements.cameraImage.src = `data:image/jpeg;base64,${jpegBase64}`;
@@ -558,6 +641,8 @@
   }
 
   document.querySelector("#closePreviewButton").addEventListener("click", clearPreview);
+
+  /* ── Voice Input ─────────────────────────────────────── */
 
   function updateVoiceInput(status = {}) {
     const enabled = status.enabled === true && status.state !== "disabled";
@@ -583,29 +668,7 @@
       .catch(() => {});
   });
 
-  elements.usbRecord.addEventListener("click", () => {
-    if (state.usbRecording) {
-      send("usb_microphone_stop").catch(() => {});
-      return;
-    }
-    state.usbRecording = true;
-    elements.usbRecord.classList.add("recording");
-    elements.usbRecord.querySelector("strong").textContent = t("record.stop");
-    const language = state.locale;
-    send("usb_microphone", { duration_seconds: 5, language })
-      .then((data) => {
-        if (data.transcript) {
-          elements.chatInput.value = data.transcript;
-          submitChat(data.transcript);
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        state.usbRecording = false;
-        elements.usbRecord.classList.remove("recording");
-        elements.usbRecord.querySelector("strong").textContent = t("record.title");
-      });
-  });
+  /* ── Speech Recognition (Web Mic) ────────────────────── */
 
   function configureSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -668,6 +731,51 @@
     });
   }
 
+  /* ── Speech On/Off Toggle ────────────────────────────── */
+
+  let speechStatusPending = false;
+  async function refreshSpeechState() {
+    if (speechStatusPending || !state.leaseId || document.hidden) return;
+    speechStatusPending = true;
+    try {
+      showSpeechState(await send("speech", { operation: "status" }));
+    } catch {
+      // A dropped connection is already reported by the connection badge.
+    } finally {
+      speechStatusPending = false;
+    }
+  }
+  window.setInterval(refreshSpeechState, 5000);
+
+  function showSpeechState(result) {
+    const data = result.data || result;
+    const enabled = data.enabled === true;
+    if (elements.speechOn) {
+      elements.speechOn.setAttribute("aria-pressed", String(enabled));
+      const detail = elements.speechOn.querySelector("small");
+      if (detail) detail.textContent = enabled ? t("speech.enabled") : t("speech.disabled");
+    }
+    document.querySelector("#speechResult").textContent = enabled
+      ? t("speech.enabled") : t("speech.disabled");
+  }
+
+  if (elements.speechOn) {
+    elements.speechOn.addEventListener("click", async () => {
+      try {
+        const pressed = elements.speechOn.getAttribute("aria-pressed") === "true";
+        const operation = pressed ? "off" : "on";
+        const result = await send("speech", { operation });
+        showSpeechState(result);
+        refreshSpeechState();
+      } catch (error) {
+        document.querySelector("#speechResult").textContent = t("speech.unavailable");
+        log(error.message || String(error), "error");
+      }
+    });
+  }
+
+  /* ── Chat ────────────────────────────────────────────── */
+
   elements.chatForm.addEventListener("submit", (event) => {
     event.preventDefault();
     submitChat(elements.chatInput.value);
@@ -704,18 +812,62 @@
     }
   });
 
+  /* ── Clear Message (preserves streaming safety) ──────── */
+
   document.querySelector("#clearChatButton").addEventListener("click", () => {
+    state.displayGeneration += 1;
     elements.chatMessages.replaceChildren();
   });
   document.querySelector("#clearLogButton").addEventListener("click", () => {
     elements.log.replaceChildren();
   });
 
-  function updateConnectionDetail() {
-    elements.remoteStatus.textContent = state.remoteConnection
-      ? t("remote.connected")
-      : t("remote.local");
+  /* ── User-created Behaviors ──────────────────────────── */
+
+  async function loadUserBehaviors() {
+    try {
+      const result = await send("user_behaviors_list");
+      const behaviors = result.behaviors || [];
+      elements.userBehaviorSelect.replaceChildren();
+      if (behaviors.length === 0) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = t("behavior.user.empty");
+        elements.userBehaviorSelect.append(option);
+        elements.playBehavior.disabled = true;
+      } else {
+        for (const behavior of behaviors) {
+          const option = document.createElement("option");
+          option.value = behavior.name;
+          option.textContent = behavior.name.replace(/_/g, " ");
+          if (behavior.contains_motion) option.dataset.motion = "true";
+          elements.userBehaviorSelect.append(option);
+        }
+        elements.playBehavior.disabled = false;
+      }
+    } catch {
+      // Silent — behavior list is best-effort.
+    }
   }
+
+  elements.playBehavior.addEventListener("click", async () => {
+    const name = elements.userBehaviorSelect.value;
+    if (!name) return;
+    const selected = elements.userBehaviorSelect.selectedOptions[0];
+    if (selected?.dataset.motion === "true") {
+      if (!window.confirm(t("behavior.user.confirmMotion"))) return;
+    }
+    try {
+      elements.playBehavior.disabled = true;
+      await send("user_behavior_run", { name });
+    } catch (error) {
+      toast(error.message || t("behavior.user.error"));
+    } finally {
+      elements.playBehavior.disabled = !elements.userBehaviorSelect.value;
+    }
+  });
+
+  /* ── Power Off ───────────────────────────────────────── */
 
   function updatePoweroffAvailability() {
     elements.powerOff.disabled =
@@ -782,59 +934,6 @@
     }
   }
 
-  let speechStatusPending = false;
-  async function refreshSpeechState() {
-    if (speechStatusPending || !state.leaseId || document.hidden) return;
-    speechStatusPending = true;
-    try {
-      showSpeechState(await send("speech", { operation: "status" }));
-    } catch {
-      // A dropped connection is already reported by the connection badge.
-    } finally {
-      speechStatusPending = false;
-    }
-  }
-  window.setInterval(refreshSpeechState, 5000);
-
-  function showSpeechState(result) {
-    const data = result.data || result;
-    const enabled = data.enabled === true;
-    document.querySelector("#speechOnButton").setAttribute("aria-pressed", String(enabled));
-    document.querySelector("#speechOffButton").setAttribute("aria-pressed", String(!enabled));
-    const unavailable = data.reason || (enabled &&
-      (data.playback?.ready === false || data.synthesis?.ready === false));
-    document.querySelector("#speechResult").textContent = unavailable
-      ? t("speech.unavailable") : t(enabled ? "speech.enabled" : "speech.disabled");
-  }
-
-  document.querySelectorAll("[data-speech]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      try {
-        // OFF remains available while an ON request or a chat turn is pending.
-        const result = await send("speech", { operation: button.dataset.speech });
-        showSpeechState(result);
-        refreshSpeechState();
-      } catch (error) {
-        document.querySelector("#speechResult").textContent = t("speech.unavailable");
-        log(error.message || String(error), "error");
-      }
-    });
-  });
-
-  document.querySelectorAll("[data-game]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const output = document.querySelector("#gameResult");
-      try {
-        if (button.dataset.game === "start") output.textContent = t("game.running");
-        const result = await send("game", { operation: button.dataset.game, duration_seconds: 30 });
-        const data = result.data || {};
-        output.textContent = result.error || [data.state, data.reason].filter(Boolean).join(": ");
-      } catch (error) {
-        output.textContent = error.message || String(error);
-      }
-    });
-  });
-
   elements.menuButton.addEventListener("click", openMenu);
   elements.closeMenu.addEventListener("click", () => closeMenu());
   elements.menu.addEventListener("click", (event) => {
@@ -885,36 +984,7 @@
       });
   });
 
-  async function refreshTasks(operation = "list", taskId = "") {
-    const notice = document.querySelector("#tasksNotice");
-    try {
-      const result = await send("tasks", {operation, task_id: taskId, minutes: 5});
-      notice.textContent = result.notice || t("tasks.refreshed");
-      const list = document.querySelector("#tasksList");
-      list.replaceChildren();
-      for (const task of result.tasks || []) {
-        const card = document.createElement("section");
-        const review = document.createElement("pre");
-        review.textContent = task.review;
-        card.append(review);
-        const actions = task.kind === "request" ? ["cancel"] : (
-          task.status === "draft" ? ["confirm", "cancel"] : ["cancel", "snooze"]
-        );
-        for (const action of actions) {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = "small-button";
-          button.textContent = t(`tasks.${action}`);
-          button.addEventListener("click", () => refreshTasks(action, task.task_id));
-          card.append(button);
-        }
-        list.append(card);
-      }
-    } catch (error) {
-      notice.textContent = error.message;
-    }
-  }
-  document.querySelector("#tasksRefresh").addEventListener("click", () => refreshTasks());
+  /* ── Keyboard ────────────────────────────────────────── */
 
   document.addEventListener("keydown", (event) => {
     if (!elements.powerDialog.classList.contains("hidden")) {
@@ -927,6 +997,8 @@
       else trapDialogFocus(event, elements.menu);
     }
   });
+
+  /* ── Activity Drawer ─────────────────────────────────── */
 
   function setActivityDrawer(open) {
     elements.activityDrawer.classList.toggle("open", open);
@@ -964,6 +1036,8 @@
     setActivityDrawer(!elements.activityDrawer.classList.contains("open"));
   });
 
+  /* ── Viewport ────────────────────────────────────────── */
+
   function syncViewportHeight() {
     const height = window.visualViewport?.height || window.innerHeight;
     // The keyboard changes viewport proportions, not the physical orientation.
@@ -980,6 +1054,8 @@
     stopMovement();
     window.clearInterval(state.heartbeatTimer);
   });
+
+  /* ── Standalone / Fullscreen ─────────────────────────── */
 
   function standaloneDisplay() {
     return (
@@ -1013,6 +1089,7 @@
     state.controllerStarted = true;
     await requestControllerFullscreen();
     elements.startOverlay.classList.add("started");
+    switchView(state.interfaceMode);
     connect();
   }
 
@@ -1024,12 +1101,15 @@
     });
   });
 
+  /* ── Initialization ──────────────────────────────────── */
+
   await setLocale(state.locale);
   syncViewportHeight();
   configureSpeechRecognition();
   if (standaloneDisplay()) {
     elements.startOverlay.classList.add("started");
     state.controllerStarted = true;
+    switchView(state.interfaceMode);
     connect();
   }
 })();

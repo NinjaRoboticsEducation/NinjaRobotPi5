@@ -217,6 +217,20 @@ def test_integrated_agent_ide_exposes_shared_simulated_robot_capabilities(
         behavior_names = {behavior["name"] for behavior in result.data["behaviors"]}
         assert {"move_forward", "move_backward", "turn_left", "turn_right"} <= (behavior_names)
 
+        user_list = await client.execute(
+            ActionRequest(
+                action_id="list-user-1",
+                capability="behavior.list",
+                arguments={"source": "user"},
+                requested_by="test",
+                session_id="test-session",
+                idempotency_key="list-key-user-1",
+            )
+        )
+        assert user_list.status is ActionStatus.SUCCEEDED
+        assert user_list.data is not None
+        assert user_list.data["behaviors"] == []
+
         expression = await client.execute(
             ActionRequest(
                 action_id="expression-1",

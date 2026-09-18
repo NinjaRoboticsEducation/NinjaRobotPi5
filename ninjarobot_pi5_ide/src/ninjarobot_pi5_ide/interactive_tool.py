@@ -73,7 +73,6 @@ class InteractiveConsole:
         items: Sequence[tuple[str, str, str]],
         *,
         back: bool,
-        emergency: bool = True,
     ) -> None:
         if self.term.is_a_tty:
             click.echo(self.term.clear + self.term.home, nl=False)
@@ -95,8 +94,6 @@ class InteractiveConsole:
                 click.echo(f"     {line}")
         if back:
             click.echo("  B. Back")
-        if emergency:
-            click.echo(self.term.red("  E. EMERGENCY STOP (available from every menu)"))
         click.echo()
 
     async def choose(self, choices: Sequence[str]) -> str:
@@ -285,53 +282,39 @@ async def run_interactive(
                     ),
                     (
                         "2",
-                        "Run Robot Behaviors",
-                        "Run built-in animated faces, movements, and special behaviors.",
-                    ),
-                    (
-                        "3",
-                        "Create Robot Behavior",
-                        "Build and preview a private behavior one step at a time.",
-                    ),
-                    (
-                        "4",
-                        "Run User-Created Behaviors",
-                        "Choose and directly run a behavior saved in your private catalog.",
-                    ),
-                    (
-                        "5",
-                        "Delete User-Created Behaviors",
-                        "Review and safely delete only private user behaviors.",
-                    ),
-                    (
-                        "6",
                         "Simulation",
                         "Run with simulated modules and no GPIO, PWM, I2C, or SPI access.",
                     ),
                     (
-                        "8",
+                        "3",
+                        "Run Robot Behaviors",
+                        "Run built-in animated faces, movements, and special behaviors.",
+                    ),
+                    (
+                        "4",
+                        "User-created Behaviors",
+                        "Create, run, or delete private user-created behaviors.",
+                    ),
+                    (
+                        "5",
                         "Bluetooth Speaker Connection",
                         "Scan, pair, trust, connect and save a speaker.",
                     ),
-                    ("7", "Quit", "Stop active work, release hardware, and exit the tool."),
                 ),
                 back=False,
             )
-            choice = await console.choose(("1", "2", "3", "4", "5", "6", "7", "8", "e", "q"))
+            click.echo("  Q. Quit")
+            choice = await console.choose(("1", "2", "3", "4", "5", "q"))
             try:
                 if choice == "1":
                     await _hardware_menu(console, session)
                 elif choice == "2":
-                    await _built_in_menu(console, session)
-                elif choice == "3":
-                    await _create_menu(console, session, simulation_runner)
-                elif choice == "4":
-                    await _user_run_menu(console, session)
-                elif choice == "5":
-                    await _user_delete_menu(console, session)
-                elif choice == "6":
                     await _simulation_menu(console, session, simulation_runner)
-                elif choice == "8":
+                elif choice == "3":
+                    await _built_in_menu(console, session)
+                elif choice == "4":
+                    await _user_behavior_menu(console, session, simulation_runner)
+                elif choice == "5":
                     if session.robot is not None:
                         console.warning(
                             "Exit active hardware work first, then reopen speaker setup."
@@ -340,8 +323,6 @@ async def run_interactive(
                         from .bluetooth_setup import connect_wizard
 
                         await connect_wizard(config_path)
-                elif choice == "e":
-                    await _emergency(console, session)
                 else:
                     return
             except click.Abort:
@@ -363,50 +344,37 @@ async def _hardware_menu(
     console: InteractiveConsole,
     session: InteractiveRobotSession,
 ) -> None:
-    while True:
-        config = session.config
-        console.menu(
-            "Hardware Configurations",
-            "This page reads configuration only. It does not move a servo, play a "
-            "sound, record media, or initialize a sensor.",
-            (
-                (
-                    "1",
-                    "Show Current Configuration",
-                    "Display GPIO, buses, servo roles, calibration, and safety thresholds.",
-                ),
-            ),
-            back=True,
-        )
-        choice = await console.choose(("1", "b", "e"))
-        if choice == "b":
-            return
-        if choice == "e":
-            await _emergency(console, session)
-            continue
-        calibration = Path(config.hardware.servos.calibration_file).expanduser()
-        console.json(
-            {
-                "software": {
-                    "ninjarobot_pi5_ide": _installed_version("ninjarobot-pi5-ide"),
-                    "python": platform.python_version(),
-                    "platform": sys.platform,
-                },
-                "display": config.hardware.display.model_dump(mode="json"),
-                "buzzer_gpio": config.hardware.buzzer.gpio,
-                "i2c": config.hardware.i2c.model_dump(mode="json"),
-                "servo_endpoints": list(config.hardware.servos.endpoints),
-                "servo_roles": config.behaviors.servo_roles,
-                "servo_calibration_file": str(calibration),
-                "servo_calibration_exists": calibration.is_file(),
-                "motion_enabled": config.hardware.servos.motion_enabled,
-                "group_motion_enabled": config.hardware.servos.group_motion_enabled,
-                "obstacle_threshold_mm": config.behaviors.obstacle_threshold_mm,
-                "safety": SafetyStateStore(config.behaviors.safety_state_file).read(),
-                "user_behavior_directory": config.behaviors.user_directory,
-            }
-        )
-        await _pause()
+    config = session.config
+    console.menu(
+        "Hardware Configurations",
+        "This page reads configuration only. It does not move a servo, play a "
+        "sound, record media, or initialize a sensor.",
+        (),
+        back=False,
+    )
+    calibration = Path(config.hardware.servos.calibration_file).expanduser()
+    console.json(
+        {
+            "software": {
+                "ninjarobot_pi5_ide": _installed_version("ninjarobot-pi5-ide"),
+                "python": platform.python_version(),
+                "platform": sys.platform,
+            },
+            "display": config.hardware.display.model_dump(mode="json"),
+            "buzzer_gpio": config.hardware.buzzer.gpio,
+            "i2c": config.hardware.i2c.model_dump(mode="json"),
+            "servo_endpoints": list(config.hardware.servos.endpoints),
+            "servo_roles": config.behaviors.servo_roles,
+            "servo_calibration_file": str(calibration),
+            "servo_calibration_exists": calibration.is_file(),
+            "motion_enabled": config.hardware.servos.motion_enabled,
+            "group_motion_enabled": config.hardware.servos.group_motion_enabled,
+            "obstacle_threshold_mm": config.behaviors.obstacle_threshold_mm,
+            "safety": SafetyStateStore(config.behaviors.safety_state_file).read(),
+            "user_behavior_directory": config.behaviors.user_directory,
+        }
+    )
+    await _pause()
 
 
 async def _built_in_menu(
@@ -433,24 +401,42 @@ async def _built_in_menu(
                 (
                     "3",
                     "Special Behaviors",
-                    "Greeting, Celebrate, Emergency Stop, Resume, and Error Warning.",
+                    "Greeting, Celebrating, and Error Warning.",
+                ),
+                (
+                    "4",
+                    "EMERGENCY STOP",
+                    "Level 2: stop servos and sensors, silence sound, and show the sign.",
+                ),
+                (
+                    "5",
+                    "Resume Hardware Movement",
+                    "Health-check and reconstruct modules; never restart prior movement.",
                 ),
             ),
             back=True,
         )
-        choice = await console.choose(("1", "2", "3", "b", "e"))
+        choice = await console.choose(("1", "2", "3", "4", "5", "b"))
         if choice == "b":
             if session.active_motion:
                 await session.stop_active()
             return
-        if choice == "e":
-            await _emergency(console, session)
-        elif choice == "1":
+        if choice == "1":
             await _face_menu(console, session)
         elif choice == "2":
             await _movement_menu(console, session)
-        else:
+        elif choice == "3":
             await _special_menu(console, session)
+        elif choice == "4":
+            await _emergency(console, session)
+        elif choice == "5":
+            approved = await _confirm(
+                "Resume after real hardware health checks?",
+                default=False,
+            )
+            if approved:
+                console.json(await session.resume())
+                console.info("Robot modules are ready. No previous movement was restarted.")
 
 
 async def _face_menu(
@@ -471,12 +457,9 @@ async def _face_menu(
             back=True,
         )
         choices = tuple(str(index) for index in range(1, len(FACE_MENU) + 1))
-        choice = await console.choose((*choices, "b", "e"))
+        choice = await console.choose((*choices, "b"))
         if choice == "b":
             return
-        if choice == "e":
-            await _emergency(console, session)
-            continue
         name = FACE_MENU[int(choice) - 1][0]
         await session.start_background(session.repository.load(name), loop_face=True)
         console.info(f"{name.replace('_', ' ').title()} is now running.")
@@ -499,13 +482,10 @@ async def _movement_menu(
             items,
             back=True,
         )
-        choice = await console.choose(("1", "2", "3", "4", "b", "e"))
+        choice = await console.choose(("1", "2", "3", "4", "b"))
         if choice == "b":
             await session.stop_active()
             return
-        if choice == "e":
-            await _emergency(console, session)
-            continue
         name = MOVEMENT_MENU[int(choice) - 1][0]
         approved = await _confirm(
             f"Run {name.replace('_', ' ')} on the real wheel servos?",
@@ -526,44 +506,32 @@ async def _special_menu(
         await _report_background(console, session)
         console.menu(
             "Special Behaviors",
-            "Safety actions are executed directly and are not reusable behavior files.",
+            "Built-in special behaviors. Safety actions are in the parent menu.",
             (
                 (
                     "1",
-                    "Greeting",
+                    "Greetings",
                     "Greeting face and Happy melody, then Nice to meet you; no wheels.",
                 ),
                 (
                     "2",
-                    "Celebrate",
+                    "Celebrating",
                     "Exciting and Success faces, melody, and a short guarded wheel dance.",
                 ),
                 (
                     "3",
-                    "Emergency Stop",
-                    "Level 2: stop servos and sensors, silence sound, and show the sign.",
-                ),
-                (
-                    "4",
-                    "Resume Robot Movement",
-                    "Health-check and reconstruct modules; never restart prior movement.",
-                ),
-                (
-                    "5",
                     "Error Warning",
                     "Stop active wheels, then loop Error and Warning without new movement.",
                 ),
             ),
             back=True,
         )
-        choice = await console.choose(("1", "2", "3", "4", "5", "b", "e"))
+        choice = await console.choose(("1", "2", "3", "b"))
         if choice == "b":
             if session.active_motion:
                 await session.stop_active()
             return
-        if choice in {"3", "e"}:
-            await _emergency(console, session)
-        elif choice == "1":
+        if choice == "1":
             result = await session.run_once(session.repository.load("greeting"))
             console.info(f"{result['name']} completed.")
         elif choice == "2":
@@ -574,14 +542,6 @@ async def _special_menu(
             if approved:
                 result = await session.run_once(session.repository.load("celebrate"))
                 console.info(f"{result['name']} completed.")
-        elif choice == "4":
-            approved = await _confirm(
-                "Resume after real hardware health checks?",
-                default=False,
-            )
-            if approved:
-                console.json(await session.resume())
-                console.info("Robot modules are ready. No previous movement was restarted.")
         else:
             await session.stop_active()
             await session.start_background(
@@ -591,31 +551,61 @@ async def _special_menu(
             console.warning("Error Warning is running without servo movement.")
 
 
-async def _create_menu(
+async def _user_behavior_menu(
     console: InteractiveConsole,
     session: InteractiveRobotSession,
     simulation_runner: SimulationRunner,
 ) -> None:
+    """Grouped menu for creating, running, and deleting user behaviors."""
+    while True:
+        await _report_background(console, session)
+        console.menu(
+            "User-created Behaviors",
+            "Create, run, or delete private user-created behaviors.",
+            (
+                (
+                    "1",
+                    "Start Behaviors Creator",
+                    "Build and preview a private behavior one step at a time.",
+                ),
+                (
+                    "2",
+                    "Run User-Created Behaviors",
+                    "Choose and directly run a behavior saved in your private catalog.",
+                ),
+                (
+                    "3",
+                    "Delete User-Created Behaviors",
+                    "Review and safely delete only private user behaviors.",
+                ),
+            ),
+            back=True,
+        )
+        choice = await console.choose(("1", "2", "3", "b"))
+        if choice == "b":
+            return
+        if choice == "1":
+            await _create_behavior(console, session, simulation_runner)
+        elif choice == "2":
+            await _user_run_menu(console, session)
+        else:
+            await _user_delete_menu(console, session)
+
+
+async def _create_behavior(
+    console: InteractiveConsole,
+    session: InteractiveRobotSession,
+    simulation_runner: SimulationRunner,
+) -> None:
+    """Enter the behavior creator directly without a redundant start screen."""
     console.menu(
-        "Create Robot Behavior",
+        "Start Behaviors Creator",
         "Build one simultaneous stage from a face or text, an optional melody, "
         "and optional wheel movement. Example: Happy face + Happy melody + "
         "left 25/right -25. The tool validates and simulates it before saving.",
-        (
-            (
-                "1",
-                "Start Guided Creator",
-                "Answer each prompt; nothing physical runs during the preview.",
-            ),
-        ),
-        back=True,
+        (),
+        back=False,
     )
-    choice = await console.choose(("1", "b", "e"))
-    if choice == "b":
-        return
-    if choice == "e":
-        await _emergency(console, session)
-        return
 
     name = cast(str, await asyncio.to_thread(click.prompt, "Behavior name (lowercase)"))
     description = cast(str, await asyncio.to_thread(click.prompt, "Short description"))
@@ -751,14 +741,11 @@ async def _user_run_menu(
             back=True,
         )
         choices = tuple(str(index) for index in range(1, len(definitions) + 1))
-        choice = await console.choose((*choices, "b", "e"))
+        choice = await console.choose((*choices, "b"))
         if choice == "b":
             if session.active_motion:
                 await session.stop_active()
             return
-        if choice == "e":
-            await _emergency(console, session)
-            continue
         definition = definitions[int(choice) - 1]
         if definition.contains_motion and not await _confirm(
             f"Run {definition.name} on real wheel servos?",
@@ -795,12 +782,9 @@ async def _user_delete_menu(
             back=True,
         )
         choices = tuple(str(index) for index in range(1, len(definitions) + 1))
-        choice = await console.choose((*choices, "b", "e"))
+        choice = await console.choose((*choices, "b"))
         if choice == "b":
             return
-        if choice == "e":
-            await _emergency(console, session)
-            continue
         definition = definitions[int(choice) - 1]
         if await _confirm(f"Permanently delete {definition.name}?", default=False):
             session.repository.delete_user(definition.name)
@@ -827,12 +811,9 @@ async def _simulation_menu(
             back=True,
         )
         choices = tuple(str(index) for index in range(1, len(definitions) + 1))
-        choice = await console.choose((*choices, "b", "e"))
+        choice = await console.choose((*choices, "b"))
         if choice == "b":
             return
-        if choice == "e":
-            await _emergency(console, session)
-            continue
         definition = definitions[int(choice) - 1]
         console.info(
             f"Simulating {definition.name} for at most two seconds of continuous activity."

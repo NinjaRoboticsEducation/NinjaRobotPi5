@@ -1905,7 +1905,6 @@ async def _interactive(arguments: argparse.Namespace) -> int:
             "12. Startup Agent Deployment\n"
             "13. Stop Agent Service\n"
             "14. Exit\n"
-            "15. Guided checks (read-only; service must be running)\n"
         )
         choice = (await asyncio.to_thread(input, "Select an option: ")).strip()
         try:
@@ -1976,25 +1975,8 @@ async def _interactive(arguments: argparse.Namespace) -> int:
             elif choice == "14":
                 print("CLI disconnected. Any running agent service continues.")
                 return 0
-            elif choice == "15":
-                while True:
-                    step = (
-                        await asyncio.to_thread(
-                            input,
-                            "Guide: 1 environment, 2 stop/resume, 3 text, 4 reminders, "
-                            "5 help; Enter to leave: ",
-                        )
-                    ).strip()
-                    if not step:
-                        break
-                    if step not in {"1", "2", "3", "4", "5"}:
-                        print("Choose 1 through 5 or press Enter to skip.")
-                        continue
-                    await _service_request(
-                        arguments, {"command": "guided_checks", "step": int(step) - 1}
-                    )
             else:
-                print("Please choose a number from 1 through 15.")
+                print("Please choose a number from 1 through 14.")
         except (
             AgentIPCError,
             CloudProviderError,
