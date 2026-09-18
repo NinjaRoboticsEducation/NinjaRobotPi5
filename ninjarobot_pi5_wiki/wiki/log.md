@@ -1,5 +1,11 @@
 # Wiki Update Log
 
+## 2026-09-18
+
+* **Update**: Applied plan `ui-refinement-citations-260918` — Attach citations to web controller overview paragraphs in architecture and features-and-tools pages.. Sources: `src-20260918-developmentguide`, `src-20260918-ninjarobot-mcp-skill`, `src-20260907-knowledgeintegration`.
+
+* **Update**: Applied plan `ui-refinement-260918` — Ingest 2026-09-18 UI refinement and terminal menu reorganization manuals, updating eleven knowledge pages with dual-page web architecture, modular frontend, user behavior execution safety, button styling toggles, and terminal menu consolidation.. Sources: `src-20260907-knowledgeintegration`, `src-20260918-developmentguide`, `src-20260918-installationguide`, `src-20260918-ninjarobot-mcp-skill`, `src-20260918-developmentlog`.
+
 ## 2026-09-17
 
 * **Update**: Applied plan `calendar-confirm-260917` — Ingest 2026-09-17 Google Calendar guided setup and unified CONFIRM manuals, updating eleven knowledge pages with calendar discovery, plain CONFIRM/CANCEL flow, field-specific preview errors, and hash-checked project help.. Sources: `src-20260907-knowledgeintegration`, `src-20260917-developmentguide`, `src-20260917-installationguide`, `src-20260917-ninjarobot-mcp-skill`, `src-20260917-developmentlog`.

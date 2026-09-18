@@ -1,0 +1,16 @@
+id: src-20260918-installationguide
+path: raw/articles/ninjarobotpi5/2026-09-18/InstallationGuide.md
+media_type: text/markdown
+kind: text
+title: InstallationGuide.md
+added_at: '2026-09-18T08:31:40Z'
+content_hash: sha256:7b3efdc139d5f2c990c81ab90105b57d91638260b0eac2b9510bd846fe7aee1e
+state: ingested
+original_uri: urn:llmwiki:source:src-20260918-installationguide
+source_version: ui-refinement-260918
+retrieved_at: null
+normalized_at: '2026-09-18T08:33:12Z'
+normalizer: llmwiki-text/0.2
+error: null
+ingested_at: '2026-09-18T10:06:04Z'
+last_plan: ui-refinement-260918

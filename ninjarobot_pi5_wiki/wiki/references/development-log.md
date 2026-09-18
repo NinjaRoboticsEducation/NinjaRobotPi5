@@ -9,10 +9,10 @@ generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20260917-developmentlog
-  resource: urn:llmwiki:source:src-20260917-developmentlog
+- id: src-20260918-developmentlog
+  resource: urn:llmwiki:source:src-20260918-developmentlog
   title: DevelopmentLog.md
-  content_hash: sha256:2c9e4a8d9702facf8d609b368da4c898d00c8f912dbfe3a9026c78f9849f4fa3
+  content_hash: sha256:277d35efbf87ca9daa1a353ecc8bc1b917f6e367043f716215021d8c32f42ff9
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -20,7 +20,7 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-09-17T15:40:00Z'
+  performed_at: '2026-09-18T16:50:00Z'
   result: passed
   checks:
     source_support: passed
@@ -29,16 +29,17 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered 17 September calendar CONFIRM flow, guided
-    authorization, and project help evidence; no human verification is claimed.
+  - Reviewed this page against registered 18 September UI refinement, modular web
+    frontend, and terminal menu consolidation evidence; no human verification is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
-    and note pending font repair and monetary spending cap.
-  target_hash: sha256:30a3637f8153d3e2a760cd616f9d7c0a6e5f5e86d52fc128454b50b53841074d
+    and note pending font repair, monetary spending cap, and physical mobile Wi-Fi
+    checks.
+  target_hash: sha256:1e3b03aecd63742b56454976a72994194fe65d98eb1a71c63ccb31169646aa20
 ---
 
 # Development log
 
-The complete log preserves dated implementation decisions and validation reports. Historical test results describe their recorded checkout and date; they are not fresh verification.[^src-20260917-developmentlog]
+The complete log preserves dated implementation decisions and validation reports. Historical test results describe their recorded checkout and date; they are not fresh verification.[^src-20260918-developmentlog]
 
 Use the source identifier below to resolve the complete manual through the raw
 source catalog. The outer wiki README also links directly to the current full
@@ -47,15 +48,18 @@ Read the relevant full section before acting on an abbreviated explanation.[^src
 
 [Return to project overview](/overview.md).
 
-## Current checkpoint: Calendar guided setup, unified CONFIRM flow, and project help
+## Current checkpoint: Web interface refinement, modular frontend, and terminal menu consolidation
 
-The 17 September 2026 entries record Google Calendar guided OAuth setup with primary-calendar
+The 18 September 2026 entries record web interface partitioning into dedicated Game Pad (`/gamepad`)
+and Agent Interface (`/agent`) surfaces, frontend script modularization (`app-shared.js`, `app-gamepad.js`,
+`app-agent.js`), user-created behavior execution with motion safety confirmation modals, high-contrast button
+styling and state toggles (A/B/X/Y and audio controls), 4-language i18n parity, and IDE terminal menu
+restructuring (options 1–5, Q), alongside 17 September Google Calendar guided OAuth setup with primary-calendar
 discovery, port 8765 loopback SSH tunnel, field validation error handling, unified `CONFIRM` / `CANCEL`
-chat authorization across create, update, and delete, and runtime project help hash checking with
-bounded continuation tokens, alongside 16 September distance game hand-placement timing, 15 September
-repairs, Phase 4 information assistant completion, narrowed Phase 4 foundations, Phase 5 evaluation,
-and system clock access.[^src-20260917-developmentlog]
+chat authorization across create, update, and delete, runtime project help hash checking with bounded
+continuation tokens, 16 September distance game hand-placement timing, 15 September repairs, Phase 4
+information assistant completion, narrowed Phase 4 foundations, Phase 5 evaluation, and system clock access.[^src-20260918-developmentlog]
 
 
-[^src-20260917-developmentlog]: DevelopmentLog.md, source version `calendar-confirm-260917`; registered source `src-20260917-developmentlog`.
+[^src-20260918-developmentlog]: DevelopmentLog.md, source version `ui-refinement-260918`; registered source `src-20260918-developmentlog`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

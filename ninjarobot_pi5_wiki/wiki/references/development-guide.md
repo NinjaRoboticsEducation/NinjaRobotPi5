@@ -9,10 +9,10 @@ generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20260917-developmentguide
-  resource: urn:llmwiki:source:src-20260917-developmentguide
+- id: src-20260918-developmentguide
+  resource: urn:llmwiki:source:src-20260918-developmentguide
   title: DevelopmentGuide.md
-  content_hash: sha256:55b061c1a72d4b5f81693f83f2ae39200ff8ed7ea992645e83e661ac5efcd0f0
+  content_hash: sha256:a4295e369acd972b74b34383683623b37ef8a1a4cf1d2e066c50d7d4fc6ec649
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -20,7 +20,7 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-09-17T15:40:00Z'
+  performed_at: '2026-09-18T16:50:00Z'
   result: passed
   checks:
     source_support: passed
@@ -29,16 +29,17 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered 17 September calendar CONFIRM flow, guided
-    authorization, and project help evidence; no human verification is claimed.
+  - Reviewed this page against registered 18 September UI refinement, modular web
+    frontend, and terminal menu consolidation evidence; no human verification is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
-    and note pending font repair and monetary spending cap.
-  target_hash: sha256:719d653a904c9e1cf17b4cd1fb4d2351f86a6f98ef5af6d0e1e4c9a5108f2d10
+    and note pending font repair, monetary spending cap, and physical mobile Wi-Fi
+    checks.
+  target_hash: sha256:98bbbc00efc81674476132a5726eb3001637304dba14c81ed0df61eab7b09fc8
 ---
 
 # Development guide
 
-The full guide describes architecture, managed drivers, configuration, safety, the behavior system, external tools, memory, web access, and development checks.[^src-20260917-developmentguide]
+The full guide describes architecture, managed drivers, configuration, safety, the behavior system, external tools, memory, web access, and development checks.[^src-20260918-developmentguide]
 
 Use the source identifier below to resolve the complete manual through the raw
 source catalog. The outer wiki README also links directly to the current full
@@ -47,16 +48,17 @@ Read the relevant full section before acting on an abbreviated explanation.[^src
 
 [Return to project overview](/overview.md).
 
-## Current checkpoint: Calendar guided setup, unified CONFIRM flow, and project help
+## Current checkpoint: Web interface refinement, modular frontend, and terminal menu consolidation
 
-The 17 September 2026 revision (`2026-09-17-03`) details the implementation map for
-`calendar_chat.py` unified single-word `CONFIRM` / `CANCEL` flow across event create,
-update, and delete (strictly rejecting command bypasses), field-specific preview errors,
-Google Calendar service primary-calendar auto-discovery and token reuse, and `project_documents.py`
-hash-checked bounded sections for runtime public help, alongside 15–16 September distance game
-and servo repairs, Phase 4 information services (T04 calendar, T05 research, T06 notes/checklists/briefings,
-`InformationStore`, `InformationControls`, migration 7), Phase 4 foundations, and system clock access.[^src-20260917-developmentguide]
+The 18 September 2026 revision (`2026-09-18`) documents the dual-page web interface (`/agent`
+and `/gamepad`), modular frontend scripts (`app-shared.js`, `app-gamepad.js`, `app-agent.js`),
+user-created behavior execution with motion safety confirmation modals, high-contrast button styling
+and toggle states (A/B/X/Y and audio controls), 4-language i18n parity, and IDE terminal menu
+restructuring (options 1–5, Q), alongside 17 September calendar setup and unified `CONFIRM` / `CANCEL`
+flow, 15–16 September distance game and servo repairs, Phase 4 information services (T04 calendar,
+T05 research, T06 notes/checklists/briefings, `InformationStore`, `InformationControls`, migration 7),
+Phase 4 foundations, and system clock access.[^src-20260918-developmentguide]
 
 
-[^src-20260917-developmentguide]: DevelopmentGuide.md, source version `calendar-confirm-260917`; registered source `src-20260917-developmentguide`.
+[^src-20260918-developmentguide]: DevelopmentGuide.md, source version `ui-refinement-260918`; registered source `src-20260918-developmentguide`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

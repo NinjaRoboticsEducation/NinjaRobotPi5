@@ -1,27 +1,27 @@
 {
   "version": 1,
-  "reviewed_checkout": "0a1f7f6121cc9449980d0db1e0bea8aa7bae097f",
+  "reviewed_checkout": "699046d6af763a293cf9a45c67422239351a0cf1",
   "reviewed_by": "agent:antigravity",
-  "reviewed_at": "2026-09-17T15:40:00.000000+00:00",
+  "reviewed_at": "2026-09-18T16:50:00.000000+00:00",
   "documents": [
     {
       "name": "InstallationGuide.md",
-      "path": "raw/articles/ninjarobotpi5/2026-09-17-03/InstallationGuide.md",
-      "original_content_hash": "sha256:7e50d29d87acf54bcc5dce24f26b8c667acf2b026edfec45e2cc8c286e190029",
-      "content_hash": "sha256:7e50d29d87acf54bcc5dce24f26b8c667acf2b026edfec45e2cc8c286e190029",
-      "previous_path": "raw/articles/ninjarobotpi5/2026-09-16/InstallationGuide.md",
+      "path": "raw/articles/ninjarobotpi5/2026-09-18/InstallationGuide.md",
+      "original_content_hash": "sha256:7b3efdc139d5f2c990c81ab90105b57d91638260b0eac2b9510bd846fe7aee1e",
+      "content_hash": "sha256:7b3efdc139d5f2c990c81ab90105b57d91638260b0eac2b9510bd846fe7aee1e",
+      "previous_path": "raw/articles/ninjarobotpi5/2026-09-17-03/InstallationGuide.md",
       "pages": [
         "wiki/references/installation-guide.md",
         "wiki/concepts/installation.md"
       ],
-      "source_id": "src-20260917-installationguide"
+      "source_id": "src-20260918-installationguide"
     },
     {
       "name": "DevelopmentGuide.md",
-      "path": "raw/articles/ninjarobotpi5/2026-09-17-03/DevelopmentGuide.md",
-      "original_content_hash": "sha256:55b061c1a72d4b5f81693f83f2ae39200ff8ed7ea992645e83e661ac5efcd0f0",
-      "content_hash": "sha256:55b061c1a72d4b5f81693f83f2ae39200ff8ed7ea992645e83e661ac5efcd0f0",
-      "previous_path": "raw/articles/ninjarobotpi5/2026-09-16/DevelopmentGuide.md",
+      "path": "raw/articles/ninjarobotpi5/2026-09-18/DevelopmentGuide.md",
+      "original_content_hash": "sha256:a4295e369acd972b74b34383683623b37ef8a1a4cf1d2e066c50d7d4fc6ec649",
+      "content_hash": "sha256:a4295e369acd972b74b34383683623b37ef8a1a4cf1d2e066c50d7d4fc6ec649",
+      "previous_path": "raw/articles/ninjarobotpi5/2026-09-17-03/DevelopmentGuide.md",
       "pages": [
         "wiki/overview.md",
         "wiki/references/development-guide.md",
@@ -30,31 +30,31 @@
         "wiki/concepts/features-and-tools.md",
         "wiki/analyses/knowledge-limitations.md"
       ],
-      "source_id": "src-20260917-developmentguide"
+      "source_id": "src-20260918-developmentguide"
     },
     {
       "name": "NinjaRobot_MCP_Skill.md",
-      "path": "raw/articles/ninjarobotpi5/2026-09-17-03/NinjaRobot_MCP_Skill.md",
-      "original_content_hash": "sha256:1f99135350ca5fcd714428806c4eb34248af59b888369be8fe3d398a3655ed7c",
-      "content_hash": "sha256:1f99135350ca5fcd714428806c4eb34248af59b888369be8fe3d398a3655ed7c",
-      "previous_path": "raw/articles/ninjarobotpi5/2026-09-16/NinjaRobot_MCP_Skill.md",
+      "path": "raw/articles/ninjarobotpi5/2026-09-18/NinjaRobot_MCP_Skill.md",
+      "original_content_hash": "sha256:f12a0d70b9fc6b5be50e53b4a1278ac50d7c66054934239883803530fde7242d",
+      "content_hash": "sha256:f12a0d70b9fc6b5be50e53b4a1278ac50d7c66054934239883803530fde7242d",
+      "previous_path": "raw/articles/ninjarobotpi5/2026-09-17-03/NinjaRobot_MCP_Skill.md",
       "pages": [
         "wiki/references/mcp-skills-guide.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "source_id": "src-20260917-ninjarobot-mcp-skill"
+      "source_id": "src-20260918-ninjarobot-mcp-skill"
     },
     {
       "name": "DevelopmentLog.md",
-      "path": "raw/notes/ninjarobotpi5/2026-09-17-03/DevelopmentLog.md",
-      "original_content_hash": "sha256:2c9e4a8d9702facf8d609b368da4c898d00c8f912dbfe3a9026c78f9849f4fa3",
-      "content_hash": "sha256:2c9e4a8d9702facf8d609b368da4c898d00c8f912dbfe3a9026c78f9849f4fa3",
-      "previous_path": "raw/notes/ninjarobotpi5/2026-09-16/DevelopmentLog.md",
+      "path": "raw/notes/ninjarobotpi5/2026-09-18/DevelopmentLog.md",
+      "original_content_hash": "sha256:277d35efbf87ca9daa1a353ecc8bc1b917f6e367043f716215021d8c32f42ff9",
+      "content_hash": "sha256:277d35efbf87ca9daa1a353ecc8bc1b917f6e367043f716215021d8c32f42ff9",
+      "previous_path": "raw/notes/ninjarobotpi5/2026-09-17-03/DevelopmentLog.md",
       "pages": [
         "wiki/references/development-log.md",
         "wiki/concepts/development-history.md"
       ],
-      "source_id": "src-20260917-developmentlog"
+      "source_id": "src-20260918-developmentlog"
     }
   ],
   "implementation_roots": [
@@ -79,12 +79,12 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/agent_cli.py": {
-      "content_hash": "sha256:898cc58f8509c886fd6b2965b647357d405d830b752defffb9fd9ee3fbd84bea",
+      "content_hash": "sha256:156eb23209790124b7453955788562945fc84cb49dcee79c6d82cd81e1c20b45",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed 17 September calendar setup and project help CLI updates against consolidated 2026-09-17-03 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
+      "review_note": "Reviewed 18 September agent CLI interactive menu updates (1-14) against consolidated 2026-09-18 manual checkpoint; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/agent_loop.py": {
       "content_hash": "sha256:3fb00d9dc85d080f14d321228b79a2f56643733ff173db3cebb4ff4ec7e925e8",
@@ -287,6 +287,14 @@
         "wiki/concepts/features-and-tools.md"
       ],
       "review_note": "Reviewed Phase 4 and Phase 5 delta against consolidated 2026-09-13 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/calendar_chat.py": {
+      "content_hash": "sha256:87bdee12b90586de1e4491f5de69da0872b76ad68438e0dfec0e00de6a4152b0",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Unified CONFIRM / CANCEL chat handler for calendar action previews (create, update, delete); single-word confirmation contract."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/calendar_google.py": {
       "content_hash": "sha256:205cb8d8000ba7db0b79bafc01cd158d5df9d977a0ad914c8ee2c59996a349f7",
@@ -576,6 +584,14 @@
       ],
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/project_documents.py": {
+      "content_hash": "sha256:18a1a01d8ef8f449d287e1ced1b8a543b2b1eb963feb7d41d5b8ee5a6e388769",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Runtime document section reader and hash validator for public project help; reads published manual sections without touching private files."
+    },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/project_help.py": {
       "content_hash": "sha256:43c170bf7de3bfee2c939de3c5a57ff136f89e609952c183e0ea42a715c9580d",
       "pages": [
@@ -590,6 +606,13 @@
         "wiki/concepts/features-and-tools.md"
       ],
       "review_note": "Pinned manifest of published documents for runtime public project help."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/project_help_sources.json": {
+      "content_hash": "sha256:c751867dc1d1918c93b17a7a4f262967e6c670293d61766ba13267a717281728",
+      "pages": [
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Published document section catalog with content hashes and section IDs for runtime project help."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/prompts.py": {
       "content_hash": "sha256:889e6937546f04303b355299f54b58d4ea6d4d1ec07313bfb160f2b2fbca1d99",
@@ -648,12 +671,12 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/remote_access.py": {
-      "content_hash": "sha256:8ca69a2059f24c9f1d0bab4713fba3101f9b720850e3328285048bb38a321897",
+      "content_hash": "sha256:d9b54eff5e615d92e855f25f225f08965fd3a8f3e63cb4a0a0a1e88e333d5c61",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed 18 September remote access and pairing endpoint handling against 2026-09-18 manual checkpoint."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/research_service.py": {
       "content_hash": "sha256:6f5e3f832c076a42ac8d9355536194b54ed12a9d1125c837bf8ac45d912d9889",
@@ -807,68 +830,88 @@
       "review_note": "Reviewed Phase 0\u20132 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_app.py": {
-      "content_hash": "sha256:87b7e426eaa46c12e434baf4e7b39e898d5888a630e48de6568e8d0e20cc7db4",
+      "content_hash": "sha256:253f45174512a575199fdda4e469bd289055db47096f0fcf6bba9a91e49e65e2",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed Phase 4 and Phase 5 delta against consolidated 2026-09-13 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
+      "review_note": "Reviewed 18 September dual-page web controller routing (/agent, /gamepad), user behavior websocket dispatch, and pairing flow against 2026-09-18 manual checkpoint."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_control.py": {
-      "content_hash": "sha256:f851be5ca074a568c1f0215fcec061b986ce749c7ffc1e56d033ce93c094d472",
+      "content_hash": "sha256:ee70cdfdfdf802725c7cdfb7b00042b6ea1d6aaaa6fb7cb2b119cff8d1a176f8",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed web controller redundant game check removal and visible UI notification handling against 2026-09-16 manual checkpoint."
+      "review_note": "Reviewed 18 September web controller list_user_behaviors and run_user_behavior methods with motion safety validation against 2026-09-18 manual checkpoint."
     },
-    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/app.js": {
-      "content_hash": "sha256:4890fa45860514010898946e483b172fd798058333ed4c3bc86398198bae6006",
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/agent.html": {
+      "content_hash": "sha256:3b496cd69267b5b97b381576e143da9fd5da2ca5a8cc25608e791af965eb6ff7",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed web UI error notification display and game start message handling against 2026-09-16 manual checkpoint."
+      "review_note": "Reviewed 18 September Agent Interface dedicated structure, message viewport, and control button markup against 2026-09-18 manual checkpoint."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/app-agent.js": {
+      "content_hash": "sha256:caf876e7e0c3383afd0e53c46e6c8362e1cba7b74f6edd600e28dfe251983c1c",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Reviewed 18 September agent view controller module (chat stream, button toggle states, audio controls) against 2026-09-18 manual checkpoint."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/app-gamepad.js": {
+      "content_hash": "sha256:cf6ecc6fcc57ebe6ad4e1efb576f3a920ec89408ebd878b3201ba6c324cfb664",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Reviewed 18 September game pad view controller module (touch D-pad dispatch, user behavior selector) against 2026-09-18 manual checkpoint."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/app-shared.js": {
+      "content_hash": "sha256:2bc8a84069ec42a98009aaccbd571bf2c71c1d702a248f88837bc9d516011231",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Reviewed 18 September shared frontend controller module (websocket, modals, i18n, lease negotiation) against 2026-09-18 manual checkpoint."
+    },
+    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/gamepad.html": {
+      "content_hash": "sha256:4450010815c59e678b94b0e582b98c03d405e7ef5e8645a79070bda9672723ba",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/features-and-tools.md"
+      ],
+      "review_note": "Reviewed 18 September Game Pad dedicated structure, touch D-pad, and user behavior selector against 2026-09-18 manual checkpoint."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/i18n/en.json": {
-      "content_hash": "sha256:da4af6d625f3f599d6d6046f19881357d345421b2019cad0be05b29ce11f64f9",
+      "content_hash": "sha256:96d22aba17d6414be4dc3a250e4e1dffd1e97614d899997fd4c1a61d8a25cf4c",
       "pages": [
-        "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed web UI error notification strings against 2026-09-16 manual checkpoint."
+      "review_note": "Reviewed 18 September English localization updates (146 keys) for dual interface, user behaviors, and chat controls against 2026-09-18 manual checkpoint."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/i18n/ja.json": {
-      "content_hash": "sha256:43eedb80fd71c87797ed26ab7135a157dc3092eec47758a5c5105af8deb8e1d6",
+      "content_hash": "sha256:6a6397579d1c85488e7f05d09c73dfd8e518061c837e0fb6dc4cb11fd236f633",
       "pages": [
-        "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed web UI error notification Japanese strings against 2026-09-16 manual checkpoint."
+      "review_note": "Reviewed 18 September Japanese localization updates (146 keys) for dual interface, user behaviors, and chat controls against 2026-09-18 manual checkpoint."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/i18n/zh-CN.json": {
-      "content_hash": "sha256:6b7afde449940fd885ab0a83fc9746300598dd4f9a78ddcb4cc7a6b48a60c9da",
+      "content_hash": "sha256:b621b18ef3da11c2da9c6699964859075ed78cb52ba0991122c8de874288992c",
       "pages": [
-        "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed web UI error notification Simplified Chinese strings against 2026-09-16 manual checkpoint."
+      "review_note": "Reviewed 18 September Simplified Chinese localization updates (146 keys) for dual interface, user behaviors, and chat controls against 2026-09-18 manual checkpoint."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/i18n/zh-TW.json": {
-      "content_hash": "sha256:5e88e837e65b97e4f30bf01b474ff174532269b5461b136bf7ad95583625420a",
+      "content_hash": "sha256:9eff573560eb00020a4e05b7e2ed616684b93045548ede58afb05dbf7d8a2b5a",
       "pages": [
-        "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed web UI error notification Traditional Chinese strings against 2026-09-16 manual checkpoint."
-    },
-    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/index.html": {
-      "content_hash": "sha256:dfabc6ad374e7033d94331bc3e006613932f891d3bb738330d4d9ba902689c13",
-      "pages": [
-        "wiki/concepts/architecture.md",
-        "wiki/concepts/features-and-tools.md"
-      ],
-      "review_note": "Reviewed Phase 4 and Phase 5 delta against consolidated 2026-09-13 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
+      "review_note": "Reviewed 18 September Traditional Chinese localization updates (146 keys) for dual interface, user behaviors, and chat controls against 2026-09-18 manual checkpoint."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/manifest.webmanifest": {
       "content_hash": "sha256:4887afdbcd1b947b651c99609c7470dd5a1d800237d2bc06c45b3ccad2eea8bc",
@@ -879,12 +922,12 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/styles.css": {
-      "content_hash": "sha256:5c7a496d3b8c808c38fdcc0acf3387180ea68ef2c05483b18ee78075cb4917be",
+      "content_hash": "sha256:80817b835a1704d36ca2fc3c649cfa4805897d93479c97634c4b413ab5092853",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed Phase 4 and Phase 5 delta against consolidated 2026-09-13 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
+      "review_note": "Reviewed 18 September responsive layout tokens, agent interface button styling (A/B/X/Y and audio controls), and D-pad styling against 2026-09-18 manual checkpoint."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/__init__.py": {
       "content_hash": "sha256:add3fd89837d626729e472c9ab821a47036fc66eadeef1385c3e41859bf5319a",
@@ -1352,20 +1395,21 @@
       "review_note": "Reviewed Phase 0\u20132 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/integrated.py": {
-      "content_hash": "sha256:ffde0996bc7efd726417ceed506b8d13372e141cdceaf0a7a2b134367d6aecd2",
+      "content_hash": "sha256:a49049ff7874ca1970885adb58f7bc02c09c9d6671dab3f13b10dd56e82753d0",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed distance game stop and status handling in integrated IDE coordinator against 2026-09-16 manual checkpoint."
+      "review_note": "Reviewed 18 September _BehaviorListAdapter source filtering (all/user) integration against 2026-09-18 manual checkpoint."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/interactive_tool.py": {
-      "content_hash": "sha256:f3a2fb44d4a76d43205c08507f6e177a3cf81be1630394cc5e57191134719850",
+      "content_hash": "sha256:9cbfc483b635d25f634e78f6d618a79206a77d714a7df54614df1155443fe2d9",
       "pages": [
         "wiki/concepts/architecture.md",
-        "wiki/concepts/features-and-tools.md"
+        "wiki/concepts/features-and-tools.md",
+        "wiki/concepts/installation.md"
       ],
-      "review_note": "Reviewed Phase 4 and Phase 5 delta against consolidated 2026-09-13 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
+      "review_note": "Reviewed 18 September interactive menu restructuring (options 1-5, Q; Bluetooth at 5) and removal of single-key emergency stop injection against 2026-09-18 manual checkpoint."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/ledger.py": {
       "content_hash": "sha256:8ca863358ae91c4825d7fe91d2f7ba221a7582c89df1d7daebfb969e88e270c7",
@@ -1470,29 +1514,6 @@
         "wiki/concepts/features-and-tools.md"
       ],
       "review_note": "Reviewed Phase 4 and Phase 5 delta against consolidated 2026-09-13 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
-    },
-    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/project_documents.py": {
-      "content_hash": "sha256:18a1a01d8ef8f449d287e1ced1b8a543b2b1eb963feb7d41d5b8ee5a6e388769",
-      "pages": [
-        "wiki/concepts/architecture.md",
-        "wiki/concepts/features-and-tools.md"
-      ],
-      "review_note": "Runtime document section reader and hash validator for public project help; reads published manual sections without touching private files."
-    },
-    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/calendar_chat.py": {
-      "content_hash": "sha256:87bdee12b90586de1e4491f5de69da0872b76ad68438e0dfec0e00de6a4152b0",
-      "pages": [
-        "wiki/concepts/architecture.md",
-        "wiki/concepts/features-and-tools.md"
-      ],
-      "review_note": "Unified CONFIRM / CANCEL chat handler for calendar action previews (create, update, delete); single-word confirmation contract."
-    },
-    "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/project_help_sources.json": {
-      "content_hash": "sha256:c751867dc1d1918c93b17a7a4f262967e6c670293d61766ba13267a717281728",
-      "pages": [
-        "wiki/concepts/features-and-tools.md"
-      ],
-      "review_note": "Published document section catalog with content hashes and section IDs for runtime project help."
     }
   },
   "adapters": [

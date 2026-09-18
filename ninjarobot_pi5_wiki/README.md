@@ -20,10 +20,10 @@ briefings), Phase 4 foundations, and system clock access.
 Use [the document map](project-knowledge.json) for registered source provenance;
 use the links below for the full manuals:
 
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-17-03/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-17-03/DevelopmentGuide.md)
-- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-17-03/NinjaRobot_MCP_Skill.md)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-17-03/DevelopmentLog.md)
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-18/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-18/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-18/NinjaRobot_MCP_Skill.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-18/DevelopmentLog.md)
 - [Calendar CONFIRM walkthrough](../docs/validation/calendar_confirm_walkthrough_260917.md)
 - [Calendar and project-help walkthrough](../docs/validation/calendar_wiki_walkthrough_260917.md)
 - [Distance game hand-placement repair and tests](../docs/validation/distance_game_web_hand_260916.md)
