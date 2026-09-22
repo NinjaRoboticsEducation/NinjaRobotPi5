@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import os
+import pty
+import select
 import shutil
 import stat
 import subprocess
 import sys
+import time
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
@@ -23,6 +26,166 @@ END_MARKER = BOOT_CONFIG.END_MARKER
 PWM_OVERLAY = BOOT_CONFIG.PWM_OVERLAY
 render_boot_config = BOOT_CONFIG.render_boot_config
 validate_boot_config = BOOT_CONFIG.validate_boot_config
+
+
+@pytest.fixture
+def local_bootstrap(tmp_path):
+    """Use real Git and an inert installer; never access GitHub or OS setup."""
+    source = tmp_path / "source"
+    source.mkdir()
+
+    def git(*args):
+        return subprocess.check_output(["git", "-C", str(source), *args], text=True).strip()
+
+    git("init", "-q", "-b", "main")
+    (source / "scripts").mkdir()
+    (source / "install.sh").write_text("#!/bin/bash\nprintf 'delegated:%s\\n' \"$*\"\n")
+    (source / "install.sh").chmod(0o755)
+    for name in ("uv.lock", "scripts/install-rpi.sh", "scripts/install-versions.env"):
+        (source / name).write_text("# fixture\n")
+    git("add", ".")
+    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "fixture")
+    sha = git("rev-parse", "HEAD")
+    for name in ("public_v07", "release/public_v08", "collision"):
+        git("branch", name)
+    git("tag", "v1")
+    git(
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.invalid",
+        "tag",
+        "-am",
+        "annotated",
+        "v2",
+    )
+    git("tag", "collision")
+    config = tmp_path / "gitconfig"
+    config.write_text(
+        f'[url "{source}"]\n insteadOf = https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git\n'
+    )
+    environment = {**os.environ, "GIT_CONFIG_GLOBAL": str(config), "GIT_CONFIG_NOSYSTEM": "1"}
+    return sha, environment
+
+
+@pytest.mark.parametrize(
+    "ref",
+    [
+        "main",
+        "public_v07",
+        "release/public_v08",
+        "v1",
+        "v2",
+        "COMMIT",
+        "refs/heads/collision",
+        "refs/tags/collision",
+        "missing",
+        "collision",
+    ],
+)
+def test_streamed_bootstrap_with_real_git(tmp_path, local_bootstrap, ref):
+    sha, environment = local_bootstrap
+    parent = tmp_path / "custom Ninja folder"
+    parent.mkdir()
+    destination = parent / "NinjaRobotPi5"
+    result = subprocess.run(
+        [
+            "bash",
+            "-s",
+            "--",
+            "--ref",
+            sha if ref == "COMMIT" else ref,
+            "--install-dir",
+            str(destination),
+            "--profile",
+            "development",
+        ],
+        input=(ROOT / "install.sh").read_text(),
+        env=environment,
+        cwd=parent,
+        text=True,
+        capture_output=True,
+        timeout=20,
+    )
+    if ref in {"missing", "collision"}:
+        assert result.returncode != 0
+        assert ("Cannot resolve" if ref == "missing" else "Ambiguous") in result.stderr
+        assert not destination.exists()
+    else:
+        assert result.returncode == 0, result.stderr
+        assert "delegated:--profile development" in result.stdout
+        assert (
+            subprocess.check_output(
+                ["git", "-C", str(destination), "rev-parse", "HEAD"], text=True
+            ).strip()
+            == sha
+        )
+        assert (
+            subprocess.run(
+                ["git", "-C", str(destination), "symbolic-ref", "-q", "HEAD"], capture_output=True
+            ).returncode
+            == 1
+        )
+    assert not list(parent.glob(".ninjarobot-bootstrap.*"))
+
+
+@pytest.mark.parametrize("assume_yes", [False, True])
+def test_confirmation_without_terminal_is_explicit(assume_yes):
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            'source "$1"; ASSUME_YES="$2"; confirm_plan',
+            "test",
+            str(ROOT / "scripts/install-rpi.sh"),
+            str(int(assume_yes)),
+        ],
+        input="INSTALL\n",
+        text=True,
+        capture_output=True,
+        start_new_session=True,
+        timeout=5,
+    )
+    assert result.returncode == (0 if assume_yes else 1)
+    if not assume_yes:
+        assert "No controlling terminal" in result.stderr
+
+
+def test_confirmation_uses_terminal_when_stdin_is_a_pipe():
+    pid, terminal = pty.fork()
+    if pid == 0:
+        os.execlp(
+            "bash",
+            "bash",
+            "-c",
+            'printf "wrong\\n" | bash -c \'source "$1"; confirm_plan\' test "$1"',
+            "test",
+            str(ROOT / "scripts/install-rpi.sh"),
+        )
+    try:
+        output = b""
+        deadline = time.monotonic() + 5
+        while b"Type INSTALL" not in output and time.monotonic() < deadline:
+            if select.select([terminal], [], [], 0.1)[0]:
+                output += os.read(terminal, 4096)
+        assert b"Type INSTALL" in output
+        os.write(terminal, b"INSTALL\n")
+        while time.monotonic() < deadline:
+            waited, status = os.waitpid(pid, os.WNOHANG)
+            if waited:
+                pid = 0
+                assert os.waitstatus_to_exitcode(status) == 0
+                break
+            time.sleep(0.01)
+        else:
+            pytest.fail("terminal confirmation did not finish")
+    finally:
+        os.close(terminal)
+        if pid:
+            import signal
+
+            os.kill(pid, signal.SIGKILL)
+            os.waitpid(pid, 0)
 
 
 def _install_fake_git(tmp_path: Path, *, resolved: str) -> Path:
@@ -52,7 +215,9 @@ if arguments and arguments[0] == "clone":
     (checkout / "uv.lock").write_text("# test fixture\\n")
 elif len(arguments) >= 4 and arguments[0] == "-C" and arguments[2] == "checkout":
     pass
-elif len(arguments) == 4 and arguments[0] == "-C" and arguments[2:] == ["rev-parse", "HEAD"]:
+elif arguments[0] == "-C" and arguments[2] == "rev-parse":
+    if arguments[-1].startswith("refs/"):
+        raise SystemExit(1)
     print(os.environ["FAKE_GIT_RESOLVED"])
 else:
     raise SystemExit(f"unexpected fake git arguments: {arguments!r}")

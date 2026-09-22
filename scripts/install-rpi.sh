@@ -118,7 +118,16 @@ EOF
 
 confirm_plan() {
   ((ASSUME_YES)) && return
-  read -r -p "Continue? Type INSTALL to proceed: " answer
+  local answer terminal_fd
+  if ! { exec {terminal_fd}<>/dev/tty; } 2>/dev/null; then
+    fail "No controlling terminal. Run from an interactive terminal, or review --dry-run and explicitly pass --yes."
+  fi
+  printf 'Continue? Type INSTALL to proceed: ' >&"${terminal_fd}"
+  if ! read -r answer <&"${terminal_fd}"; then
+    exec {terminal_fd}>&-
+    fail "Installation cancelled: no confirmation was received."
+  fi
+  exec {terminal_fd}>&-
   [[ "${answer}" == "INSTALL" ]] || fail "Installation cancelled; no changes were made."
 }
 

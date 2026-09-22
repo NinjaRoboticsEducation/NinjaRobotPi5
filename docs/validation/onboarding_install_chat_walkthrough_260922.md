@@ -11,14 +11,14 @@ Use the raw-file URL. This one-line command downloads the bootstrap and asks it
 to install the reviewed public release branch:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/public_v06/install.sh | bash -s -- --ref public_v06
+curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/public_v07/install.sh | bash -s -- --ref public_v07
 ```
 
-For a higher-assurance release, replace both `public_v06` values with the same
+For a higher-assurance release, replace both `public_v07` values with the same
 published 40-character commit ID. The bootstrap clones into
 `~/NinjaRobotPi5`, prints the resolved commit, verifies the required installer
 files, and then runs the existing installer. Add `--dry-run` after `--ref
-public_v06` to preview without creating the destination.
+public_v07` to preview without creating the destination.
 
 The previous clone workflow remains supported:
 
@@ -38,6 +38,37 @@ export PATH="$HOME/.local/bin:$PATH"
 
 The installer does not start the Agent, pull an Ollama model, move motors, or
 capture camera or microphone data.
+
+
+## Branch selection and custom installation directories — 23 September 2026
+
+The bootstrap resolves the selected branch, tag, or full commit to a commit
+before checkout. This fixes the tracking-branch guessing conflict with
+`--detach` when installing a non-default branch. If a branch and tag share a
+name, use `refs/heads/NAME` or `refs/tags/NAME` in `--ref` to disambiguate.
+Use the same published revision in the raw URL and `--ref` when changing releases.
+The downloaded bootstrap cannot infer which URL curl used.
+
+The default is `~/NinjaRobotPi5`, regardless of the current directory. To install
+inside a custom folder, run these commands in your Pi SSH terminal:
+
+```bash
+mkdir -p "$HOME/Ninja"
+cd "$HOME/Ninja"
+curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/public_v07/install.sh | bash -s -- --ref public_v07 --install-dir "$PWD/NinjaRobotPi5"
+```
+
+Add `--dry-run` to preview without writing files. The destination must be an
+absolute path that does not exist, and its parent must already exist. Spaces
+are supported when the path is quoted. Changing directories alone does not
+change the default destination. Existing clone plus `./install.sh` installation
+remains supported.
+
+The confirmation prompt reads the controlling terminal, so piping the script
+from curl does not consume or hide your answer. Without a terminal, installation
+fails with guidance; `--yes` remains an explicit way to accept the previewed OS
+changes. An existing `ninjarobot` launcher pointing elsewhere is refused; this
+flow does not migrate an existing installation or its services.
 
 ## Preview or resume onboarding
 
@@ -194,6 +225,36 @@ Some Mac terminal profiles use the word **Option** instead of **Alt**. If the
 terminal sends Option+Enter as an ordinary Enter, press and release `Esc`, then
 press `Enter`. Pasted multiline text stays in the editor until ordinary Enter
 sends it.
+
+## Curl repair validation — 23 September 2026
+
+The repair passed 1,034 repository tests, including 44 installer tests, and
+457 managed-driver tests in separate processes. Ruff lint and formatting,
+mypy, compilation, driver integrity/source checks, Bash syntax, documentation
+links, and whitespace checks passed. ShellCheck was unavailable. No dependency
+or managed driver changed. The earlier validation below records the previous
+checkpoint.
+
+After the repair is published to `public_v07`, test on a disposable Raspberry
+Pi OS image:
+
+1. Safe smoke: run the custom-folder curl example above with `--dry-run`.
+   Expect the chosen revision and absolute destination, with no new checkout.
+2. Installation/interface: run without `--dry-run`. Expect a resolved commit,
+   the existing installation plan, and a usable `INSTALL` prompt over SSH.
+   Enter anything else to cancel before OS changes. The downloaded checkout
+   remains available; retry through its `./install.sh`.
+3. On the disposable image, rerun the checkout installer and type `INSTALL`.
+   Expect the usual installation checks and launcher pointing to this checkout.
+   An existing launcher owned by another installation must be refused.
+4. Actuator-moving tests: not required for this repair; do not move wheels.
+5. Power-risk tests: no power-off test. Follow any existing installer reboot
+   guidance only after installation completes and the robot is safely stopped.
+
+Rollback for a completed OS installation is restoration of the disposable image
+or your prior OS backup. Keep existing installations, private configuration,
+and services intact while testing a new destination. A changed checkout path
+alone does not relocate an existing systemd deployment.
 
 ## Automated validation completed
 

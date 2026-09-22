@@ -17,7 +17,7 @@
 > [!NOTE]
 > **v1.0.0 public release.** The project owner completed the Phase 8 manual
 > Raspberry Pi validation. New installations must still follow the safety and
-> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-22/InstallationGuide.md) because
+> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23/InstallationGuide.md) because
 > wiring and hardware tolerances differ between robots.
 
 ---
@@ -242,6 +242,35 @@ external MCP and ngrok services, and offers simulation or real-hardware launch.
 Skipping ngrok starts authenticated HTTPS for the same Wi-Fi only when you
 choose to launch the Agent. Choosing Exit leaves it stopped.
 
+The bootstrap resolves the selected branch, tag, or full commit to a commit
+before checkout. This fixes the tracking-branch guessing conflict with
+`--detach` when installing a non-default branch. If a branch and tag share a
+name, use `refs/heads/NAME` or `refs/tags/NAME` in `--ref` to disambiguate.
+Use the same published revision in the raw URL and `--ref` when changing releases.
+The downloaded bootstrap cannot infer which URL curl used.
+
+The default is `~/NinjaRobotPi5`, regardless of the current directory. To install
+inside a custom folder, run these commands in your Pi SSH terminal:
+
+```bash
+mkdir -p "$HOME/Ninja"
+cd "$HOME/Ninja"
+curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/public_v07/install.sh | bash -s -- --ref public_v07 --install-dir "$PWD/NinjaRobotPi5"
+```
+
+Add `--dry-run` to preview without writing files. The destination must be an
+absolute path that does not exist, and its parent must already exist. Spaces
+are supported when the path is quoted. Changing directories alone does not
+change the default destination. Existing clone plus `./install.sh` installation
+remains supported.
+
+The confirmation prompt reads the controlling terminal, so piping the script
+from curl does not consume or hide your answer. Without a terminal, installation
+fails with guidance; `--yes` remains an explicit way to accept the previewed OS
+changes. An existing `ninjarobot` launcher pointing elsewhere is refused; this
+flow does not migrate an existing installation or its services.
+
+
 The manual clone workflow remains supported:
 
 ```bash
@@ -255,7 +284,7 @@ The installer does not download an Ollama model, start the Agent, move a motor,
 open the camera or microphone, or deploy boot startup. Follow the
 [guided setup and manual-test walkthrough](docs/validation/onboarding_install_chat_walkthrough_260922.md)
 and the complete
-[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-22/InstallationGuide.md)
+[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23/InstallationGuide.md)
 for wiring, calibration, privacy checks, and safe first movement.
 
 ---
@@ -317,10 +346,10 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 
 | Document | Purpose |
 |---|---|
-| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-22/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
+| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
 | [MCP and Agent Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-22/NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
-| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-22/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
-| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-22/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
+| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
+| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
 | [Documentation Index](docs/README.md) | Public, developer, architecture, history, and validation documents |
 | [Audit Report](docs/project-history/AuditReport_260731.md) | Historical security, reliability, and documentation audit findings |
 | [Implementation Plan](docs/project-history/NinjaRobotPi5V4_ImplementationPlan.md) | Historical phase design and delivery decisions |
