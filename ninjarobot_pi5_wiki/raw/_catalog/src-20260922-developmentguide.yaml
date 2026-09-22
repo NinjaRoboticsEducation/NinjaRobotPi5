@@ -1,0 +1,16 @@
+id: src-20260922-developmentguide
+path: raw/articles/ninjarobotpi5/2026-09-22/DevelopmentGuide.md
+media_type: text/markdown
+kind: text
+title: DevelopmentGuide.md
+added_at: '2026-09-22T13:11:31Z'
+content_hash: sha256:d3e8a50fe808614a7affbaa221fd457f8e981931d43bc5c17a8bc89be89d1a31
+state: ingested
+original_uri: urn:llmwiki:source:src-20260922-developmentguide
+source_version: onboarding-install-chat-260922
+retrieved_at: null
+normalized_at: '2026-09-22T13:11:39Z'
+normalizer: llmwiki-text/0.2
+error: null
+ingested_at: '2026-09-22T13:26:08Z'
+last_plan: architecture-citation-260922

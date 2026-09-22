@@ -225,8 +225,8 @@ Preview and install from the reviewed public release branch with the raw
 bootstrap script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/public_v06/install.sh | bash -s -- --ref public_v06 --dry-run
-curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/public_v06/install.sh | bash -s -- --ref public_v06
+curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/public_v07/install.sh | bash -s -- --ref public_v07 --dry-run
+curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/public_v07/install.sh | bash -s -- --ref public_v07
 ```
 
 For a published release, use the same 40-character commit ID in the raw URL and

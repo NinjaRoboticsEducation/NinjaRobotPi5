@@ -1,5 +1,11 @@
 # Wiki Update Log
 
+## 2026-09-22
+
+* **Update**: Applied plan `architecture-citation-260922` — Attach footnote citation to guided hardware setup paragraph in architecture.md.. Sources: `src-20260922-developmentguide`.
+
+* **Update**: Applied plan `onboarding-install-chat-260922` — Ingest 2026-09-22 guided onboarding, curl bootstrap, editable chat, and external MCP preset manuals; update eleven knowledge pages with guided setup architecture, hardware dispatch locks, prompt-toolkit multiline chat, curl bootstrap installer, and Tavily/Calendar/Notion MCP presets.. Sources: `src-20260907-knowledgeintegration`, `src-20260922-developmentguide`, `src-20260922-installationguide`, `src-20260922-ninjarobot-mcp-skill`, `src-20260922-developmentlog`.
+
 ## 2026-09-18
 
 * **Update**: Applied plan `ui-refinement-citations-260918` — Attach citations to web controller overview paragraphs in architecture and features-and-tools pages.. Sources: `src-20260918-developmentguide`, `src-20260918-ninjarobot-mcp-skill`, `src-20260907-knowledgeintegration`.

@@ -17,6 +17,7 @@ tags:
 - phase5
 - calendar
 - ui-refinement
+- onboarding
 generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
@@ -25,14 +26,14 @@ sources:
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
   content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
-- id: src-20260918-developmentguide
-  resource: urn:llmwiki:source:src-20260918-developmentguide
+- id: src-20260922-developmentguide
+  resource: urn:llmwiki:source:src-20260922-developmentguide
   title: DevelopmentGuide.md
-  content_hash: sha256:a4295e369acd972b74b34383683623b37ef8a1a4cf1d2e066c50d7d4fc6ec649
+  content_hash: sha256:d3e8a50fe808614a7affbaa221fd457f8e981931d43bc5c17a8bc89be89d1a31
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-09-18T16:50:00Z'
+  performed_at: '2026-09-22T13:30:00Z'
   result: passed
   checks:
     source_support: passed
@@ -41,12 +42,13 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered 18 September UI refinement, modular web
-    frontend, and terminal menu consolidation evidence; no human verification is claimed.
+  - Reviewed this page against registered 22 September guided onboarding, curl bootstrap,
+    editable terminal chat, and external MCP preset evidence; no human verification
+    is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
-    and note pending font repair, monetary spending cap, and physical mobile Wi-Fi
-    checks.
-  target_hash: sha256:c00b22c04962bd09c2f003101873eed53f7afe10311cba836ec960c88a3e6685
+    and note pending physical acceptance, live third-party accounts, and monetary
+    spending caps.
+  target_hash: sha256:a03781ad76e624d6c067e65227b4487f0b0e7949247e238513d63fe7de141d6c
 ---
 
 # Development and documentation workflow
@@ -54,7 +56,7 @@ semantic_review:
 Before significant development, consult the local wiki and current full
 manuals, inspect relevant code, and identify missing or conflicting evidence.
 The root project policy requires an approved phased plan and preservation of
-robot interfaces and managed-driver rules.[^src-20260918-developmentguide]
+robot interfaces and managed-driver rules.[^src-20260922-developmentguide]
 
 Feature completion includes a wiki impact assessment. Update affected manual
 versions, topic pages, specifications, and architecture guidance, then record
@@ -73,8 +75,8 @@ AI review is distinct from human verification.[^src-20260907-knowledgeintegratio
 
 ## Milestones and source consolidation
 
-The active manuals are versioned under `raw/articles/ninjarobotpi5/2026-09-18/`
-and `raw/notes/ninjarobotpi5/2026-09-18/`. This version consolidates:
+The active manuals are versioned under `raw/articles/ninjarobotpi5/2026-09-22/`
+and `raw/notes/ninjarobotpi5/2026-09-22/`. This version consolidates:
 1. System clock access (`/time` and `system.time.get`, `2026-09-12-02`),
 2. Refinement Phase 5 software foundations and distance game (`2026-09-13`),
 3. Narrowed Phase 4 foundations (M03 memory ranking, M04 read-only recipes, X01 v2 skills, X05 help, `2026-09-13-02`),
@@ -86,13 +88,14 @@ and `raw/notes/ninjarobotpi5/2026-09-18/`. This version consolidates:
 9. Google Calendar guided OAuth setup with primary-calendar discovery and port 8765 loopback SSH tunnel (`2026-09-17`),
 10. Field-specific preview validation errors and plain `CONFIRM` / `CANCEL` chat authorization for calendar writes,
 11. Unified single-word `CONFIRM` flow across event create, update, and delete, eliminating direct command confirmation bypasses,
-12. Hash-checked runtime public project help with bounded sections (`project_documents.py`, `project_help_sources.json`), and
-13. Web interface refinement into dedicated Game Pad and Agent Interface surfaces, modular frontend (`app-shared.js`, `app-gamepad.js`, `app-agent.js`), user-created behavior execution with motion safety modals, button toggle states, 4-language i18n parity, and IDE terminal menu consolidation (1–5, Q, `2026-09-18`).[^src-20260918-developmentguide]
+12. Hash-checked runtime public project help with bounded sections (`project_documents.py`, `project_help_sources.json`),
+13. Web interface refinement into dedicated Game Pad and Agent Interface surfaces, modular frontend (`app-shared.js`, `app-gamepad.js`, `app-agent.js`), user-created behavior execution with motion safety modals, button toggle states, 4-language i18n parity, and IDE terminal menu consolidation (1–5, Q, `2026-09-18`), and
+14. Guided onboarding CLI (`ninjarobot onboard`) orchestrating 5 mandatory hardware components, model providers, and external read-only MCP presets (Tavily, Calendar, Notion), standalone curl bootstrap installer (`install.sh`), and prompt-toolkit interactive chat (`2026-09-22`).[^src-20260922-developmentguide]
 
 Automated validation covers extensive unit tests, compilation, linting, formatting,
 type checks, and driver verification gates. Passing software gates does not
-substitute for owner physical acceptance testing on real hardware with raised wheels.[^src-20260918-developmentguide]
+substitute for owner physical acceptance testing on real hardware with raised wheels.[^src-20260922-developmentguide]
 
 
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
-[^src-20260918-developmentguide]: DevelopmentGuide.md, source version `ui-refinement-260918`; registered source `src-20260918-developmentguide`.
+[^src-20260922-developmentguide]: DevelopmentGuide.md, source version `onboarding-install-chat-260922`; registered source `src-20260922-developmentguide`.

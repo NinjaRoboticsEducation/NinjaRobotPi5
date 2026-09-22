@@ -6,10 +6,10 @@ New installations can download the root bootstrap directly. The GitHub page URL
 ending in `/install.sh` is not a raw script URL; use:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/public_v06/install.sh | bash -s -- --ref public_v06
+curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/public_v07/install.sh | bash -s -- --ref public_v07
 ```
 
-For a published release, replace both `public_v06` values with the same reviewed
+For a published release, replace both `public_v07` values with the same reviewed
 40-character commit ID. The script clones into `~/NinjaRobotPi5`, verifies the
 resolved revision and required installer files, and delegates to the existing
 `scripts/install-rpi.sh`. The existing clone plus `./install.sh` flow remains
@@ -1264,14 +1264,14 @@ sudo apt install -y git
 Preview the download location and revision without creating files:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/public_v06/install.sh | bash -s -- --ref public_v06 --dry-run
+curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/public_v07/install.sh | bash -s -- --ref public_v07 --dry-run
 ```
 
 Download the reviewed public branch and run the existing installer in one
 command:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/public_v06/install.sh | bash -s -- --ref public_v06
+curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/public_v07/install.sh | bash -s -- --ref public_v07
 ```
 
 The bootstrap prints the resolved revision before handing control to the

@@ -9,10 +9,10 @@ generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20260918-installationguide
-  resource: urn:llmwiki:source:src-20260918-installationguide
+- id: src-20260922-installationguide
+  resource: urn:llmwiki:source:src-20260922-installationguide
   title: InstallationGuide.md
-  content_hash: sha256:7b3efdc139d5f2c990c81ab90105b57d91638260b0eac2b9510bd846fe7aee1e
+  content_hash: sha256:77fb2e6476189c9459e99c8d5b6a428191320c9a031b45d3c47ea3d10c6eff97
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -20,7 +20,7 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-09-18T16:50:00Z'
+  performed_at: '2026-09-22T13:30:00Z'
   result: passed
   checks:
     source_support: passed
@@ -29,17 +29,18 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered 18 September UI refinement, modular web
-    frontend, and terminal menu consolidation evidence; no human verification is claimed.
+  - Reviewed this page against registered 22 September guided onboarding, curl bootstrap,
+    editable terminal chat, and external MCP preset evidence; no human verification
+    is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
-    and note pending font repair, monetary spending cap, and physical mobile Wi-Fi
-    checks.
-  target_hash: sha256:6a0d02f598ab2c1b8f07f18f0f4e046c7083a8b80b293700137463322107d370
+    and note pending physical acceptance, live third-party accounts, and monetary
+    spending caps.
+  target_hash: sha256:7d301897b813586e8a069cc6dd9c68ae41d7c44ed77e950326f77dbcc2022add
 ---
 
 # Installation guide
 
-The full guide covers beginner setup, hardware initialization and calibration, startup, and troubleshooting. Hardware commands require stated operator precautions.[^src-20260918-installationguide]
+The full guide covers beginner setup, hardware initialization and calibration, startup, and troubleshooting. Hardware commands require stated operator precautions.[^src-20260922-installationguide]
 
 Use the source identifier below to resolve the complete manual through the raw
 source catalog. The outer wiki README also links directly to the current full
@@ -48,18 +49,21 @@ Read the relevant full section before acting on an abbreviated explanation.[^src
 
 [Return to project overview](/overview.md).
 
-## Current checkpoint: Web interface refinement, modular frontend, and terminal menu consolidation
+## Current checkpoint: Guided onboarding, curl bootstrap, and editable chat
 
-The 18 September 2026 revision (`2026-09-18`) documents dual-page web interface access (`/agent`
-and `/gamepad`), hamburger menu interface selection, IDE menu option 5 for Bluetooth speaker connection,
-reorganized terminal menu options (1–5, Q), alongside 17 September Google Calendar guided authorization
-(port 8765 loopback SSH tunnel, primary-calendar auto-discovery, `credentials.json` default path, `--write` flag),
-unified single-word `CONFIRM` / `CANCEL` chat authorization, 16 September distance game hand-placement
+The 22 September 2026 revision (`2026-09-22`) documents the root installer curl streaming bootstrap
+command, commit revision verification, `ninjarobot onboard` step-by-step wizard covering 5 mandatory
+hardware devices (raised wheels for servos, privacy consent for camera/mic), optional Bluetooth/whisper.cpp,
+model provider choices, 3 read-only external MCP presets (Tavily, Google Calendar, Notion), and remote access,
+alongside 18 September dual-page web interface access (`/agent` and `/gamepad`), hamburger menu interface selection,
+IDE menu option 5 for Bluetooth speaker connection, reorganized terminal menu options (1–5, Q), 17 September
+Google Calendar guided authorization (port 8765 loopback SSH tunnel, primary-calendar auto-discovery, `credentials.json`
+default path, `--write` flag), unified single-word `CONFIRM` / `CANCEL` chat authorization, 16 September distance game hand-placement
 procedure, default distance game configuration (`[distance_game]` default-enabled), 15 September follow-up
 repairs, full Phase 4 information setup, Phase 4 foundations (M03/M04/X01/X05), system clock access,
 and headless Lite audio with Bluetooth setup wizard. Software tests do not substitute for physical
-hardware validation.[^src-20260918-installationguide]
+hardware validation.[^src-20260922-installationguide]
 
 
-[^src-20260918-installationguide]: InstallationGuide.md, source version `ui-refinement-260918`; registered source `src-20260918-installationguide`.
+[^src-20260922-installationguide]: InstallationGuide.md, source version `onboarding-install-chat-260922`; registered source `src-20260922-installationguide`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

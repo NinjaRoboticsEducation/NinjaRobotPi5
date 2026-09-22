@@ -4,12 +4,13 @@ Start here for project documentation, architecture, development history, and
 AI-assisted development. Open this folder in your coding tool for wiki questions,
 or open the parent project for development and implementation verification.
 
-## Current full manuals — guided onboarding source update
+## Current full manuals — guided onboarding and curl bootstrap
 
-The registered document map remains at its earlier reviewed checkpoint. The
-linked 22 September successor sources add guided onboarding, curl bootstrap,
-editable terminal chat, and external MCP presets while retaining the earlier
-Calendar, project-help, and hardware guidance.
+These 22 September successor manuals are ingested and semantically reviewed in the wiki.
+They add the `ninjarobot` CLI entry point with resumable onboarding wizard, direct curl
+streaming installer bootstrap, prompt-toolkit multiline terminal chat, and external MCP
+presets (Tavily, Google Calendar stdio MCP, Notion OAuth) while retaining earlier Calendar,
+project-help, and hardware guidance. The registered document map is updated to the 22 September checkpoint.
 The 16 September 2026 hand-placement correction and 15 September follow-up repairs
 (normal-stop and obstacle recovery rules, automatic sensor recovery, repeated-game
 buzzer preparation, visible web errors, chat guidance, rolling context in AgentLoop,
@@ -25,9 +26,8 @@ use the links below for the full manuals:
 - [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-22/DevelopmentLog.md)
 
 These 22 September source revisions document guided onboarding, curl bootstrap,
-editable terminal chat, and the three external MCP presets. At the project
-owner's request they have not been ingested or semantically reviewed, so
-`project-knowledge.json` continues to describe the prior registered checkpoint.
+editable terminal chat, and the three external MCP presets. They are ingested and
+semantically reviewed; `project-knowledge.json` describes this registered checkpoint.
 
 - [Guided onboarding walkthrough](../docs/validation/onboarding_install_chat_walkthrough_260922.md)
 - [Calendar CONFIRM walkthrough](../docs/validation/calendar_confirm_walkthrough_260917.md)

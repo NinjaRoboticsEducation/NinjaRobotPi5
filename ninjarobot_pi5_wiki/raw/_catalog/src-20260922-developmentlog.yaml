@@ -1,0 +1,16 @@
+id: src-20260922-developmentlog
+path: raw/notes/ninjarobotpi5/2026-09-22/DevelopmentLog.md
+media_type: text/markdown
+kind: text
+title: DevelopmentLog.md
+added_at: '2026-09-22T13:11:33Z'
+content_hash: sha256:74a18d92c47c614d3bfeef9e4c8e99bb8f4e1e0f135c58efc103760a785a76b6
+state: ingested
+original_uri: urn:llmwiki:source:src-20260922-developmentlog
+source_version: onboarding-install-chat-260922
+retrieved_at: null
+normalized_at: '2026-09-22T13:11:41Z'
+normalizer: llmwiki-text/0.2
+error: null
+ingested_at: '2026-09-22T13:24:06Z'
+last_plan: onboarding-install-chat-260922
