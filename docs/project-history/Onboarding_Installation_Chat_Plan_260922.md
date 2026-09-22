@@ -14,7 +14,9 @@ Owner clarifications incorporated:
 
 - Enter sends a chat prompt; Shift+Enter inserts a newline; arrows edit the
   current prompt. Offer Alt+Enter as a compatibility fallback where the terminal
-  cannot distinguish Shift+Enter from Enter.
+  cannot distinguish Shift+Enter from Enter. On Mac, Alt means Option (⌥).
+  Also support Esc followed by Enter for SSH terminals without modifier support.
+  Display concise keyboard and `/help` guidance when entering chat.
 - Skipping ngrok selects the existing authenticated HTTPS interface accessible
   from the same Wi-Fi. Start it with the final Agent launch, not merely because
   the user skipped ngrok. Exit leaves newly started setup resources stopped.
@@ -209,7 +211,8 @@ tests and existing `test_agent_cli.py`.
    buffers and asynchronous prompting according to its
    [official documentation](https://python-prompt-toolkit.readthedocs.io/en/master/pages/asking_for_input.html).
 2. Enter submits once. Shift+Enter inserts a newline when the terminal exposes a
-   distinct sequence. Alt+Enter always provides the documented newline fallback.
+   distinct sequence. Bind Alt+Enter (Option+Enter on Mac) and Esc followed by
+   Enter to insert a newline as compatibility alternatives.
    Prototype decoding against the selected dependency before promising specific
    SSH terminal support. Do not map ordinary Enter to an indistinguishable key.
 3. Left/right move by character; up/down move within the multiline/wrapped
@@ -220,12 +223,27 @@ tests and existing `test_agent_cli.py`.
    behavior using a plain input adapter. No persistent prompt-history file.
 5. Inject the input adapter into `_chat_repl`; leave its dispatch and motion,
    camera, voice, and confirmation semantics unchanged.
+6. Display this concise hint once when entering chat, both directly and through
+   the interactive menu; include the same guidance in `/help`:
+
+   > Arrow keys: edit your prompt • Enter: send • Shift+Enter or Alt+Enter
+   > (Mac: Option+Enter): new line • If unsupported: Esc, then Enter • /help: commands
+
+   Wrap the hint for narrow terminals. Explain in help/troubleshooting that Mac
+   Terminal may require Settings → Profiles → Keyboard → **Use Option as Meta
+   key** for Option+Enter. This setting is documented by
+   [Apple](https://support.apple.com/guide/terminal/trmlkbrd/mac).
+   Do not change the user's terminal settings automatically or infer the SSH
+   client's keyboard from the Raspberry Pi's operating system. Esc, then Enter
+   means two successive key presses, not a simultaneous shortcut.
 
 **Testing:** byte/input-stream tests for all arrows, multiline edits, submit-once,
 paste, Unicode, EOF, cancellation, and slash-command dispatch; a PTY integration
 test proves no literal arrow escape strings reach the submitted prompt. Test the
-menu and direct chat paths. Manual SSH tests cover distinguishable Shift+Enter
-and the fallback terminal case.
+menu and direct chat paths, including the startup hint and `/help` text. Manual
+SSH tests cover distinguishable Shift+Enter, Mac Option+Enter with Meta enabled,
+and Esc followed by Enter when modifier shortcuts are unavailable. Verify that
+each supported newline sequence edits the buffer without sending the prompt.
 
 **Gate and outcome:** run the common Python gate below and dependency/license
 review. Existing chat contracts pass; a multiline draft can be edited before
