@@ -301,6 +301,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
 
     runtime = AgentRuntime(
         information=information,
+        execution_mode="real" if arguments.real else "simulation",
         provider=model,
         tools=tools,
         store=store,

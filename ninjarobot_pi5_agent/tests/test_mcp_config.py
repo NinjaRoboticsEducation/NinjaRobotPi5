@@ -12,7 +12,9 @@ from ninjarobot_pi5_agent import (
     MCPServerConfig,
     MCPTransport,
     SecretStore,
+    google_calendar_server_config,
     load_mcp_configuration,
+    notion_server_config,
     save_mcp_configuration,
     tavily_server_config,
 )
@@ -41,6 +43,33 @@ def test_empty_versioned_configuration_round_trips(tmp_path) -> None:
 
     assert path.read_text(encoding="utf-8") == "schema_version = 1\n"
     assert load_mcp_configuration(path) == MCPConfiguration()
+
+
+def test_external_notion_and_calendar_presets_are_bounded_and_round_trip(tmp_path) -> None:
+    notion = notion_server_config()
+    calendar = google_calendar_server_config("/usr/bin/python3", "/private/google-calendar.json")
+    path = tmp_path / "mcp.toml"
+
+    save_mcp_configuration(MCPConfiguration(servers=(notion, calendar)), path)
+
+    assert load_mcp_configuration(path).servers == (notion, calendar)
+    assert notion.authentication is MCPAuthentication.OAUTH
+    assert notion.url == "https://mcp.notion.com/mcp"
+    assert notion.allowed_tools == ("notion-search", "notion-fetch")
+    assert calendar.command == "/usr/bin/python3"
+    assert calendar.allowed_tools == ("list_today_events",)
+    assert "--credential-file" in calendar.args
+
+
+def test_oauth_is_rejected_for_stdio_servers() -> None:
+    with pytest.raises(ValidationError, match="requires Streamable HTTP"):
+        MCPServerConfig(
+            id="unsafe-oauth",
+            transport=MCPTransport.STDIO,
+            command="safe-command",
+            authentication=MCPAuthentication.OAUTH,
+            allowed_tools=("read",),
+        )
 
 
 def test_local_effect_and_retry_review_round_trips(tmp_path) -> None:

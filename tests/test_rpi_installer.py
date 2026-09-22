@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import os
 import shutil
+import stat
 import subprocess
 import sys
 from importlib.util import module_from_spec, spec_from_file_location
@@ -22,6 +23,44 @@ END_MARKER = BOOT_CONFIG.END_MARKER
 PWM_OVERLAY = BOOT_CONFIG.PWM_OVERLAY
 render_boot_config = BOOT_CONFIG.render_boot_config
 validate_boot_config = BOOT_CONFIG.validate_boot_config
+
+
+def _install_fake_git(tmp_path: Path, *, resolved: str) -> Path:
+    """Install a deterministic Git shim for bootstrap integration tests."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    executable = bin_dir / "git"
+    executable.write_text(
+        """#!/usr/bin/env python3
+import os
+import sys
+from pathlib import Path
+
+arguments = sys.argv[1:]
+if arguments and arguments[0] == "clone":
+    checkout = Path(arguments[-1])
+    (checkout / "scripts").mkdir(parents=True)
+    installer = checkout / "install.sh"
+    installer.write_text(
+        "#!/usr/bin/env python3\\nimport sys\\n"
+        "print('delegated:' + ' '.join(sys.argv[1:]))\\n",
+        encoding="utf-8",
+    )
+    installer.chmod(0o700)
+    (checkout / "scripts" / "install-rpi.sh").write_text("#!/usr/bin/env bash\\n")
+    (checkout / "scripts" / "install-versions.env").write_text("# test fixture\\n")
+    (checkout / "uv.lock").write_text("# test fixture\\n")
+elif len(arguments) >= 4 and arguments[0] == "-C" and arguments[2] == "checkout":
+    pass
+elif len(arguments) == 4 and arguments[0] == "-C" and arguments[2:] == ["rev-parse", "HEAD"]:
+    print(os.environ["FAKE_GIT_RESOLVED"])
+else:
+    raise SystemExit(f"unexpected fake git arguments: {arguments!r}")
+""",
+        encoding="utf-8",
+    )
+    executable.chmod(0o700)
+    return bin_dir
 
 
 def test_shell_installer_syntax_and_dry_run_are_safe() -> None:
@@ -44,6 +83,145 @@ def test_shell_installer_syntax_and_dry_run_are_safe() -> None:
     assert dry_run.returncode == 0, dry_run.stderr
     assert "no commands were executed" in dry_run.stdout
     assert "Ollama model" in dry_run.stdout
+
+
+def test_standalone_bootstrap_dry_run_does_not_create_destination(tmp_path: Path) -> None:
+    script = tmp_path / "install.sh"
+    shutil.copyfile(ROOT / "install.sh", script)
+    script.chmod(0o700)
+    destination = tmp_path / "NinjaRobotPi5"
+
+    result = subprocess.run(
+        [str(script), "--install-dir", str(destination), "--ref", "reviewed-ref", "--dry-run"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "reviewed-ref" in result.stdout
+    assert str(destination) in result.stdout
+    assert "No commands were executed" in result.stdout
+    assert not destination.exists()
+
+
+def test_streamed_bootstrap_does_not_trust_files_in_the_current_directory(
+    tmp_path: Path,
+) -> None:
+    destination = tmp_path / "NinjaRobotPi5"
+    result = subprocess.run(
+        ["bash", "-s", "--", "--install-dir", str(destination), "--dry-run"],
+        cwd=ROOT,
+        input=(ROOT / "install.sh").read_text(encoding="utf-8"),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "NinjaRobot bootstrap preview" in result.stdout
+    assert "No commands were executed" in result.stdout
+    assert not destination.exists()
+
+
+def test_standalone_bootstrap_check_reports_missing_installation(tmp_path: Path) -> None:
+    script = tmp_path / "install.sh"
+    shutil.copyfile(ROOT / "install.sh", script)
+    script.chmod(0o700)
+    destination = tmp_path / "missing"
+
+    result = subprocess.run(
+        [str(script), "--install-dir", str(destination), "--check"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "is not installed" in result.stderr
+    assert not destination.exists()
+
+
+def test_standalone_bootstrap_refuses_existing_destination(tmp_path: Path) -> None:
+    script = tmp_path / "install.sh"
+    shutil.copyfile(ROOT / "install.sh", script)
+    script.chmod(0o700)
+    destination = tmp_path / "existing"
+    destination.mkdir()
+
+    result = subprocess.run(
+        [str(script), "--install-dir", str(destination), "--ref", "reviewed-ref"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "Refusing to overwrite" in result.stderr
+
+
+def test_standalone_bootstrap_verifies_revision_and_delegates_arguments(tmp_path: Path) -> None:
+    script = tmp_path / "bootstrap.sh"
+    shutil.copyfile(ROOT / "install.sh", script)
+    script.chmod(0o700)
+    revision = "a" * 40
+    bin_dir = _install_fake_git(tmp_path, resolved=revision)
+    destination = tmp_path / "NinjaRobotPi5"
+    environment = {
+        **os.environ,
+        "FAKE_GIT_RESOLVED": revision,
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+    }
+
+    result = subprocess.run(
+        [
+            str(script),
+            "--install-dir",
+            str(destination),
+            "--ref",
+            revision,
+            "--profile",
+            "development",
+            "--yes",
+        ],
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert f"Verified revision {revision}" in result.stdout
+    assert "delegated:--profile development --yes" in result.stdout
+    assert (destination / "uv.lock").is_file()
+    assert not tuple(tmp_path.glob(".ninjarobot-bootstrap.*"))
+
+
+def test_standalone_bootstrap_rejects_exact_revision_mismatch(tmp_path: Path) -> None:
+    script = tmp_path / "bootstrap.sh"
+    shutil.copyfile(ROOT / "install.sh", script)
+    script.chmod(0o700)
+    requested = "a" * 40
+    bin_dir = _install_fake_git(tmp_path, resolved="b" * 40)
+    destination = tmp_path / "NinjaRobotPi5"
+    environment = {
+        **os.environ,
+        "FAKE_GIT_RESOLVED": "b" * 40,
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+    }
+
+    result = subprocess.run(
+        [str(script), "--install-dir", str(destination), "--ref", requested],
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "does not match --ref" in result.stderr
+    assert not destination.exists()
+    assert not tuple(tmp_path.glob(".ninjarobot-bootstrap.*"))
 
 
 def test_pwm_renderer_is_idempotent_and_preserves_unrelated_configuration() -> None:
@@ -126,6 +304,25 @@ def test_installer_does_not_pull_models_or_start_robot_services() -> None:
         "sudo reboot",
     )
     assert all(command not in installer for command in forbidden)
+
+
+def test_installer_creates_idempotent_private_ninjarobot_launcher(tmp_path: Path) -> None:
+    environment = {**os.environ, "HOME": str(tmp_path)}
+    script = 'source "$1"\ninstall_cli_launcher\ninstall_cli_launcher\n'
+
+    result = subprocess.run(
+        ["bash", "-c", script, "test", str(ROOT / "scripts/install-rpi.sh")],
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    launcher = tmp_path / ".local/bin/ninjarobot"
+    assert result.returncode == 0, result.stderr
+    assert launcher.is_symlink()
+    assert launcher.resolve() == (ROOT / ".venv/bin/ninjarobot").resolve()
+    assert stat.S_IMODE(launcher.parent.stat().st_mode) == 0o755
 
 
 def test_readiness_check_covers_pinned_tools_camera_and_driver_provenance() -> None:

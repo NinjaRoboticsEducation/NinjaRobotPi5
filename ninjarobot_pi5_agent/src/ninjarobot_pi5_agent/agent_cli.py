@@ -34,6 +34,7 @@ from .mcp_config import (
     MCPConfiguration,
     MCPServerConfig,
     load_mcp_configuration,
+    notion_server_config,
     save_mcp_configuration,
     tavily_server_config,
 )
@@ -61,6 +62,7 @@ from .skills import (
     SkillValidationError,
     compatible_tools,
 )
+from .terminal_input import CHAT_INPUT_HINT, ChatInput, PlainChatInput, chat_input_for_terminal
 from .tools import ToolRegistry, ToolRegistryError
 from .web_app import (
     ensure_local_ca_certificate,
@@ -170,6 +172,41 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--web-key", type=Path, default=DEFAULT_WEB_KEY)
     commands = parser.add_subparsers(dest="command")
+
+    onboard = commands.add_parser("onboard", help="Run the guided NinjaRobot setup.")
+    onboard.add_argument("--resume", action="store_true", help="Resume saved setup progress.")
+    onboard.add_argument(
+        "--status", dest="onboard_status", action="store_true", help="Show saved progress."
+    )
+    onboard.add_argument(
+        "--dry-run",
+        dest="onboard_dry_run",
+        action="store_true",
+        help="Preview steps without changing anything.",
+    )
+    onboard.add_argument(
+        "--simulation",
+        dest="onboard_simulation",
+        action="store_true",
+        help="Rehearse all steps without hardware, accounts, or services.",
+    )
+    onboard.add_argument(
+        "--step",
+        dest="onboard_step",
+        choices=(
+            "buzzer",
+            "display",
+            "distance",
+            "servo",
+            "camera",
+            "bluetooth",
+            "microphone",
+            "provider",
+            "mcp",
+            "web-access",
+        ),
+        help="Run one setup step.",
+    )
 
     chat = commands.add_parser("chat", help="Chat through the running agent service.")
     chat.add_argument("prompt", nargs="?")
@@ -406,8 +443,8 @@ def build_parser() -> argparse.ArgumentParser:
     mcp = commands.add_parser("mcp", help="Manage Model Context Protocol servers.")
     mcp_commands = mcp.add_subparsers(dest="mcp_command", required=True)
     add = mcp_commands.add_parser("add", help="Add an approved MCP preset.")
-    add.add_argument("--preset", choices=("tavily",), required=True)
-    add.add_argument("--id", default="tavily")
+    add.add_argument("--preset", choices=("tavily", "notion"), required=True)
+    add.add_argument("--id")
     mcp_commands.add_parser("list", help="List configured MCP servers.")
     for command, help_text in (
         ("health", "Connect and check one MCP server."),
@@ -504,6 +541,33 @@ def main(argv: list[str] | None = None) -> None:
 async def _run(arguments: argparse.Namespace) -> int:
     if arguments.command is None:
         return await _interactive(arguments)
+    if arguments.command == "onboard":
+        from .setup_wizard import run_setup_wizard
+
+        if (
+            not (
+                arguments.onboard_status
+                or arguments.onboard_dry_run
+                or arguments.onboard_simulation
+            )
+            and not sys.stdin.isatty()
+        ):
+            raise ValueError("interactive onboarding requires a terminal (TTY)")
+        outcome = await run_setup_wizard(arguments)
+        if outcome.launch_mode is None:
+            return 0
+        arguments.real = outcome.launch_mode == "real"
+        arguments.model = None
+        arguments.base_url = None
+        started = await _spawn_service(arguments)
+        if started != 0:
+            return started
+        await _report_onboarding_web_access(arguments)
+        return await _chat_repl(
+            arguments,
+            session_id="local-cli",
+            chat_input=chat_input_for_terminal(),
+        )
     if arguments.command == "game":
         return await _service_request(
             arguments,
@@ -533,7 +597,7 @@ async def _run(arguments: argparse.Namespace) -> int:
     if arguments.command == "remote":
         return await _run_remote_command(arguments)
     if arguments.command == "deployment":
-        return await asyncio.to_thread(_run_deployment_command, arguments)
+        return _run_deployment_command(arguments)
     if arguments.command == "web":
         if arguments.web_command == "certificate-status":
             certificate, key = ensure_local_ca_certificate(
@@ -695,9 +759,14 @@ async def _run(arguments: argparse.Namespace) -> int:
     configuration = load_mcp_configuration(config_path)
     command: str = arguments.mcp_command
     if command == "add":
-        if any(server.id == arguments.id for server in configuration.servers):
-            raise ValueError(f"MCP server already exists: {arguments.id}")
-        server = tavily_server_config(arguments.id)
+        server_id = arguments.id or arguments.preset
+        if any(server.id == server_id for server in configuration.servers):
+            raise ValueError(f"MCP server already exists: {server_id}")
+        server = (
+            tavily_server_config(server_id)
+            if arguments.preset == "tavily"
+            else notion_server_config(server_id)
+        )
         save_mcp_configuration(
             MCPConfiguration(servers=(*configuration.servers, server)),
             config_path,
@@ -775,7 +844,11 @@ async def _run(arguments: argparse.Namespace) -> int:
 
 async def _run_chat_command(arguments: argparse.Namespace) -> int:
     if arguments.prompt is None:
-        return await _chat_repl(arguments, session_id=arguments.session)
+        return await _chat_repl(
+            arguments,
+            session_id=arguments.session,
+            chat_input=chat_input_for_terminal(),
+        )
     await _stream_chat(
         arguments,
         session_id=arguments.session,
@@ -799,7 +872,7 @@ async def _run_remote_command(arguments: argparse.Namespace) -> int:
             raise ValueError("ngrok authtoken values did not match")
         if not token:
             raise ValueError("ngrok authtoken must not be empty")
-        executable = await asyncio.to_thread(install_ngrok_binary, remote.executable)
+        executable = install_ngrok_binary(remote.executable)
         secret_store.set(remote.authtoken_env, token)
         for name in (
             remote.pairing_secret_env,
@@ -986,16 +1059,26 @@ async def _stream_chat(
     return final
 
 
-async def _chat_repl(arguments: argparse.Namespace, *, session_id: str) -> int:
+async def _chat_repl(
+    arguments: argparse.Namespace,
+    *,
+    session_id: str,
+    chat_input: ChatInput | None = None,
+) -> int:
     await _service_request(
         arguments,
         {"command": "controller_connected", "interface": "terminal"},
         print_result=False,
     )
-    print("NinjaRobot chat. Type /help for commands.")
+    reader = chat_input or PlainChatInput()
+    print("NinjaRobot chat.")
+    print(CHAT_INPUT_HINT)
     while True:
         try:
-            text = (await asyncio.to_thread(input, "You> ")).strip()
+            text = (await reader.read("You> ")).strip()
+        except KeyboardInterrupt:
+            print("\nDraft cleared. Type /exit to leave chat.")
+            continue
         except EOFError:
             print()
             return 0
@@ -1022,7 +1105,7 @@ async def _chat_repl(arguments: argparse.Namespace, *, session_id: str) -> int:
                 print(f"Remote QR display failed: {exc}")
             continue
         if text == "/resume":
-            await _resume_from_chat(arguments, session_id=session_id)
+            await _resume_from_chat(arguments, session_id=session_id, chat_input=reader)
             continue
         if text == "/camera":
             await _service_request(
@@ -1041,10 +1124,7 @@ async def _chat_repl(arguments: argparse.Namespace, *, session_id: str) -> int:
             continue
         if text == "/arm":
             confirmation = (
-                await asyncio.to_thread(
-                    input,
-                    "Type ARM to allow physical motion for this session: ",
-                )
+                await reader.read("Type ARM to allow physical motion for this session: ")
             ).strip()
             if confirmation != "ARM":
                 print("Motion was not armed.")
@@ -1080,10 +1160,7 @@ async def _chat_repl(arguments: argparse.Namespace, *, session_id: str) -> int:
             confirmed_text = text.removeprefix("/confirm").strip()
             if not confirmed_text:
                 confirmed_text = (
-                    await asyncio.to_thread(
-                        input,
-                        "Enter the request you explicitly approve: ",
-                    )
+                    await reader.read("Enter the request you explicitly approve: ")
                 ).strip()
             if not confirmed_text:
                 print("No confirmed request was sent.")
@@ -1108,13 +1185,16 @@ async def _chat_repl(arguments: argparse.Namespace, *, session_id: str) -> int:
             print(f"Error: {exc}")
 
 
-async def _resume_from_chat(arguments: argparse.Namespace, *, session_id: str) -> None:
+async def _resume_from_chat(
+    arguments: argparse.Namespace,
+    *,
+    session_id: str,
+    chat_input: ChatInput | None = None,
+) -> None:
     """Confirm and run health-checked system recovery without invoking the model."""
+    reader = chat_input or PlainChatInput()
     confirmation = (
-        await asyncio.to_thread(
-            input,
-            "Type RESUME to health-check and recover all robot modules: ",
-        )
+        await reader.read("Type RESUME to health-check and recover all robot modules: ")
     ).strip()
     if confirmation != "RESUME":
         print("System resume was cancelled.")
@@ -1200,6 +1280,13 @@ async def _spawn_service(arguments: argparse.Namespace) -> int:
     except AgentIPCError:
         existing = None
     if existing is not None:
+        requested_mode = "real" if getattr(arguments, "real", False) else "simulation"
+        running_mode = existing["data"].get("execution_mode")
+        if running_mode in {"real", "simulation"} and running_mode != requested_mode:
+            raise AgentIPCError(
+                f"Agent is already running in {running_mode} mode; stop it before starting "
+                f"{requested_mode} mode"
+            )
         _print_json({"already_running": True, "status": existing["data"]})
         return 0
 
@@ -1302,6 +1389,43 @@ async def _spawn_service(arguments: argparse.Namespace) -> int:
         return 0
     process.terminate()
     raise AgentIPCError(f"agent service did not become ready; inspect {log_path}")
+
+
+async def _report_onboarding_web_access(arguments: argparse.Namespace) -> None:
+    """Report verified remote or authenticated LAN access after final launch."""
+    config = load_robot_config(arguments.config)
+    client = AgentIPCClient(arguments.service_socket)
+    try:
+        web = (await client.request({"command": "web_status"}))["data"]
+        remote = (
+            (await client.request({"command": "remote_status"}))["data"]
+            if config.remote_access.enabled
+            else None
+        )
+    except AgentIPCError as exc:
+        _print_json(
+            {
+                "onboarding_web_access": {
+                    "verified": False,
+                    "detail": _safe_error(exc),
+                }
+            }
+        )
+        return
+    remote_url = remote.get("public_url") if isinstance(remote, dict) else None
+    local_ready = bool(isinstance(web, dict) and web.get("ready") is True)
+    _print_json(
+        {
+            "onboarding_web_access": {
+                "requested": "ngrok" if config.remote_access.enabled else "same_wifi_https",
+                "verified": bool(remote_url) if config.remote_access.enabled else local_ready,
+                "remote_url": remote_url,
+                "local_fallback_ready": local_ready,
+                "local_url": web.get("url") if local_ready else None,
+                "authentication": "pairing_required",
+            }
+        }
+    )
 
 
 def _prepare_service_log(
@@ -1729,20 +1853,15 @@ async def _interactive_memory(arguments: argparse.Namespace) -> None:
             "9. Clean All Robot Memory\n"
             "10. Back\n"
         )
-        choice = (await asyncio.to_thread(input, "Select an option: ")).strip()
+        choice = input("Select an option: ").strip()
         if choice == "10":
             return
         if choice == "1":
             await _service_request(arguments, {"command": "memory_profiles"})
             continue
         if choice in {"2", "3"}:
-            user_id = (await asyncio.to_thread(input, "Enter the exact user_id: ")).strip()
-            confirmation = (
-                await asyncio.to_thread(
-                    input,
-                    "Type CONFIRM to continue with this profile operation: ",
-                )
-            ).strip()
+            user_id = input("Enter the exact user_id: ").strip()
+            confirmation = input("Type CONFIRM to continue with this profile operation: ").strip()
             if confirmation != "CONFIRM":
                 print("Profile operation cancelled.")
                 continue
@@ -1758,13 +1877,8 @@ async def _interactive_memory(arguments: argparse.Namespace) -> None:
             )
             continue
         if choice in {"4", "5"}:
-            user_id = (await asyncio.to_thread(input, "Enter the exact user_id: ")).strip()
-            kind_choice = (
-                await asyncio.to_thread(
-                    input,
-                    "Category 1) successful 2) failed 3) task recipe [1]: ",
-                )
-            ).strip()
+            user_id = input("Enter the exact user_id: ").strip()
+            kind_choice = input("Category 1) successful 2) failed 3) task recipe [1]: ").strip()
             kind = {
                 "2": "failed_behavior",
                 "3": "task_recipe",
@@ -1780,10 +1894,8 @@ async def _interactive_memory(arguments: argparse.Namespace) -> None:
                     },
                 )
                 continue
-            memory_id = (await asyncio.to_thread(input, "Enter the exact memory_id: ")).strip()
-            confirmation = (
-                await asyncio.to_thread(input, "Type DELETE to remove this memory: ")
-            ).strip()
+            memory_id = input("Enter the exact memory_id: ").strip()
+            confirmation = input("Type DELETE to remove this memory: ").strip()
             if confirmation != "DELETE":
                 print("Behavior memory deletion cancelled.")
                 continue
@@ -1803,7 +1915,7 @@ async def _interactive_memory(arguments: argparse.Namespace) -> None:
                 if choice == "6"
                 else "Failed behavior retention in days (1-3650): "
             )
-            days = int((await asyncio.to_thread(input, prompt)).strip())
+            days = int(input(prompt).strip())
             await _service_request(
                 arguments,
                 {
@@ -1817,13 +1929,8 @@ async def _interactive_memory(arguments: argparse.Namespace) -> None:
             )
             continue
         if choice == "8":
-            user_id = (await asyncio.to_thread(input, "Enter the exact user_id: ")).strip()
-            confirmation = (
-                await asyncio.to_thread(
-                    input,
-                    "Type CONFIRM to capture and register this user's face: ",
-                )
-            ).strip()
+            user_id = input("Enter the exact user_id: ").strip()
+            confirmation = input("Type CONFIRM to capture and register this user's face: ").strip()
             if confirmation != "CONFIRM":
                 print("Face registration cancelled.")
                 continue
@@ -1837,11 +1944,8 @@ async def _interactive_memory(arguments: argparse.Namespace) -> None:
             )
             continue
         if choice == "9":
-            confirmation = (
-                await asyncio.to_thread(
-                    input,
-                    "Type DELETE ALL ROBOT MEMORY to erase every profile and memory: ",
-                )
+            confirmation = input(
+                "Type DELETE ALL ROBOT MEMORY to erase every profile and memory: "
             ).strip()
             if confirmation != "DELETE ALL ROBOT MEMORY":
                 print("Full memory reset cancelled.")
@@ -1865,7 +1969,7 @@ async def _interactive_remote_access(arguments: argparse.Namespace) -> None:
             "5. Stop ngrok remote access service\n"
             "6. Back to the Interactive Tool\n"
         )
-        choice = (await asyncio.to_thread(input, "Select an option: ")).strip()
+        choice = input("Select an option: ").strip()
         if choice == "6":
             return
         if choice == "1":
@@ -1906,17 +2010,12 @@ async def _interactive(arguments: argparse.Namespace) -> int:
             "13. Stop Agent Service\n"
             "14. Exit\n"
         )
-        choice = (await asyncio.to_thread(input, "Select an option: ")).strip()
+        choice = input("Select an option: ").strip()
         try:
             if choice == "1":
                 await _interactive_model_selection(arguments)
             elif choice == "2":
-                mode = (
-                    await asyncio.to_thread(
-                        input,
-                        "Start 1) simulation or 2) real hardware? [1]: ",
-                    )
-                ).strip()
+                mode = input("Start 1) simulation or 2) real hardware? [1]: ").strip()
                 arguments.real = mode == "2"
                 arguments.model = None
                 arguments.base_url = None
@@ -1924,7 +2023,11 @@ async def _interactive(arguments: argparse.Namespace) -> int:
             elif choice == "3":
                 await _service_request(arguments, {"command": "status"})
             elif choice == "4":
-                await _chat_repl(arguments, session_id="local-cli")
+                await _chat_repl(
+                    arguments,
+                    session_id="local-cli",
+                    chat_input=chat_input_for_terminal(),
+                )
             elif choice == "5":
                 await _service_request(arguments, {"command": "web_start"})
             elif choice == "6":
@@ -1998,7 +2101,7 @@ async def _interactive_deployment(arguments: argparse.Namespace) -> None:
             "3. Show startup Agent status\n"
             "4. Back to the Interactive Tool\n"
         )
-        choice = (await asyncio.to_thread(input, "Select an option: ")).strip()
+        choice = input("Select an option: ").strip()
         if choice == "4":
             return
         command = {
@@ -2011,11 +2114,8 @@ async def _interactive_deployment(arguments: argparse.Namespace) -> None:
             continue
         confirmed = command == "setup"
         if command == "setup":
-            answer = (
-                await asyncio.to_thread(
-                    input,
-                    "Type ENABLE to install, start, and enable the real-hardware Agent: ",
-                )
+            answer = input(
+                "Type ENABLE to install, start, and enable the real-hardware Agent: "
             ).strip()
             if answer != "ENABLE":
                 print("Deployment action cancelled.")
@@ -2025,7 +2125,7 @@ async def _interactive_deployment(arguments: argparse.Namespace) -> None:
         namespace.deployment_command = command
         namespace.confirm = confirmed
         namespace.lines = 100
-        await asyncio.to_thread(_run_deployment_command, namespace)
+        _run_deployment_command(namespace)
 
 
 async def _stop_agent_before_deployment(arguments: argparse.Namespace) -> None:
@@ -2069,7 +2169,7 @@ async def _interactive_model_selection(arguments: argparse.Namespace) -> None:
         label = "Google" if provider.kind == "gemini" else provider.kind.title()
         print(f"{index}. {label} ({provider_id}){current}")
     print("0. Back")
-    provider_choice = (await asyncio.to_thread(input, "Select a provider: ")).strip()
+    provider_choice = input("Select a provider: ").strip()
     if provider_choice == "0":
         return
     try:
@@ -2091,7 +2191,7 @@ async def _interactive_model_selection(arguments: argparse.Namespace) -> None:
         print("1. Enter API Key")
         print("2. Continue with Current API Key")
         print("0. Back")
-        auth_choice = (await asyncio.to_thread(input, "Select authentication: ")).strip()
+        auth_choice = input("Select authentication: ").strip()
         if auth_choice == "0":
             return
         if auth_choice == "1":
@@ -2119,7 +2219,7 @@ async def _interactive_model_selection(arguments: argparse.Namespace) -> None:
         suffix = f" · {details}" if details else ""
         print(f"{index}. {model['name']}{current} · {accepted}{suffix}")
     print("0. Back")
-    choice = (await asyncio.to_thread(input, "Select a model: ")).strip()
+    choice = input("Select a model: ").strip()
     if choice == "0":
         return
     try:
@@ -2149,14 +2249,8 @@ async def _interactive_set_api_key(
     """Collect and persist one cloud API key without echoing it."""
     if api_key_env is None:
         raise ValueError(f"{provider_id} has no API-key secret reference")
-    secret = await asyncio.to_thread(
-        getpass.getpass,
-        f"Enter {api_key_env}: ",
-    )
-    confirmation = await asyncio.to_thread(
-        getpass.getpass,
-        f"Enter {api_key_env} again: ",
-    )
+    secret = getpass.getpass(f"Enter {api_key_env}: ")
+    confirmation = getpass.getpass(f"Enter {api_key_env} again: ")
     if secret != confirmation:
         raise ValueError("API key values did not match")
     SecretStore(arguments.secret_file).set(api_key_env, secret)

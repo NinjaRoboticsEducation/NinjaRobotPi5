@@ -1,6 +1,6 @@
 # NinjaRobotPi5 guided setup, installation, and chat implementation plan
 
-Status: proposed for owner review; implementation is not authorized yet.
+Status: approved by the project owner and implemented on 22 September 2026.
 Prepared 22 September 2026 from local wiki evidence, Serena code inspection,
 and upstream documentation. This document describes future work, not completed features.
 

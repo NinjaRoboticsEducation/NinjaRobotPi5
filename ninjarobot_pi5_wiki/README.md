@@ -4,13 +4,12 @@ Start here for project documentation, architecture, development history, and
 AI-assisted development. Open this folder in your coding tool for wiki questions,
 or open the parent project for development and implementation verification.
 
-## Current full manuals — Calendar and project-help repair
+## Current full manuals — guided onboarding source update
 
-These 17 September successor manuals are ingested and semantically reviewed in the wiki.
-They add field-specific preview errors and single-word CONFIRM for creation,
-editing, and deletion, alongside
-guided Calendar authorization, reviewed event creation, and current
-public-manual retrieval. The registered document map is updated to the 17 September checkpoint.
+The registered document map remains at its earlier reviewed checkpoint. The
+linked 22 September successor sources add guided onboarding, curl bootstrap,
+editable terminal chat, and external MCP presets while retaining the earlier
+Calendar, project-help, and hardware guidance.
 The 16 September 2026 hand-placement correction and 15 September follow-up repairs
 (normal-stop and obstacle recovery rules, automatic sensor recovery, repeated-game
 buzzer preparation, visible web errors, chat guidance, rolling context in AgentLoop,
@@ -20,10 +19,17 @@ briefings), Phase 4 foundations, and system clock access.
 Use [the document map](project-knowledge.json) for registered source provenance;
 use the links below for the full manuals:
 
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-18/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-18/DevelopmentGuide.md)
-- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-18/NinjaRobot_MCP_Skill.md)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-18/DevelopmentLog.md)
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-22/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-22/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-22/NinjaRobot_MCP_Skill.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-22/DevelopmentLog.md)
+
+These 22 September source revisions document guided onboarding, curl bootstrap,
+editable terminal chat, and the three external MCP presets. At the project
+owner's request they have not been ingested or semantically reviewed, so
+`project-knowledge.json` continues to describe the prior registered checkpoint.
+
+- [Guided onboarding walkthrough](../docs/validation/onboarding_install_chat_walkthrough_260922.md)
 - [Calendar CONFIRM walkthrough](../docs/validation/calendar_confirm_walkthrough_260917.md)
 - [Calendar and project-help walkthrough](../docs/validation/calendar_wiki_walkthrough_260917.md)
 - [Distance game hand-placement repair and tests](../docs/validation/distance_game_web_hand_260916.md)

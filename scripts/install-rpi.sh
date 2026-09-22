@@ -108,6 +108,7 @@ NinjaRobotPi5 will:
   - back up and update ${BOOT_CONFIG} for GPIO12/GPIO13 hardware PWM
   - create private per-user configuration directories
   - install the exact locked NinjaRobotPi5 hardware dependencies
+  - add a private ~/.local/bin/ninjarobot launcher for guided setup
 
 It will not pull an Ollama model, start NinjaRobotAgent, access robot hardware,
 capture camera/microphone data, move the wheels, reboot, or overwrite existing
@@ -251,6 +252,21 @@ sync_and_verify() {
   )
 }
 
+install_cli_launcher() {
+  local source launcher
+  source="${PROJECT_ROOT}/.venv/bin/ninjarobot"
+  launcher="${HOME}/.local/bin/ninjarobot"
+  [[ -x "${source}" ]] || fail "Installed ninjarobot entry point is missing: ${source}"
+  install -d -m 0755 "$(dirname -- "${launcher}")"
+  if [[ -L "${launcher}" && \
+        "$(readlink -f -- "${launcher}")" == "$(readlink -f -- "${source}")" ]]; then
+    return
+  fi
+  [[ ! -e "${launcher}" && ! -L "${launcher}" ]] || \
+    fail "Refusing to replace existing launcher: ${launcher}"
+  ln -s -- "${source}" "${launcher}"
+}
+
 readiness_check() {
   local failed=0 config_home data_home actual_commit
   config_home="${XDG_CONFIG_HOME:-${HOME}/.config}"
@@ -336,6 +352,15 @@ readiness_check() {
     printf 'FAIL: locked project environment is missing\n'
     failed=1
   fi
+  if [[ -x "${HOME}/.local/bin/ninjarobot" && \
+        -L "${HOME}/.local/bin/ninjarobot" && \
+        "$(readlink -f -- "${HOME}/.local/bin/ninjarobot")" == \
+        "$(readlink -f -- "${PROJECT_ROOT}/.venv/bin/ninjarobot")" ]]; then
+    printf 'PASS: ninjarobot launcher points to this installation\n'
+  else
+    printf 'FAIL: ninjarobot launcher is missing or belongs to another installation\n'
+    failed=1
+  fi
   return "${failed}"
 }
 
@@ -394,6 +419,7 @@ main() {
   configure_pwm
   create_user_directories
   sync_and_verify
+  install_cli_launcher
   readiness_check
   log "Installation passed. Reboot once, then continue with hardware module initialization."
   printf 'The installer did not download an Ollama model. Choose and pull one in the Agent setup.\n'

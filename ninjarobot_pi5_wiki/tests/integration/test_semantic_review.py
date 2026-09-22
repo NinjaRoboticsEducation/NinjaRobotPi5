@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from conftest import valid_page
 from llmwiki.frontmatter import dump_document, parse_file
 from llmwiki.indexes import build_indexes
 from llmwiki.lint import lint_project
 from llmwiki.semantic import semantic_target_hash
 from llmwiki.sources import add_source
 from PIL import Image
+
+from conftest import valid_page
 
 CHECKS = {
     "source_support": "passed",

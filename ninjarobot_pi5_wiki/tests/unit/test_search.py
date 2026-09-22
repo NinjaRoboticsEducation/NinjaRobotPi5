@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from conftest import valid_page
 from llmwiki.search import search_bundle
+
+from conftest import valid_page
 
 
 def test_search_returns_structured_ranked_results(project) -> None:

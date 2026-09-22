@@ -160,3 +160,27 @@ and [version handling](https://developers.google.com/workspace/calendar/api/guid
 Research retains bounded snippets and citations returned by the already documented
 Tavily provider. It does not add a full-page downloader or redistribute complete
 articles. Provider/model time and call limits do not impose a monetary cap.
+
+## Terminal chat editor — September 2026
+
+The Agent uses prompt-toolkit 3.0.53 for editable multiline terminal input over
+local terminals and SSH. prompt-toolkit is licensed under BSD-3-Clause. The
+locked dependency and its transitive `wcwidth` dependency are recorded in
+`uv.lock`; see the [upstream project](https://github.com/prompt-toolkit/python-prompt-toolkit).
+
+## Guided external MCP services — September 2026
+
+The optional onboarding flow can connect to Tavily's hosted MCP service,
+Notion's hosted MCP service, and Google Calendar API v3. These are external
+account services governed by their respective terms, quotas, privacy policies,
+and administrator settings. No service credential or third-party server code is
+bundled in this repository.
+
+The Google Calendar MCP subprocess is project code built on the existing MCP
+SDK and HTTPX dependencies. It reuses the existing Google OAuth/Calendar
+transport and requests read-only event access. The Notion preset uses the MCP
+SDK OAuth client. The local allowlists expose read operations only; account
+consent can still grant access to private workspace or calendar data selected by
+the user. See the [Tavily MCP documentation](https://docs.tavily.com/documentation/mcp),
+[Notion MCP documentation](https://developers.notion.com/guides/mcp/get-started-with-mcp),
+and [Google Calendar API documentation](https://developers.google.com/workspace/calendar/api/guides/overview).

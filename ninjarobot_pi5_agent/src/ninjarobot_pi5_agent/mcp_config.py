@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 import tomllib
 from enum import StrEnum
 from pathlib import Path
@@ -36,10 +38,11 @@ class MCPTransport(StrEnum):
 
 
 class MCPAuthentication(StrEnum):
-    """Supported non-interactive authentication modes."""
+    """Supported authentication modes."""
 
     NONE = "none"
     BEARER_ENVIRONMENT = "bearer_environment"
+    OAUTH = "oauth"
 
 
 class MCPServerConfig(BaseModel):
@@ -101,6 +104,9 @@ class MCPServerConfig(BaseModel):
         if self.authentication is MCPAuthentication.BEARER_ENVIRONMENT:
             if self.token_environment is None:
                 raise ValueError("bearer authentication requires token_environment")
+        elif self.authentication is MCPAuthentication.OAUTH:
+            if self.transport is not MCPTransport.STREAMABLE_HTTP:
+                raise ValueError("OAuth authentication requires Streamable HTTP")
         elif self.token_environment is not None:
             raise ValueError("token_environment requires bearer authentication")
         return self
@@ -165,11 +171,59 @@ def tavily_server_config(server_id: str = "tavily") -> MCPServerConfig:
     )
 
 
+def notion_server_config(server_id: str = "notion") -> MCPServerConfig:
+    """Return the reviewed read-only subset of Notion's hosted MCP server."""
+    return MCPServerConfig(
+        id=server_id,
+        enabled=True,
+        transport=MCPTransport.STREAMABLE_HTTP,
+        url="https://mcp.notion.com/mcp",
+        authentication=MCPAuthentication.OAUTH,
+        allowed_tools=("notion-search", "notion-fetch"),
+        read_only_tools=("notion-search", "notion-fetch"),
+        retry_safe_tools=("notion-search", "notion-fetch"),
+        timeout_seconds=30.0,
+        max_result_bytes=131_072,
+        preset="notion",
+    )
+
+
+def google_calendar_server_config(
+    command: str,
+    credential_file: str,
+    server_id: str = "google-calendar",
+) -> MCPServerConfig:
+    """Return the bundled external read-only Calendar MCP subprocess preset."""
+    return MCPServerConfig(
+        id=server_id,
+        enabled=True,
+        transport=MCPTransport.STDIO,
+        command=command,
+        args=(
+            "-m",
+            "ninjarobot_pi5_agent.external_mcp.google_calendar",
+            "--credential-file",
+            credential_file,
+        ),
+        authentication=MCPAuthentication.NONE,
+        allowed_tools=("list_today_events",),
+        read_only_tools=("list_today_events",),
+        retry_safe_tools=("list_today_events",),
+        timeout_seconds=20.0,
+        max_result_bytes=65_536,
+        preset="google-calendar-readonly",
+    )
+
+
 def load_mcp_configuration(path: str | Path) -> MCPConfiguration:
     """Load strict TOML, returning an empty catalog when the file is absent."""
-    config_path = Path(path).expanduser()
+    config_path = Path(path).expanduser().absolute()
     if not config_path.exists():
         return MCPConfiguration()
+    if config_path.is_symlink() or config_path.parent.resolve() != config_path.parent:
+        raise ValueError("MCP configuration must use a real private path")
+    if config_path.stat().st_size > 1_048_576:
+        raise ValueError("MCP configuration file is oversized")
     with config_path.open("rb") as handle:
         payload = tomllib.load(handle)
     _migrate_legacy_tavily_tool_name(payload)
@@ -194,8 +248,10 @@ def _migrate_legacy_tavily_tool_name(payload: dict[str, Any]) -> None:
 
 def save_mcp_configuration(configuration: MCPConfiguration, path: str | Path) -> Path:
     """Atomically save owner-only TOML without embedding secret values."""
-    config_path = Path(path).expanduser()
+    config_path = Path(path).expanduser().absolute()
     config_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if config_path.parent.resolve() != config_path.parent or config_path.is_symlink():
+        raise ValueError("MCP configuration must use a real private path")
     config_path.parent.chmod(0o700)
     lines: list[str] = [f"schema_version = {configuration.schema_version}", ""]
     for server in configuration.servers:
@@ -228,11 +284,25 @@ def save_mcp_configuration(configuration: MCPConfiguration, path: str | Path) ->
             for key, value in payload["default_parameters"].items():
                 lines.append(f"{key} = {_toml_value(value)}")
         lines.append("")
-    temporary = config_path.with_suffix(f"{config_path.suffix}.tmp")
-    temporary.write_text("\n".join(lines), encoding="utf-8")
-    temporary.chmod(0o600)
-    temporary.replace(config_path)
-    config_path.chmod(0o600)
+    descriptor, name = tempfile.mkstemp(
+        prefix=f".{config_path.name}-", suffix=".tmp", dir=config_path.parent, text=True
+    )
+    temporary = Path(name)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write("\n".join(lines))
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, config_path)
+        config_path.chmod(0o600)
+    except BaseException:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+        temporary.unlink(missing_ok=True)
+        raise
     return config_path
 
 

@@ -4,9 +4,10 @@ import json
 
 import yaml
 from click.testing import CliRunner
-from conftest import valid_page
 from llmwiki.cli import main
 from PIL import Image
+
+from conftest import valid_page
 
 
 def test_cli_blank_state_and_source_workflow(project, monkeypatch) -> None:

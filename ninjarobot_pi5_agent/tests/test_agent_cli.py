@@ -23,6 +23,31 @@ from .test_skills import write_skill
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def test_onboarding_parser_exposes_resumable_and_targeted_setup() -> None:
+    parser = agent_cli.build_parser()
+
+    arguments = parser.parse_args(["onboard", "--resume", "--step", "microphone"])
+
+    assert arguments.command == "onboard"
+    assert arguments.resume is True
+    assert arguments.onboard_step == "microphone"
+
+
+def test_notion_is_an_approved_manual_mcp_preset() -> None:
+    arguments = agent_cli.build_parser().parse_args(["mcp", "add", "--preset", "notion"])
+
+    assert arguments.preset == "notion"
+    assert arguments.id is None
+
+
+def test_interactive_onboarding_requires_a_tty(monkeypatch) -> None:
+    monkeypatch.setattr(agent_cli.sys, "stdin", SimpleNamespace(isatty=lambda: False))
+    arguments = agent_cli.build_parser().parse_args(["onboard"])
+
+    with pytest.raises(ValueError, match="requires a terminal"):
+        asyncio.run(agent_cli._run(arguments))
+
+
 def run_cli(arguments: list[str]) -> None:
     with pytest.raises(SystemExit) as exit_info:
         main(arguments)
@@ -109,6 +134,9 @@ def test_chat_resume_requires_confirmation_and_bypasses_the_model(
         },
     )
     output = capsys.readouterr().out
+    assert "Arrow keys: edit your prompt" in output
+    assert "Mac: Option+Enter" in output
+    assert "/help: commands" in output
     assert "/resume" in output
     assert "Idle restored" in output
     assert "AI motion remains disarmed" in output
@@ -692,6 +720,46 @@ def test_service_start_waits_for_liveliness_result_before_reporting(
     assert "=== NinjaRobotAgent start " in log_text
     assert "source=" in log_text
     assert "mode=real" in log_text
+
+
+def test_service_start_rejects_an_already_running_different_mode(tmp_path, monkeypatch) -> None:
+    class FakeClient:
+        async def request(self, _payload):
+            return {"data": {"execution_mode": "simulation", "ready": True}}
+
+    monkeypatch.setattr(agent_cli, "AgentIPCClient", lambda _socket: FakeClient())
+
+    with pytest.raises(agent_cli.AgentIPCError, match="already running in simulation mode"):
+        asyncio.run(
+            agent_cli._spawn_service(  # noqa: SLF001
+                SimpleNamespace(service_socket=tmp_path / "agent.sock", real=True)
+            )
+        )
+
+
+def test_onboarding_reports_authenticated_same_wifi_https(tmp_path, monkeypatch, capsys) -> None:
+    config_path = tmp_path / "config.toml"
+    save_robot_config(default_robot_config(), config_path, overwrite=False)
+
+    class FakeClient:
+        async def request(self, payload):
+            assert payload == {"command": "web_status"}
+            return {
+                "data": {
+                    "ready": True,
+                    "url": "https://ninjarobotpi5.local:8443/",
+                }
+            }
+
+    monkeypatch.setattr(agent_cli, "AgentIPCClient", lambda _socket: FakeClient())
+    arguments = SimpleNamespace(config=config_path, service_socket=tmp_path / "agent.sock")
+
+    asyncio.run(agent_cli._report_onboarding_web_access(arguments))  # noqa: SLF001
+
+    report = json.loads(capsys.readouterr().out)["onboarding_web_access"]
+    assert report["requested"] == "same_wifi_https"
+    assert report["verified"] is True
+    assert report["authentication"] == "pairing_required"
 
 
 def test_service_start_reports_onboarding_without_waiting_for_greeting(

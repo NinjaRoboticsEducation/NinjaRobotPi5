@@ -3,11 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import pytest
-from conftest import valid_page
 from llmwiki import transactions
 from llmwiki.paths import sha256_file
 from llmwiki.plans import PlanError, plan_diff, validate_plan
 from llmwiki.transactions import apply_plan
+
+from conftest import valid_page
 
 
 def make_plan(plan_id: str = "test-create-page") -> dict:

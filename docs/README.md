@@ -6,10 +6,11 @@ supporting architecture, hardware, historical, and validation records.
 ## Public guides
 
 - [Project overview](../README.md)
-- [Installation guide](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-13-02/InstallationGuide.md)
-- [MCP and Agent Skills tutorial](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-13-02/NinjaRobot_MCP_Skill.md)
-- [Development guide](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-13-02/DevelopmentGuide.md)
-- [Development log](../ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-13-02/DevelopmentLog.md)
+- [Installation guide](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-22/InstallationGuide.md)
+- [MCP and Agent Skills tutorial](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-22/NinjaRobot_MCP_Skill.md)
+- [Development guide](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-22/DevelopmentGuide.md)
+- [Development log](../ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-22/DevelopmentLog.md)
+- [Guided onboarding and manual tests](validation/onboarding_install_chat_walkthrough_260922.md)
 - [Third-party notices](../THIRD_PARTY_NOTICES.md)
 - [AI development guardrails](../AGENTS.md)
 - [Documentation style guide](markdown-style-guide.md)

@@ -101,6 +101,7 @@ class AgentRuntime:
         tasks: TaskService | None = None,
         speech: SpeechService | None = None,
         information: InformationProvider | None = None,
+        execution_mode: str = "unknown",
     ) -> None:
         self.information = information
         self.speech = speech
@@ -113,6 +114,9 @@ class AgentRuntime:
         self.camera_grants: CameraGrantManager = policy.camera_grants
         self.skills = skills
         self.events = events
+        if execution_mode not in {"simulation", "real", "unknown"}:
+            raise ValueError("execution_mode must be simulation, real, or unknown")
+        self.execution_mode = execution_mode
         self.models = model_manager
         self.memory = memory
         self._memory_capture = MemoryCaptureService(memory) if memory is not None else None
@@ -793,6 +797,7 @@ class AgentRuntime:
             owner = await self.memory.owner() if self.memory is not None else None
             return {
                 **self.startup_status(),
+                "execution_mode": self.execution_mode,
                 "provider": provider.model_dump(mode="json"),
                 "model_selection": self.models.selection() if self.models else None,
                 "tool_providers": [report.model_dump(mode="json") for report in tool_health],

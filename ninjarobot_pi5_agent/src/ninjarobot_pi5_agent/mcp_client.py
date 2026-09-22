@@ -22,6 +22,7 @@ from .mcp_config import (
     MCPServerConfig,
     MCPTransport,
 )
+from .mcp_oauth import oauth_provider_for
 from .models import (
     ProviderHealth,
     ProviderHealthStatus,
@@ -105,13 +106,20 @@ class _DiscoveredTool:
 class SDKMCPConnection:
     """Official Python SDK transport wrapper with deterministic cleanup."""
 
-    def __init__(self, config: MCPServerConfig, secret_store: SecretStore) -> None:
+    def __init__(
+        self,
+        config: MCPServerConfig,
+        secret_store: SecretStore,
+        *,
+        allow_oauth_login: bool = False,
+    ) -> None:
         self._config = config
         self._secret_store = secret_store
         self._stack = AsyncExitStack()
         self._session: ClientSession | None = None
         self._started = False
         self._closed = False
+        self._allow_oauth_login = allow_oauth_login
 
     async def start(self) -> None:
         """Connect using direct argv or HTTPS with a protected bearer header."""
@@ -133,14 +141,19 @@ class SDKMCPConnection:
                 streams = await self._stack.enter_async_context(stdio_client(parameters))
             else:
                 headers: dict[str, str] = {}
+                auth: httpx.Auth | None = None
                 if self._config.authentication is MCPAuthentication.BEARER_ENVIRONMENT:
                     token_name = cast(str, self._config.token_environment)
                     headers["Authorization"] = f"Bearer {self._secret_store.require(token_name)}"
+                elif self._config.authentication is MCPAuthentication.OAUTH:
+                    auth = oauth_provider_for(self._config, interactive=self._allow_oauth_login)
                 http_client = await self._stack.enter_async_context(
                     httpx.AsyncClient(
                         headers=headers,
+                        auth=auth,
                         timeout=self._config.timeout_seconds,
                         follow_redirects=False,
+                        trust_env=False,
                     )
                 )
                 streams = await self._stack.enter_async_context(

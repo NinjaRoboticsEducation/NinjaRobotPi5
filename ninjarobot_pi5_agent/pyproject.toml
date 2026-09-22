@@ -15,6 +15,7 @@ dependencies = [
     "jsonschema>=4.26,<5",
     "mcp>=1.12,<2",
     "ninjarobot-pi5-ide",
+    "prompt-toolkit>=3.0.52,<4",
     "pydantic>=2.12,<3",
     "uvicorn>=0.35,<1",
 ]
@@ -26,6 +27,7 @@ remote = [
 
 [project.scripts]
 ninjarobot-agent = "ninjarobot_pi5_agent.agent_cli:main"
+ninjarobot = "ninjarobot_pi5_agent.agent_cli:main"
 ninjarobot_pi5_cli = "ninjarobot_pi5_agent.cli:main"
 
 [tool.uv.sources]

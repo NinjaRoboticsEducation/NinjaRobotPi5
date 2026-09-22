@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from conftest import valid_page
 from llmwiki.indexes import build_indexes
 from llmwiki.lint import lint_project
 from llmwiki.sources import add_source
+
+from conftest import valid_page
 
 
 def test_blank_template_has_no_lint_errors(project) -> None:

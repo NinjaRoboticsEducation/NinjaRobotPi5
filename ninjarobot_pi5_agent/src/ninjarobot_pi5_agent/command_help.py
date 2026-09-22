@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import re
 
-CHAT_HELP_TEXT = """Available chat commands:
+CHAT_HELP_TEXT = """Chat input:
+  Arrow keys edit the prompt. Enter sends it. Shift+Enter or Alt+Enter
+  (Option+Enter on Mac) adds a line. If unsupported, press Esc, then Enter.
+
+Available chat commands:
 /info OPERATION {"arguments":{...},"confirmed":true}
   Read notes.list, notes.read, calendar.connections, calendar.list_events;
   preview notes.create/update/delete or calendar.propose_change, then confirm

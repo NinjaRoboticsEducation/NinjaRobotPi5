@@ -40,6 +40,7 @@ from .display import (
 from .distance import VL53L0XDistanceAdapter
 from .engine import ExecutionEngine
 from .errors import IDEError
+from .hardware_setup import hardware_setup_status, run_hardware_setup
 from .identity import FaceIdentityBackend, FaceIdentityDevice, Pi5CameraFaceIdentityBackend
 from .integrated import RobotIDEClient, build_robot_ide_client
 from .ledger import ActionLedger
@@ -124,6 +125,7 @@ __all__ = [
     "ExecutionEngine",
     "FaceOperation",
     "HealthReport",
+    "hardware_setup_status",
     "IDEClient",
     "IDEError",
     "LifecycleState",
@@ -144,6 +146,7 @@ __all__ = [
     "ResourceScheduler",
     "RetrySafety",
     "RiskLevel",
+    "run_hardware_setup",
     "RobotAssembly",
     "RobotConfig",
     "RemoteAccessConfig",
