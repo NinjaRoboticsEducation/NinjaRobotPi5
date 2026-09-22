@@ -6,10 +6,11 @@ supporting architecture, hardware, historical, and validation records.
 ## Public guides
 
 - [Project overview](../README.md)
-- [Installation guide](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23/InstallationGuide.md)
-- [MCP and Agent Skills tutorial](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-22/NinjaRobot_MCP_Skill.md)
-- [Development guide](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23/DevelopmentGuide.md)
-- [Development log](../ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23/DevelopmentLog.md)
+- [Installation guide](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md)
+- [MCP and Agent Skills tutorial](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/NinjaRobot_MCP_Skill.md)
+- [Development guide](../ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md)
+- [Development log](../ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md)
+- [Onboarding refinement and Mac Calendar manual tests](validation/onboarding_refinement_walkthrough_260923.md)
 - [Guided onboarding and manual tests](validation/onboarding_install_chat_walkthrough_260922.md)
 - [Third-party notices](../THIRD_PARTY_NOTICES.md)
 - [AI development guardrails](../AGENTS.md)

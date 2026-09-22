@@ -167,7 +167,9 @@ class SDKMCPConnection:
                 ClientSession(
                     read_stream,
                     write_stream,
-                    read_timeout_seconds=timedelta(seconds=self._config.timeout_seconds),
+                    read_timeout_seconds=timedelta(
+                        seconds=360 if self._allow_oauth_login else self._config.timeout_seconds
+                    ),
                 )
             )
             await session.initialize()

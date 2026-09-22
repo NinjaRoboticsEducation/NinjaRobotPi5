@@ -76,26 +76,27 @@ def discover_pi5_configs(cwd: Path | None = None) -> list[DiscoveredConfig]:
     """List known standalone config locations without importing a driver."""
     current = (cwd or Path.cwd()).resolve()
     home = Path.home()
+    config_home = Path(os.environ.get("XDG_CONFIG_HOME", str(home / ".config"))).expanduser()
     candidates: dict[str, tuple[Path, ...]] = {
         "pi5buzzer": (
-            home / ".config/pi5buzzer/buzzer.json",
+            config_home / "pi5buzzer/buzzer.json",
             current / "buzzer.json",
         ),
-        "pi5disp": (home / ".config/pi5disp/display.json",),
+        "pi5disp": (config_home / "pi5disp/display.json",),
         "pi5servo": (
-            home / ".config/pi5servo/servo.json",
+            config_home / "pi5servo/servo.json",
             current / "servo.json",
         ),
         "pi5vl53l0x": (
-            home / ".config/pi5vl53l0x/vl53l0x.json",
+            config_home / "pi5vl53l0x/vl53l0x.json",
             current / "vl53l0x.json",
         ),
         "pi5camera": (
-            home / ".config/pi5camera/camera.json",
+            config_home / "pi5camera/camera.json",
             current / "camera.json",
         ),
         "pi5mic": (
-            home / ".config/pi5mic/mic.json",
+            config_home / "pi5mic/mic.json",
             current / "mic.json",
         ),
     }

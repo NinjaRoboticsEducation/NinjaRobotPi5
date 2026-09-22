@@ -17,7 +17,7 @@
 > [!NOTE]
 > **v1.0.0 public release.** The project owner completed the Phase 8 manual
 > Raspberry Pi validation. New installations must still follow the safety and
-> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23/InstallationGuide.md) because
+> calibration checks in the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md) because
 > wiring and hardware tolerances differ between robots.
 
 ---
@@ -236,6 +236,15 @@ For a published release, use the same 40-character commit ID in the raw URL and
 ninjarobot onboard
 ```
 
+Onboarding now shows a NINJAROBOT welcome screen, numeric menus, and one
+**Apply existing settings for all modules** option when saved settings exist.
+It checks configuration automatically, guides incomplete modules through their
+existing tools, and uses Enter to continue through configuration summaries.
+For Calendar authorization in a Mac browser, follow the displayed SSH forwarding
+instructions before opening the link. See the
+[refined onboarding and Mac Calendar walkthrough](docs/validation/onboarding_refinement_walkthrough_260923.md).
+
+
 The guided setup opens the existing hardware tools one at a time, stores private
 progress without credentials, configures a selected provider, optionally adds
 external MCP and ngrok services, and offers simulation or real-hardware launch.
@@ -284,7 +293,7 @@ The installer does not download an Ollama model, start the Agent, move a motor,
 open the camera or microphone, or deploy boot startup. Follow the
 [guided setup and manual-test walkthrough](docs/validation/onboarding_install_chat_walkthrough_260922.md)
 and the complete
-[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23/InstallationGuide.md)
+[Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md)
 for wiring, calibration, privacy checks, and safe first movement.
 
 ---
@@ -346,10 +355,10 @@ NinjaRobotPi5 uses a strict **three-layer boundary**:
 
 | Document | Purpose |
 |---|---|
-| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
-| [MCP and Agent Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-22/NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
-| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
-| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
+| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md) | Step-by-step: from blank Pi to a calibrated, running robot |
+| [MCP and Agent Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/NinjaRobot_MCP_Skill.md) | Beginner guide to supported external tools, custom read-only MCP servers, and reusable Skills |
+| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md) | Architecture, API reference, driver policy, and contributor workflow |
+| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md) | Dated implementation history, decisions, and validation records |
 | [Documentation Index](docs/README.md) | Public, developer, architecture, history, and validation documents |
 | [Audit Report](docs/project-history/AuditReport_260731.md) | Historical security, reliability, and documentation audit findings |
 | [Implementation Plan](docs/project-history/NinjaRobotPi5V4_ImplementationPlan.md) | Historical phase design and delivery decisions |

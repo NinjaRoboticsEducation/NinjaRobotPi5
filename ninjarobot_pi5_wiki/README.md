@@ -4,7 +4,7 @@ Start here for project documentation, architecture, development history, and
 AI-assisted development. Open this folder in your coding tool for wiki questions,
 or open the parent project for development and implementation verification.
 
-## Current full manuals — guided onboarding and curl bootstrap
+## Current full manuals — refined onboarding and Mac Calendar setup
 
 These 22 September successor manuals are ingested and semantically reviewed in the wiki.
 They add the `ninjarobot` CLI entry point with resumable onboarding wizard, direct curl
@@ -20,15 +20,16 @@ briefings), Phase 4 foundations, and system clock access.
 Use [the document map](project-knowledge.json) for registered source provenance;
 use the links below for the full manuals:
 
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-23/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-23/DevelopmentGuide.md)
-- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-22/NinjaRobot_MCP_Skill.md)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-23/DevelopmentLog.md)
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-23-02/NinjaRobot_MCP_Skill.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md)
 
-These 22 September source revisions document guided onboarding, curl bootstrap,
+These source revisions document guided onboarding, curl bootstrap,
 editable terminal chat, and the three external MCP presets. They are ingested and
 semantically reviewed; `project-knowledge.json` describes this registered checkpoint.
 
+- [Onboarding refinement and Mac Calendar tests](../docs/validation/onboarding_refinement_walkthrough_260923.md)
 - [Guided onboarding walkthrough](../docs/validation/onboarding_install_chat_walkthrough_260922.md)
 - [Calendar CONFIRM walkthrough](../docs/validation/calendar_confirm_walkthrough_260917.md)
 - [Calendar and project-help walkthrough](../docs/validation/calendar_wiki_walkthrough_260917.md)

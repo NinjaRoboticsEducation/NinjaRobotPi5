@@ -8,7 +8,7 @@ import hashlib
 import json
 import secrets
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import httpx
@@ -17,8 +17,14 @@ from .calendar_google import READ_SCOPE, WRITE_SCOPE, bounded_request
 
 
 async def authorize(
-    client_file: Path, *, port: int = 8765, write: bool = False, discover_primary: bool = False
+    client_file: Path,
+    *,
+    port: int = 8765,
+    write: bool = False,
+    discover_primary: bool = False,
+    output: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
+    output = output or print
     if not 1024 <= port <= 65535:
         raise ValueError("choose a local callback port from 1024 through 65535")
     with client_file.open("rb") as stream:
@@ -63,6 +69,17 @@ async def authorize(
                 received = values.get("state", [""])[0]
                 code = values.get("code", [""])[0]
                 if (
+                    secrets.compare_digest(received, state)
+                    and values.get("error")
+                    and not future.done()
+                ):
+                    future.set_exception(
+                        ValueError(
+                            "Google authorization was declined. Retry and grant read-only access."
+                        )
+                    )
+                    return
+                if (
                     target.path != "/"
                     or target.scheme
                     or target.netloc
@@ -73,6 +90,7 @@ async def authorize(
                 ):
                     raise ValueError("invalid callback state/code")
                 if not future.done():
+                    output("Authorization received from your browser. Validating Google access...")
                     future.set_result(code)
                     status = "200 OK"
                     message = b"Authorization received. Return to the Pi terminal."
@@ -115,12 +133,17 @@ async def authorize(
                 "code_challenge_method": "S256",
             }
         )
-        print(
-            f"Keep an SSH tunnel from your computer's port {port} to the Pi's loopback port {port}."
-        )
-        print("Open this URL in your computer's browser (not a Pi desktop):\n" + url, flush=True)
+        output("Open this authorization link in your browser:\n" + url)
+        output("Waiting for browser authorization (up to 5 minutes). Ctrl+C cancels.")
         async with asyncio.timeout(300):
-            code = await future
+            while not future.done():
+                done, _ = await asyncio.wait({future}, timeout=20)
+                if not done:
+                    output(
+                        "Still waiting. On a Mac, keep the SSH port-forward terminal open; "
+                        "127.0.0.1 refers to the Mac."
+                    )
+            code = future.result()
         async with asyncio.timeout(15):
             async with httpx.AsyncClient(
                 timeout=10, follow_redirects=False, trust_env=False

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import fcntl
 import getpass
 import json
@@ -12,7 +13,7 @@ import tempfile
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import IO, Literal, Protocol
+from typing import IO, Awaitable, Callable, Literal, Protocol
 
 from ninjarobot_pi5_ide.bluetooth_setup import connect_wizard
 from ninjarobot_pi5_ide.config_import import (
@@ -39,7 +40,7 @@ from .mcp_config import (
 from .model_selection import BenchmarkRegistry, persist_model_selection
 from .models import ProviderHealthStatus
 from .remote_access import install_ngrok_binary, persist_remote_access_enabled
-from .secrets import SecretStore
+from .secrets import SecretStore, _validate_name
 
 DEFAULT_PROGRESS = Path("~/.local/state/ninjarobot_pi5/setup-progress.json")
 SCHEMA_VERSION = 1
@@ -62,7 +63,7 @@ class SetupConsole(Protocol):
 
 class TerminalSetupConsole:
     def write(self, message: str = "") -> None:
-        print(message)
+        print(message, flush=True)
 
     def ask(self, prompt: str) -> str:
         return input(prompt).strip()
@@ -135,7 +136,42 @@ class ProgressStore:
             raise ValueError("setup progress must contain a JSON object")
         if raw.get("schema_version") != SCHEMA_VERSION:
             raise ValueError("unsupported setup progress version; file was not changed")
-        steps = {name: StepRecord(**record) for name, record in raw.get("steps", {}).items()}
+        records = raw.get("steps", {})
+        selections = raw.get("selections", {})
+        if not isinstance(records, dict) or not isinstance(selections, dict):
+            raise ValueError("invalid setup progress structure; file was not changed")
+        steps = {}
+        for name, record in records.items():
+            if name not in {
+                *MANDATORY_HARDWARE,
+                *OPTIONAL_HARDWARE,
+                "provider",
+                "mcp",
+                "web_access",
+            } or not isinstance(record, dict):
+                raise ValueError("invalid setup progress step; file was not changed")
+            if record.get("status") not in {
+                "pending",
+                "complete",
+                "skipped",
+                "failed",
+                "needs_attention",
+            } or record.get("verification") not in {
+                "unverified",
+                "configured",
+                "software_verified",
+                "operator_verified",
+                "simulated",
+            }:
+                raise ValueError("invalid setup progress status; file was not changed")
+            if any(not isinstance(value, str) for value in record.values()):
+                raise ValueError("invalid setup progress value; file was not changed")
+            try:
+                steps[name] = StepRecord(**record)
+            except TypeError as exc:
+                raise ValueError("invalid setup progress record; file was not changed") from exc
+        if any(not isinstance(value, str) for value in selections.values()):
+            raise ValueError("invalid setup selections; file was not changed")
         return SetupProgress(
             schema_version=SCHEMA_VERSION,
             steps=steps,
@@ -187,78 +223,136 @@ async def run_setup_wizard(
     with store:
         progress = store.load()
         if getattr(arguments, "onboard_simulation", False):
-            _simulate(progress)
-            store.save(progress)
+            rehearsal = SetupProgress()
+            _simulate(rehearsal)
+            ui.write(json.dumps(asdict(rehearsal), indent=2))
             ui.write("Simulation rehearsal complete. No hardware, account, or service was changed.")
             return SetupOutcome()
 
-        ui.write("NinjaRobot guided setup")
-        ui.write("Required hardware comes first. You can save and exit after any step.")
-        config_path = Path(getattr(arguments, "config")).expanduser()
-        requested_step = getattr(arguments, "onboard_step", None)
+        try:
+            _welcome(ui)
+            ui.write("Required hardware comes first. You can save and exit after any step.")
+            config_path = Path(getattr(arguments, "config")).expanduser()
+            requested_step = getattr(arguments, "onboard_step", None)
 
-        for index, component in enumerate(MANDATORY_HARDWARE, 1):
-            if requested_step and requested_step != component:
-                continue
-            prior = progress.steps.get(component)
-            current_status = hardware_setup_status(component)
-            if (
-                getattr(arguments, "resume", False)
-                and prior is not None
-                and prior.status == "complete"
-                and current_status["configuration_saved"] is True
-            ):
-                ui.write(
-                    f"\nStep {index} of {len(MANDATORY_HARDWARE)} — "
-                    f"{component.title()} [Required]: saved verification still present."
-                )
-                continue
-            outcome = _hardware_step(ui, component, index=index, total=len(MANDATORY_HARDWARE))
-            _record(progress, component, *outcome)
-            store.save(progress)
-            if outcome[0] == "needs_attention" and outcome[2] == "saved_for_later":
-                return SetupOutcome()
+            reused: set[str] = set()
+            if not requested_step:
+                saved = {
+                    name: hardware_setup_status(name)
+                    for name in (*MANDATORY_HARDWARE, "microphone")
+                }
+                if any(item["configuration_saved"] for item in saved.values()):
+                    choice = _choice(
+                        ui,
+                        "1) Open setup tools step by step\n2) Apply existing settings for "
+                        "all modules\nQ) Save and exit\nChoose: ",
+                        {"1", "2", "q"},
+                    )
+                    if choice == "q":
+                        store.save(progress)
+                        return SetupOutcome()
+                    if choice == "2":
+                        for name, status in saved.items():
+                            if status.get("configuration_valid"):
+                                _show_hardware(ui, name, status)
+                                _record(
+                                    progress,
+                                    name,
+                                    "complete",
+                                    "software_verified",
+                                    "settings_checked",
+                                )
+                                reused.add(name)
+                            else:
+                                ui.write(f"{name}: setup still needed.")
+                        store.save(progress)
 
-        if requested_step in OPTIONAL_HARDWARE:
-            await _optional_hardware(progress, store, ui, config_path, selected=requested_step)
-            if requested_step == "microphone":
+            for index, component in enumerate(MANDATORY_HARDWARE, 1):
+                if requested_step and requested_step != component:
+                    continue
+                if component in reused:
+                    continue
+                prior = progress.steps.get(component)
+                current_status = hardware_setup_status(component)
+                if (
+                    getattr(arguments, "resume", False)
+                    and prior is not None
+                    and prior.status == "complete"
+                    and prior.verification != "simulated"
+                    and current_status.get("configuration_valid") is True
+                ):
+                    ui.write(
+                        f"\nStep {index} of {len(MANDATORY_HARDWARE)} — "
+                        f"{component.title()} [Required]: saved verification still present."
+                    )
+                    continue
+                outcome = _hardware_step(ui, component, index=index, total=len(MANDATORY_HARDWARE))
+                _record(progress, component, *outcome)
+                store.save(progress)
+                if outcome[0] == "needs_attention" and outcome[2] == "saved_for_later":
+                    return SetupOutcome()
+
+            if requested_step in MANDATORY_HARDWARE:
                 _import_hardware_configuration(config_path, ui)
-        elif requested_step == "provider":
-            await _provider_setup(progress, store, ui, arguments)
-        elif requested_step == "mcp":
-            await _mcp_setup(progress, store, ui, arguments)
-        elif requested_step == "web-access":
-            await _remote_setup(progress, store, ui, arguments)
-        elif not requested_step:
-            _import_hardware_configuration(config_path, ui)
-            await _optional_hardware(progress, store, ui, config_path)
-            _import_hardware_configuration(config_path, ui)
-            await _provider_setup(progress, store, ui, arguments)
-            await _mcp_setup(progress, store, ui, arguments)
-            await _remote_setup(progress, store, ui, arguments)
+            if requested_step in OPTIONAL_HARDWARE:
+                await _optional_hardware(progress, store, ui, config_path, selected=requested_step)
+                if requested_step == "microphone":
+                    _import_hardware_configuration(
+                        config_path,
+                        ui,
+                        include_microphone=progress.steps.get("microphone", StepRecord()).status
+                        == "complete",
+                    )
+            elif requested_step == "provider":
+                await _recover_step(_provider_setup, progress, store, ui, arguments)
+            elif requested_step == "mcp":
+                await _mcp_setup(progress, store, ui, arguments)
+            elif requested_step == "web-access":
+                await _recover_step(_remote_setup, progress, store, ui, arguments)
+            elif not requested_step:
+                await _optional_hardware(
+                    progress, store, ui, config_path, reuse_microphone="microphone" in reused
+                )
+                _import_hardware_configuration(
+                    config_path,
+                    ui,
+                    include_microphone=progress.steps.get("microphone", StepRecord()).status
+                    == "complete",
+                )
+                await _recover_step(_provider_setup, progress, store, ui, arguments)
+                await _mcp_setup(progress, store, ui, arguments)
+                await _recover_step(_remote_setup, progress, store, ui, arguments)
 
-        incomplete = [
-            component
-            for component in MANDATORY_HARDWARE
-            if progress.steps.get(component, StepRecord()).status != "complete"
-        ]
-        progress.completed = not incomplete
-        store.save(progress)
-        _summary(ui, progress)
-        if requested_step:
-            return SetupOutcome()
-        choice = ui.ask("Choose 1) Start NinjaRobot Agent or 2) Exit onboarding [2]: ") or "2"
-        if choice != "1":
-            ui.write("Setup progress saved. Run `ninjarobot onboard --resume` to continue.")
-            return SetupOutcome()
-        mode = ui.ask("Start 1) simulation or 2) real hardware? [1]: ") or "1"
-        if mode == "2" and incomplete:
-            ui.write(
-                "Real-hardware launch is blocked until required steps pass: "
-                + ", ".join(incomplete)
+            incomplete = [
+                component
+                for component in MANDATORY_HARDWARE
+                if progress.steps.get(component, StepRecord()).status != "complete"
+                or progress.steps[component].verification == "simulated"
+                or not hardware_setup_status(component).get("configuration_valid")
+            ]
+            progress.completed = not incomplete
+            store.save(progress)
+            _summary(ui, progress)
+            if requested_step:
+                return SetupOutcome()
+            choice = _choice(
+                ui, "Choose 1) Start NinjaRobot Agent or 2) Exit onboarding [2]: ", {"1", "2"}, "2"
             )
+            if choice != "1":
+                ui.write("Setup progress saved. Run `ninjarobot onboard --resume` to continue.")
+                return SetupOutcome()
+            mode = _choice(ui, "Start 1) simulation or 2) real hardware? [1]: ", {"1", "2"}, "1")
+            if mode == "2" and incomplete:
+                ui.write(
+                    "Real-hardware launch is blocked until required steps pass: "
+                    + ", ".join(incomplete)
+                )
+                return SetupOutcome()
+            return SetupOutcome("real" if mode == "2" else "simulation")
+        except (EOFError, KeyboardInterrupt, asyncio.CancelledError):
+            store.save(progress)
+            ui.write("\nProgress saved. Run `ninjarobot onboard --resume` to continue.")
             return SetupOutcome()
-        return SetupOutcome("real" if mode == "2" else "simulation")
 
 
 def _hardware_step(
@@ -283,7 +377,7 @@ def _hardware_step(
         ),
         "camera": (
             "The CSI camera provides temporary vision.",
-            "Setup verifies the camera without retaining media.",
+            "Setup checks camera settings. Photo tests are optional.",
         ),
     }
     actions = {
@@ -325,47 +419,50 @@ def _hardware_step(
         ui.write("Privacy: tell nearby people and obtain consent before taking any test photo.")
     elif component == "buzzer":
         ui.write("Notice: the initialization check plays a short audible tone.")
-    choice = ui.ask(
-        "Choose O) Open setup tool, V) verify existing setup, or Q) save and exit: "
-    ).lower()
-    if choice == "q":
-        return "needs_attention", "unverified", "saved_for_later"
-    if choice == "o":
-        if component in {"servo", "camera"}:
-            phrase = "WHEELS RAISED" if component == "servo" else "CONSENT OBTAINED"
-            if ui.ask(f"Type {phrase} to continue: ") != phrase:
-                return "needs_attention", "unverified", "confirmation_not_given"
-        result = run_hardware_setup(component)
-        if result != 0:
-            if ui.ask("Setup tool failed. Choose R) retry or C) continue later: ").lower() == "r":
-                return _hardware_step(ui, component, index=index, total=total)
-            return "failed", "unverified", f"setup_tool_exit_{result}"
-    refreshed = hardware_setup_status(component)
-    if not refreshed["configuration_saved"]:
-        ui.write(
-            "No saved configuration was found. Retry this step after correcting the tool error."
-        )
-        if ui.ask("Choose R) retry or C) continue later: ").lower() == "r":
-            return _hardware_step(ui, component, index=index, total=total)
-        return "failed", "unverified", "configuration_missing"
-    verified = ui.ask("Did the component check succeed exactly as described? Type YES: ")
-    if verified != "YES":
-        return "needs_attention", "configured", "operator_verification_pending"
-    return "complete", "operator_verified", "operator_confirmed"
+    while True:
+        choice = _choice(ui, "1) Open setup tool\nQ) Save and exit\nChoose: ", {"1", "q"})
+        if choice == "q":
+            return "needs_attention", "unverified", "saved_for_later"
+        if component == "servo" and ui.ask("Type WHEELS RAISED to continue: ") != "WHEELS RAISED":
+            continue
+        try:
+            result = run_hardware_setup(component)
+            refreshed = hardware_setup_status(component)
+            if result == 0 and refreshed.get("configuration_valid"):
+                _show_hardware(ui, component, refreshed)
+                ui.ask("Press ENTER to continue: ")
+                return "complete", "software_verified", "settings_checked"
+            ui.write(
+                "Setup needs attention: "
+                + str(refreshed.get("message", "tool did not finish successfully"))
+            )
+        except (OSError, RuntimeError, ValueError):
+            ui.write("Could not open setup. Check installation and ensure the Agent is stopped.")
+        ui.write("Retry the setup tool or save and exit to fix the problem.")
 
 
-def _import_hardware_configuration(path: Path, ui: SetupConsole) -> None:
+def _import_hardware_configuration(
+    path: Path, ui: SetupConsole, *, include_microphone: bool = False
+) -> None:
     base = load_effective_config(path if path.exists() else None)
-    updated, imported = import_pi5_configs(base, discover_pi5_configs())
+    valid_libraries = {
+        str(hardware_setup_status(name)["component"])
+        for name in (*MANDATORY_HARDWARE, *(("microphone",) if include_microphone else ()))
+        if hardware_setup_status(name).get("configuration_valid")
+    }
+    updated, imported = import_pi5_configs(
+        base, [item for item in discover_pi5_configs() if item.library in valid_libraries]
+    )
     ui.write("\nIntegrated configuration preview:")
     for item in imported:
         ui.write(f"  - {item}")
     if not imported:
         ui.write("  No standalone hardware configuration was found.")
         return
-    if ui.ask("Type APPLY to save this integrated configuration: ") == "APPLY":
-        save_robot_config(updated, path, overwrite=path.exists())
-        ui.write(f"Saved private robot configuration to {path}.")
+    ui.write(json.dumps(updated.hardware.model_dump(mode="json"), indent=2))
+    ui.ask("Press ENTER to save these settings and continue: ")
+    save_robot_config(updated, path, overwrite=path.exists())
+    ui.write(f"Saved private robot configuration to {path}.")
 
 
 async def _optional_hardware(
@@ -375,6 +472,7 @@ async def _optional_hardware(
     config_path: Path,
     *,
     selected: str | None = None,
+    reuse_microphone: bool = False,
 ) -> None:
     ui.write("\nOptional hardware")
     if selected in {None, "bluetooth"}:
@@ -387,12 +485,16 @@ async def _optional_hardware(
                 )
                 _record(progress, "bluetooth", "failed", "unverified", type(exc).__name__)
             else:
-                _record(progress, "bluetooth", "complete", "operator_verified", "speaker_selected")
+                current = load_effective_config(config_path)
+                if current.bluetooth_speaker.address:
+                    _record(progress, "bluetooth", "complete", "configured", "speaker_selected")
+                else:
+                    _record(progress, "bluetooth", "skipped", "unverified", "setup_cancelled")
         else:
             _record(progress, "bluetooth", "skipped", "unverified", "user_skipped")
         store.save(progress)
 
-    if selected not in {None, "microphone"}:
+    if reuse_microphone or selected not in {None, "microphone"}:
         return
     if _yes(ui.ask("Configure the optional USB microphone and Hey Ninja wake word? [y/N]: ")):
         ui.write("The default speech-to-text engine is local whisper.cpp.")
@@ -402,18 +504,25 @@ async def _optional_hardware(
             "whisper_cpp backend, then enable always-on input with the bundled "
             "hey_Ninja.onnx model. Run Doctor before exiting."
         )
-        if (
-            ui.ask("Type CONSENT to allow microphone setup and optional test recording: ")
-            == "CONSENT"
-        ):
-            result = run_hardware_setup("microphone")
-            status = hardware_setup_status("microphone")
-            if result == 0 and status["configuration_saved"]:
-                _record(progress, "microphone", "complete", "operator_verified", "whisper_and_wake")
-            else:
-                _record(progress, "microphone", "failed", "unverified", f"setup_tool_exit_{result}")
-        else:
-            _record(progress, "microphone", "skipped", "unverified", "consent_not_given")
+        ui.write(
+            "Privacy: obtain consent before selecting a recording test in the microphone tool."
+        )
+        while True:
+            try:
+                result = run_hardware_setup("microphone")
+                status = hardware_setup_status("microphone")
+                if result == 0 and status.get("configuration_valid"):
+                    _show_hardware(ui, "microphone", status)
+                    ui.ask("Press ENTER to continue: ")
+                    _record(
+                        progress, "microphone", "complete", "software_verified", "settings_checked"
+                    )
+                    break
+            except (OSError, RuntimeError, ValueError):
+                pass
+            if _choice(ui, "Microphone setup incomplete. R) Retry or S) Skip: ", {"r", "s"}) == "s":
+                _record(progress, "microphone", "failed", "unverified", "setup_incomplete")
+                break
     else:
         _record(progress, "microphone", "skipped", "unverified", "user_skipped")
     store.save(progress)
@@ -426,7 +535,7 @@ async def _provider_setup(
     for number, provider_name in enumerate(PROVIDERS, 1):
         label = "Google" if provider_name == "gemini" else provider_name.title()
         ui.write(f"  {number}) {label}")
-    raw = ui.ask("Choose a provider [1]: ") or "1"
+    raw = _choice(ui, "Choose a provider [1]: ", {"1", "2", "3", "4"}, "1")
     try:
         provider_id = PROVIDERS[int(raw) - 1]
     except (ValueError, IndexError) as exc:
@@ -434,7 +543,7 @@ async def _provider_setup(
     config_path = Path(getattr(arguments, "config")).expanduser()
     if not config_path.exists():
         save_robot_config(load_effective_config(None), config_path, overwrite=False)
-    secret_store = SecretStore(Path(getattr(arguments, "secret_file")))
+    secret_store = _CandidateSecrets(Path(getattr(arguments, "secret_file")))
     config = load_robot_config(config_path)
     provider = config.providers[provider_id]
     if provider_id != "ollama":
@@ -459,7 +568,7 @@ async def _provider_setup(
         _record(progress, "provider", "failed", "configured", "no_models_available")
         store.save(progress)
         ui.write("No selectable models were returned. Install or enable a model, then retry.")
-        return
+        raise RuntimeError("no models available")
     benchmarks = BenchmarkRegistry(Path(getattr(arguments, "benchmark_dir")))
     for number, entry in enumerate(catalog, 1):
         benchmark = ""
@@ -468,7 +577,9 @@ async def _provider_setup(
                 " — accepted benchmark" if benchmarks.accepted(entry.name) else " — not benchmarked"
             )
         ui.write(f"  {number}) {entry.name}{benchmark}")
-    selected_raw = ui.ask("Choose a model [1]: ") or "1"
+    selected_raw = _choice(
+        ui, "Choose a model [1]: ", {str(n) for n in range(1, len(catalog) + 1)}, "1"
+    )
     try:
         selected = catalog[int(selected_raw) - 1]
     except (ValueError, IndexError) as exc:
@@ -479,11 +590,13 @@ async def _provider_setup(
     finally:
         await adapter.close()
     if health.status is not ProviderHealthStatus.READY:
-        _record(progress, "provider", "failed", "configured", health.detail or "health_failed")
+        _record(progress, "provider", "failed", "configured", "health_failed")
         store.save(progress)
         ui.write("Provider validation failed. The previous model selection was preserved.")
-        return
-    persist_model_selection(config_path, provider_id, selected.name)
+        raise RuntimeError("provider validation failed")
+    secret_store.commit_configuration(
+        lambda: persist_model_selection(config_path, provider_id, selected.name)
+    )
     if provider_id == "ollama" and not benchmarks.accepted(selected.name):
         ui.write(
             "This local model has no accepted Raspberry Pi benchmark report. "
@@ -501,7 +614,8 @@ async def _remote_setup(
     config = load_robot_config(config_path)
     if _yes(ui.ask("Enable optional ngrok remote web control? [y/N]: ")):
         ui.write(
-            "ngrok creates an authenticated outbound tunnel. Create an account at https://ngrok.com/"
+            "ngrok creates an authenticated outbound tunnel. Create an account "
+            "at https://ngrok.com/"
         )
         token = ui.secret("Enter the ngrok authtoken: ")
         confirmation = ui.secret("Enter the ngrok authtoken again: ")
@@ -540,14 +654,18 @@ async def _mcp_setup(
     ui.write("\nOptional external MCP tools")
     ui.write("These services can give the Agent read-only access to selected outside data.")
     ui.write("  1) Tavily Search   2) Google Calendar   3) Notion")
-    raw = ui.ask("Enter one or more numbers separated by commas, or press Enter to skip: ")
-    if not raw.strip():
-        _record(progress, "mcp", "skipped", "unverified", "user_skipped")
-        store.save(progress)
-        return
-    selected = _parse_multiple_choices(raw, maximum=3)
+    while True:
+        raw = ui.ask("Enter one or more numbers separated by commas, or press Enter to skip: ")
+        if not raw.strip():
+            _record(progress, "mcp", "skipped", "unverified", "user_skipped")
+            store.save(progress)
+            return
+        try:
+            selected = _parse_multiple_choices(raw, maximum=3)
+            break
+        except ValueError:
+            ui.write("Choose 1, 2, or 3 separated by commas, or Enter to skip.")
     mcp_path = Path(getattr(arguments, "mcp_config")).expanduser()
-    secret_store = SecretStore(Path(getattr(arguments, "secret_file")))
     results: list[str] = []
     failures: list[str] = []
     for number in selected:
@@ -556,24 +674,43 @@ async def _mcp_setup(
             server_id = name.lower().replace(" ", "-")
             ui.write(f"\nOptional tool — {name}")
             ui.write(_mcp_explanation(number))
+            secret_store = _CandidateSecrets(Path(getattr(arguments, "secret_file")))
+            candidate_path: Path | None = None
+            committed = False
             try:
-                server = await _prepare_mcp_server(number, ui, secret_store)
+                if number == 2:
+                    candidate_path = Path(
+                        "~/.config/ninjarobot_pi5/mcp-google-calendar"
+                    ).expanduser() / ("credential-" + secrets.token_hex(12) + ".json")
+                server = await _prepare_mcp_server(
+                    number, ui, secret_store, credential_path=candidate_path
+                )
                 server_id = server.id
                 await _validate_mcp_server(server, secret_store)
-                _save_mcp_server(mcp_path, server)
+                secret_store.commit_configuration(lambda: _save_mcp_server(mcp_path, server))
+                committed = True
             except Exception as exc:
                 ui.write(
                     f"{name} validation failed ({type(exc).__name__}). "
-                    "No MCP server configuration was replaced. Any credential you entered "
-                    "remains in private storage for a retry."
+                    "Setup did not complete. Previously validated credentials are preserved."
                 )
-                choice = ui.ask("Choose R) retry this tool or S) skip it: ").lower()
+                if number == 2:
+                    ui.write(
+                        "Calendar troubleshooting: confirm Desktop client type, enabled API"
+                        " and test user. For a browser timeout, keep the Mac SSH tunnel "
+                        "open and retry with a fresh link. Check port 8765 is available on "
+                        "the Pi."
+                    )
+                choice = _choice(ui, "Choose R) retry this tool or S) skip it: ", {"r", "s"})
                 if choice == "r":
                     continue
                 failures.append(server_id)
             else:
                 ui.write(f"Success: {name} connected and its reviewed tools were found.")
                 results.append(server.id)
+            finally:
+                if candidate_path is not None and not committed:
+                    candidate_path.unlink(missing_ok=True)
             break
     progress.selections["mcp_tools"] = ",".join(results)
     if failures:
@@ -611,7 +748,7 @@ def _mcp_explanation(number: int) -> str:
 
 
 async def _prepare_mcp_server(
-    number: int, ui: SetupConsole, secret_store: SecretStore
+    number: int, ui: SetupConsole, secret_store: SecretStore, *, credential_path: Path | None = None
 ) -> MCPServerConfig:
     if number == 1:
         ui.write("Create a Tavily API key in the Tavily dashboard. It will be stored privately.")
@@ -622,11 +759,47 @@ async def _prepare_mcp_server(
         secret_store.set("TAVILY_API_KEY", value)
         return tavily_server_config()
     if number == 2:
-        ui.write("Create a Google Desktop OAuth client and copy its JSON file to the Pi.")
-        client_file = Path(ui.ask("Path to the Google OAuth client JSON file: ")).expanduser()
-        ui.write("The next step grants read-only event access in your browser.")
+        ui.write("Google Calendar - connect your account (read-only)")
+        ui.write("1. Open https://console.cloud.google.com/ and select or create a project.")
+        ui.write("2. APIs & Services > Library: enable Google Calendar API.")
+        ui.write(
+            "3. Google Auth Platform: configure Branding and Audience. For an "
+            "External app in Testing, add your Google account as a test user."
+        )
+        ui.write(
+            "4. Clients > Create client > Desktop app. Download its JSON file "
+            "and copy it privately to the Pi."
+        )
+        ui.write("Guide: https://developers.google.com/workspace/calendar/api/quickstart/python")
+        client_file = Path(ui.ask("5. Path to the Google OAuth client JSON file: ")).expanduser()
+        browser = _choice(
+            ui,
+            "6. Browser location: 1) Mac/another computer via SSH  2) Pi desktop [1]: ",
+            {"1", "2"},
+            "1",
+        )
+        if browser == "1":
+            ui.write(
+                "On your Mac, open a SECOND Terminal and run (replace USER and "
+                "PI_HOST with your Pi SSH login):"
+            )
+            ui.write(
+                "ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:8765:127.0.0.1:8765 USER@PI_HOST"
+            )
+            ui.write(
+                "Keep that terminal open. Silence after login is normal. If the "
+                "port is busy, close the old tunnel first."
+            )
+            ui.write(
+                "The browser's 127.0.0.1 is your Mac; this tunnel forwards approval to the Pi."
+            )
+        ui.ask("Press ENTER when ready to open a NEW authorization link: ")
+        ui.write(
+            "7. Open the link below, sign in with the test-user account, and "
+            "grant read-only access. Do not share the link or redirected URL."
+        )
         credential = await authorize_google_calendar(
-            client_file, write=False, discover_primary=True
+            client_file, write=False, discover_primary=True, output=ui.write
         )
         credential = {
             key: credential[key]
@@ -638,9 +811,10 @@ async def _prepare_mcp_server(
                 "calendar_id",
             )
         }
-        credential_path = Path(
-            "~/.config/ninjarobot_pi5/mcp-google-calendar/credential.json"
-        ).expanduser()
+        credential_path = (
+            credential_path
+            or Path("~/.config/ninjarobot_pi5/mcp-google-calendar/credential.json").expanduser()
+        )
         _save_private_json(credential_path, credential)
         return google_calendar_server_config(sys.executable, str(credential_path))
     if number == 3:
@@ -653,18 +827,29 @@ async def _prepare_mcp_server(
 
 
 async def _validate_mcp_server(server: MCPServerConfig, secrets_store: SecretStore) -> None:
+    connection = SDKMCPConnection(server, secrets_store, allow_oauth_login=True)
     provider = MCPToolProvider(
         server,
         secrets_store,
-        connection_factory=lambda config, secrets: SDKMCPConnection(
-            config, secrets, allow_oauth_login=True
-        ),
+        connection_factory=lambda config, secrets: connection,
     )
     try:
+        async with asyncio.timeout(360):
+            await connection.start()
         await provider.start()
         tools = await provider.list_tools()
         if not tools:
             raise RuntimeError("the server exposed no reviewed tools")
+        if server.preset == "google-calendar-readonly":
+            async with asyncio.timeout(server.timeout_seconds):
+                result = await connection.call_tool(
+                    "list_today_events", {"timezone": "UTC", "max_results": 1}
+                )
+            if result.get("isError") or len(json.dumps(result).encode()) > server.max_result_bytes:
+                raise RuntimeError("Calendar read-only API validation failed")
+            structured = result.get("structuredContent")
+            if not isinstance(structured, dict) or not isinstance(structured.get("events"), list):
+                raise RuntimeError("Calendar returned an invalid response")
     finally:
         await provider.close()
 
@@ -748,3 +933,100 @@ def _yes(value: str) -> bool:
 
 def _now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _choice(ui: SetupConsole, prompt: str, allowed: set[str], default: str = "") -> str:
+    while True:
+        answer = ui.ask(prompt).strip().lower() or default
+        if answer in allowed:
+            return answer
+        ui.write("Please choose one of the displayed options.")
+
+
+def _show_hardware(ui: SetupConsole, name: str, status: dict[str, object]) -> None:
+    ui.write(f"[OK] {name.title()} settings checked")
+    ui.write("  " + str(status.get("configuration", "")))
+    ui.write(json.dumps(status.get("summary", {}), indent=2, ensure_ascii=True))
+    ui.write("  Configuration checked; physical operation is not automatically tested.")
+
+
+def _welcome(ui: SetupConsole) -> None:
+    ui.write(r"""
+ _   _ ___ _   _     _   _    ____   ___  ____   ___ _____
+| \ | |_ _| \ | |   | | / \  |  _ \ / _ \| __ ) / _ \_   _|
+|  \| || ||  \| |_  | |/ _ \ | |_) | | | |  _ \| | | || |
+| |\  || || |\  | |_| / ___ \|  _ <| |_| | |_) | |_| || |
+|_| \_|___|_| \_|\___/_/   \_\_| \_\___/|____/ \___/ |_|
+""")
+    ui.write("Welcome to NinjaRobotPi5 - your Raspberry Pi robot assistant.")
+    ui.write("We will set up hardware, AI, optional tools, and secure web access.")
+    ui.write("Hardware > AI provider > Optional tools > Web access > Ready")
+
+
+class _CandidateSecrets(SecretStore):
+    """Validate new keys in memory before replacing existing private credentials."""
+
+    def __init__(self, path: Path) -> None:
+        super().__init__(path)
+        self.pending: dict[str, str] = {}
+
+    def set(self, name: str, value: str) -> None:
+        _validate_name(name)
+        if not value or any(character in value for character in "\n\r\x00"):
+            raise ValueError("invalid credential")
+        if os.environ.get(name) and os.environ[name] != value:
+            raise ValueError(
+                "An environment credential overrides this key. Update it outside onboarding first."
+            )
+        self.pending[name] = value
+
+    def get(self, name: str) -> str | None:
+        return self.pending.get(name) or super().get(name)
+
+    def commit(self) -> None:
+        if self.pending:
+            stored = self._read_file()
+            stored.update(self.pending)
+            self._write_file(stored)
+            self.pending.clear()
+
+    def commit_configuration(self, save: Callable[[], object]) -> None:
+        original = self._read_file()
+        existed = self.path.exists()
+        changed = bool(self.pending)
+        self.commit()
+        try:
+            save()
+        except BaseException:
+            if changed:
+                if existed:
+                    self._write_file(original)
+                else:
+                    self.path.unlink(missing_ok=True)
+            raise
+
+
+async def _recover_step(
+    action: Callable[[SetupProgress, ProgressStore, SetupConsole, object], Awaitable[None]],
+    progress: SetupProgress,
+    store: ProgressStore,
+    ui: SetupConsole,
+    arguments: object,
+) -> None:
+    while True:
+        try:
+            await action(progress, store, ui, arguments)
+            return
+        except Exception:
+            name = "provider" if action is _provider_setup else "web_access"
+            _record(progress, name, "needs_attention", "unverified", "setup_failed")
+            ui.write(
+                "This step could not finish. Check connectivity, credentials and prerequisites. "
+                "An existing environment API key must be changed in that environment."
+            )
+            store.save(progress)
+            choice = _choice(ui, "R) Retry or C) Continue or Q) Save and exit: ", {"r", "c", "q"})
+            if choice == "q":
+                raise EOFError
+            if choice == "c":
+                return
