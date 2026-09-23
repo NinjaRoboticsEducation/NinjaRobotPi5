@@ -203,16 +203,11 @@ ninjarobot onboard --step servo   # Jump to a specific step
 
 ### 2.6 Chat Interface (Terminal)
 
-Once onboarding is complete and the Agent service is running, open the terminal chat:
+Once onboarding is complete and the Agent service is running, open the terminal chat directly.
+Or run `ninjarobot-agent` to open the Interactive Tool for a menu-driven experience:
 
 ```bash
-ninjarobot-agent chat
-```
-
-Or use the Interactive Tool for a menu-driven experience:
-
-```bash
-ninjarobot-agent interactive
+ninjarobot-agent
 ```
 
 Then choose **4. Start NinjaRobot Chat Interface**.
