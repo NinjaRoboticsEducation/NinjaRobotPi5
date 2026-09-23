@@ -1,5 +1,9 @@
 # Wiki Update Log
 
+## 2026-09-23
+
+* **Update**: Applied plan `onboarding-refinement-260923` — Ingest 2026-09-23 refined onboarding, bulk settings reuse, Mac Calendar OAuth, and installer repair manuals; update eleven knowledge pages with ASCII welcome, bulk reuse, Mac SSH port forwarding, and installer disambiguation.. Sources: `src-20260907-knowledgeintegration`, `src-20260923-developmentguide-2`, `src-20260923-installationguide-2`, `src-20260923-ninjarobot-mcp-skill`, `src-20260923-developmentlog-2`.
+
 ## 2026-09-22
 
 * **Update**: Applied plan `architecture-citation-260922` — Attach footnote citation to guided hardware setup paragraph in architecture.md.. Sources: `src-20260922-developmentguide`.

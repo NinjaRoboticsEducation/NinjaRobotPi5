@@ -14,14 +14,14 @@ sources:
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
   content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
-- id: src-20260922-developmentguide
-  resource: urn:llmwiki:source:src-20260922-developmentguide
+- id: src-20260923-developmentguide-2
+  resource: urn:llmwiki:source:src-20260923-developmentguide-2
   title: DevelopmentGuide.md
-  content_hash: sha256:d3e8a50fe808614a7affbaa221fd457f8e981931d43bc5c17a8bc89be89d1a31
+  content_hash: sha256:17ba019c024248a5273bf2de3124d7fd62421e82ec2554cd3f756248ebd7ace5
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-09-22T13:30:00Z'
+  performed_at: '2026-09-23T00:30:00Z'
   result: passed
   checks:
     source_support: passed
@@ -30,20 +30,20 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered 22 September guided onboarding, curl bootstrap,
-    editable terminal chat, and external MCP preset evidence; no human verification
-    is claimed.
+  - Reviewed this page against registered 23 September onboarding refinement, bulk
+    settings reuse, Mac Calendar OAuth SSH tunnel, and installer repair evidence; no human
+    verification is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
     and note pending physical acceptance, live third-party accounts, and monetary
     spending caps.
-  target_hash: sha256:ee8ea861c1eff08bb394641ad04d9c3563aee3322bed327c7ce4b8b45881f2a7
+  target_hash: sha256:9121b49c40f7039325ecaccd4cde02febf38d2882a654cccd0f4b3767ff38b49
 ---
 
 # NinjaRobotPi5 project overview
 
 NinjaRobotPi5 documents an Agent layer for user/model interaction, an IDE layer
 for coordinating devices, and managed Pi5 libraries for individual devices.
-The development guide describes their permitted ownership boundary.[^src-20260922-developmentguide]
+The development guide describes their permitted ownership boundary.[^src-20260923-developmentguide-2]
 
 The local wiki is the primary developer knowledge collection. Full manuals are
 versioned under raw source folders; outer README links and the project knowledge
@@ -63,26 +63,25 @@ compare important claims with the current checkout before coding.[^src-20260907-
 - [Development log](references/development-log.md)
 - [MCP and skills tutorial](references/mcp-skills-guide.md)
 
-## Current checkpoint: Guided onboarding, curl bootstrap, and editable chat
+## Current checkpoint: Refined onboarding, bulk settings reuse, and installer repairs
 
-The project consolidates 22 September 2026 guided onboarding, curl bootstrap, and editable
-terminal chat alongside the 18 September web controller refinement, 17 September Google
-Calendar guided setup and unified CONFIRM flow, 16 September distance game hand-placement
-correction, 15 September servo/game repairs, Phase 4 information work (T04 calendar planning,
-T05 research, T06 notes/checklists/briefings), Phase 4 foundations (recipes, memory ranking,
-v2 skills, project help), and system clock access. The Agent/IDE/driver boundary remains
-intact: setup wizard orchestration belongs to the Agent layer, while hardware locking and
-dispatch belong to the IDE.[^src-20260922-developmentguide]
+The project consolidates 23 September 2026 onboarding interface refinements, bulk settings reuse,
+Mac Calendar OAuth loopback forwarding, and installer branch/directory repairs alongside the 22 September
+guided onboarding CLI, prompt-toolkit multiline chat, 18 September web controller refinement, 17 September
+Google Calendar setup and unified CONFIRM flow, 16 September distance game hand-placement correction, 15 September
+servo/game repairs, Phase 4 information work (T04 calendar planning, T05 research, T06 notes/checklists/briefings),
+Phase 4 foundations (recipes, memory ranking, v2 skills, project help), and system clock access. The Agent/IDE/driver
+boundary remains intact: setup wizard orchestration belongs to the Agent layer, while hardware locking and dispatch
+belong to the IDE.[^src-20260923-developmentguide-2]
 
-Recent updates add the `ninjarobot` CLI entry point with resumable onboarding (`ninjarobot onboard`)
-covering 5 mandatory hardware components (`pi5buzzer`, `pi5disp`, `pi5vl53l0x`, `pi5servo`, `pi5camera`),
-optional Bluetooth/whisper.cpp microphone setup, 4 model providers, 3 read-only external MCP presets
-(Tavily Search, Google Calendar stdio MCP, Notion SDK OAuth on loopback port 8766), remote access
-(ngrok or same-Wi-Fi HTTPS), and simulation/real launch into chat. Interactive terminal chat uses
-prompt-toolkit with multiline keybindings. The root installer supports direct curl streaming bootstrap
-with commit verification. Physical acceptance, live accounts, display font repair, and monetary spending
-caps remain unverified.[^src-20260922-developmentguide]
+Recent updates add an ASCII welcome screen, numeric menus, a bulk hardware reuse option ("2) Apply existing settings
+for all modules"), automatic configuration checks, Enter-to-continue summaries, removal of redundant typed YES/APPLY phrases,
+Mac SSH forwarding instructions (`-L 127.0.0.1:8765:127.0.0.1:8765`), waiting updates, callback receipt acknowledgment,
+read-only Calendar MCP validation, candidate credential cleanup, key rollback on save failure, microphone subprocess import
+containment, and simulation isolation. Root installer updates fix branch disambiguation and support custom installation
+directories via `--install-dir`. Physical acceptance, live accounts, display font repair, and monetary spending caps
+remain unverified.[^src-20260923-developmentguide-2]
 
 
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
-[^src-20260922-developmentguide]: DevelopmentGuide.md, source version `onboarding-install-chat-260922`; registered source `src-20260922-developmentguide`.
+[^src-20260923-developmentguide-2]: DevelopmentGuide.md, source version `onboarding-refinement-260923`; registered source `src-20260923-developmentguide-2`.

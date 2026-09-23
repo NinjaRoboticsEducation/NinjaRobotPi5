@@ -9,10 +9,10 @@ generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20260922-installationguide
-  resource: urn:llmwiki:source:src-20260922-installationguide
+- id: src-20260923-installationguide-2
+  resource: urn:llmwiki:source:src-20260923-installationguide-2
   title: InstallationGuide.md
-  content_hash: sha256:77fb2e6476189c9459e99c8d5b6a428191320c9a031b45d3c47ea3d10c6eff97
+  content_hash: sha256:d08eb44241ce1a46f5e9e0e9df149cd293fb817c0bd4fe0a4c43dde47ee5d6ca
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -20,7 +20,7 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-09-22T13:30:00Z'
+  performed_at: '2026-09-23T00:30:00Z'
   result: passed
   checks:
     source_support: passed
@@ -29,18 +29,18 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered 22 September guided onboarding, curl bootstrap,
-    editable terminal chat, and external MCP preset evidence; no human verification
-    is claimed.
+  - Reviewed this page against registered 23 September onboarding refinement, bulk
+    settings reuse, Mac Calendar OAuth SSH tunnel, and installer repair evidence; no human
+    verification is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
     and note pending physical acceptance, live third-party accounts, and monetary
     spending caps.
-  target_hash: sha256:7d301897b813586e8a069cc6dd9c68ae41d7c44ed77e950326f77dbcc2022add
+  target_hash: sha256:4bcf729d99e1ed7ba2c10e35ec375f108a394ac7b3642e08b0ab0d823eef2db7
 ---
 
 # Installation guide
 
-The full guide covers beginner setup, hardware initialization and calibration, startup, and troubleshooting. Hardware commands require stated operator precautions.[^src-20260922-installationguide]
+The full guide covers beginner setup, hardware initialization and calibration, startup, and troubleshooting. Hardware commands require stated operator precautions.[^src-20260923-installationguide-2]
 
 Use the source identifier below to resolve the complete manual through the raw
 source catalog. The outer wiki README also links directly to the current full
@@ -49,21 +49,20 @@ Read the relevant full section before acting on an abbreviated explanation.[^src
 
 [Return to project overview](/overview.md).
 
-## Current checkpoint: Guided onboarding, curl bootstrap, and editable chat
+## Current checkpoint: Refined onboarding, bulk settings reuse, and installer repairs
 
-The 22 September 2026 revision (`2026-09-22`) documents the root installer curl streaming bootstrap
-command, commit revision verification, `ninjarobot onboard` step-by-step wizard covering 5 mandatory
-hardware devices (raised wheels for servos, privacy consent for camera/mic), optional Bluetooth/whisper.cpp,
-model provider choices, 3 read-only external MCP presets (Tavily, Google Calendar, Notion), and remote access,
-alongside 18 September dual-page web interface access (`/agent` and `/gamepad`), hamburger menu interface selection,
-IDE menu option 5 for Bluetooth speaker connection, reorganized terminal menu options (1–5, Q), 17 September
-Google Calendar guided authorization (port 8765 loopback SSH tunnel, primary-calendar auto-discovery, `credentials.json`
-default path, `--write` flag), unified single-word `CONFIRM` / `CANCEL` chat authorization, 16 September distance game hand-placement
-procedure, default distance game configuration (`[distance_game]` default-enabled), 15 September follow-up
-repairs, full Phase 4 information setup, Phase 4 foundations (M03/M04/X01/X05), system clock access,
-and headless Lite audio with Bluetooth setup wizard. Software tests do not substitute for physical
-hardware validation.[^src-20260922-installationguide]
+The 23 September 2026 revisions (`2026-09-23` and `2026-09-23-02`) document the root installer curl streaming
+bootstrap with revision branch disambiguation and `--install-dir` custom installation path support, `/dev/tty`
+controlling terminal confirmation, `ninjarobot onboard` refinements (ASCII NINJAROBOT welcome screen, numeric menus,
+bulk settings reuse option "2) Apply existing settings for all modules", automatic configuration checks, Enter-to-continue
+summaries, and removal of redundant typed YES/APPLY phrases), Mac SSH port forwarding for Google Calendar OAuth
+(`ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:8765:127.0.0.1:8765`), waiting updates, callback receipt acknowledgment,
+end-to-end read-only Calendar MCP validation, candidate credential cleanup, key rollback, alongside 22 September
+guided onboarding, prompt-toolkit multiline chat, 18 September web controller dual-view interface, 17 September Google
+Calendar guided authorization and unified `CONFIRM` / `CANCEL` chat authorization, 16 September distance game hand-placement
+procedure, Phase 4 information setup, Phase 4 foundations, and headless Lite audio with Bluetooth wizard. Software tests
+do not substitute for physical hardware validation.[^src-20260923-installationguide-2]
 
 
-[^src-20260922-installationguide]: InstallationGuide.md, source version `onboarding-install-chat-260922`; registered source `src-20260922-installationguide`.
+[^src-20260923-installationguide-2]: InstallationGuide.md, source version `onboarding-refinement-260923`; registered source `src-20260923-installationguide-2`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

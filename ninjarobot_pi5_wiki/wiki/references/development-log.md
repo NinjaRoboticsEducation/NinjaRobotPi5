@@ -9,10 +9,10 @@ generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20260922-developmentlog
-  resource: urn:llmwiki:source:src-20260922-developmentlog
+- id: src-20260923-developmentlog-2
+  resource: urn:llmwiki:source:src-20260923-developmentlog-2
   title: DevelopmentLog.md
-  content_hash: sha256:74a18d92c47c614d3bfeef9e4c8e99bb8f4e1e0f135c58efc103760a785a76b6
+  content_hash: sha256:f3d7250487a6b979f38b50b9a0b91bb75c1114c192e9006adb9931d0c536e847
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -20,7 +20,7 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-09-22T13:30:00Z'
+  performed_at: '2026-09-23T00:30:00Z'
   result: passed
   checks:
     source_support: passed
@@ -29,18 +29,18 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered 22 September guided onboarding, curl bootstrap,
-    editable terminal chat, and external MCP preset evidence; no human verification
-    is claimed.
+  - Reviewed this page against registered 23 September onboarding refinement, bulk
+    settings reuse, Mac Calendar OAuth SSH tunnel, and installer repair evidence; no human
+    verification is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
     and note pending physical acceptance, live third-party accounts, and monetary
     spending caps.
-  target_hash: sha256:b074a47777f6ba795087defb678499a4c81282804eed001faaf1f2f9b66fb987
+  target_hash: sha256:c03f743e97d208eb2958ec499fe90eda30d90906ea163c7fc407f84528ce9a2f
 ---
 
 # Development log
 
-The complete log preserves dated implementation decisions and validation reports. Historical test results describe their recorded checkout and date; they are not fresh verification.[^src-20260922-developmentlog]
+The complete log preserves dated implementation decisions and validation reports. Historical test results describe their recorded checkout and date; they are not fresh verification.[^src-20260923-developmentlog-2]
 
 Use the source identifier below to resolve the complete manual through the raw
 source catalog. The outer wiki README also links directly to the current full
@@ -49,17 +49,21 @@ Read the relevant full section before acting on an abbreviated explanation.[^src
 
 [Return to project overview](/overview.md).
 
-## Current checkpoint: Guided onboarding, curl bootstrap, and editable chat
+## Current checkpoint: Refined onboarding, bulk settings reuse, and installer repairs
 
-The 22 September 2026 entries record the unified `ninjarobot` entry point and resumable onboarding
-orchestrator, prompt-toolkit multiline chat REPL with arrow key editing, root installer curl streaming
-bootstrap with exact commit ID checks, idempotent `~/.local/bin/ninjarobot` user launcher, 5 mandatory
-hardware checks through IDE locks, model provider setup, 3 read-only external MCP presets (Tavily, Calendar, Notion),
-and successful passage of 1,021 repository tests and 457 managed-driver tests without live hardware motion,
-alongside 18 September web controller dual views, 17 September Google Calendar guided OAuth setup with primary-calendar
-discovery, port 8765 loopback SSH tunnel, field validation error handling, unified `CONFIRM` / `CANCEL`
-chat authorization across create, update, and delete, runtime project help hash checking, 16 September distance game hand-placement timing, 15 September repairs, Phase 4 information assistant completion, narrowed Phase 4 foundations, Phase 5 evaluation, and system clock access.[^src-20260922-developmentlog]
+The 23 September 2026 entries record the refined onboarding interface with ASCII welcome screen, numeric menus,
+bulk settings reuse ("2) Apply existing settings for all modules"), automatic configuration checks, Enter-to-continue
+summaries, removal of redundant typed YES/APPLY phrases, detailed Mac SSH port forwarding for Google Calendar OAuth
+(`ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:8765:127.0.0.1:8765`), waiting feedback, callback receipt acknowledgment,
+end-to-end read-only Calendar MCP validation, candidate credential cleanup, key rollback, isolated microphone asset checking
+via `ninjarobot_pi5_ide.hardware_config_probe` subprocess to preserve runtime containment, passage of 1,065 full-suite tests,
+and root installer branch disambiguation, custom installation directory support (`--install-dir`), and `/dev/tty` controlling
+terminal confirmation, alongside 22 September guided onboarding CLI, prompt-toolkit multiline chat, 18 September web controller
+dual views, 17 September Google Calendar guided OAuth setup with primary-calendar discovery, port 8765 loopback SSH tunnel,
+field validation error handling, unified `CONFIRM` / `CANCEL` chat authorization across create, update, and delete, runtime project
+help hash checking, 16 September distance game hand-placement timing, 15 September repairs, Phase 4 information assistant completion,
+narrowed Phase 4 foundations, Phase 5 evaluation, and system clock access.[^src-20260923-developmentlog-2]
 
 
-[^src-20260922-developmentlog]: DevelopmentLog.md, source version `onboarding-install-chat-260922`; registered source `src-20260922-developmentlog`.
+[^src-20260923-developmentlog-2]: DevelopmentLog.md, source version `onboarding-refinement-260923`; registered source `src-20260923-developmentlog-2`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

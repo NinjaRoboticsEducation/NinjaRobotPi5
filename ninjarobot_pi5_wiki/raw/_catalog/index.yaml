@@ -1,5 +1,5 @@
 version: 2
-generated_at: '2026-09-22T13:26:08Z'
+generated_at: '2026-09-23T00:12:22Z'
 sources:
 - id: src-20260906-developmentguide
   title: DevelopmentGuide.md
@@ -389,5 +389,40 @@ sources:
 - id: src-20260922-ninjarobot-mcp-skill
   title: NinjaRobot_MCP_Skill.md
   path: raw/articles/ninjarobotpi5/2026-09-22/NinjaRobot_MCP_Skill.md
+  kind: text
+  state: ingested
+- id: src-20260923-developmentguide-2
+  title: DevelopmentGuide.md
+  path: raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md
+  kind: text
+  state: ingested
+- id: src-20260923-developmentguide
+  title: DevelopmentGuide.md
+  path: raw/articles/ninjarobotpi5/2026-09-23/DevelopmentGuide.md
+  kind: text
+  state: pending
+- id: src-20260923-developmentlog-2
+  title: DevelopmentLog.md
+  path: raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md
+  kind: text
+  state: ingested
+- id: src-20260923-developmentlog
+  title: DevelopmentLog.md
+  path: raw/notes/ninjarobotpi5/2026-09-23/DevelopmentLog.md
+  kind: text
+  state: pending
+- id: src-20260923-installationguide-2
+  title: InstallationGuide.md
+  path: raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md
+  kind: text
+  state: ingested
+- id: src-20260923-installationguide
+  title: InstallationGuide.md
+  path: raw/articles/ninjarobotpi5/2026-09-23/InstallationGuide.md
+  kind: text
+  state: pending
+- id: src-20260923-ninjarobot-mcp-skill
+  title: NinjaRobot_MCP_Skill.md
+  path: raw/articles/ninjarobotpi5/2026-09-23-02/NinjaRobot_MCP_Skill.md
   kind: text
   state: ingested
