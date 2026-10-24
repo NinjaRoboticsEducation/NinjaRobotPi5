@@ -68,6 +68,25 @@ def test_unknown_component_cannot_inject_a_command() -> None:
         ("servo", "servo", {"12": {}, "13": {}}, False),
         ("servo", "servo", {"12": {"pulse_center": 1500}, "13": {"pulse_center": 1500}}, True),
         ("servo", "servo", {"12": {"pulse_center": 0}, "13": {"pulse_center": 1500}}, False),
+        (
+            "servo",
+            "servo",
+            {
+                "__backend__": {"name": "sunfounder_robot_hat", "kwargs": {"address": 20}},
+                "hat_pwm0": {"pulse_center": 1500},
+                "hat_pwm1": {"pulse_center": 1500},
+            },
+            True,
+        ),
+        (
+            "servo",
+            "servo",
+            {
+                "__backend__": {"name": "pca9685", "kwargs": {"address": 64}},
+                "hat_pwm0": {"pulse_center": 1500},
+            },
+            False,
+        ),
         ("microphone", "mic", {"audio": {"channels": 1}}, False),
     ],
 )

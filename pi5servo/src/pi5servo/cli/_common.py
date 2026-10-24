@@ -16,6 +16,9 @@ BACKEND_CHOICES = (
     "rp1_hardware_pwm",
     "pwm_pio",
     "dfr0566",
+    "sunfounder_robot_hat",
+    "sunfounder",
+    "robot_hat",
     "pca9685",
     "pigpio",
 )

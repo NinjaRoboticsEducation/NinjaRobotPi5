@@ -496,6 +496,19 @@
       },
       "reason": "Correct native PWM alternate-pin routing and two-channel setup guidance"
     },
+    "pi5servo/src/pi5servo/cli/_common.py": {
+      "approved": {
+        "sha256": "e651ebb9a165817162657b12ed00e31cdc1e8a7f956968fd5bc2542ae190ae4d",
+        "size": 9565
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-10-25",
+      "baseline": {
+        "sha256": "0b3414c083ce444e1c3f0b0dc2127a6518bef727347b01f44962b8430f6f83d5",
+        "size": 9502
+      },
+      "reason": "Add SunFounder Robot HAT (0x14 Big-Endian 3-byte protocol, P0..P11, ADC A4 battery) and General PCA9685 smbus2/hat_pwm0..15 multi-HAT support while preserving DFR0566 baseline."
+    },
     "pi5servo/src/pi5servo/cli/calib.py": {
       "approved": {
         "sha256": "b67f67502bac2cf6c4a4df8b14dc25a8ece3c98562516095d494ae9399635eac",
@@ -587,6 +600,32 @@
       },
       "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
     },
+    "pi5servo/src/pi5servo/core/backend.py": {
+      "approved": {
+        "sha256": "4a8db56e98a7e917fb922552469064c1371a347587b7620e4e3b9998ad9c68ff",
+        "size": 11111
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-10-25",
+      "baseline": {
+        "sha256": "7d1c7bc15beb2cb82af294f2650a299b90b404cd61a5fd7b76f576e791ce5c5d",
+        "size": 9850
+      },
+      "reason": "Add SunFounder Robot HAT (0x14 Big-Endian 3-byte protocol, P0..P11, ADC A4 battery) and General PCA9685 smbus2/hat_pwm0..15 multi-HAT support while preserving DFR0566 baseline."
+    },
+    "pi5servo/src/pi5servo/core/backends/__init__.py": {
+      "approved": {
+        "sha256": "4db86ed08d32357cc5bf54452a73363dbf8b0af7fffcde34b4e09e25cffef933",
+        "size": 550
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-10-25",
+      "baseline": {
+        "sha256": "48e178ab44f98e08a620ac6180814a4ee23adc50c0418fd441b457336257f7ed",
+        "size": 339
+      },
+      "reason": "Add SunFounder Robot HAT (0x14 Big-Endian 3-byte protocol, P0..P11, ADC A4 battery) and General PCA9685 smbus2/hat_pwm0..15 multi-HAT support while preserving DFR0566 baseline."
+    },
     "pi5servo/src/pi5servo/core/backends/hardware_pwm.py": {
       "approved": {
         "sha256": "b0f1d0844fcc1bc39322e390ea5fbc45c222d14aa01594ade331677b116af48d",
@@ -600,18 +639,54 @@
       },
       "reason": "Correct native PWM alternate-pin routing and two-channel setup guidance"
     },
+    "pi5servo/src/pi5servo/core/backends/pca9685.py": {
+      "approved": {
+        "sha256": "9bce441e75b0edd192529482f1d2e5407bd4846ab4c9928eb31356163897baf3",
+        "size": 10851
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-10-25",
+      "baseline": {
+        "sha256": "de72eb3233561e0e1bd87283c0e45a06595cde7a0523fa109fddf18adbab688c",
+        "size": 4611
+      },
+      "reason": "Add SunFounder Robot HAT (0x14 Big-Endian 3-byte protocol, P0..P11, ADC A4 battery) and General PCA9685 smbus2/hat_pwm0..15 multi-HAT support while preserving DFR0566 baseline."
+    },
+    "pi5servo/src/pi5servo/core/backends/sunfounder_robot_hat.py": {
+      "approved": {
+        "sha256": "0ffc461d200ce7917aace71132d5f8c83788576b0590b975bdcc539eedf27289",
+        "size": 9083
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-10-25",
+      "baseline": null,
+      "reason": "Add SunFounder Robot HAT (0x14 Big-Endian 3-byte protocol, P0..P11, ADC A4 battery) and General PCA9685 smbus2/hat_pwm0..15 multi-HAT support while preserving DFR0566 baseline."
+    },
+    "pi5servo/src/pi5servo/core/endpoint.py": {
+      "approved": {
+        "sha256": "58a0340ea2f013552157368ea5f1038cd107bd5fd30cdef458b60945c61f37d4",
+        "size": 2774
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-10-25",
+      "baseline": {
+        "sha256": "2d73b0a159acbaf481021aec044c317257774c090e993185b4a6c909870c6c96",
+        "size": 2255
+      },
+      "reason": "Add SunFounder Robot HAT (0x14 Big-Endian 3-byte protocol, P0..P11, ADC A4 battery) and General PCA9685 smbus2/hat_pwm0..15 multi-HAT support while preserving DFR0566 baseline."
+    },
     "pi5servo/tests/test_backend.py": {
       "approved": {
-        "sha256": "a4963d322a82c3386c2389ab5a11f47e62068ef5e1a871abb421b473c9b93abb",
-        "size": 12036
+        "sha256": "2e5f13a8240cbe7190c029968bc504406f1847bb897679a2bf623b676491b1fe",
+        "size": 15036
       },
-      "authorized_by": "project owner",
-      "authorized_on": "2026-07-26",
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-10-25",
       "baseline": {
         "sha256": "c5498ba11e948ca925f5655f88120d2c1ff82ebed3d33ef8a17da130360459ed",
         "size": 11153
       },
-      "reason": "Regression coverage for native PWM alternate-pin routing"
+      "reason": "Add SunFounder Robot HAT (0x14 Big-Endian 3-byte protocol, P0..P11, ADC A4 battery) and General PCA9685 smbus2/hat_pwm0..15 multi-HAT support while preserving DFR0566 baseline."
     },
     "pi5servo/tests/test_config.py": {
       "approved": {
@@ -625,6 +700,19 @@
         "size": 7517
       },
       "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
+    "pi5servo/tests/test_parser.py": {
+      "approved": {
+        "sha256": "85f73824700ebab83783edd0b0b032c0001f42258995ef42c4ab421023bcb16a",
+        "size": 9217
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-10-25",
+      "baseline": {
+        "sha256": "51efddd7512ca646b82889479cd4a8009ce0eeafdd126090a6b262468905cd9c",
+        "size": 8616
+      },
+      "reason": "Add SunFounder Robot HAT (0x14 Big-Endian 3-byte protocol, P0..P11, ADC A4 battery) and General PCA9685 smbus2/hat_pwm0..15 multi-HAT support while preserving DFR0566 baseline."
     },
     "pi5vl53l0x/README.md": {
       "approved": {

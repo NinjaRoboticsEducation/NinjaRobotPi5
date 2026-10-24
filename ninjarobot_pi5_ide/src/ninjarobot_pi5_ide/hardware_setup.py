@@ -119,14 +119,42 @@ def hardware_setup_status(component: str) -> dict[str, object]:
                 manager = ConfigManager(configuration)
                 if not manager.load():
                     raise ValueError("unable to load servo calibration")
-                for pin in (12, 13):
-                    entry = data.get(str(pin), data.get(f"gpio{pin}"))
-                    if not isinstance(entry, dict) or "pulse_center" not in entry:
-                        raise ValueError("missing saved wheel neutral calibration")
-                calibrated = manager.get_all_calibrations()
-                if not {12, 13} <= set(calibrated):
-                    raise ValueError("calibrate both GPIO12 and GPIO13")
-                for calibration in calibrated.values():
+                backend_cfg = manager.get_backend_config()
+                backend_name = str(backend_cfg.get("name", "auto") or "auto").lower()
+                backend_addr = backend_cfg.get("kwargs", {}).get("address")
+                is_hat_backend = backend_name in {
+                    "sunfounder_robot_hat",
+                    "sunfounder",
+                    "robot_hat",
+                    "pca9685",
+                } or backend_addr in {0x14, 0x40, "0x14", "0x40"}
+                all_calibrated = manager.get_all_endpoint_calibrations()
+
+                if is_hat_backend or any(k.startswith("hat_pwm") for k in all_calibrated):
+                    required_endpoints = ("hat_pwm0", "hat_pwm1")
+                    for ep in required_endpoints:
+                        ch_num = ep.removeprefix("hat_pwm")
+                        entry = data.get(ep) or data.get(f"pwm{ch_num}") or data.get(f"p{ch_num}")
+                        if not isinstance(entry, dict) or "pulse_center" not in entry:
+                            raise ValueError("missing saved wheel neutral calibration")
+                    if not set(required_endpoints) <= set(all_calibrated):
+                        raise ValueError("calibrate both hat_pwm0 and hat_pwm1")
+                    selected_calibrations = {
+                        ep: cal for ep, cal in all_calibrated.items() if ep.startswith("hat_pwm")
+                    }
+                else:
+                    for pin in (12, 13):
+                        entry = data.get(str(pin), data.get(f"gpio{pin}"))
+                        if not isinstance(entry, dict) or "pulse_center" not in entry:
+                            raise ValueError("missing saved wheel neutral calibration")
+                    calibrated = manager.get_all_calibrations()
+                    if not {12, 13} <= set(calibrated):
+                        raise ValueError("calibrate both GPIO12 and GPIO13")
+                    selected_calibrations = {
+                        str(pin): cal for pin, cal in calibrated.items() if pin in {12, 13}
+                    }
+
+                for calibration in selected_calibrations.values():
                     if (
                         not 500
                         <= calibration.pulse_min
@@ -150,9 +178,8 @@ def hardware_setup_status(component: str) -> dict[str, object]:
                         summary[key] = section[key]
             if component == "servo":
                 summary = {
-                    str(pin): {"pulse_center": cal.pulse_center, "speed": cal.speed}
-                    for pin, cal in calibrated.items()
-                    if pin in {12, 13}
+                    ep_key: {"pulse_center": cal.pulse_center, "speed": cal.speed}
+                    for ep_key, cal in selected_calibrations.items()
                 }
             valid = True
             problem = "Settings checked; physical operation has not been tested."
@@ -245,3 +272,66 @@ def _check_microphone_assets(data: dict[str, object]) -> None:
         raise ValueError("microphone asset check could not finish") from exc
     if result.returncode:
         raise ValueError("microphone speech or wake model setup is incomplete")
+
+
+HARDWARE_PROFILE_BACKENDS: dict[str, dict[str, object]] = {
+    "dfr0566": {
+        "name": "auto",
+        "kwargs": {"bus_id": 1, "address": 16, "frequency_hz": 50},
+    },
+    "sunfounder_robot_hat": {
+        "name": "sunfounder_robot_hat",
+        "kwargs": {"bus_id": 1, "address": 20, "frequency_hz": 50},
+    },
+    "pca9685": {
+        "name": "pca9685",
+        "kwargs": {"bus_id": 1, "address": 64, "frequency_hz": 50},
+    },
+}
+
+
+def apply_hardware_profile_preset(profile: str) -> Path:
+    """Write the selected Expansion HAT backend preset into ``servo.json``."""
+    if profile not in HARDWARE_PROFILE_BACKENDS:
+        raise ValueError(f"unsupported hardware profile: {profile}")
+    discovered = next(item for item in discover_pi5_configs() if item.library == "pi5servo")
+    servo_path = discovered.path.expanduser().resolve()
+    servo_path.parent.mkdir(parents=True, exist_ok=True)
+    data: dict[str, object] = {}
+    if servo_path.is_file() and not servo_path.is_symlink():
+        try:
+            loaded = json.loads(servo_path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                data = loaded
+        except (OSError, ValueError):
+            data = {}
+    data["__backend__"] = dict(HARDWARE_PROFILE_BACKENDS[profile])
+    servo_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return servo_path
+
+
+async def configure_sunfounder_i2s_speaker(config_path: Path) -> str:
+    """Enable GPIO12 amplifier, discover I2S sink, and persist in ``config.toml``."""
+    from .audio_output import _set_speaker_amplifier, discover_i2s_output_node
+    from .config_import import load_effective_config, save_robot_config
+
+    _set_speaker_amplifier(12, True)
+    node = await discover_i2s_output_node() or "alsa_output.platform-soc_sound.stereo-fallback"
+    resolved_path = config_path.expanduser()
+    current = load_effective_config(resolved_path if resolved_path.exists() else None)
+    payload = current.model_dump()
+    servos_endpoints = tuple(payload["hardware"]["servos"].get("endpoints") or ())
+    if "gpio12" in servos_endpoints or "12" in servos_endpoints:
+        payload["hardware"]["servos"]["endpoints"] = ("hat_pwm0", "hat_pwm1")
+        roles = dict(payload["behaviors"].get("servo_roles") or {})
+        roles["left_motor"] = "hat_pwm0"
+        roles["right_motor"] = "hat_pwm1"
+        payload["behaviors"]["servo_roles"] = roles
+    payload["speech_output"]["enabled"] = True
+    payload["speech_output"]["output_node"] = node
+    payload["speech_output"]["speaker_enable_gpio"] = 12
+    from .config import RobotConfig
+
+    updated = RobotConfig.model_validate(payload)
+    save_robot_config(updated, resolved_path, overwrite=resolved_path.exists())
+    return node

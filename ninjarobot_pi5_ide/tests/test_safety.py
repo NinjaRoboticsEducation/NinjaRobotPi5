@@ -667,3 +667,68 @@ async def _health(value: bool) -> bool:
 
 async def _failed_health() -> bool:
     raise ImportError("missing camera backend")
+
+
+def test_auxiliary_servo_role_movement_without_wheel_targets(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        motion, servo, _distance, _state = controller(
+            tmp_path,
+            readings=[200],
+            config_updates={
+                "servo_roles": {
+                    "left_motor": "hat_pwm0",
+                    "right_motor": "hat_pwm1",
+                    "head_pan": "hat_pwm2",
+                }
+            },
+        )
+        op = DriveOperation.model_validate(
+            {
+                "kind": "drive",
+                "targets": {"head_pan": 30.0},
+                "obstacle_policy": "warn_only",
+                "hold_seconds": 0.05,
+            }
+        )
+        result = await motion.drive(op, "nod_head")
+        assert result["stop_reason"] == "movement_duration_complete"
+        assert servo.move_calls == [({"hat_pwm2": 30.0}, "M")]
+
+    asyncio.run(exercise())
+
+
+def test_sunfounder_battery_cutoff_latches_undervoltage(tmp_path: Path) -> None:
+    from ninjarobot_pi5_ide.config import PowerConfig
+
+    async def exercise() -> None:
+        warnings: list[str] = []
+
+        async def record_warning(msg: str) -> None:
+            warnings.append(msg)
+
+        servo = FakeServo()
+        voltages = iter([7.10, 6.80])
+        servo.read_battery_voltage_sync = lambda: next(voltages, 6.80)  # type: ignore[attr-defined]
+        distance = FakeDistance([200])
+        config = behavior_config(tmp_path)
+        state = SafetyStateStore(config.safety_state_file)
+        motion = MotionController(
+            servo=cast(ServoDevice, servo),
+            distance=distance,
+            config=config,
+            state=state,
+            power_config=PowerConfig(
+                enabled=True,
+                fuel_gauge_address=0x14,
+                warning_voltage=7.15,
+                cutoff_voltage=6.90,
+            ),
+            undervoltage_provider=lambda: False,
+            warning_handler=record_warning,
+        )
+        result = await motion.drive(drive_operation(hold_seconds=0.5), "move_forward")
+        assert result["stop_reason"] == "undervoltage"
+        assert state.read().motion_latched is True
+        assert any("low battery voltage" in w for w in warnings)
+
+    asyncio.run(exercise())

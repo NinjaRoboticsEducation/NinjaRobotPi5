@@ -300,6 +300,48 @@ def test_disabled_devices_do_not_reserve_gpio() -> None:
     payload["hardware"]["servos"]["enabled"] = False
     payload["hardware"]["buzzer"]["gpio"] = 12
     assert RobotConfig.model_validate(payload).hardware.buzzer.gpio == 12
+    payload = load_robot_config(EXAMPLE).model_dump()
     payload["hardware"]["display"]["enabled"] = False
     payload["hardware"]["buzzer"]["gpio"] = 10
     assert RobotConfig.model_validate(payload).hardware.buzzer.gpio == 10
+
+
+def test_multi_hat_servo_endpoint_normalization_and_power_config() -> None:
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["hardware"]["servos"]["endpoints"] = ("pwm0", "p1", "hat_pwm2", "hat_pwm15")
+    payload["behaviors"]["servo_roles"] = {
+        "left_motor": "pwm0",
+        "right_motor": "p1",
+        "head_pan": "pwm2",
+        "gripper": "hat_pwm15",
+    }
+    payload["hardware"]["power"] = {
+        "enabled": True,
+        "fuel_gauge_address": 0x14,
+        "warning_voltage": 7.15,
+        "cutoff_voltage": 6.90,
+        "charging_gpio": 23,
+    }
+    payload["speech_output"]["speaker_enable_gpio"] = 12
+
+    config = RobotConfig.model_validate(payload)
+
+    assert config.hardware.servos.endpoints == ("hat_pwm0", "hat_pwm1", "hat_pwm2", "hat_pwm15")
+    assert config.behaviors.servo_roles == {
+        "left_motor": "hat_pwm0",
+        "right_motor": "hat_pwm1",
+        "head_pan": "hat_pwm2",
+        "gripper": "hat_pwm15",
+    }
+    assert config.hardware.power.enabled is True
+    assert config.hardware.power.fuel_gauge_address == 0x14
+    assert config.hardware.power.charging_gpio == 23
+    assert config.speech_output.speaker_enable_gpio == 12
+
+
+def test_speaker_enable_gpio_conflicts_with_gpio12_servo() -> None:
+    payload = load_robot_config(EXAMPLE).model_dump()
+    payload["speech_output"]["speaker_enable_gpio"] = 12
+
+    with pytest.raises(ValidationError, match="GPIO.*conflict"):
+        RobotConfig.model_validate(payload)

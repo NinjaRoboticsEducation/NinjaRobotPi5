@@ -220,3 +220,61 @@ def test_bluetooth_profile_change_resolves_only_same_speaker(monkeypatch):
         assert not (await output.health())["ready"]
 
     asyncio.run(exercise())
+
+
+def test_discover_i2s_output_node_and_speaker_enable_gpio(monkeypatch):
+    from ninjarobot_pi5_ide.audio_output import discover_i2s_output_node
+
+    async def exercise():
+        gpio_calls = []
+        monkeypatch.setattr(
+            "ninjarobot_pi5_ide.audio_output._set_speaker_amplifier",
+            lambda pin, enabled: gpio_calls.append((pin, enabled)),
+        )
+        monkeypatch.setattr("ninjarobot_pi5_ide.audio_output.shutil.which", lambda cmd: cmd)
+
+        pw_payload = json.dumps(
+            [
+                {
+                    "info": {
+                        "props": {
+                            "media.class": "Audio/Sink",
+                            "node.name": "alsa_output.platform-soc_sound.stereo-fallback",
+                            "node.description": "snd_rpi_hifiberry_dac",
+                        }
+                    }
+                }
+            ]
+        ).encode()
+
+        async def runner(args, **kwargs):
+            if args[0] == "pw-dump":
+                return pw_payload
+            return b""
+
+        node = await discover_i2s_output_node(runner)
+        assert node == "alsa_output.platform-soc_sound.stereo-fallback"
+
+        @asynccontextmanager
+        async def scene():
+            yield
+
+        output = AudioOutput(
+            SpeechOutputConfig(
+                output_node=node,
+                speaker_enable_gpio=12,
+                bluetooth_lead_in_seconds=0,
+            ),
+            voice=AsyncMock(),
+            microphone=Microphone(),
+            permitted=lambda: True,
+            scene=scene,
+            runner=runner,
+        )
+        res = await output.play(audio())
+        assert res["played"] is True
+        assert (12, True) in gpio_calls
+        await output.close()
+        assert gpio_calls[-1] == (12, False)
+
+    asyncio.run(exercise())

@@ -23,7 +23,13 @@ from ninjarobot_pi5_ide.config_import import (
     save_robot_config,
 )
 
-from ninjarobot_pi5_ide import hardware_setup_status, load_robot_config, run_hardware_setup
+from ninjarobot_pi5_ide import (
+    apply_hardware_profile_preset,
+    configure_sunfounder_i2s_speaker,
+    hardware_setup_status,
+    load_robot_config,
+    run_hardware_setup,
+)
 
 from .calendar_oauth import authorize as authorize_google_calendar
 from .cloud_registry import ConfiguredProviderRegistry
@@ -251,6 +257,8 @@ async def run_setup_wizard(
                     if choice == "q":
                         store.save(progress)
                         return SetupOutcome()
+                    if choice == "1":
+                        _select_hardware_profile(ui, progress, store)
                     if choice == "2":
                         for name, status in saved.items():
                             if status.get("configuration_valid"):
@@ -266,6 +274,16 @@ async def run_setup_wizard(
                             else:
                                 ui.write(f"{name}: setup still needed.")
                         store.save(progress)
+                else:
+                    _select_hardware_profile(ui, progress, store)
+            elif (
+                requested_step == "servo"
+                and not getattr(arguments, "resume", False)
+                and "hardware_profile" not in progress.selections
+            ):
+                _select_hardware_profile(ui, progress, store)
+
+            active_profile = progress.selections.get("hardware_profile", "dfr0566")
 
             for index, component in enumerate(MANDATORY_HARDWARE, 1):
                 if requested_step and requested_step != component:
@@ -286,7 +304,13 @@ async def run_setup_wizard(
                         f"{component.title()} [Required]: saved verification still present."
                     )
                     continue
-                outcome = _hardware_step(ui, component, index=index, total=len(MANDATORY_HARDWARE))
+                outcome = _hardware_step(
+                    ui,
+                    component,
+                    index=index,
+                    total=len(MANDATORY_HARDWARE),
+                    hardware_profile=active_profile,
+                )
                 _record(progress, component, *outcome)
                 store.save(progress)
                 if outcome[0] == "needs_attention" and outcome[2] == "saved_for_later":
@@ -355,8 +379,39 @@ async def run_setup_wizard(
             return SetupOutcome()
 
 
+def _select_hardware_profile(
+    ui: SetupConsole,
+    progress: SetupProgress,
+    store: ProgressStore,
+) -> str:
+    ui.write("\n======================================================================")
+    ui.write("Hardware Expansion Profile Selection")
+    ui.write("======================================================================")
+    ui.write("Select the Expansion HAT installed on your Raspberry Pi 5:")
+    ui.write("  1. DFRobot DFR0566 IO Expansion HAT")
+    ui.write("  2. SunFounder Robot HAT")
+    ui.write("  3. General PCA9685 PWM Expansion HAT")
+    choice = _choice(ui, "Choose hardware profile [1]: ", {"1", "2", "3", "q"}, "1")
+    if choice == "q":
+        raise EOFError
+    profile = {
+        "1": "dfr0566",
+        "2": "sunfounder_robot_hat",
+        "3": "pca9685",
+    }[choice]
+    progress.selections["hardware_profile"] = profile
+    apply_hardware_profile_preset(profile)
+    store.save(progress)
+    return profile
+
+
 def _hardware_step(
-    ui: SetupConsole, component: str, *, index: int, total: int
+    ui: SetupConsole,
+    component: str,
+    *,
+    index: int,
+    total: int,
+    hardware_profile: str = "dfr0566",
 ) -> tuple[StepStatus, Verification, str]:
     explanations = {
         "buzzer": (
@@ -380,6 +435,22 @@ def _hardware_step(
             "Setup checks camera settings. Photo tests are optional.",
         ),
     }
+    servo_actions = {
+        "dfr0566": (
+            "With both wheels raised, choose Calibrate for GPIO12 and GPIO13. Verify each "
+            "wheel stops at neutral before leaving the tool."
+        ),
+        "sunfounder_robot_hat": (
+            "With both wheels raised, choose 3. Calibrate for pwm0 (P0 Left) and pwm1 "
+            "(P1 Right), plus any extra P2-P11 servos. Verify each wheel stops at neutral "
+            "before leaving the tool."
+        ),
+        "pca9685": (
+            "With both wheels raised, choose 3. Calibrate for pwm0 (PWM0 Left) and pwm1 "
+            "(PWM1 Right), plus any extra PWM2-PWM15 servos. Verify each wheel stops at "
+            "neutral before leaving the tool."
+        ),
+    }
     actions = {
         "buzzer": (
             "Choose Init, listen for the short test beep, confirm it becomes silent, then Exit."
@@ -392,10 +463,7 @@ def _hardware_step(
             "Choose Health Check, Single Read, then Calibrate with a target at a measured "
             "distance. A no-target value such as 8191 is not a calibration success."
         ),
-        "servo": (
-            "With both wheels raised, choose Calibrate for GPIO12 and GPIO13. Verify each "
-            "wheel stops at neutral before leaving the tool."
-        ),
+        "servo": servo_actions.get(hardware_profile, servo_actions["dfr0566"]),
         "camera": (
             "Choose Run setup wizard, then Doctor. Capture a temporary test photo only after "
             "everyone nearby has consented; delete test media when finished."
@@ -476,23 +544,53 @@ async def _optional_hardware(
 ) -> None:
     ui.write("\nOptional hardware")
     if selected in {None, "bluetooth"}:
-        if _yes(ui.ask("Configure a Bluetooth speaker? [y/N]: ")):
-            try:
-                await connect_wizard(config_path)
-            except Exception as exc:
-                ui.write(
-                    f"Bluetooth setup failed: {type(exc).__name__}. Review the audio prerequisites."
-                )
-                _record(progress, "bluetooth", "failed", "unverified", type(exc).__name__)
-            else:
-                current = load_effective_config(config_path)
-                if current.bluetooth_speaker.address:
-                    _record(progress, "bluetooth", "complete", "configured", "speaker_selected")
+        configured_i2s = False
+        if progress.selections.get("hardware_profile") == "sunfounder_robot_hat":
+            if _yes(
+                ui.ask("Configure the SunFounder Robot HAT onboard I2S speaker (GPIO12)? [Y/n]: ")
+                or "y"
+            ):
+                try:
+                    node = await configure_sunfounder_i2s_speaker(config_path)
+                except Exception as exc:
+                    ui.write(
+                        f"Onboard I2S speaker setup failed: {type(exc).__name__}. "
+                        "Check dtoverlay=hifiberry-dac in /boot/firmware/config.txt."
+                    )
+                    _record(progress, "bluetooth", "failed", "unverified", type(exc).__name__)
                 else:
-                    _record(progress, "bluetooth", "skipped", "unverified", "setup_cancelled")
-        else:
-            _record(progress, "bluetooth", "skipped", "unverified", "user_skipped")
-        store.save(progress)
+                    ui.write(
+                        "Configured SunFounder onboard I2S speaker "
+                        f"(GPIO12 amplifier enabled, sink: {node})."
+                    )
+                    _record(
+                        progress,
+                        "bluetooth",
+                        "complete",
+                        "configured",
+                        "onboard_i2s_speaker",
+                    )
+                configured_i2s = True
+                store.save(progress)
+        if not configured_i2s:
+            if _yes(ui.ask("Configure a Bluetooth speaker? [y/N]: ")):
+                try:
+                    await connect_wizard(config_path)
+                except Exception as exc:
+                    ui.write(
+                        f"Bluetooth setup failed: {type(exc).__name__}. "
+                        "Review the audio prerequisites."
+                    )
+                    _record(progress, "bluetooth", "failed", "unverified", type(exc).__name__)
+                else:
+                    current = load_effective_config(config_path)
+                    if current.bluetooth_speaker.address:
+                        _record(progress, "bluetooth", "complete", "configured", "speaker_selected")
+                    else:
+                        _record(progress, "bluetooth", "skipped", "unverified", "setup_cancelled")
+            else:
+                _record(progress, "bluetooth", "skipped", "unverified", "user_skipped")
+            store.save(progress)
 
     if reuse_microphone or selected not in {None, "microphone"}:
         return

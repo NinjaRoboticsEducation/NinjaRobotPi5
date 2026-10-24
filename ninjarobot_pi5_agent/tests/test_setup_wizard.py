@@ -453,3 +453,80 @@ def test_candidate_secrets_preserve_secret_store_name_validation(tmp_path):
         candidate.set("INVALID\nNAME", "fixture")
     assert not candidate.pending
     assert not candidate.path.exists()
+
+
+@pytest.mark.parametrize(
+    ("choice", "expected_profile", "expected_backend_name", "expected_prompt_fragment"),
+    [
+        ("1", "dfr0566", "auto", "GPIO12 and GPIO13"),
+        ("2", "sunfounder_robot_hat", "sunfounder_robot_hat", "pwm0 (P0 Left) and pwm1 (P1 Right)"),
+        ("3", "pca9685", "pca9685", "pwm0 (PWM0 Left) and pwm1 (PWM1 Right)"),
+    ],
+)
+def test_hardware_profile_selection_and_servo_step(
+    monkeypatch,
+    tmp_path,
+    choice: str,
+    expected_profile: str,
+    expected_backend_name: str,
+    expected_prompt_fragment: str,
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.chdir(tmp_path)
+
+    path = tmp_path / "state" / "progress.json"
+    progress = setup_wizard.SetupProgress()
+    ui_select = _Console((choice,))
+    with setup_wizard.ProgressStore(path) as store:
+        selected = setup_wizard._select_hardware_profile(ui_select, progress, store)
+        loaded = store.load()
+
+    assert selected == expected_profile
+    assert loaded.selections["hardware_profile"] == expected_profile
+    banner = "\n".join(ui_select.messages)
+    assert "1. DFRobot DFR0566 IO Expansion HAT" in banner
+    assert "2. SunFounder Robot HAT" in banner
+    assert "3. General PCA9685 PWM Expansion HAT" in banner
+
+    servo_json = tmp_path / "xdg" / "pi5servo" / "servo.json"
+    assert servo_json.is_file()
+    data = json.loads(servo_json.read_text(encoding="utf-8"))
+    assert data["__backend__"]["name"] == expected_backend_name
+
+    monkeypatch.setattr(
+        setup_wizard,
+        "hardware_setup_status",
+        lambda _name: {"configuration_saved": False, "configuration_valid": False},
+    )
+    ui_step = _Console(("q",))
+    setup_wizard._hardware_step(
+        ui_step,
+        "servo",
+        index=4,
+        total=5,
+        hardware_profile=expected_profile,
+    )
+    assert expected_prompt_fragment in "\n".join(ui_step.messages)
+
+
+def test_sunfounder_optional_hardware_configures_onboard_i2s_speaker(monkeypatch, tmp_path) -> None:
+    configured_paths: list[Path] = []
+
+    async def fake_configure_i2s(config_path: Path) -> str:
+        configured_paths.append(config_path)
+        return "alsa_output.platform-soc_sound.stereo-fallback"
+
+    monkeypatch.setattr(setup_wizard, "configure_sunfounder_i2s_speaker", fake_configure_i2s)
+    path = tmp_path / "state" / "progress.json"
+    progress = setup_wizard.SetupProgress(selections={"hardware_profile": "sunfounder_robot_hat"})
+    ui = _Console(("y", "n"))
+    config_path = tmp_path / "config.toml"
+
+    with setup_wizard.ProgressStore(path) as store:
+        asyncio.run(setup_wizard._optional_hardware(progress, store, ui, config_path))
+        saved = store.load()
+
+    assert configured_paths == [config_path]
+    assert saved.steps["bluetooth"].status == "complete"
+    assert saved.steps["bluetooth"].detail == "onboard_i2s_speaker"

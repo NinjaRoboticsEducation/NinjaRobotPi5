@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .config import RobotConfig, load_robot_config
+from .config import RobotConfig, _normalize_servo_endpoint, load_robot_config
 
 DEFAULT_USER_CONFIG = Path("~/.config/ninjarobot_pi5/config.toml").expanduser()
 
@@ -150,6 +150,61 @@ def import_pi5_configs(
         elif item.library == "pi5servo":
             payload["hardware"]["servos"]["calibration_file"] = str(item.path)
             imported.append(f"pi5servo calibration path from {item.path}")
+            backend_meta = data.get("__backend__")
+            backend_name = ""
+            backend_addr = None
+            if isinstance(backend_meta, dict):
+                backend_name = str(backend_meta.get("name", "") or "").lower()
+                kwargs_meta = backend_meta.get("kwargs")
+                if isinstance(kwargs_meta, dict):
+                    backend_addr = kwargs_meta.get("address")
+
+            is_sunfounder = backend_name in {
+                "sunfounder_robot_hat",
+                "sunfounder",
+                "robot_hat",
+            } or backend_addr in {0x14, "0x14"}
+            is_pca9685 = backend_name == "pca9685" or backend_addr in {0x40, "0x40"}
+
+            hat_endpoints: list[str] = []
+            for key, val in data.items():
+                if key == "__backend__" or not isinstance(val, dict):
+                    continue
+                norm = _normalize_servo_endpoint(key)
+                if (
+                    isinstance(norm, str)
+                    and norm.startswith("hat_pwm")
+                    and norm not in hat_endpoints
+                ):
+                    hat_endpoints.append(norm)
+
+            if is_sunfounder or is_pca9685:
+                for req in ("hat_pwm0", "hat_pwm1"):
+                    if req not in hat_endpoints:
+                        hat_endpoints.append(req)
+                hat_endpoints.sort(key=lambda ep: int(ep.removeprefix("hat_pwm")))
+                payload["hardware"]["servos"]["endpoints"] = tuple(hat_endpoints)
+                roles = dict(payload["behaviors"].get("servo_roles") or {})
+                roles["left_motor"] = "hat_pwm0"
+                roles["right_motor"] = "hat_pwm1"
+                payload["behaviors"]["servo_roles"] = roles
+                if is_sunfounder:
+                    payload["speech_output"]["speaker_enable_gpio"] = 12
+                    payload["hardware"]["power"] = {
+                        "enabled": True,
+                        "fuel_gauge_address": 0x14,
+                        "warning_voltage": 7.15,
+                        "cutoff_voltage": 6.90,
+                        "charging_gpio": 23,
+                    }
+                    imported.append(
+                        f"pi5servo SunFounder Robot HAT profile "
+                        f"(endpoints={hat_endpoints}) from {item.path}"
+                    )
+                else:
+                    imported.append(
+                        f"pi5servo PCA9685 HAT profile (endpoints={hat_endpoints}) from {item.path}"
+                    )
         elif item.library == "pi5camera":
             camera = data.get("camera")
             if isinstance(camera, dict):
@@ -303,6 +358,23 @@ def robot_config_to_toml(config: RobotConfig) -> str:
         f"max_capture_seconds = {hardware.microphone.max_capture_seconds}",
         f"media_directory = {_toml(hardware.microphone.media_directory)}",
         f"retain_audio_by_default = {_toml(hardware.microphone.retain_audio_by_default)}",
+        *(
+            [
+                "",
+                "[hardware.power]",
+                f"enabled = {_toml(hardware.power.enabled)}",
+                f"fuel_gauge_address = {hardware.power.fuel_gauge_address}",
+                f"warning_voltage = {hardware.power.warning_voltage}",
+                f"cutoff_voltage = {hardware.power.cutoff_voltage}",
+                *(
+                    [f"charging_gpio = {hardware.power.charging_gpio}"]
+                    if hardware.power.charging_gpio is not None
+                    else []
+                ),
+            ]
+            if hardware.power.enabled
+            else []
+        ),
         "",
         "[behaviors]",
         f"user_directory = {_toml(behavior.user_directory)}",
@@ -359,6 +431,7 @@ def robot_config_to_toml(config: RobotConfig) -> str:
             *[
                 f"{key} = {_toml(value)}"
                 for key, value in config.speech_output.model_dump().items()
+                if value is not None
             ],
             "",
             "[bluetooth_speaker]",

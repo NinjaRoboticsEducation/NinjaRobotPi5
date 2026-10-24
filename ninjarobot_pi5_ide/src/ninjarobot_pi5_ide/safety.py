@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from .behavior_models import DriveOperation
-from .config import BehaviorConfig
+from .config import BehaviorConfig, PowerConfig
 from .errors import IDEError, is_hardware_driver_error
 from .models import ErrorDetails, RetrySafety
 from .servo import ServoDevice
@@ -291,6 +291,7 @@ class MotionController:
         distance: DistanceReader,
         config: BehaviorConfig,
         state: SafetyStateStore,
+        power_config: PowerConfig | None = None,
         undervoltage_provider: UndervoltageProvider = raspberry_pi_undervoltage_active,
         warning_handler: WarningHandler | None = None,
         system_stopped: Callable[[], bool] | None = None,
@@ -299,6 +300,7 @@ class MotionController:
         self._system_stopped = system_stopped or (lambda: False)
         self._distance = distance
         self._config = config
+        self._power_config = power_config or PowerConfig()
         self._state = state
         self._undervoltage_provider = undervoltage_provider
         self._warning_handler = warning_handler
@@ -606,6 +608,25 @@ class MotionController:
                 if active:
                     await self.stop_motion("undervoltage", latch=True)
                     return
+
+            if self._power_config.enabled and self._power_config.fuel_gauge_address == 0x14:
+                reader = getattr(self._servo, "read_battery_voltage_sync", None)
+                if callable(reader):
+                    try:
+                        voltage = await asyncio.to_thread(reader)
+                    except Exception:
+                        await self._warn("battery voltage status unavailable; movement continues")
+                    else:
+                        if isinstance(voltage, (int, float)):
+                            if voltage < self._power_config.cutoff_voltage:
+                                await self.stop_motion("undervoltage", latch=True)
+                                return
+                            if voltage < self._power_config.warning_voltage:
+                                warn_v = self._power_config.warning_voltage
+                                await self._warn(
+                                    f"low battery voltage ({voltage:.2f}V < {warn_v:.2f}V)"
+                                )
+
             await asyncio.sleep(min(self._config.watchdog_timeout_seconds / 2, 1.0))
 
     async def _warn(self, warning: str) -> None:
@@ -647,11 +668,13 @@ class MotionController:
         if unknown:
             raise MotionSafetyError(f"movement contains unmapped servo roles: {', '.join(unknown)}")
         required = {self._config.left_motor_role, self._config.right_motor_role}
-        missing = sorted(required - set(operation.targets))
-        if missing:
-            raise MotionSafetyError(
-                f"movement is missing required motor roles: {', '.join(missing)}"
-            )
+        has_wheel_role = bool(required & set(operation.targets)) or not operation.targets
+        if has_wheel_role:
+            missing = sorted(required - set(operation.targets))
+            if missing:
+                raise MotionSafetyError(
+                    f"movement is missing required motor roles: {', '.join(missing)}"
+                )
         return {
             self._config.servo_roles[role]: target for role, target in operation.targets.items()
         }

@@ -24,13 +24,36 @@ DEFAULT_SERVO_ENDPOINTS = (
     "gpio12",
     "gpio13",
 )
-SUPPORTED_SERVO_ENDPOINTS = (
+LEGACY_SERVO_ENDPOINTS = (
     *DEFAULT_SERVO_ENDPOINTS,
     "hat_pwm1",
     "hat_pwm2",
     "hat_pwm3",
     "hat_pwm4",
 )
+SUPPORTED_SERVO_ENDPOINTS = (
+    *DEFAULT_SERVO_ENDPOINTS,
+    *(f"hat_pwm{channel}" for channel in range(0, 16)),
+)
+
+
+def _normalize_servo_endpoint(raw: object) -> object:
+    """Normalize servo endpoint aliases ('pwm0', 'p0', '12') to canonical identifiers."""
+    if isinstance(raw, int) and not isinstance(raw, bool):
+        return f"gpio{raw}"
+    if not isinstance(raw, str):
+        return raw
+    text = raw.strip().lower()
+    if text.isdigit():
+        return f"gpio{int(text)}"
+    if text.startswith("gpio") and text[4:].isdigit():
+        return f"gpio{int(text[4:])}"
+    for prefix in ("hat_pwm", "pwm", "p"):
+        if text.startswith(prefix) and text[len(prefix) :].isdigit():
+            channel = int(text[len(prefix) :])
+            if 0 <= channel <= 15:
+                return f"hat_pwm{channel}"
+    return raw
 
 
 class ConfigModel(BaseModel):
@@ -60,9 +83,9 @@ class ServoConfig(ConfigModel):
     @field_validator("endpoints", mode="before")
     @classmethod
     def normalize_toml_array(cls, endpoints: object) -> object:
-        """Convert TOML arrays explicitly instead of relying on loose coercion."""
-        if isinstance(endpoints, list):
-            return tuple(endpoints)
+        """Convert TOML arrays and endpoint aliases ('pwm0', 'p0') explicitly."""
+        if isinstance(endpoints, (list, tuple)):
+            return tuple(_normalize_servo_endpoint(item) for item in endpoints)
         return endpoints
 
     @field_validator("endpoints")
@@ -167,6 +190,14 @@ class BehaviorConfig(ConfigModel):
     system_stopped_display_seconds: Annotated[float, Field(ge=0.0, le=10.0)] = 2.0
     stop_on_invalid_distance: Literal[False] = False
 
+    @field_validator("servo_roles", mode="before")
+    @classmethod
+    def normalize_servo_role_endpoints(cls, roles: object) -> object:
+        """Normalize role endpoint aliases ('pwm0', 'p0') to canonical identifiers."""
+        if isinstance(roles, dict):
+            return {role: _normalize_servo_endpoint(endpoint) for role, endpoint in roles.items()}
+        return roles
+
     @model_validator(mode="after")
     def motor_roles_must_be_distinct_and_supported(self) -> BehaviorConfig:
         """Require two distinct logical motor roles mapped to supported endpoints."""
@@ -187,6 +218,22 @@ class BehaviorConfig(ConfigModel):
         return self
 
 
+class PowerConfig(ConfigModel):
+    """Optional battery/UPS monitoring configuration across supported HATs."""
+
+    enabled: bool = False
+    fuel_gauge_address: Literal[0x36, 0x14] = 0x36
+    warning_voltage: Annotated[float, Field(ge=6.0, le=8.4)] = 7.15
+    cutoff_voltage: Annotated[float, Field(ge=6.0, le=8.0)] = 6.90
+    charging_gpio: Annotated[int, Field(ge=0, le=27)] | None = None
+
+    @model_validator(mode="after")
+    def warning_must_exceed_cutoff(self) -> PowerConfig:
+        if self.warning_voltage <= self.cutoff_voltage:
+            raise ValueError("power warning_voltage must be greater than cutoff_voltage")
+        return self
+
+
 class HardwareConfig(ConfigModel):
     """Authoritative V4 hardware mapping."""
 
@@ -196,6 +243,7 @@ class HardwareConfig(ConfigModel):
     i2c: I2CConfig = Field(default_factory=I2CConfig)
     camera: CameraConfig = Field(default_factory=CameraConfig)
     microphone: MicrophoneConfig = Field(default_factory=MicrophoneConfig)
+    power: PowerConfig = Field(default_factory=PowerConfig)
 
     @model_validator(mode="after")
     def top_level_gpio_assignments_must_not_conflict(self) -> HardwareConfig:
@@ -227,6 +275,8 @@ class HardwareConfig(ConfigModel):
                     claim(int(endpoint[4:]), "servo")
         if self.buzzer.enabled:
             claim(self.buzzer.gpio, "buzzer")
+        if self.power.enabled and self.power.charging_gpio is not None:
+            claim(self.power.charging_gpio, "power charging indicator")
         return self
 
 
@@ -417,6 +467,7 @@ class SpeechOutputConfig(ConfigModel):
     synthesis_timeout_seconds: Annotated[float, Field(ge=1, le=60)] = 30.0
     playback_timeout_seconds: Annotated[float, Field(ge=1, le=120)] = 60.0
     bluetooth_lead_in_seconds: Annotated[float, Field(ge=0, le=2)] = 0.5
+    speaker_enable_gpio: Annotated[int, Field(ge=0, le=27)] | None = None
 
     @field_validator("output_node")
     @classmethod
@@ -504,6 +555,13 @@ class RobotConfig(ConfigModel):
             raise ValueError("voice_input requires the configured microphone to be enabled")
         if self.onboarding.enabled and not self.hardware.display.enabled:
             raise ValueError("onboarding requires the configured display to be enabled")
+        if self.speech_output.speaker_enable_gpio is not None and self.hardware.servos.enabled:
+            speaker_endpoint = f"gpio{self.speech_output.speaker_enable_gpio}"
+            if speaker_endpoint in self.hardware.servos.endpoints:
+                raise ValueError(
+                    f"GPIO{self.speech_output.speaker_enable_gpio} conflict: "
+                    "speech_output.speaker_enable_gpio overlaps servo endpoint"
+                )
         return self
 
 

@@ -150,9 +150,9 @@ class TestParseCommand:
             parse_command("20:45X")  # X is not a speed
 
     def test_invalid_hat_pwm_channel_raises(self):
-        """Reject unsupported DFRobot HAT PWM channels."""
-        with pytest.raises(ValueError, match="DFRobot HAT PWM channels"):
-            parse_command("hat_pwm5:45")
+        """Reject unsupported HAT PWM channels outside 0..15."""
+        with pytest.raises(ValueError, match="Invalid HAT PWM channel"):
+            parse_command("hat_pwm16:45")
 
 
 class TestServoTarget:
@@ -211,6 +211,21 @@ class TestServoEndpointParsing:
     def test_parse_hat_pwm_identifier(self):
         """Explicit DFRobot HAT PWM identifier is supported."""
         assert parse_servo_endpoint("hat_pwm3") == ServoEndpoint("hat_pwm", 3)
+
+    def test_parse_hat_pwm_aliases(self):
+        """SunFounder P0..P11 and PCA9685 PWM0..PWM15 aliases normalize to hat_pwm0..15."""
+        ep0 = parse_servo_endpoint("p0")
+        assert ep0 == ServoEndpoint("hat_pwm", 0)
+        assert ep0.identifier == "hat_pwm0"
+        assert ep0.label == "HAT_PWM0"
+
+        ep11 = parse_servo_endpoint("P11")
+        assert ep11 == ServoEndpoint("hat_pwm", 11)
+        assert ep11.identifier == "hat_pwm11"
+
+        ep15 = parse_servo_endpoint("pwm15")
+        assert ep15 == ServoEndpoint("hat_pwm", 15)
+        assert ep15.identifier == "hat_pwm15"
 
 
 class TestResolveSpecialAngle:

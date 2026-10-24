@@ -16,8 +16,10 @@ class ServoEndpoint:
             raise ValueError(f"Unsupported servo endpoint kind: {self.kind}")
         if self.value < 0:
             raise ValueError("Servo endpoint value must be non-negative")
-        if self.kind == "hat_pwm" and not 1 <= self.value <= 4:
-            raise ValueError("DFRobot HAT PWM channels must be in the range 1..4")
+        if self.kind == "hat_pwm" and not 0 <= self.value <= 15:
+            raise ValueError(
+                f"Invalid HAT PWM channel {self.value}. Supported channels are 0 to 15."
+            )
 
     @property
     def identifier(self) -> str:
@@ -25,6 +27,13 @@ class ServoEndpoint:
         if self.kind == "gpio":
             return f"gpio{self.value}"
         return f"hat_pwm{self.value}"
+
+    @property
+    def label(self) -> str:
+        """Human-readable label for CLI display."""
+        if self.kind == "gpio":
+            return f"GPIO{self.value}"
+        return f"HAT_PWM{self.value}"
 
     @property
     def legacy_pin(self) -> int:
@@ -64,4 +73,12 @@ def parse_servo_endpoint(raw: int | str | ServoEndpoint) -> ServoEndpoint:
     if text.startswith("hat_pwm") and text[7:].isdigit():
         return ServoEndpoint(kind="hat_pwm", value=int(text[7:]))
 
-    raise ValueError(f"Unsupported servo endpoint '{raw}'. Use GPIO numbers, gpioNN, or hat_pwmN.")
+    if text.startswith("pwm") and text[3:].isdigit():
+        return ServoEndpoint(kind="hat_pwm", value=int(text[3:]))
+
+    if text.startswith("p") and text[1:].isdigit():
+        return ServoEndpoint(kind="hat_pwm", value=int(text[1:]))
+
+    raise ValueError(
+        f"Unsupported servo endpoint '{raw}'. Use GPIO numbers, gpioNN, hat_pwmN, pwmN, or pN."
+    )

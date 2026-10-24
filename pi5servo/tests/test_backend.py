@@ -17,6 +17,7 @@ from pi5servo.core.backend import (
 from pi5servo.core.backends.dfr0566 import DFR0566ServoBackend
 from pi5servo.core.backends.hardware_pwm import HardwarePWMServoBackend
 from pi5servo.core.backends.pca9685 import PCA9685ServoBackend
+from pi5servo.core.backends.sunfounder_robot_hat import SunFounderRobotHatBackend
 
 
 class FakeHardwarePWM:
@@ -366,3 +367,76 @@ def test_mixed_servo_backend_routes_gpio_and_hat_endpoints(monkeypatch) -> None:
     assert hat_identifier == "hat_pwm1"
     assert gpio_backend.pulses[12] == 1500
     assert hat_backend.pulses["hat_pwm1"] == 1600
+
+
+def test_sunfounder_robot_hat_backend_writes_big_endian_and_reads_battery() -> None:
+    """SunFounder backend must send 3-byte Big-Endian [reg, MSB, LSB] packets and read ADC A4."""
+
+    class FakeSunFounderBus(FakeSMBus):
+        def __init__(self) -> None:
+            super().__init__()
+            self._read_queue = [0x0B, 0x1A]  # raw = 0x0B1A = 2842 -> ~6.87V
+
+        def read_byte(self, address: int) -> int:
+            assert address == 0x14
+            return self._read_queue.pop(0)
+
+    bus = FakeSunFounderBus()
+    backend = SunFounderRobotHatBackend(bus=bus)
+
+    # Verify Timer 0, 1, 2 period = 4095 (0x0FFF -> [0x0F, 0xFF]) and prescaler = 351 (0x015F -> [0x01, 0x5F])
+    assert (0x14, 0x40, [0x01, 0x5F]) in bus.writes
+    assert (0x14, 0x44, [0x0F, 0xFF]) in bus.writes
+    assert (0x14, 0x41, [0x01, 0x5F]) in bus.writes
+    assert (0x14, 0x45, [0x0F, 0xFF]) in bus.writes
+    assert (0x14, 0x42, [0x01, 0x5F]) in bus.writes
+    assert (0x14, 0x46, [0x0F, 0xFF]) in bus.writes
+
+    # Set pulse on P0 (hat_pwm0) to 1500us -> ticks = round(1500/20000 * 4095) = 307 (0x0133 -> [0x01, 0x33])
+    backend.set_pulse_us("p0", 1500)
+    assert backend.get_pulse_us("hat_pwm0") == 1500
+    assert (0x14, 0x20, [0x01, 0x33]) in bus.writes
+
+    # Read battery voltage (channel A4 -> reg 0x13)
+    voltage = backend.read_battery_voltage()
+    assert (0x14, 0x13, [0x00, 0x00]) in bus.writes
+    assert voltage == pytest.approx(6.87, abs=0.02)
+
+    backend.off("pwm0")
+    assert backend.get_pulse_us("hat_pwm0") == 0
+    assert (0x14, 0x20, [0x00, 0x00]) in bus.writes
+
+    with pytest.raises(BackendConfigurationError, match="out of range"):
+        backend.claim("hat_pwm12")
+
+
+def test_pca9685_backend_supports_hat_pwm_and_smbus2() -> None:
+    """PCA9685 backend should support hat_pwm0..15 directly over smbus2."""
+    bus = FakeSMBus()
+    backend = PCA9685ServoBackend(i2c_bus=bus)
+
+    backend.set_pulse_us("hat_pwm0", 1500)
+    assert backend.get_pulse_us("pwm0") == 1500
+    # Verify LED0_ON_L (0x06) received a 4-byte block write
+    led0_writes = [w for w in bus.writes if w[0] == 0x40 and w[1] == 0x06]
+    assert led0_writes
+    assert led0_writes[-1][2][:2] == [0x00, 0x00]
+
+    backend.off("hat_pwm0")
+    assert backend.get_pulse_us("hat_pwm0") == 0
+    assert bus.writes[-1] == (0x40, 0x06, [0x00, 0x00, 0x00, 0x10])
+
+
+def test_auto_backend_selects_sunfounder_and_pca9685_by_address() -> None:
+    """Auto backend with hat_pwm endpoints should dispatch by I2C address."""
+    bus_sf = FakeSMBus()
+    sf_backend = create_servo_backend(
+        "auto", pins=["hat_pwm0", "hat_pwm1"], address=0x14, i2c_bus=bus_sf
+    )
+    assert isinstance(sf_backend, SunFounderRobotHatBackend)
+
+    bus_pca = FakeSMBus()
+    pca_backend = create_servo_backend(
+        "auto", pins=["hat_pwm0", "hat_pwm15"], address=0x40, i2c_bus=bus_pca
+    )
+    assert isinstance(pca_backend, PCA9685ServoBackend)

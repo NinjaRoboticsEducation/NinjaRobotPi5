@@ -183,6 +183,7 @@ class RobotAssembly:
             distance=self.distance,
             config=config.behaviors,
             state=self.safety_state,
+            power_config=config.hardware.power,
             undervoltage_provider=undervoltage_provider,
             warning_handler=self._show_motion_warning,
             system_stopped=lambda: self.system_safety.stopped,

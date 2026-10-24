@@ -13,6 +13,7 @@ from .backends.dfr0566 import DFR0566ServoBackend
 from .backends.hardware_pwm import HardwarePWMServoBackend
 from .backends.pca9685 import PCA9685ServoBackend
 from .backends.pwm_pio import PwmPioServoBackend
+from .backends.sunfounder_robot_hat import SunFounderRobotHatBackend
 from .endpoint import ServoEndpoint, parse_servo_endpoint
 
 HARDWARE_PWM_BACKEND_KWARGS = {"pin_channel_map", "frequency_hz", "chip", "pwm_cls"}
@@ -24,13 +25,25 @@ DFR0566_BACKEND_KWARGS = {
     "i2c_bus",
     "smbus_cls",
 }
+SUNFOUNDER_ROBOT_HAT_BACKEND_KWARGS = {
+    "address",
+    "bus_id",
+    "frequency_hz",
+    "channel_map",
+    "bus",
+    "i2c_bus",
+    "bus_factory",
+    "smbus_cls",
+}
 PCA9685_BACKEND_KWARGS = {
     "address",
+    "bus_id",
     "frequency_hz",
     "reference_clock_speed",
     "channel_map",
     "i2c_bus",
     "pca9685_cls",
+    "smbus_cls",
 }
 PIGPIO_BACKEND_KWARGS = {"owns_pi"}
 PWM_PIO_BACKEND_KWARGS: set[str] = set()
@@ -187,6 +200,25 @@ class MixedServoBackend:
             backend.close()
 
 
+def _create_hat_backend(kwargs: dict[str, Any]) -> ServoPulseBackend:
+    """Instantiate the appropriate HAT PWM backend based on hat_backend or address."""
+    hat_backend_name = str(kwargs.get("hat_backend", "") or "").lower()
+    address = kwargs.get("address")
+    if isinstance(address, str):
+        try:
+            address = int(address, 0)
+        except ValueError:
+            address = None
+
+    if hat_backend_name in {"sunfounder_robot_hat", "sunfounder", "robot_hat"} or address == 0x14:
+        return SunFounderRobotHatBackend(
+            **_filter_backend_kwargs(kwargs, SUNFOUNDER_ROBOT_HAT_BACKEND_KWARGS)
+        )
+    if hat_backend_name == "pca9685" or address == 0x40:
+        return PCA9685ServoBackend(**_filter_backend_kwargs(kwargs, PCA9685_BACKEND_KWARGS))
+    return DFR0566ServoBackend(**_filter_backend_kwargs(kwargs, DFR0566_BACKEND_KWARGS))
+
+
 def _create_auto_backend(
     pins: list[int | str | ServoEndpoint],
     kwargs: dict[str, Any],
@@ -200,7 +232,7 @@ def _create_auto_backend(
             pins=[endpoint.legacy_pin for endpoint in gpio_endpoints],
             **_filter_backend_kwargs(kwargs, HARDWARE_PWM_BACKEND_KWARGS),
         )
-        hat_backend = DFR0566ServoBackend(**_filter_backend_kwargs(kwargs, DFR0566_BACKEND_KWARGS))
+        hat_backend = _create_hat_backend(kwargs)
         routes: dict[str, tuple[ServoPulseBackend, int | str]] = {
             endpoint.identifier: (gpio_backend, endpoint.legacy_pin) for endpoint in gpio_endpoints
         }
@@ -210,7 +242,7 @@ def _create_auto_backend(
         return MixedServoBackend(routes, owned_backends=[gpio_backend, hat_backend])
 
     if hat_endpoints:
-        return DFR0566ServoBackend(**_filter_backend_kwargs(kwargs, DFR0566_BACKEND_KWARGS))
+        return _create_hat_backend(kwargs)
 
     return HardwarePWMServoBackend(
         pins=[endpoint.legacy_pin for endpoint in gpio_endpoints],
@@ -256,6 +288,11 @@ def create_servo_backend(
 
     if backend_name == "pca9685":
         return PCA9685ServoBackend(**_filter_backend_kwargs(kwargs, PCA9685_BACKEND_KWARGS))
+
+    if backend_name in {"sunfounder_robot_hat", "sunfounder", "robot_hat"}:
+        return SunFounderRobotHatBackend(
+            **_filter_backend_kwargs(kwargs, SUNFOUNDER_ROBOT_HAT_BACKEND_KWARGS)
+        )
 
     if backend_name == "dfr0566":
         return DFR0566ServoBackend(**_filter_backend_kwargs(kwargs, DFR0566_BACKEND_KWARGS))

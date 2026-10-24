@@ -19,6 +19,71 @@ from .voice_input import VoiceInputController
 
 ProcessRunner = Callable[..., Coroutine[Any, Any, bytes]]
 
+_I2S_SINK_PATTERNS = (
+    "hifiberry",
+    "soc_sound",
+    "rpi_hifiberry_dac",
+    "snd_rpi_hifiberry_dac",
+)
+
+
+def _set_speaker_amplifier(gpio_pin: int | None, enabled: bool) -> None:
+    """Drive the SunFounder Robot HAT speaker amplifier switch (GPIO 12) via lgpio."""
+    if gpio_pin is None:
+        return
+    try:
+        import importlib
+
+        lgpio = importlib.import_module("lgpio")
+
+        for chip in (4, 0):
+            try:
+                handle = lgpio.gpiochip_open(chip)
+                break
+            except Exception:
+                continue
+        else:
+            return
+        try:
+            lgpio.gpio_claim_output(handle, gpio_pin, 1 if enabled else 0)
+            lgpio.gpio_write(handle, gpio_pin, 1 if enabled else 0)
+        finally:
+            lgpio.gpiochip_close(handle)
+    except Exception:
+        pass
+
+
+async def discover_i2s_output_node(runner: ProcessRunner = run_audio_process) -> str:
+    """Inspect pw-dump for an onboard I2S DAC sink (HiFiBerry / soc_sound)."""
+    if not shutil.which("pw-dump"):
+        return ""
+    try:
+        data = await runner(["pw-dump"], timeout=3, output_limit=2_000_000)
+        rows = json.loads(data)
+    except Exception:
+        return ""
+    if not isinstance(rows, list):
+        return ""
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        info = row.get("info")
+        if not isinstance(info, dict):
+            continue
+        props = info.get("props")
+        if not isinstance(props, dict):
+            continue
+        if props.get("media.class") != "Audio/Sink":
+            continue
+        node_name = props.get("node.name")
+        if not isinstance(node_name, str) or not node_name:
+            continue
+        description = str(props.get("node.description", "")).lower()
+        haystack = f"{node_name.lower()} {description}"
+        if any(pattern in haystack for pattern in _I2S_SINK_PATTERNS):
+            return node_name
+    return ""
+
 
 def wav_duration(data: bytes) -> float:
     if not data or len(data) > 8_000_000:
@@ -189,6 +254,10 @@ class AudioOutput:
     async def _play_stream(self, data: bytes, duration: float, generation: int) -> dict[str, Any]:
         playback: asyncio.Task[bytes] | None = None
         try:
+            if self.config.speaker_enable_gpio is not None:
+                await asyncio.to_thread(
+                    _set_speaker_amplifier, self.config.speaker_enable_gpio, True
+                )
             target = self._target_node
             arguments = [
                 "pw-play",
@@ -259,3 +328,5 @@ class AudioOutput:
         await self.stop()
         if active is not None and active is not asyncio.current_task():
             await asyncio.gather(active, return_exceptions=True)
+        if not self._simulated and self.config.speaker_enable_gpio is not None:
+            await asyncio.to_thread(_set_speaker_amplifier, self.config.speaker_enable_gpio, False)

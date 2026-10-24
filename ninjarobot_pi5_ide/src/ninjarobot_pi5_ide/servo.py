@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, TypeVar, cast
 
-from .config import SUPPORTED_SERVO_ENDPOINTS
+from .config import LEGACY_SERVO_ENDPOINTS, SUPPORTED_SERVO_ENDPOINTS
 from .errors import IDEError
 from .models import (
     CapabilityDescriptor,
@@ -119,15 +119,20 @@ def _load_servo_runtime(
         for endpoint, calibration in calibrations.items()
         if endpoint in endpoints and _is_calibrated(calibration)
     )
+    backend_cfg = manager.get_backend_config() if hasattr(manager, "get_backend_config") else {}
+    saved_backend = str(backend_cfg.get("name", "auto") or "auto")
+    saved_kwargs = dict(backend_cfg.get("kwargs") or {})
+    effective_kwargs = {
+        "bus_id": saved_kwargs.get("bus_id", i2c_bus),
+        "address": saved_kwargs.get("address", dfr0566_address),
+        **saved_kwargs,
+    }
     group = group_type(
         None,
         pins=list(endpoints),
         calibrations=calibrations,
-        backend="auto",
-        backend_kwargs={
-            "bus_id": i2c_bus,
-            "address": dfr0566_address,
-        },
+        backend=saved_backend,
+        backend_kwargs=effective_kwargs,
     )
     return ServoRuntime(
         group=cast(ServoGroupDriver, group),
@@ -141,7 +146,7 @@ class ServoDevice:
     def __init__(
         self,
         *,
-        endpoints: tuple[str, ...] = SUPPORTED_SERVO_ENDPOINTS,
+        endpoints: tuple[str, ...] = LEGACY_SERVO_ENDPOINTS,
         calibration_file: str = "~/.config/pi5servo/servo.json",
         i2c_bus: int = 1,
         dfr0566_address: int = 0x10,
@@ -545,6 +550,17 @@ class ServoDevice:
         runtime.group.abort()
         runtime.group.off()
         return True
+
+    def read_battery_voltage_sync(self) -> float | None:
+        """Read battery voltage from the active HAT backend when supported."""
+        runtime = self._runtime
+        if runtime is None:
+            return None
+        backend = getattr(runtime.group, "backend", None)
+        reader = getattr(backend, "read_battery_voltage", None)
+        if callable(reader):
+            return float(reader())
+        return None
 
     async def stop(self) -> dict[str, Any]:
         """Abort movement and set every configured servo output to zero."""

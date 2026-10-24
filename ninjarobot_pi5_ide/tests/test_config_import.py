@@ -150,3 +150,58 @@ def test_import_rejects_invalid_json_without_changing_destination(tmp_path: Path
         )
 
     assert not destination.exists()
+
+
+def test_import_sunfounder_and_pca9685_servo_configs(tmp_path: Path) -> None:
+    sunfounder_servo = tmp_path / "sunfounder_servo.json"
+    write_json(
+        sunfounder_servo,
+        {
+            "__backend__": {
+                "name": "sunfounder_robot_hat",
+                "kwargs": {"bus_id": 1, "address": 20, "frequency_hz": 50},
+            },
+            "hat_pwm0": {"pulse_center": 1500},
+            "hat_pwm1": {"pulse_center": 1500},
+            "hat_pwm2": {"pulse_center": 1500},
+        },
+    )
+    imported_sf, _ = import_pi5_configs(
+        load_robot_config(EXAMPLE),
+        [DiscoveredConfig("pi5servo", sunfounder_servo, True)],
+    )
+    assert imported_sf.hardware.servos.endpoints == ("hat_pwm0", "hat_pwm1", "hat_pwm2")
+    assert imported_sf.behaviors.servo_roles["left_motor"] == "hat_pwm0"
+    assert imported_sf.behaviors.servo_roles["right_motor"] == "hat_pwm1"
+    assert imported_sf.speech_output.speaker_enable_gpio == 12
+    assert imported_sf.hardware.power.enabled is True
+    assert imported_sf.hardware.power.fuel_gauge_address == 0x14
+    assert imported_sf.hardware.power.charging_gpio == 23
+
+    toml_path = tmp_path / "sunfounder.toml"
+    toml_path.write_text(robot_config_to_toml(imported_sf), encoding="utf-8")
+    restored_sf = load_robot_config(toml_path)
+    assert restored_sf == imported_sf
+
+    pca_servo = tmp_path / "pca9685_servo.json"
+    write_json(
+        pca_servo,
+        {
+            "__backend__": {
+                "name": "pca9685",
+                "kwargs": {"bus_id": 1, "address": 64, "frequency_hz": 50},
+            },
+            "hat_pwm0": {"pulse_center": 1500},
+            "hat_pwm1": {"pulse_center": 1500},
+            "hat_pwm15": {"pulse_center": 1500},
+        },
+    )
+    imported_pca, _ = import_pi5_configs(
+        load_robot_config(EXAMPLE),
+        [DiscoveredConfig("pi5servo", pca_servo, True)],
+    )
+    assert imported_pca.hardware.servos.endpoints == ("hat_pwm0", "hat_pwm1", "hat_pwm15")
+    assert imported_pca.behaviors.servo_roles["left_motor"] == "hat_pwm0"
+    assert imported_pca.behaviors.servo_roles["right_motor"] == "hat_pwm1"
+    assert imported_pca.speech_output.speaker_enable_gpio is None
+    assert imported_pca.hardware.power.enabled is False

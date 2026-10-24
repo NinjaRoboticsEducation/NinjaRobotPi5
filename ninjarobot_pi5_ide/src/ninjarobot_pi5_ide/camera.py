@@ -235,6 +235,12 @@ class _SystemPythonCameraCapture:
         return _BridgeCaptureResult(path=captured_path, metadata={})
 
 
+def _load_simulated_camera_capture() -> CameraCapture:
+    """Load the managed driver for stub/simulated capture in the current interpreter."""
+    module = importlib.import_module("pi5camera.core.capture")
+    return cast(CameraCapture, module.capture_photo)
+
+
 def _load_in_process_camera_capture() -> CameraCapture:
     """Load Picamera2 and the managed driver in the current interpreter."""
     importlib.import_module("picamera2")
@@ -284,7 +290,13 @@ class CameraDevice:
         self._warmup_seconds = float(warmup_seconds)
         self._autofocus_mode = autofocus_mode
         self._media_directory = Path(media_directory).expanduser().resolve()
-        self._camera_factory = camera_factory or _load_camera_capture
+        self._camera_factory = (
+            camera_factory
+            if camera_factory is not None
+            else _load_simulated_camera_capture
+            if simulated
+            else _load_camera_capture
+        )
         self._simulated = simulated
         self._capture: CameraCapture | None = None
         self._startup_error: str | None = None

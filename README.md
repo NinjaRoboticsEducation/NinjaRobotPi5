@@ -55,21 +55,31 @@ Follow these steps to build and run your own NinjaRobotPi5 from scratch.
 | **Operating System** | Raspberry Pi OS Lite 64-bit | No desktop needed — headless (no monitor) is fine |
 | **Storage** | microSD card (32 GB+) or NVMe SSD | SSD gives faster AI model loading |
 | **Cooling** | Active cooler (fan + heatsink) | Required — AI inference runs hot |
-| **Expansion Board** | DFRobot DFR0566 IO Expansion HAT | Provides GPIO breakout and extra servo power (optional) |
-| **Left Wheel Servo** | TowerPro MG90D 360° continuous rotation | Connected to GPIO12 |
-| **Right Wheel Servo** | TowerPro MG90D 360° continuous rotation | Connected to GPIO13 |
+| **Expansion Board** | **1.** DFRobot DFR0566 IO Expansion HAT *(baseline)*<br>**2.** SunFounder Robot HAT v5 (`0x14`)<br>**3.** General PCA9685 PWM Expansion HAT (`0x40`) | Choose your installed HAT during `ninjarobot onboard` |
+| **Left Wheel Servo** | TowerPro MG90D 360° continuous rotation | `GPIO12` (DFR0566) or `pwm0` / `hat_pwm0` (SunFounder `P0` / PCA9685 `PWM0`) |
+| **Right Wheel Servo** | TowerPro MG90D 360° continuous rotation | `GPIO13` (DFR0566) or `pwm1` / `hat_pwm1` (SunFounder `P1` / PCA9685 `PWM1`) |
+| **Auxiliary Servos** *(optional)* | Up to 10 (`P2`–`P11` on SunFounder) or 14 (`PWM2`–`PWM15` on PCA9685) | Head pan/tilt, arm, gripper (`hat_pwm2`..`hat_pwm15`) |
 | **Buzzer** | Passive buzzer | Connected to GPIO27 |
 | **Distance Sensor** | VL53L0X Time-of-Flight (laser distance) | I2C bus 1 at address 0x29 |
-| **Display** | ST7789V 240×320 IPS LCD | SPI0; DC=GPIO4, RST=GPIO5, BL=GPIO6 |
+| **Display** | ST7789V 240×320 IPS LCD | SPI0; DC=GPIO4, RST=GPIO5, BL=GPIO6 *(SunFounder: RST=GPIO22, BL=GPIO26)* |
 | **Camera** | Raspberry Pi Camera Module (OV5647) | CSI ribbon cable, 1280×720 |
 | **Microphone** | USB audio input device | Use a Linux/ALSA-compatible mic; verify device and sample-rate support |
-| **Power Supply** | Official Raspberry Pi 27 W USB-C supply; optional compatible UPS battery | Through Geekworm X1208 UPS board |
+| **Audio Output** | Bluetooth speaker *(all HATs)* or **Onboard I2S Speaker** *(SunFounder Robot HAT v5)* | SunFounder uses `dtoverlay=hifiberry-dac` + `GPIO12` amplifier enable |
+| **Power Supply** | Official Pi 27 W USB-C + Geekworm X1208 UPS (`0x36`) **or** SunFounder Robot HAT 2S battery (`0x14` ADC A4) | Undervoltage monitoring & safe 6.90 V cutoff supported |
 
 > **📎 Full hardware details:** See [hardware-profile.md](docs/hardware/hardware-profile.md)
 
-### 2.2 Hardware Wiring
+### 2.2 Hardware Wiring & Supported Expansion HAT Profiles
 
-Below is how each component connects to the Raspberry Pi 5 through the DFR0566 expansion board:
+NinjaRobotPi5 supports **three Expansion HAT profiles** out of the box:
+
+| Profile | Expansion HAT | I2C Address | Wheel Servo Channels | Extra Servo Channels | Power & Audio Highlights |
+|---|---|---|---|---|---|
+| **Profile 1** *(Default)* | **DFRobot DFR0566 IO Expansion HAT** (+ Geekworm X1208 UPS) | `0x10` (HAT) / `0x36` (X1208) | `gpio12` (Left), `gpio13` (Right) | `hat_pwm0`..`hat_pwm3` | Pi 5 native hardware PWM on D12/D13; Bluetooth speaker |
+| **Profile 2** | **SunFounder Robot HAT v5** | `0x14` (AT32F413 MCU) | `pwm0` / `P0` (Left), `pwm1` / `P1` (Right) | `pwm2`..`pwm11` (`P2`..`P11`) | Onboard 2S battery ADC (`A4` reg `0x13`), `GPIO5` MCU reset, `GPIO23` charge indicator, built-in I2S speaker (`GPIO12` enable) |
+| **Profile 3** | **General PCA9685 PWM Expansion HAT** | `0x40` (PCA9685) | `pwm0` / `PWM0` (Left), `pwm1` / `PWM1` (Right) | `pwm2`..`pwm15` (`PWM2`..`PWM15`) | 16-channel 12-bit hardware I2C PWM; Bluetooth speaker |
+
+Below is how each component connects to the Raspberry Pi 5 through the DFR0566 expansion board (Profile 1) or SunFounder / PCA9685 HATs (Profiles 2 & 3):
 
 #### Power Chain
 
@@ -99,16 +109,18 @@ Below is how each component connects to the Raspberry Pi 5 through the DFR0566 e
 
 | Component | Connection Type | Pin / Address |
 |---|---|---|
-| Left wheel servo | Native hardware PWM signal; separate power | Signal → D12/GPIO12; red → D12 `+`; ground → GND |
-| Right wheel servo | Native hardware PWM signal; separate power | Signal → D13/GPIO13; red → D13 `+`; ground → GND |
+| Left wheel servo | Native PWM (Profile 1) or I2C HAT PWM (Profiles 2 & 3) | Profile 1: `D12`/`gpio12`; Profile 2: `P0`/`pwm0`; Profile 3: `PWM0`/`pwm0` |
+| Right wheel servo | Native PWM (Profile 1) or I2C HAT PWM (Profiles 2 & 3) | Profile 1: `D13`/`gpio13`; Profile 2: `P1`/`pwm1`; Profile 3: `PWM1`/`pwm1` |
+| Auxiliary servos *(optional)* | I2C HAT PWM | Profile 2: `P2`–`P11` (`pwm2`–`pwm11`); Profile 3: `PWM2`–`PWM15` (`pwm2`–`pwm15`) |
 | Passive buzzer | GPIO | GPIO27 |
 | VL53L0X distance sensor | I2C bus 1 | Address 0x29 |
 | ST7789V display – data | SPI0 | CE0=GPIO8, MOSI=GPIO10, SCLK=GPIO11 |
-| ST7789V display – control | GPIO | DC=GPIO4, RST=GPIO5, Backlight=GPIO6 |
+| ST7789V display – control | GPIO | Profile 1 & 3: DC=GPIO4, RST=GPIO5, BL=GPIO6; Profile 2 (SunFounder): DC=GPIO4, RST=GPIO22, BL=GPIO26 |
+| SunFounder onboard I2S speaker *(Profile 2)* | I2S0 + GPIO | I2S (`GPIO18`, `GPIO19`, `GPIO21`) via `dtoverlay=hifiberry-dac`; Amplifier enable = `GPIO12` |
 | Camera (OV5647) | CSI ribbon cable | CSI port on Pi 5 |
 | USB microphone | USB | Any USB port |
 
-> ⚠️ **Safety reminder:** Never change wiring while the robot is powered on. D12/D13 use native Pi PWM, not the HAT’s separate PWM0–PWM3 outputs. Verify servo voltage and grounding against the [confirmed hardware profile](docs/hardware/hardware-profile.md). Follow the [X1208 manufacturer instructions](https://wiki.geekworm.com/X1208) for battery type, polarity, and power input; do not assume any USB charger is suitable.
+> ⚠️ **Safety reminder:** Never change wiring while the robot is powered on. In Profile 1, D12/D13 use native Pi PWM. In Profile 2 (SunFounder Robot HAT v5), `GPIO5` is reserved for onboard MCU reset, `GPIO23` is the USB-C charge indicator, and `GPIO12` enables the onboard I2S speaker amplifier (`dtoverlay=hifiberry-dac` in `/boot/firmware/config.txt`). Verify servo voltage and grounding against the [confirmed hardware profile](docs/hardware/hardware-profile.md). Follow the [X1208 manufacturer instructions](https://wiki.geekworm.com/X1208) or SunFounder 2S battery instructions for battery type, polarity, and power input.
 
 ### 2.3 Raspberry Pi OS Installation
 
@@ -183,13 +195,40 @@ The wizard shows a NINJAROBOT welcome screen and walks you through:
 
 | Step | What happens |
 |---|---|
-| **1. Hardware setup** | Opens existing setup tools for buzzer, display, distance sensor, servos, and camera; checks saved configuration afterward. Existing valid settings can be applied together. Configuration checks do not certify physical operation. |
-| **2. Bluetooth speaker** *(optional)* | Pairs a Bluetooth speaker for spoken replies. |
+| **0. Expansion HAT profile selection** | Choose **`1. DFRobot DFR0566 IO Expansion HAT`**, **`2. SunFounder Robot HAT`**, or **`3. General PCA9685 PWM Expansion HAT`**. The wizard automatically writes the matching servo backend preset (`auto` at `0x10`, `sunfounder_robot_hat` at `0x14`, or `pca9685` at `0x40`) to `~/.config/pi5servo/servo.json`. |
+| **1. Hardware setup** | Opens existing setup tools one by one for buzzer, display, distance sensor, servos (`GPIO12`/`GPIO13` for Option 1, or `pwm0`/`pwm1` for Options 2 & 3), and camera; checks saved configuration afterward and automatically imports HAT endpoints, `servo_roles`, and power monitoring into `config.toml`. Existing valid settings can be applied together. Configuration checks do not certify physical operation. |
+| **2. Speaker setup** *(optional)* | For Option 2 (SunFounder Robot HAT), enables the onboard I2S speaker amplifier (`GPIO12`) and selects the HiFiBerry DAC sink automatically; for Options 1 & 3 (or fallback), pairs a Bluetooth speaker for spoken replies. |
 | **3. Microphone setup** *(optional)* | Configures your USB mic, local `whisper.cpp` speech-to-text, and the bundled `hey_Ninja.onnx` wake model. |
 | **4. AI provider** | Choose between Ollama (free, local), OpenAI, Gemini, or Anthropic. |
 | **5. External MCP tools** *(optional)* | Set up Tavily web search, Google Calendar, or Notion. |
 | **6. Ngrok remote access** *(optional)* | Configure remote access from outside your home network. See [Appendix D](#appendix-d-ngrok-account-setup). |
 | **7. Launch** | Start the robot in simulation mode (safe) or real-hardware mode. |
+
+#### Step-by-Step Multi-HAT Onboarding & Servo Calibration Guide
+
+1. **Run Onboarding & Select Your Expansion HAT (`1`, `2`, or `3`):**
+   ```bash
+   ninjarobot onboard
+   ```
+   When prompted at **Hardware Expansion Profile Selection**, enter:
+   - **`1`** for **DFRobot DFR0566 IO Expansion HAT** (+ Geekworm X1208 UPS)
+   - **`2`** for **SunFounder Robot HAT** (v5 AT32F413 MCU at `0x14` + onboard I2S speaker)
+   - **`3`** for **General PCA9685 PWM Expansion HAT** (16-channel I2C PWM at `0x40`)
+2. **Initialize Each Hardware Module One by One:**
+   - **Step 1 (Buzzer):** Open `buzzer-tool`, choose `Init`, verify the short beep and silence, then exit.
+   - **Step 2 (Display):** Open `display-tool`, choose `Init` (on SunFounder Robot HAT use `DC=4, RST=22, BL=26`), test `Show Text` and `Clear`, then exit.
+   - **Step 3 (Distance Sensor):** Open `sensor-tool`, run `Health Check`, `Single Read`, and `Calibrate` against a target at a known distance.
+   - **Step 4 (Servo Calibration — Raise Both Wheels First!):**
+     Type `WHEELS RAISED` when prompted to open `pi5servo servo-tool`:
+     1. Choose **`3. Calibrate`** from the menu.
+     2. Enter the left wheel endpoint: `gpio12` (Option 1) or `pwm0` (Options 2 & 3).
+     3. Press **`c`** to select **Center (`0°`)**, adjust the pulse using **`w` / `s`** (`±1 µs`) or **`Up` / `Down`** arrow keys (`±20 µs`) until the wheel completely stops spinning, and press **`Enter`** to save.
+     4. Optionally press **`v`** (Min `-90°`) and **`x`** (Max `+90°`), press **`Enter`** to save, then press **`q`** to return to the menu.
+     5. Repeat **`3. Calibrate`** for the right wheel endpoint (`gpio13` for Option 1, or `pwm1` for Options 2 & 3) and any auxiliary servos (`pwm2`..`pwm11` on SunFounder or `pwm2`..`pwm15` on PCA9685), then press **`q`** to exit `servo-tool`.
+   - **Step 5 (Camera):** Open `camera-tool`, run the setup wizard and `Doctor`, then exit.
+   - **Step 6 (Speaker & Microphone):** Confirm onboard I2S speaker setup (Option 2) or Bluetooth speaker pairing (Options 1 & 3), and optionally configure the USB microphone (`mic-tool`).
+3. **Save Integrated Configuration & Start the Agent:**
+   Press **Enter** at the integrated configuration preview to save `~/.config/ninjarobot_pi5/config.toml`, complete provider setup, and start the Agent service (`ninjarobot service start --real`).
 
 When saved hardware settings exist, choose **2) Apply existing settings for all modules** to reuse valid settings and set up missing modules. New users see **1) Open setup tool** and **Q) Save and exit**. Review configuration summaries and press Enter to continue. **Exit onboarding** does not start the Agent. Skipping ngrok selects authenticated same-Wi-Fi HTTPS for final launch.
 
@@ -362,7 +401,7 @@ Each `pi5*` driver is a standalone library that works independently. You can use
 
 | Driver | Description | Documentation |
 |---|---|---|
-| **pi5servo** | Velocity-based servo control and calibration tools. Supports MG90D continuous-rotation servos via hardware PWM. | [pi5servo/README.md](pi5servo/README.md) |
+| **pi5servo** | Velocity-based servo control and calibration tools. Supports MG90D continuous-rotation and positional servos via Pi 5 hardware PWM, DFRobot DFR0566 (`0x10`), SunFounder Robot HAT v5 (`0x14`), and General PCA9685 PWM Expansion HAT (`0x40`). | [pi5servo/README.md](pi5servo/README.md) |
 | **pi5disp** | ST7789V display driver for the robot's face screen. Supports images, text, scrolling, brightness, and rotation. | [pi5disp/README.md](pi5disp/README.md) |
 | **pi5buzzer** | Passive buzzer driver for beeps, notes, and melodies. Includes named emotion sounds like `happy` and `sad`. | [pi5buzzer/README.md](pi5buzzer/README.md) |
 | **pi5vl53l0x** | VL53L0X laser distance sensor driver. Supports calibration, health checks, and obstacle detection. | [pi5vl53l0x/README.md](pi5vl53l0x/README.md) |
@@ -714,10 +753,10 @@ The principal `/` commands are listed below; `/help` is the current in-app refer
 
 | Document | Description |
 |---|---|
-| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md) | Complete step-by-step guide from blank Pi to running robot |
-| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md) | Architecture, API reference, and developer workflow |
-| [MCP and Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/NinjaRobot_MCP_Skill.md) | Beginner guide to external tools and reusable Skills |
-| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md) | Implementation history and decisions |
+| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md) ([2026-10-25 Multi-HAT Update](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md)) | Complete step-by-step guide from blank Pi to running robot |
+| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md) ([2026-10-25 Multi-HAT Update](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/DevelopmentGuide.md)) | Architecture, API reference, and developer workflow |
+| [MCP and Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/NinjaRobot_MCP_Skill.md) ([2026-10-25 Multi-HAT Update](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md)) | Beginner guide to external tools and reusable Skills |
+| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md) ([2026-10-25 Multi-HAT Update](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md)) | Implementation history and decisions |
 | [Hardware Profile](docs/hardware/hardware-profile.md) | Confirmed wiring and electrical records |
 | [Documentation Index](docs/README.md) | Index of all project documents |
 | [v1.0.0 Support Matrix](docs/architecture/v1.0.0-support-matrix.md) | Historical release baseline; see current manuals for later additions such as speech output |
@@ -939,9 +978,9 @@ Made with ❤️ for AI Robotics Education and Research
 | **OS** | Raspberry Pi OS Lite 64-bit | デスクトップ不要 |
 | **ストレージ** | microSD（32 GB+）または NVMe SSD | SSD推奨 |
 | **冷却** | アクティブクーラー（ファン＋ヒートシンク） | 必須 |
-| **拡張ボード** | DFRobot DFR0566 IO Expansion HAT | サーボ電源(オプション)とGPIOピンブレイクアウト |
-| **左ホイールサーボ** | TowerPro MG90D 360° 連続回転 | GPIO12 |
-| **右ホイールサーボ** | TowerPro MG90D 360° 連続回転 | GPIO13 |
+| **拡張ボード** | **1.** DFRobot DFR0566 IO Expansion HAT<br>**2.** SunFounder Robot HAT v5 (`0x14`)<br>**3.** General PCA9685 PWM Expansion HAT (`0x40`) | `ninjarobot onboard` で 1 / 2 / 3 を選択 |
+| **左ホイールサーボ** | TowerPro MG90D 360° 連続回転 | GPIO12 (DFR0566) または `pwm0` (SunFounder `P0` / PCA9685 `PWM0`) |
+| **右ホイールサーボ** | TowerPro MG90D 360° 連続回転 | GPIO13 (DFR0566) または `pwm1` (SunFounder `P1` / PCA9685 `PWM1`) |
 | **ブザー** | パッシブブザー | GPIO27 |
 | **距離センサー** | VL53L0X Time-of-Flight | I2C バス 1、アドレス 0x29 |
 | **ディスプレイ** | ST7789V 240×320 IPS LCD | SPI0; DC=GPIO4, RST=GPIO5, BL=GPIO6 |
@@ -1066,9 +1105,9 @@ AI ロボティクス教育と研究のために ❤️ を込めて作られま
 | **作業系統** | Raspberry Pi OS Lite 64-bit | 不需桌面 |
 | **儲存** | microSD（32 GB+）或 NVMe SSD | SSD 更快 |
 | **散熱** | 主動式散熱器 | 必需 |
-| **擴充板** | DFRobot DFR0566 | 伺服電源(選配)與GPIO引腳擴展 |
-| **左輪伺服** | MG90D 360° | GPIO12 |
-| **右輪伺服** | MG90D 360° | GPIO13 |
+| **擴充板** | **1.** DFRobot DFR0566<br>**2.** SunFounder Robot HAT v5 (`0x14`)<br>**3.** General PCA9685 PWM Expansion HAT (`0x40`) | 於 `ninjarobot onboard` 選擇 1 / 2 / 3 |
+| **左輪伺服** | MG90D 360° | GPIO12 (DFR0566) 或 `pwm0` (SunFounder `P0` / PCA9685 `PWM0`) |
+| **右輪伺服** | MG90D 360° | GPIO13 (DFR0566) 或 `pwm1` (SunFounder `P1` / PCA9685 `PWM1`) |
 | **蜂鳴器** | 被動式 | GPIO27 |
 | **距離感測器** | VL53L0X | I2C 0x29 |
 | **顯示螢幕** | ST7789V 240×320 | SPI0 |
@@ -1189,9 +1228,9 @@ AI ロボティクス教育と研究のために ❤️ を込めて作られま
 | **操作系统** | Raspberry Pi OS Lite 64-bit | 不需桌面 |
 | **存储** | microSD（32 GB+）或 NVMe SSD | SSD 更快 |
 | **散热** | 主动散热器 | 必需 |
-| **扩展板** | DFRobot DFR0566 | 舵机电源(选配)与GPIO引脚扩展 |
-| **左轮舵机** | MG90D 360° | GPIO12 |
-| **右轮舵机** | MG90D 360° | GPIO13 |
+| **扩展板** | **1.** DFRobot DFR0566<br>**2.** SunFounder Robot HAT v5 (`0x14`)<br>**3.** General PCA9685 PWM Expansion HAT (`0x40`) | 在 `ninjarobot onboard` 中选择 1 / 2 / 3 |
+| **左轮舵机** | MG90D 360° | GPIO12 (DFR0566) 或 `pwm0` (SunFounder `P0` / PCA9685 `PWM0`) |
+| **右轮舵机** | MG90D 360° | GPIO13 (DFR0566) 或 `pwm1` (SunFounder `P1` / PCA9685 `PWM1`) |
 | **蜂鸣器** | 无源 | GPIO27 |
 | **距离传感器** | VL53L0X | I2C 0x29 |
 | **显示屏** | ST7789V 240×320 | SPI0 |
