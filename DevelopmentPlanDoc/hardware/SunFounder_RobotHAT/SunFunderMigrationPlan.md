@@ -1,1047 +1,654 @@
-# SunFounder Robot HAT Migration Plan
+# Phased Hardware & Software Migration Plan: Multi-HAT Support for NinjaRobotPi5
 
-**Document ID:** `DOC-HW-MIGRATION-261024-ROBOTHAT-V1`  
-**Companion Document:** [NinjaPi5Compatibility.md](./NinjaPi5Compatibility.md)  
-**Target Platform:** Raspberry Pi 5 (8 GB) running NinjaRobotPi5  
-**Migration:** DFRobot DFR0566 IO Expansion HAT → SunFounder Robot HAT (v5)  
-**Author:** Antigravity AI Pair Programmer  
-**Date:** 2026-10-24  
+**Target Repository:** `NinjaRobotPi5`  
+**Supported Hardware Profiles:**
+1. **`1. DFRobot DFR0566 IO Expansion HAT`** *(+ Geekworm X1208 UPS — Existing Baseline, 100% Preserved)*
+2. **`2. SunFounder Robot HAT`** *(SunFounder Robot HAT v5 — All-in-One Power, I2S Speaker & 12-Ch Servo MCU)*
+3. **`3. General PCA9685 PWM Expansion HAT`** *(16-Channel I2C PWM Servo Driver)*
 
----
-
-## Table of Contents
-
-1. [Migration Overview](#1-migration-overview)
-2. [Prerequisites & Safety Checklist](#2-prerequisites--safety-checklist)
-3. [Phase 1: Hardware Decommissioning & Physical Installation](#phase-1-hardware-decommissioning--physical-installation)
-4. [Phase 2: Operating System & Audio Configuration](#phase-2-operating-system--audio-configuration)
-5. [Phase 3: Display & Sensor Adaptation](#phase-3-display--sensor-adaptation)
-6. [Phase 4: AT32F413 MCU Servo Backend Development](#phase-4-at32f413-mcu-servo-backend-development)
-7. [Phase 5: Battery Telemetry & Power Management](#phase-5-battery-telemetry--power-management)
-8. [Phase 6: Motion Control & Servo Calibration](#phase-6-motion-control--servo-calibration)
-9. [Phase 7: Integration Testing & Validation](#phase-7-integration-testing--validation)
-10. [Phase 8: Documentation & Cleanup](#phase-8-documentation--cleanup)
-11. [Risk Register & Mitigation](#risk-register--mitigation)
-12. [Complete GPIO Allocation Map](#complete-gpio-allocation-map)
-13. [Migration Timeline Summary](#migration-timeline-summary)
+**Companion Compatibility Report:** `NinjaPi5Compatibility.md`  
+**Document Version:** 3.0 (Verified against `NinjaRobotPi5` Codebase & `ninjarobot_pi5_wiki`)
 
 ---
 
-## 1. Migration Overview
+## 📖 Quick Plain-English Glossary
 
-### 1.1 What Are We Doing?
+New to some of the hardware or software terms in this plan? Here is a quick guide:
+* **HAT** (*Hardware Attached on Top*): An expansion circuit board that plugs directly onto the Raspberry Pi's 40-pin header.
+* **GPIO** (*General-Purpose Input/Output*) & **BCM** (*Broadcom Pin Numbering*): The 40 metal pins on the Raspberry Pi and the logical numbers (`GPIO12`, `GPIO17`) software uses to talk to them.
+* **RP1** (*Raspberry Pi 5 Southbridge*): The chip on Raspberry Pi 5 that controls all GPIO pins. Because of RP1, Pi 5 requires the **`lgpio`** Python library instead of the old Pi 4 `RPi.GPIO` library.
+* **PWM** (*Pulse-Width Modulation*): Sending 50 electrical pulses per second (**50 Hz**) to a servo motor. The pulse width in microseconds (**µs**)—from `500 µs` (`-90°`) to `1500 µs` (`0°` center) to `2500 µs` (`+90°`)—sets the servo's angle or wheel speed.
+* **I2C** (*Inter-Integrated Circuit*): A two-wire bus (`GPIO2 SDA`, `GPIO3 SCL`) where multiple chips share the same wires using unique hexadecimal addresses (`0x10` for DFR0566, `0x14` for SunFounder MCU, `0x29` for VL53L0X distance sensor, `0x36` for X1208 UPS, `0x40` for PCA9685).
+* **Big-Endian vs. Little-Endian**: The byte order used when sending a 16-bit number (`0..65535`) over I2C. **Big-Endian** sends the high byte (`MSB`) first and low byte (`LSB`) second. The SunFounder MCU requires **Big-Endian** 3-byte packets (`[register, MSB, LSB]`).
+* **SPI** (*Serial Peripheral Interface*): A fast 4-wire bus used to drive the ST7789V 2.0" color LCD eye screen.
+* **I2S** (*Inter-IC Sound*) & **PipeWire**: I2S sends pure digital audio over GPIO pins (`18, 19, 20, 21`) to the SunFounder HAT's built-in speaker chip; **PipeWire** is the Linux audio router that sends the robot's voice to a named speaker (`output_node`).
+* **MCU** (*Microcontroller Unit*) & **ADC** (*Analog-to-Digital Converter*): The onboard helper chip (**Artery AT32F413** on the SunFounder HAT) that generates servo pulses and measures analog battery voltage.
+* **MCP** (*Model Context Protocol*): The structured tool-calling protocol used by `ninjarobot_pi5_agent` to request safe robot actions from `ninjarobot_pi5_ide`.
 
-We're replacing the DFRobot DFR0566 IO Expansion HAT (a simple GPIO breakout board) with a SunFounder Robot HAT v5 (a feature-rich robotics controller with an onboard microcontroller, audio system, and power management). This isn't just swapping a board — it's upgrading the entire hardware foundation of NinjaRobotPi5.
+---
 
-```
-BEFORE (DFR0566 Architecture)              AFTER (SunFounder Robot HAT Architecture)
-                                                    
-┌─────────────────────┐                    ┌──────────────────────────┐
-│ Geekworm X1208 UPS  │                    │ SunFounder 2S Li-ion     │
-│ (External Battery)  │                    │ Battery Pack (7.4V)      │
-└────────┬────────────┘                    └──────────┬───────────────┘
-         │                                            │
-┌────────▼────────────┐                    ┌──────────▼───────────────┐
-│ Raspberry Pi 5      │                    │ SunFounder Robot HAT v5  │
-│ + DFR0566 HAT       │                    │ ├── AT32F413 MCU (I2C)   │
-│ ├── 2 Servos        │                    │ ├── 12 PWM Channels      │
-│ │   (GPIO 12 & 13)  │        ═══►        │ ├── 4 Motor Ports        │
-│ ├── Buzzer (GPIO 27)│                    │ ├── I2S Speaker + Mic    │
-│ ├── Display (SPI)   │                    │ ├── 4-ch ADC + Battery   │
-│ └── Sensor (I2C)    │                    │ └── Buttons + LED        │
-│                     │                    │                          │
-│ BT Speaker (ext.)   │                    │ ┌─ Raspberry Pi 5 ─────┐ │
-│ USB Mic (ext.)      │                    │ │ 8 Servos on P0–P7    │ │
-└─────────────────────┘                    │ │ Display, Sensor, Cam  │ │
-                                           └─┴───────────────────────┘
+## 🗺️ Master Migration Roadmap
+
+```mermaid
+flowchart LR
+    P1["Phase 1\nPhysical Assembly &\nPower Safety"] --> P2["Phase 2\nOS Boot Config &\nI2S Audio Setup"]
+    P2 --> P3["Phase 3\nVerify Existing\nSensors & Display"]
+    P3 --> P4["Phase 4\npi5servo Multi-HAT\nDrivers & Endpoints"]
+    P4 --> P5["Phase 5\nninjarobot_pi5_ide\nRuntime & Battery"]
+    P5 --> P6["Phase 6\nInteractive Hardware\nCalibration"]
+    P6 --> P7["Phase 7\nninjarobot onboard\n3-Profile Wizard"]
+    P7 --> P8["Phase 8\nTest Suite & Wiki\nKnowledge Sync"]
 ```
 
-### 1.2 What Changes?
-
-| Aspect | Before (DFR0566) | After (Robot HAT) | Change Type |
-|---|---|---|:---:|
-| Power source | Geekworm X1208 UPS + 27W USB-C | Robot HAT 7.4V battery | **Replace** |
-| Servo count | 2 (GPIO 12, 13) | 8 (P0–P7 via MCU I2C) | **Expand** |
-| Servo driver | Pi5 RP1 hardware PWM | AT32F413 MCU at `0x14` | **New Backend** |
-| Audio output | External Bluetooth speaker | Onboard I2S 2030 speaker | **Replace** |
-| Audio input | USB PnP microphone | USB mic + onboard MEMS mic | **Add Option** |
-| Display RST pin | GPIO 5 | GPIO 17 | **Rewire** |
-| Battery monitoring | None | ADC Ch4 over I2C | **New Feature** |
-| Physical buttons | None | USR (GPIO 25), RST (GPIO 16) | **New Feature** |
-| Status LED | None | User LED (GPIO 26) | **New Feature** |
-
-### 1.3 What Stays the Same?
-
-These subsystems require **zero changes** — they connect directly and work as-is:
-
-- ✅ **ST7789V Display** SPI data path (MOSI=GPIO 10, SCLK=GPIO 11, CS=GPIO 8)
-- ✅ **VL53L0X Distance Sensor** I2C bus (SDA=GPIO 2, SCL=GPIO 3, address `0x29`)
-- ✅ **Passive Buzzer** on GPIO 27 (Digital 27 on Robot HAT)
-- ✅ **OV5647 Camera** CSI ribbon to Pi 5
-- ✅ **Display DC pin** on GPIO 4 (Digital 4 on Robot HAT)
-- ✅ **Display Backlight** on GPIO 6 (BSY pin on SPI header)
-
-### 1.4 Multi-Hardware Profile System & Full Backward Compatibility
-
-The migration does **not** abandon or break previous hardware choices. The codebase maintains full support across three distinct hardware profiles:
-
-1. **SunFounder Robot HAT (v5) [Target Profile]:**
-   - 2S 7.4V battery pack (Geekworm X1208 retired), onboard 5V/5A buck regulator.
-   - Onboard 2.5W 2030 chamber speaker driven over I2S with GPIO 12 amplifier enable.
-   - Up to 12 servos on PWM ports P0–P11 via AT32F413 MCU (`0x14`).
-   - ST7789V Display Reset wired to Digital 17 (GPIO 17).
-2. **DFRobot DFR0566 IO Expansion HAT + Geekworm X1208 UPS [Legacy Profile]:**
-   - Dual-power: X1208 UPS battery + 27W USB-C.
-   - 2 servos on GPIO 12 & 13 driven via Pi 5 RP1 hardware PWM.
-   - External Bluetooth speaker for voice output.
-   - ST7789V Display Reset wired to GPIO 5.
-3. **General PCA9685 12/16-Channel PWM Expansion Board [External Controller Profile]:**
-   - External UBEC / battery pack to PCA9685 `V+` screw terminal (ideal for 4–16 heavy MG996R servos).
-   - Up to 16 servos on channels 0–15 driven via pre-existing `pca9685` backend at I2C address `0x40`.
-   - USB or Bluetooth speaker.
-
-All core `pi5servo` driver functions stay untouched; the active profile is selected during onboarding or switched on-demand via the IDE.
+| Phase | Focus Area | Packages / Files Touched | Key Outcome |
+| :--- | :--- | :--- | :--- |
+| **Phase 1** | Physical Assembly & Power Verification | Hardware Only | Safe power-up for Profile 1 (DFR0566+X1208), Profile 2 (SunFounder), or Profile 3 (PCA9685). |
+| **Phase 2** | OS Boot Overlay & Onboard I2S Audio | `/boot/firmware/config.txt`, `ninjarobot_pi5_ide/audio_output.py` | Built-in I2S speaker enabled (`GPIO12` amp + PipeWire `output_node`) for Profile 2; Bluetooth preserved for Profiles 1 & 3. |
+| **Phase 3** | Existing Peripheral Verification | `pi5disp`, `pi5vl53l0x`, `pi5buzzer`, Camera, Mic | Confirms LCD, Laser Distance Sensor (`0x29`), Buzzer (`GPIO17`), Camera, and USB Mic work identically without code changes. |
+| **Phase 4** | `pi5servo` Multi-HAT Backend Upgrade | `pi5servo` (`sunfounder_robot_hat.py`, `pca9685.py`, `endpoint.py`, `backend.py`, `config_manager.py`, `cli/_common.py`) | Unified support for `dfr0566` (`0x10`), `sunfounder_robot_hat` (`0x14`), and `pca9685` (`0x40`) with `0..15` channel addressing. |
+| **Phase 5** | `ninjarobot_pi5_ide` Runtime, Safety & Battery Integration | `ninjarobot_pi5_ide` (`servo.py`, `config.py`, `hardware_setup.py`, `config_import.py`, `safety.py`) | IDE dynamically loads the active HAT backend, validates HAT servo calibrations, supports multi-joint movements, and monitors battery voltage safely. |
+| **Phase 6** | Interactive Hardware Initialization | CLI Tools (`buzzer-tool`, `display-tool`, `sensor-tool`, `servo-tool`, `camera-tool`) | Step-by-step initialization and neutral/min/max servo calibration using the real TUI tools. |
+| **Phase 7** | `ninjarobot onboard` 3-Profile Wizard & Agent Control | `ninjarobot_pi5_agent` (`setup_wizard.py`) | User runs `ninjarobot onboard`, picks `1`, `2`, or `3`, initializes each hardware module, and controls the robot via the AI Agent. |
+| **Phase 8** | Automated Regression Testing & Wiki Sync | `pytest`, `authorized_driver_changes.json`, `ninjarobot_pi5_wiki` | 100% test pass rate across all packages and canonical wiki documentation updated. |
 
 ---
 
-## 2. Prerequisites & Safety Checklist
+## Phase 1: Physical Assembly, Pre-Flight Safety & Power Verification
 
-### 2.1 Hardware You Will Need
-
-| Item | Quantity | Purpose |
-|---|:---:|---|
-| SunFounder Robot HAT v5 | 1 | Main expansion board |
-| SunFounder 2S 18650 Battery Pack (XH2.54 3-pin) | 1 | Sole power source (7.4V, 2000 mAh) |
-| TowerPro MG996R servo | Up to 2 | High-torque joints (arm shoulder/base) |
-| TowerPro MG90S / MG90D servo | Up to 8 | Lightweight joints (head, gripper, wheels) |
-| Dupont jumper wires (F-F) | ~6 | Display DC, RST, BL signal connections |
-| USB Type-C cable | 1 | Battery charging |
-| Elevated work platform or block | 1 | Suspend wheels/arms during calibration |
-
-### 2.2 Software Prerequisites
-
-| Requirement | How to Verify | Notes |
-|---|---|---|
-| NinjaRobotPi5 repo cloned | `ls ~/NinjaRobotPi5` | All code must be at current HEAD |
-| `uv` package manager | `uv --version` | Required for running project tools |
-| Python 3.11+ | `python3 --version` | Standard Pi 5 Bookworm OS |
-| I2C enabled | `sudo raspi-config` → Interfaces → I2C | Must be ON for MCU communication |
-| SPI enabled | `sudo raspi-config` → Interfaces → SPI | Must be ON for display |
-| SSH access | `ssh user@ninjarobotpi5.local` | Remote work during headless setup |
-
-### 2.3 Pre-Flight Safety Checklist
-
-> [!CAUTION]
-> **Complete ALL items before touching any hardware.**
-
-- [ ] Robot is powered off (`sudo poweroff`)
-- [ ] USB-C power cable is **physically disconnected**
-- [ ] Geekworm X1208 battery is disconnected (if applicable)
-- [ ] Robot chassis is elevated on a block — wheels and arms in the air
-- [ ] You have a second computer nearby for SSH access
-- [ ] You have read and understood the [NinjaPi5Compatibility.md](./NinjaPi5Compatibility.md) report
-- [ ] You have a backup of `~/.config/ninjarobot_pi5/config.toml`
-- [ ] You have a backup of `~/.config/pi5disp/display.json`
-- [ ] You have a backup of `~/.config/pi5servo/servo.json`
-- [ ] Git working tree is clean (`git status --short` shows no uncommitted changes)
+### 1.1 Safety First: Pre-Assembly Checklist
+Before unplugging or plugging any wires on your Raspberry Pi 5:
+1. Run `sudo poweroff` and wait until the Raspberry Pi 5 status LED turns solid red/off.
+2. Disconnect all USB-C power cables and switch **OFF** any battery power switches.
+3. Keep all servo motors **unplugged** during initial board power-up (you will plug them in during Phase 6 after verifying the I2C bus).
 
 ---
 
-## Phase 1: Hardware Decommissioning & Physical Installation
+### 1.2 Hardware Wiring by Profile
 
-### Objective
-Physically remove the old DFR0566 HAT and Geekworm X1208 UPS, then mount the SunFounder Robot HAT onto the Raspberry Pi 5.
+#### Option 1: DFRobot DFR0566 IO Expansion HAT + Geekworm X1208 UPS *(Existing Baseline)*
+* **No physical changes required!** Keep the Geekworm X1208 mounted underneath the Pi 5, the DFR0566 mounted on top, the left wheel servo on `D12` (`GPIO12`), and the right wheel servo on `D13` (`GPIO13`).
 
-### Hardware Risk Level: 🟡 MODERATE
-Incorrect header alignment can short pins. Static discharge can damage ICs.
+#### Option 2: SunFounder Robot HAT (v5)
+1. **Remove the Geekworm X1208 UPS (Recommended):** The SunFounder Robot HAT has its own built-in `5V/5A` power regulator and 2S battery protection circuit. Removing the bottom X1208 UPS reduces weight and avoids double-powering the 5V GPIO rail.
+2. **Mount the SunFounder Robot HAT:** Align the 40-pin female header on the underside of the SunFounder Robot HAT with the Raspberry Pi 5's 40-pin GPIO header and press down firmly on the standoffs.
+3. **Reconnect Existing Peripherals to the SunFounder Pass-Through Header:**
+   * **CSI Camera Ribbon:** Route the ribbon cable through the HAT's camera slot into the Pi 5 `CAM/DISP` MIPI CSI port.
+   * **ST7789V SPI LCD (`pi5disp`):** Plug jumper wires into the top 40-pin pass-through header: `VCC -> 3.3V (Pin 1)`, `GND -> GND (Pin 6)`, `CS -> GPIO8 (Pin 24)`, `MOSI -> GPIO10 (Pin 19)`, `SCLK -> GPIO11 (Pin 23)`, `DC -> GPIO24 (Pin 18)`, `RST -> GPIO25 (Pin 22)`, `BL -> GPIO14 (Pin 8)`. *(Note: Do not press the small physical `USR` tactile button on the HAT while LCD `RST` is wired to `GPIO25`.)*
+   * **VL53L0X Distance Sensor (`pi5vl53l0x`):** Connect to the HAT's 4-pin **I2C** header (`3.3V`, `GND`, `SDA -> GPIO2`, `SCL -> GPIO3`).
+   * **External Buzzer (`pi5buzzer`):** Connect `SIG -> GPIO17 (Pin 11)`, `VCC -> 3.3V`, `GND -> GND`.
+   * **2S Battery (`7.4V–8.4V`):** Plug the 3-wire XH2.54 battery plug into the white battery socket in the corner of the HAT.
 
-### Tasks
-
-#### 1.1 Decommission Geekworm X1208 UPS
-
-1. Ensure the X1208 is fully powered off and disconnected.
-2. Unscrew the X1208 mounting hardware from the Pi 5 underside.
-3. Remove pogo pin connectors or GPIO header connections.
-4. Store the X1208 safely — it is no longer needed.
-
-#### 1.2 Remove DFR0566 HAT
-
-1. Disconnect all wires from DFR0566 headers:
-   - Servo connectors from D12 and D13
-   - Buzzer connector from D27
-   - Display wires from the GPIO breakout
-   - VL53L0X I2C wires
-2. Carefully lift the DFR0566 off the 40-pin header.
-3. Inspect the 40-pin header for bent pins. Straighten if needed.
-
-#### 1.3 Mount SunFounder Robot HAT
-
-1. **Ground yourself** — touch a grounded metal surface.
-2. Align the Robot HAT's 40-pin socket with the Pi 5's 40-pin header.
-3. Press down firmly and evenly until fully seated.
-4. Verify alignment: Pin 1 (3V3) on the Pi must mate with the correct corner of the HAT.
-
-#### 1.4 Connect Battery
-
-1. Insert the SunFounder 2S 18650 battery pack's XH2.54 3-pin connector into the Robot HAT's **Power Port**.
-2. **Do NOT turn on the power switch yet.**
-3. Verify the battery connector is fully seated and oriented correctly (reverse polarity protection exists, but proper orientation is still best practice).
-
-### Validation Gate
-- [ ] Robot HAT is firmly seated on the 40-pin header
-- [ ] No bent pins visible
-- [ ] Battery pack connected but power switch OFF
-- [ ] Old X1208 and DFR0566 physically removed and stored
-
-### Rollback
-If the Robot HAT does not seat properly or if pins appear damaged, stop and inspect. The Pi 5 can be used without any HAT for basic testing.
+#### Option 3: General PCA9685 PWM Expansion HAT
+1. Mount the PCA9685 HAT onto the 40-pin header (or connect via `3.3V`, `GND`, `GPIO2 SDA`, `GPIO3 SCL`).
+2. Connect an external `5V–6V` high-current power supply (or UBEC) to the green **`V+` and `GND` screw terminal** on the PCA9685 board to power the servo rail.
+3. Connect the LCD (`SPI0`), VL53L0X (`I2C1`), and Buzzer (`GPIO17`) to the pass-through GPIO pins exactly as in Option 1.
 
 ---
 
-## Phase 2: Operating System & Audio Configuration
-
-### Objective
-Configure the Raspberry Pi 5 operating system to recognize the Robot HAT's I2S audio system (speaker + MEMS microphone) and verify basic I2C communication with the onboard MCU.
-
-### Hardware Risk Level: 🟢 LOW
-Software-only changes. No hardware manipulation after initial power-on.
-
-### Prerequisites
-- Phase 1 complete
-- SSH access available
-
-### Tasks
-
-#### 2.1 Initial Power-On & I2C Verification
-
-1. Slide the Robot HAT power switch **ON**.
-2. Wait for the Pi 5 to boot. SSH in:
-   ```bash
-   ssh YOUR_USERNAME@ninjarobotpi5.local
-   ```
-3. Verify the AT32F413 MCU is visible on I2C bus 1:
-   ```bash
-   i2cdetect -y 1
-   ```
-   **Expected:** Address `0x14` appears in the scan results. If the VL53L0X sensor is also connected, `0x29` should also appear.
-
-4. If `0x14` does not appear:
-   - Power cycle the Robot HAT (slide switch OFF, wait 5 seconds, ON).
-   - Check that I2C is enabled: `sudo raspi-config` → Interface Options → I2C → Yes.
-   - Verify the HAT is fully seated on the header.
-
-#### 2.2 Enable I2S Audio Overlay
-
-1. Edit the boot configuration:
-   ```bash
-   sudo nano /boot/firmware/config.txt
-   ```
-2. Add or ensure these lines are present (not duplicated):
-   ```ini
-   dtparam=i2s=on
-   dtoverlay=hifiberry-dac
-   ```
-3. Save and exit (`Ctrl+O`, `Enter`, `Ctrl+X`).
-4. Reboot:
-   ```bash
-   sudo reboot
-   ```
-
-#### 2.3 Verify Audio Output
-
-1. SSH back in after reboot.
-2. Check that the I2S sound card is recognized:
-   ```bash
-   aplay -l
-   ```
-   **Expected:** A card named `snd_rpi_hifiberry_dac` (or similar) appears.
-
-3. Enable the speaker amplifier:
-   ```bash
-   # Set GPIO 12 HIGH to power the amplifier
-   pinctrl set 12 op dh
-   ```
-
-4. Play a test tone:
-   ```bash
-   speaker-test -D default -c 1 -t sine -f 440 -l 1
-   ```
-   **Expected:** A 440 Hz tone plays from the onboard 2030 speaker.
-
-5. Set GPIO 12 LOW to disable the amplifier when done:
-   ```bash
-   pinctrl set 12 op dl
-   ```
-
-#### 2.4 Verify Battery LED Indicators
-
-- Both battery LEDs should be ON if the battery is above 7.6V (freshly charged).
-- If only one LED is on, the battery voltage is between 7.15V and 7.6V.
-- If both are off, charge the battery immediately via the Type-C port.
-
-### Validation Gate
-- [ ] `i2cdetect -y 1` shows address `0x14`
-- [ ] `aplay -l` shows the HiFiBerry DAC sound card
-- [ ] Test tone plays audibly from the onboard speaker
-- [ ] Battery LEDs indicate healthy charge level
-- [ ] System boots normally with the new HAT
-
-### Rollback
-The I2S overlay can be removed by deleting the added lines from `/boot/firmware/config.txt` and rebooting. No permanent changes are made in this phase.
-
----
-
-## Phase 3: Display & Sensor Adaptation
-
-### Objective
-Reconnect the ST7789V display and VL53L0X distance sensor to the Robot HAT, with the critical change of moving the display Reset pin from GPIO 5 (which is the MCU reset on the Robot HAT!) to GPIO 17.
-
-### Hardware Risk Level: 🟡 MODERATE
-Incorrect wiring of the display Reset pin to GPIO 5 would cause the MCU to reset unexpectedly during display initialization.
-
-### Prerequisites
-- Phase 2 complete
-- Display and sensor hardware available
-
-### Tasks
-
-#### 3.1 Wire the ST7789V Display
-
-Connect the display to the Robot HAT as follows:
-
-| Display Pin | Wire to Robot HAT | GPIO | Notes |
-|---|---|:---:|---|
-| VCC (3.3V) | SPI Header: `3V3` | — | Display power |
-| GND | SPI Header: `GND` | — | Ground |
-| MOSI (Data) | SPI Header: `MO` | GPIO 10 | SPI data (**same as before**) |
-| SCLK (Clock) | SPI Header: `SCK` | GPIO 11 | SPI clock (**same as before**) |
-| CS (Chip Select) | SPI Header: `CS` | GPIO 8 | Active-low select (**same as before**) |
-| DC (Data/Command) | Digital `4` header: Signal pin | GPIO 4 | (**same as before**) |
-| **RST (Reset)** | **Digital `17` header: Signal pin** | **GPIO 17** | ⚠️ **CHANGED from GPIO 5!** |
-| BL (Backlight) | SPI Header: `BSY` | GPIO 6 | Backlight PWM (**same as before**) |
-
-> [!WARNING]
-> **DO NOT connect the display Reset wire to GPIO 5!** On the Robot HAT, GPIO 5 is hardwired to the AT32F413 MCU's reset pin. Pulling it low during display initialization would reset the microcontroller, killing all servo PWM signals and I2C communication.
-
-#### 3.2 Update Display Configuration
-
-Run the display interactive tool and update the Reset pin setting:
+### 1.3 Initial Power-Up & I2C Bus Verification
+Turn on the power switch, boot into Raspberry Pi OS, and run:
 
 ```bash
-cd ~/NinjaRobotPi5
-uv run --frozen --no-sync pi5disp display-tool
+# 1. Verify no undervoltage or throttling occurred during boot (must return throttled=0x0)
+vcgencmd get_throttled
+
+# 2. Scan I2C Bus 1 to confirm your HAT and distance sensor are visible
+sudo i2cdetect -y 1
 ```
 
-1. Select **`1. Init`** (Set up display module & pin config).
-2. Enter the pin values:
-   - `dc_pin` = `4` (unchanged)
-   - `rst_pin` = **`17`** ← **This is the critical change!**
-   - `backlight_pin` = `6` (unchanged)
-3. Return to the main menu.
-4. Select **`4. Ball Demo`** to verify the display renders correctly.
-5. Select **`9. Exit`** to save settings to `~/.config/pi5disp/display.json`.
+**Expected `i2cdetect -y 1` Output by Profile:**
+* **Profile 1 (DFR0566 + X1208):** Shows `10` (DFR0566), `29` (VL53L0X), and `36` (X1208 Fuel Gauge).
+* **Profile 2 (SunFounder Robot HAT):** Shows **`14`** (AT32F413 MCU) and **`29`** (VL53L0X).
+* **Profile 3 (PCA9685 HAT):** Shows **`29`** (VL53L0X) and **`40`** (PCA9685 PWM Driver; plus `70` all-call address if enabled).
 
-#### 3.3 Connect the VL53L0X Distance Sensor
+> **Troubleshooting if `14` is missing on SunFounder Robot HAT:**  
+> Pulse the MCU Reset pin (`GPIO5`) using Raspberry Pi 5's built-in `pinctrl` tool (never `RPi.GPIO`):
+> ```bash
+> pinctrl set 5 op dl && sleep 0.05 && pinctrl set 5 op dh && sleep 0.2
+> sudo i2cdetect -y 1
+> ```
 
-Connect the sensor to the Robot HAT's I2C interface:
+---
 
-| Sensor Pin | Wire to Robot HAT | Notes |
-|---|---|---|
-| VCC | I2C Header: `3V3` or `VCC` | 3.3V power |
-| GND | I2C Header: `GND` | Ground |
-| SDA | I2C Header: `SDA` | GPIO 2 (**same as before**) |
-| SCL | I2C Header: `SCL` | GPIO 3 (**same as before**) |
+## Phase 2: OS Boot Configuration & Onboard I2S Audio Setup
 
-**Alternative:** Use the SH1.0 QWIIC/STEMMA QT port if your sensor has a compatible cable.
+### 2.1 Boot Overlay Configuration (`/boot/firmware/config.txt`)
 
-#### 3.4 Verify Sensor Communication
+Ensure `/boot/firmware/config.txt` enables `i2c_arm` and `spi` for all profiles, and adds the **HiFiBerry I2S DAC overlay** plus **`GPIO12` speaker enable** when using the SunFounder Robot HAT:
 
-```bash
-uv run --frozen --no-sync pi5vl53l0x sensor-tool
+```ini
+# --- NinjaRobotPi5 Core Buses (All Profiles) ---
+dtparam=i2c_arm=on
+dtparam=spi=on
+
+# --- SunFounder Robot HAT Onboard I2S Speaker (Safe on All Profiles when GPIO12 is not used for PWM) ---
+# Note: Only active when Profile 2 (SunFounder Robot HAT) is selected, or enabled via setup script.
+dtparam=i2s=on
+dtoverlay=hifiberry-dac
 ```
 
-1. Select **`5. Health Check`** — confirms I2C address `0x29` is responsive.
-2. Select **`4. Calibrate`** — place a flat surface 100 mm away, enter `100`.
-3. Select **`q. Exit`**.
+> **Important Compatibility Note for Profile 1 (DFR0566):**  
+> On Profile 1, `GPIO18`–`GPIO21` are unused, so loading `dtoverlay=hifiberry-dac` does not touch `GPIO12` or `GPIO13`! However, do **not** hardcode `gpio=12=op,dh` in `/boot/firmware/config.txt` if you switch back and forth to Profile 1 (which uses `GPIO12` as hardware PWM `Alt0` for the left wheel servo). Instead, let `NinjaRobotPi5` toggle `GPIO12` dynamically in software via `lgpio` whenever Profile 2's I2S speaker is active!
 
-#### 3.5 Verify Buzzer
+---
 
-Connect the buzzer to Digital 27 header (Signal=GPIO 27, VCC=5V, GND=GND):
+### 2.2 Integrating Onboard I2S Audio with `ninjarobot_pi5_ide/audio_output.py`
+
+In the existing codebase, [`ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/audio_output.py`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/audio_output.py#L64-L66) requires an explicit PipeWire `output_node` in `config.toml` (`[speech_output]`) and runs `pw-play --target=<output_node>` with `"node.dont-fallback": True`. Furthermore, the SunFounder Robot HAT has a hardware mute/enable switch on **`GPIO12`** (`HIGH` = Speaker Amplifier ON, `LOW` = Muted).
+
+#### Required Enhancement to `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/audio_output.py`:
+1. Add a helper function `discover_i2s_output_node()` that inspects `pw-dump` for a PipeWire `Audio/Sink` whose `node.name` or `node.description` matches `hifiberry` / `soc_sound` / `rpi_hifiberry_dac` (typically `alsa_output.platform-soc_sound.stereo-fallback`).
+2. Add optional `speaker_enable_gpio: int | None = None` to [`SpeechOutputConfig`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/config.py#L298-L315) in `config.py` (set to `12` for Profile 2 `sunfounder_robot_hat`, and `None` for Profiles 1 & 3).
+3. Inside `AudioOutput._play_stream()`, when `self.config.speaker_enable_gpio is not None`:
+   * Use `lgpio` to assert `GPIO12` `HIGH` (`1`) before spawning `pw-play`, and optionally keep it `HIGH` (or pull `LOW` on `close()`) so the built-in speaker always plays clearly even right after a cold reboot!
+
+```python
+# Helper in ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/audio_output.py
+def _set_speaker_amplifier(gpio_pin: int | None, enabled: bool) -> None:
+    """Drive the SunFounder Robot HAT speaker amplifier switch (GPIO 12) via lgpio."""
+    if gpio_pin is None:
+        return
+    try:
+        import lgpio
+        for chip in (4, 0):
+            try:
+                handle = lgpio.gpiochip_open(chip)
+                break
+            except Exception:
+                continue
+        else:
+            return
+        try:
+            lgpio.gpio_claim_output(handle, gpio_pin, 1 if enabled else 0)
+            lgpio.gpio_write(handle, gpio_pin, 1 if enabled else 0)
+        finally:
+            lgpio.gpiochip_close(handle)
+    except Exception:
+        pass
+```
+
+#### Quick CLI Verification for Onboard I2S Speaker (Profile 2):
+```bash
+# Enable amplifier on GPIO 12 using Pi 5's pinctrl and play a 2-second test tone
+pinctrl set 12 op dh
+speaker-test -t sine -f 440 -c 2 -l 1
+```
+
+---
+
+## Phase 3: Existing Hardware Verification (Zero Code Changes Needed)
+
+Before touching any servo code, verify that the four non-servo peripherals work identically across your mounted HAT:
 
 ```bash
+# 1. Verify Buzzer on GPIO 17
 uv run --frozen --no-sync pi5buzzer buzzer-tool
+
+# 2. Verify ST7789V SPI LCD Display
+uv run --frozen --no-sync pi5disp display-tool
+
+# 3. Verify VL53L0X Laser Distance Sensor on I2C 0x29
+uv run --frozen --no-sync pi5vl53l0x sensor-tool
+
+# 4. Verify Pi 5 CSI Camera
+rpicam-hello --list-cameras
+
+# 5. Verify USB Microphone
+arecord -l
 ```
-
-Select **`2. Beep`** to confirm GPIO 27 buzzer output works.
-
-### Validation Gate
-- [ ] Display renders Ball Demo correctly with RST on GPIO 17
-- [ ] `~/.config/pi5disp/display.json` shows `"rst_pin": 17`
-- [ ] VL53L0X health check passes at address `0x29`
-- [ ] Sensor calibration stores offset successfully
-- [ ] Buzzer beeps on GPIO 27
-- [ ] No MCU resets observed (check `dmesg` for I2C errors)
-
-### Rollback
-If the display does not work with GPIO 17, verify wiring continuity. The `rst_pin` setting can be reverted in `~/.config/pi5disp/display.json` to `5` to restore old behavior (only valid when using the old DFR0566 HAT).
 
 ---
 
-## Phase 4: AT32F413 MCU Servo Backend Development
+## Phase 4: `pi5servo` Multi-HAT Driver & Endpoint Upgrade
 
-### Objective
-Create a new `pi5servo` backend driver that communicates with the SunFounder Robot HAT's AT32F413 MCU over I2C to control PWM channels P0–P7 (expandable to P0–P11) for servo motors.
+> **Governance Reminder (`NinjaRobotPi5/AGENTS.md`):**  
+> Because `pi5servo` is a managed hardware driver package checked by `scripts/check_driver_ modifications.py`, any intentional edits to `pi5servo/` must also be recorded in `authorized_driver_changes.json` with an explicit reason and change ID.
 
-### Hardware Risk Level: 🟢 LOW (development phase)
-Code development and testing. Live hardware testing is deferred to Phase 6.
+### 4.1 Implementing `SunFounderRobotHatBackend` (`pi5servo/src/pi5servo/core/backends/sunfounder_robot_hat.py`)
 
-### Prerequisites
-- Phase 3 complete
-- Understanding of the MCU I2C protocol (see [OnboardMCU.md](./OnboardMCU.md))
-
-### Tasks
-
-#### 4.1 Create the Backend Module
-
-Create a new file: `pi5servo/src/pi5servo/core/backends/sunfounder_robot_hat.py`
-
-This module must implement the same interface as existing backends (e.g., `dfr0566.py`, `pca9685.py`):
-
-**Core Responsibilities:**
-1. Open I2C bus 1 at address `0x14`.
-2. Configure Timer 0 (channels P0–P3) and Timer 1 (channels P4–P7) for 50 Hz servo frequency:
-   - Set period to `4095` (registers `0x44` for Timer 0, `0x45` for Timer 1).
-   - Calculate prescaler: `72,000,000 / (4095 + 1) / 50 - 1 = 350`.
-   - Write prescaler to registers `0x40` (Timer 0) and `0x41` (Timer 1).
-3. Convert servo pulse width (in microseconds, typically 500–2500 µs) to an "On Value":
-   - `on_value = pulse_us / 20000 * (period + 1)` → For period 4095: `on_value = pulse_us * 4096 / 20000`.
-   - Example: 1500 µs center → `on_value = 1500 * 4096 / 20000 = 307`.
-4. Write the On Value to the appropriate channel register (`0x20` + channel).
-5. Implement MCU reset recovery: if an I2C `IOError` occurs, pulse GPIO 5 LOW for 10 ms then HIGH for 10 ms, wait 10 ms, then retry.
-
-**I2C Protocol Reference:**
+#### Critical Hardware Protocol Rules (Verified from `OnboardMCU.md` & `sunfounder/robot-hat`):
+1. **Big-Endian 3-Byte Packet Format:** The Artery AT32F413 MCU at `0x14` reads fixed 3-byte I2C packets: `[register, value_high_byte, value_low_byte]`. Standard SMBus `write_word_data` sends Little-Endian (`[register, LSB, MSB]`), which corrupts 16-bit numbers like `PERIOD = 4095` (`0x0FFF` -> `0xFF0F = 65295`). Therefore, **all 16-bit writes must use `bus.write_i2c_block_data(address, reg, [(val >> 8) & 0xFF, val & 0xFF])`**!
+2. **Timer Register Layout on AT32F413 MCU:**
+   * Channels `P0–P11` (indices `0..11`) are grouped into 3 hardware timers of 4 channels each:
+     * **Timer 0 (`P0–P3`):** Prescaler Reg `0x40`, Period (ARR) Reg `0x44`
+     * **Timer 1 (`P4–P7`):** Prescaler Reg `0x41`, Period (ARR) Reg `0x45`
+     * **Timer 2 (`P8–P11`):** Prescaler Reg `0x42`, Period (ARR) Reg `0x46`
+   * Pulse width register for channel `ch` (`0..11`): **`0x20 + ch`** (`0x20` to `0x2B`).
+3. **Thread-Safe Bus Lock (`threading.RLock`) & `lgpio` MCU Reset (`GPIO5`):**
+   * Both servo PWM writes and battery ADC reads (`A4`, Reg `0x13`) share the same MCU state machine at `0x14`. A class-level `threading.RLock()` ensures an ADC battery read never interleaves mid-packet with a servo write.
+   * If an I2C `OSError` occurs, the backend can optionally pulse `GPIO5` (`MCURST`) via `lgpio` and re-initialize the timers.
 
 ```python
-# Example: Set channel 0 to 1500 µs (center position)
-from smbus2 import SMBus
+"""SunFounder Robot HAT (v5) I2C servo & battery ADC backend for pi5servo."""
 
-ADDR = 0x14
-PERIOD = 4095
-FREQ = 50
+from __future__ import annotations
 
-bus = SMBus(1)
+import threading
+import time
+from collections.abc import Callable
+from typing import Any
 
-# Step 1: Configure Timer 0
-bus.write_word_data(ADDR, 0x44, PERIOD)         # Timer 0 period = 4095
-prescaler = int(72_000_000 / (PERIOD + 1) / FREQ) - 1  # = 350
-bus.write_word_data(ADDR, 0x40, prescaler)      # Timer 0 prescaler = 350
+from ..endpoint import parse_servo_endpoint
+from .base import BackendConfigurationError, BackendUnavailableError, ServoBackend
 
-# Step 2: Set servo pulse
-pulse_us = 1500  # Center position
-on_value = int(pulse_us * (PERIOD + 1) / 20000)  # = 307
-bus.write_word_data(ADDR, 0x20, on_value)       # Channel 0 = 307
+SUNFOUNDER_DEFAULT_ADDRESS = 0x14
+SUNFOUNDER_PWM_CHANNELS = range(0, 12)  # P0 through P11 (0-indexed)
+SUNFOUNDER_MCU_CLOCK_HZ = 72_000_000
+SUNFOUNDER_PWM_PERIOD = 4095
+SUNFOUNDER_ADC_BATTERY_CHANNEL = 4  # A4 internal 20k/10k voltage divider
+
+
+class SunFounderRobotHatBackend(ServoBackend):
+    """Drive up to 12 servos (P0..P11) and read battery ADC via SunFounder Robot HAT MCU (0x14)."""
+
+    name = "sunfounder_robot_hat"
+    _io_lock = threading.RLock()
+
+    def __init__(
+        self,
+        *,
+        bus_id: int = 1,
+        address: int = SUNFOUNDER_DEFAULT_ADDRESS,
+        frequency_hz: int = 50,
+        bus: Any | None = None,
+        bus_factory: Callable[[int], Any] | None = None,
+    ) -> None:
+        if address < 0x03 or address > 0x77:
+            raise BackendConfigurationError(f"Invalid I2C address 0x{address:02X}.")
+        if frequency_hz < 40 or frequency_hz > 300:
+            raise BackendConfigurationError(
+                f"Invalid servo PWM frequency {frequency_hz}Hz. Expected 40-300Hz."
+            )
+
+        self.bus_id = int(bus_id)
+        self.address = int(address)
+        self.frequency_hz = int(frequency_hz)
+        self.period_us = 1_000_000.0 / float(self.frequency_hz)
+        self._owns_bus = bus is None
+        self._bus = bus or self._open_bus(bus_factory)
+        self._pulses: dict[int, float] = {}
+        self._closed = False
+        self._initialize_timers()
+
+    def _open_bus(self, bus_factory: Callable[[int], Any] | None) -> Any:
+        if bus_factory is not None:
+            return bus_factory(self.bus_id)
+        try:
+            from smbus2 import SMBus
+        except ImportError as exc:
+            raise BackendUnavailableError(
+                "SunFounder Robot HAT backend requires 'smbus2'."
+            ) from exc
+        try:
+            return SMBus(self.bus_id)
+        except Exception as exc:
+            raise BackendUnavailableError(
+                f"Unable to open I2C bus {self.bus_id} for SunFounder Robot HAT "
+                f"at 0x{self.address:02X}: {exc}"
+            ) from exc
+
+    def _write_u16_be(self, register: int, value: int) -> None:
+        """Write a 16-bit unsigned integer in Big-Endian [MSB, LSB] format to the AT32F413 MCU."""
+        clamped = max(0, min(65535, int(value)))
+        msb = (clamped >> 8) & 0xFF
+        lsb = clamped & 0xFF
+        with self._io_lock:
+            self._bus.write_i2c_block_data(self.address, register, [msb, lsb])
+
+    def _initialize_timers(self) -> None:
+        """Configure Timers 0, 1, and 2 (covering P0..P11) for 50Hz PWM."""
+        prescaler = max(
+            1,
+            int(
+                round(
+                    SUNFOUNDER_MCU_CLOCK_HZ
+                    / (self.frequency_hz * (SUNFOUNDER_PWM_PERIOD + 1))
+                )
+            )
+            - 1,
+        )
+        try:
+            with self._io_lock:
+                for timer_idx in range(3):  # Timers 0, 1, 2 -> Channels P0..P11
+                    self._write_u16_be(0x40 + timer_idx, prescaler)
+                    self._write_u16_be(0x44 + timer_idx, SUNFOUNDER_PWM_PERIOD)
+        except Exception as exc:
+            if self._owns_bus and hasattr(self._bus, "close"):
+                self._bus.close()
+            raise BackendUnavailableError(
+                f"Unable to initialize SunFounder Robot HAT MCU at 0x{self.address:02X}: {exc}"
+            ) from exc
+
+    def _resolve_channel(self, identifier: int | str) -> int:
+        endpoint = parse_servo_endpoint(identifier)
+        if endpoint.kind != "hat_pwm":
+            raise BackendConfigurationError(
+                f"SunFounder Robot HAT requires HAT PWM endpoints (pwm0..pwm11 / p0..p11), got {identifier!r}."
+            )
+        if endpoint.value not in SUNFOUNDER_PWM_CHANNELS:
+            raise BackendConfigurationError(
+                f"SunFounder Robot HAT channel {endpoint.value} out of range (expected 0..11)."
+            )
+        return endpoint.value
+
+    def set_pulse_us(self, identifier: int | str, pulse_us: float) -> None:
+        channel = self._resolve_channel(identifier)
+        if pulse_us <= 0:
+            self.off(channel)
+            return
+        ticks = int(
+            round((float(pulse_us) / self.period_us) * float(SUNFOUNDER_PWM_PERIOD))
+        )
+        ticks = max(0, min(SUNFOUNDER_PWM_PERIOD, ticks))
+        self._write_u16_be(0x20 + channel, ticks)
+        self._pulses[channel] = float(pulse_us)
+
+    def get_pulse_us(self, identifier: int | str) -> float:
+        channel = self._resolve_channel(identifier)
+        return self._pulses.get(channel, 0.0)
+
+    def off(self, identifier: int | str) -> None:
+        channel = self._resolve_channel(identifier)
+        self._write_u16_be(0x20 + channel, 0)
+        self._pulses[channel] = 0.0
+
+    def read_battery_voltage(self) -> float:
+        """Thread-safe read of onboard 2S battery voltage via ADC channel A4 (Reg 0x13)."""
+        channel_reg = (SUNFOUNDER_ADC_BATTERY_CHANNEL | 0x10)  # 0x14 -> 0x13 for A4 (7 - 4 | 0x10)
+        channel_reg = (7 - SUNFOUNDER_ADC_BATTERY_CHANNEL) | 0x10  # 0x13
+        with self._io_lock:
+            self._write_u16_be(channel_reg, 0)
+            msb = self._bus.read_byte(self.address)
+            lsb = self._bus.read_byte(self.address)
+        raw = (msb << 8) | lsb
+        return round((raw / 4095.0) * 3.3 * 3.0, 2)
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        for ch in list(self._pulses):
+            try:
+                self.off(ch)
+            except Exception:
+                pass
+        self._closed = True
+        if self._owns_bus and hasattr(self._bus, "close"):
+            self._bus.close()
 ```
 
-#### 4.2 Register the Backend
+---
 
-Update `pi5servo/src/pi5servo/core/backends/__init__.py` to register the new backend alongside existing ones:
+### 4.2 Updating `PCA9685ServoBackend` (`pi5servo/src/pi5servo/core/backends/pca9685.py`) for Direct `hat_pwm0..15` & `smbus2` Support
+
+#### Why `pca9685.py` Must Be Updated:
+In the current codebase, [`PCA9685ServoBackend._normalize_identifier()`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/pi5servo/src/pi5servo/core/backends/pca9685.py#L57-L64) rejects any endpoint where `endpoint.kind != "gpio"` and requires `adafruit-blinka` + `adafruit-circuitpython-pca9685` (which are not installed in the base `uv` environment).
+To satisfy **Requirement #2 and #3** (smooth support for **General PCA9685 PWM Expansion HAT** using `hat_pwm0..15` / `pwm0..15`), update `PCA9685ServoBackend` in [`pi5servo/src/pi5servo/core/backends/pca9685.py`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/pi5servo/src/pi5servo/core/backends/pca9685.py) to:
+1. Accept `endpoint.kind == "hat_pwm"` with `0 <= endpoint.value <= 15` directly as PCA9685 channel `0..15` (while still supporting legacy `endpoint.kind == "gpio"` via `channel_map` so existing unit tests in `pi5servo/tests/test_backends.py` pass 100% unchanged!).
+2. Provide a built-in **`smbus2` register implementation** (using PCA9685 registers `MODE1 = 0x00`, `PRESCALE = 0xFE`, and `LED0_ON_L = 0x06 + 4 * ch`) whenever `pca9685_device` / `adafruit_pca9685` is not passed, so the General PCA9685 HAT works out-of-the-box with `smbus2` just like `dfr0566` and `sunfounder_robot_hat`!
+
+---
+
+### 4.3 Expanding `ServoEndpoint` (`pi5servo/src/pi5servo/core/endpoint.py`) & `ConfigManager` (`config_manager.py`)
+
+1. **In [`pi5servo/src/pi5servo/core/endpoint.py`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/pi5servo/src/pi5servo/core/endpoint.py#L18-L62):**
+   * Change `ServoEndpoint.__post_init__` validation from `1 <= self.value <= 4` to **`0 <= self.value <= 15`**:
+     ```python
+     if self.kind == "hat_pwm" and not 0 <= self.value <= 15:
+         raise ValueError(
+             f"Invalid HAT PWM channel {self.value}. Supported channels are 0 to 15."
+         )
+     ```
+   * In `parse_servo_endpoint()`, accept `"hat_pwm0"`..`"hat_pwm15"`, `"pwm0"`..`"pwm15"`, and `"p0"`..`"p15"` (case-insensitive), all returning `ServoEndpoint(kind="hat_pwm", value=channel)` whose canonical `.identifier` is `f"hat_pwm{self.value}"` and `.label` is `f"HAT_PWM{self.value}"`.
+   * Note: `DFR0566ServoBackend` continues to enforce `DFR0566_PWM_CHANNELS = range(1, 5)` inside `dfr0566.py`, so DFR0566's 1-indexed `hat_pwm1..4` validation remains 100% unchanged!
+
+2. **In [`pi5servo/src/pi5servo/core/backend.py`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/pi5servo/src/pi5servo/core/backend.py) & [`pi5servo/src/pi5servo/cli/_common.py`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/pi5servo/src/pi5servo/cli/_common.py):**
+   * Register `"sunfounder_robot_hat"` (and aliases `"sunfounder"`, `"robot_hat"`) in `create_servo_backend()` and `BACKEND_CHOICES`.
+   * Update `_create_auto_backend()` in `backend.py` so that when `hat_endpoints` are present, it checks `hat_backend` / `address` (`0x14` -> `SunFounderRobotHatBackend`, `0x40` -> `PCA9685ServoBackend`, default `0x10` -> `DFR0566ServoBackend`) instead of unconditionally instantiating `DFR0566ServoBackend`.
+
+---
+
+## Phase 5: `ninjarobot_pi5_ide` Runtime, Safety, Power & Config Import Integration
+
+To ensure the IDE (`ninjarobot-ide-tool`) and AI Agent (`ninjarobot_pi5_agent`) work seamlessly across all 3 HATs, update the following five files in `ninjarobot_pi5_ide`:
+
+### 5.1 Dynamic Backend Loading in [`ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/servo.py`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/servo.py#L100-L136)
+
+**Current Bug:** `_load_servo_runtime()` ignores `manager.get_backend_config()` stored in `~/.config/pi5servo/servo.json` (`__backend__`) and hardcodes `backend="auto"` and `backend_kwargs={"bus_id": i2c_bus, "address": dfr0566_address}` (`0x10`).  
+**Fix:** Read `backend_cfg = manager.get_backend_config()` from `ConfigManager`. If `backend_cfg["name"]` is `"sunfounder_robot_hat"` or `"pca9685"` (or `hat_pwm` endpoints are used with saved `kwargs`), pass the saved `backend_name` and merged `backend_kwargs` (`bus_id`, `address`, `frequency_hz`) to `MultiServos(...)`!
 
 ```python
-# Add to the backend registry
-"sunfounder_robot_hat": SunFounderRobotHatBackend,
+# Inside _load_servo_runtime() in ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/servo.py
+backend_cfg = manager.get_backend_config()
+saved_backend = str(backend_cfg.get("name", "auto") or "auto")
+saved_kwargs = dict(backend_cfg.get("kwargs") or {})
+effective_kwargs = {
+    "bus_id": saved_kwargs.get("bus_id", i2c_bus),
+    "address": saved_kwargs.get("address", dfr0566_address),
+    **saved_kwargs,
+}
+group = group_type(
+    None,
+    pins=list(endpoints),
+    calibrations=calibrations,
+    backend=saved_backend,
+    backend_kwargs=effective_kwargs,
+)
 ```
-
-#### 4.3 Add MCU Reset Utility
-
-Implement a `reset_mcu()` function that:
-1. Sets GPIO 5 as output.
-2. Drives GPIO 5 LOW for 10 ms.
-3. Drives GPIO 5 HIGH for 10 ms.
-4. Waits 10 ms for MCU to reinitialize.
-
-> [!IMPORTANT]
-> **Architecture Boundary:** Per AGENTS.md, the `pi5servo` driver owns its device directly. The `reset_mcu()` function belongs in this backend, not in `ninjarobot_pi5_agent` or at a higher abstraction level.
-
-#### 4.4 Simplified Endpoint Aliases & Endpoint Validation
-
-1. **Update `ServoEndpoint` in `pi5servo`:**
-   In `pi5servo/src/pi5servo/core/endpoint.py`, expand channel range validation and add intuitive, simplified aliases:
-   ```python
-   # In ServoEndpoint.__post_init__:
-   if self.kind == "hat_pwm" and not 0 <= self.value <= 15:
-       raise ValueError("HAT/expansion PWM channels must be in the range 0..15")
-
-   # In parse_servo_endpoint(raw):
-   # Accept "pwm0", "pwm1", etc.
-   if text.startswith("pwm") and text[3:].isdigit():
-       return ServoEndpoint(kind="hat_pwm", value=int(text[3:]))
-   # Accept "p0", "p1", etc. (matching physical Robot HAT silkscreen!)
-   if text.startswith("p") and text[1:].isdigit():
-       return ServoEndpoint(kind="hat_pwm", value=int(text[1:]))
-   # Retain "hat_pwm0" for canonical compatibility
-   if text.startswith("hat_pwm") and text[7:].isdigit():
-       return ServoEndpoint(kind="hat_pwm", value=int(text[7:]))
-   ```
-   **User Benefit:** When calibrating or moving servos, the user can simply type `pwm0` or `p0` instead of the cumbersome `hat_pwm0`!
-
-2. **Update IDE Supported Endpoints:**
-   In `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/config.py`, update `SUPPORTED_SERVO_ENDPOINTS` to include channels 0 through 11 (up to 15) in both canonical and simplified alias formats:
-   ```python
-   EXPANSION_PWM_ENDPOINTS = tuple(f"pwm{i}" for i in range(16))
-   CANONICAL_PWM_ENDPOINTS = tuple(f"hat_pwm{i}" for i in range(16))
-   SUPPORTED_SERVO_ENDPOINTS = (
-       *DEFAULT_SERVO_ENDPOINTS,
-       *CANONICAL_PWM_ENDPOINTS,
-       *EXPANSION_PWM_ENDPOINTS,
-   )
-   ```
-
-#### 4.5 Add Pin Mapping & Hardware Profile Tool in `ninjarobot_pi5_ide`
-
-Create a dedicated hardware profile switcher in `ninjarobot-ide-tool`:
-```bash
-uv run ninjarobot-ide-tool hardware set-profile <profile_name> [--apply]
-```
-Supported profiles:
-- `sunfounder_robot_hat`:
-  - Sets display `rst_pin = 17`, `dc_pin = 4` in `~/.config/pi5disp/display.json`.
-  - Sets servo backend `sunfounder_robot_hat` in `~/.config/pi5servo/servo.json`.
-  - Sets `servo_roles`: `left_motor = "pwm0"`, `right_motor = "pwm1"`, `head_pan = "pwm2"`, `head_tilt = "pwm3"` in `~/.config/ninjarobot_pi5/config.toml`.
-  - Enables I2S audio with GPIO 12 amplifier enable.
-- `dfr0566`:
-  - Sets display `rst_pin = 5`, `dc_pin = 4`.
-  - Sets servo backend `hardware_pwm` (GPIO 12/13).
-  - Sets `servo_roles`: `left_motor = "gpio12"`, `right_motor = "gpio13"`.
-  - Routes audio to Bluetooth speaker.
-- `pca9685`:
-  - Sets servo backend `pca9685` at I2C address `0x40`.
-  - Sets `servo_roles`: `left_motor = "pwm0"`, `right_motor = "pwm1"`.
-
-#### 4.6 Authorize Managed Driver Changes (`AGENTS.md` Policy)
-
-Because `pi5servo` is a managed driver package with an immutable baseline, all file additions (`sunfounder_robot_hat.py`) and modifications (`endpoint.py`, `__init__.py`) must be recorded in `docs/validation/authorized_driver_changes.json`:
-```bash
-uv run python scripts/verify_immutable_drivers.py \
-  --record-authorized pi5servo/src/pi5servo/core/endpoint.py \
-  --reason "Support SunFounder Robot HAT PWM channels 0-11 and pwm/p aliases" \
-  --authorized-by "Project owner" \
-  --authorized-on 2026-10-24
-```
-
-#### 4.7 Unit Testing (Off-Hardware)
-
-Write unit tests that:
-- Mock I2C bus reads/writes for address `0x14`.
-- Verify `parse_servo_endpoint("pwm0")` and `parse_servo_endpoint("p0")` return `ServoEndpoint(kind="hat_pwm", value=0)`.
-- Verify correct prescaler (350) and period (4095) calculations for 50 Hz.
-- Verify pulse-to-On Value conversion is accurate.
-- Verify MCU reset sequence timing (GPIO 5 toggling).
-
-### Validation Gate
-- [ ] `sunfounder_robot_hat.py` exists and follows existing backend interface
-- [ ] Backend registered in `__init__.py`
-- [ ] `uv run --frozen python -m compileall -q pi5servo/src` passes
-- [ ] `uv run --frozen ruff check pi5servo/` passes
-- [ ] `uv run --frozen ruff format --check pi5servo/` passes
-- [ ] `uv run --frozen mypy pi5servo/src` passes
-- [ ] `uv run --frozen pytest pi5servo/tests/` passes (mocked I2C)
-- [ ] Managed driver verifier passes: `uv run --frozen python scripts/verify_immutable_drivers.py`
-
-### Rollback
-The new backend file can be removed entirely without affecting existing GPIO-based or DFR0566 servo backends. No existing files are modified beyond adding a registry entry.
 
 ---
 
-## Phase 5: Battery Telemetry & Power Management
+### 5.2 Endpoint Canonicalization in [`ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/config.py`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/config.py#L46-L65)
 
-### Objective
-Implement a real-time battery voltage monitoring service that reads the SunFounder Robot HAT's onboard ADC (Channel 4) over I2C and alerts the user before battery voltage drops to dangerous levels.
-
-### Hardware Risk Level: 🟢 LOW
-Read-only I2C queries to the MCU's ADC. No actuator movement.
-
-### Prerequisites
-- Phase 4 complete (I2C communication established)
-
-### Tasks
-
-#### 5.1 Implement Battery Voltage Reader
-
-Create a module that:
-1. Reads ADC Channel 4 (battery level) from the MCU:
-   ```python
-   # ADC Channel 4 register address: 0x130000 (3-byte format)
-   bus.write_word_data(0x14, 0x13, 0)  # Write 0x13 + 0x0000
-   msb = bus.read_byte(0x14)
-   lsb = bus.read_byte(0x14)
-   raw_value = (msb << 8) | lsb  # 12-bit ADC value (0–4095)
-   ```
-2. Convert raw ADC to battery voltage:
-   ```python
-   # Voltage divider ratio: 200K / 100K = 3:1
-   va4 = raw_value / 4095.0 * 3.3
-   battery_voltage = va4 * 3.0
-   ```
-3. Map voltage to battery state:
-
-   | Battery Voltage | State | LED Indicator | Action |
-   |---|---|---|---|
-   | ≥ 7.6V | Healthy | 2 LEDs ON | Normal operation |
-   | 7.15V – 7.6V | Fair | 1 LED ON | Log warning |
-   | 6.9V – 7.15V | Low | 1 LED ON | Alert user, reduce servo activity |
-   | < 6.9V | Critical | Both OFF | Safe shutdown sequence |
-
-#### 5.2 Integrate with IDE Health Monitoring
-
-- Create a periodic background probe (polling every 30 seconds).
-- Expose battery voltage via the IDE's status reporting.
-- Trigger a graceful shutdown warning at 6.9V.
-- Never initiate actual shutdown without user confirmation (hardware safety boundary).
-
-#### 5.3 Charging Detection
-
-- Read GPIO 23 (CHG indicator) to detect if the Type-C charger is connected.
-- Display charging state in the IDE status.
-
-### Validation Gate
-- [ ] Battery voltage reading matches physical LED indicator state
-- [ ] Voltage calculation produces values in the 6.0V–8.4V expected range
-- [ ] Warning triggers correctly at threshold voltages (testable by draining battery)
-- [ ] Charging detection works when Type-C is plugged in
-
-### Rollback
-Battery telemetry is an additive feature. Removing it has zero impact on servo or display functionality.
+**Current Bug:** `_normalize_servo_endpoint()` in `config.py` only allows `hat_pwm1..4` and rejects `pwm0` / `hat_pwm0..15`. Furthermore, `ConfigManager` in `pi5servo` saves calibration keys as canonical `"hat_pwm0"`, so if `config.toml` has `"pwm0"`, `servo.py` thinks the endpoint is uncalibrated!  
+**Fix:** Update `_normalize_servo_endpoint()` in `config.py` to accept `hat_pwm0..15`, `pwm0..15`, and `p0..15` and normalize all of them to the canonical string **`f"hat_pwm{channel}"`** (while keeping `gpio<N>` normalized to `f"gpio{pin}"`). That way, whether a user writes `"pwm0"`, `"p0"`, or `"hat_pwm0"` in `config.toml`, it always matches `servo.json`!
 
 ---
 
-## Phase 6: Motion Control & Servo Calibration
+### 5.3 Multi-HAT Servo Setup Validation in [`ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/hardware_setup.py`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/hardware_setup.py#L97-L157)
 
-### Objective
-Connect servos to PWM ports P0–P7, perform hardware zeroing, and calibrate each channel using the `pi5servo servo-tool`.
+**Current Bug:** `hardware_setup_status("servo")` hardcodes `for pin in (12, 13):` and calls `manager.get_all_calibrations()` (which skips `hat_pwm` endpoints).  
+**Fix:** Update `hardware_setup_status("servo")` to:
+1. Call `all_calibrations = manager.get_all_endpoint_calibrations()`.
+2. Determine the required wheel endpoints from `manager.get_backend_config()["name"]` (or `config.toml`):
+   * If backend is `"sunfounder_robot_hat"` or `"pca9685"`: check `("hat_pwm0", "hat_pwm1")` (or any 2 calibrated `hat_pwm` endpoints).
+   * Otherwise (default Profile 1 `dfr0566` / `hardware_pwm`): check `("gpio12", "gpio13")`.
 
-### Hardware Risk Level: 🔴 HIGH
-**Live servo movement.** Motors will spin. Arms will swing. Ensure the robot chassis is elevated with all appendages clear of obstacles and people.
+---
 
-### Prerequisites
-- Phase 4 complete (AT32F413 backend functional)
-- Phase 5 complete (battery monitoring active — you'll need to know if power sags)
-- Physical servos available and servo horns loosely attached
+### 5.4 Importing HAT Endpoints & Roles in [`ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/config_import.py`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/config_import.py#L149-L155)
 
-### Tasks
+**Current Bug:** `import_pi5_configs()` only updates `servos.calibration_file` and leaves `servos.endpoints = ("gpio12", "gpio13")` and `behaviors.servo_roles = {"left_motor": "gpio12", "right_motor": "gpio13"}` unchanged.  
+**Fix:** When `import_pi5_configs()` inspects `pi5servo`'s `servo.json`, also read `__backend__` and all calibrated endpoint keys:
+* If `__backend__.name` is `"sunfounder_robot_hat"` or `"pca9685"`, automatically populate `hardware.servos.endpoints` with all calibrated `hat_pwm*` endpoints (defaulting to `("hat_pwm0", "hat_pwm1")`) and set `behaviors.servo_roles["left_motor"] = "hat_pwm0"` and `behaviors.servo_roles["right_motor"] = "hat_pwm1"`.
+* If `__backend__.name` is `"sunfounder_robot_hat"`, also auto-configure `speech_output.speaker_enable_gpio = 12` and discover the I2S `output_node` if present.
 
-#### 6.1 Servo Power Budget Decision
+---
 
-Before connecting servos, choose your configuration based on the [NinjaPi5Compatibility.md](./NinjaPi5Compatibility.md) power audit:
+### 5.5 Independent Auxiliary Servo Control & Battery Monitoring in [`ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/safety.py`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/safety.py)
 
-| Configuration | Max Simultaneous | Internal Power? | Notes |
-|---|:---:|:---:|---|
-| 8× MG90S only | ✅ All 8 | ✅ Yes | Safest. Recommended starting point. |
-| 2× MG996R + 6× MG90S | ✅ All 8 | ✅ Yes | Full capability. Use speed ramping. |
-| ≥ 3× MG996R | ⚠️ Sequential only | ❌ Need UBEC | External 5V/10A supply for servo power. |
+1. **Allowing Head/Arm/Gripper Movements Without Wheel Motion (`MotionController._resolve_targets`):**
+   * Currently, [`MotionController._resolve_targets()`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/safety.py#L649-L653) raises `MotionSafetyError("movement is missing required motor roles: left_motor, right_motor")` if a `DriveOperation` only targets auxiliary servos like `{"head_pan": 30.0}` or `{"gripper": 45.0}`.
+   * **Fix:** Require `left_motor` and `right_motor` **only** when at least one wheel motor role is included in `operation.targets` (or when `operation.targets` is empty). If `operation.targets` targets only auxiliary roles configured in `behaviors.servo_roles` (such as `head_pan`, `head_tilt`, `arm_shoulder`, `gripper`), resolve and move those endpoints directly!
+2. **Supporting SunFounder Onboard Battery Monitoring Alongside Geekworm X1208 (`safety.py`):**
+   * In `PowerConfig` (`config.py`), allow `fuel_gauge_address` to be `0x36` (Geekworm X1208 MAX17040) or `0x14` (SunFounder Robot HAT ADC A4).
+   * When `fuel_gauge_address == 0x14`, `_undervoltage_monitor()` reads battery voltage through the shared `ServoDevice` / `SunFounderRobotHatBackend.read_battery_voltage()` lock (and optionally checks `GPIO23` for USB-C charging state via `lgpio`), triggering low-battery warnings below `7.15V` and safe motion cutoff below `6.90V`.
 
-> [!WARNING]
-> **Do NOT connect more than 2× MG996R servos to the Robot HAT's internal 5V rail.** Each MG996R can draw up to 2.5A during stall, which will exceed the 5A regulator capacity and crash the Pi 5. See the Compatibility Report Section 3.4 for full details.
+---
 
-#### 6.2 Physical Servo Connection
+## Phase 6: Interactive Hardware Calibration Walkthrough
 
-1. Plug each servo's 3-pin connector into the PWM port:
-   - Orange/Yellow wire → `S` (Signal)
-   - Red wire → `+` (5V Power)
-   - Brown/Black wire → `−` (Ground)
+Once the software updates in Phases 4 and 5 are in place, here is how a user initializes and calibrates servos using the real `pi5servo` CLI tools:
 
-2. Recommended channel assignment:
+### 6.1 Launching `servo-tool`
+```bash
+# Launch with the backend configured in ~/.config/pi5servo/servo.json:
+uv run --frozen --no-sync pi5servo servo-tool
 
-   | PWM Port | Servo Role | Recommended Type |
-   |:---:|---|---|
-   | **P0** | Left Wheel / Drive | MG90S (continuous rotation) |
-   | **P1** | Right Wheel / Drive | MG90S (continuous rotation) |
-   | **P2** | Head Pan | MG90S |
-   | **P3** | Head Tilt | MG90S |
-   | **P4** | Arm Base | MG90S or MG996R |
-   | **P5** | Arm Shoulder | MG996R |
-   | **P6** | Arm Elbow | MG90S |
-   | **P7** | Gripper | MG90S |
+# Or explicitly pass the backend on the command line:
+uv run --frozen --no-sync pi5servo servo-tool --backend sunfounder_robot_hat
+uv run --frozen --no-sync pi5servo servo-tool --backend pca9685
+```
 
-#### 6.3 Hardware Servo Zeroing
+### 6.2 Navigating the Real `pi5servo servo-tool` Interactive Menu
+When `pi5servo servo-tool` starts (defined in [`pi5servo/src/pi5servo/cli/servo_tool.py`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/pi5servo/src/pi5servo/cli/servo_tool.py#L235-L268)), it displays:
 
-1. Ensure all servos are physically connected to P0–P7.
-2. **Double-click** the onboard **Servo Zeroing** button on the Robot HAT.
-3. The MCU will output 1500 µs pulses (center position) to ALL channels (P0–P11).
-4. While servos are holding center position, attach servo horns at 90° / neutral.
-5. **Double-click again** to release all PWM signals (servos go limp).
+```
+============================================================
+         Raspberry Pi 5 Servo Calibration Tool
+============================================================
 
-#### 6.4 Software Servo Calibration & Simplified Aliasing
+Commands:
+  1. Quick Move    - Enter commands like 'gpio12:30/hat_pwm1:M'
+  2. Single Move   - Move one servo to angle
+  3. Calibrate     - Launch calibration TUI
+  4. Set Speed     - Adjust servo speed limit
+  5. Status        - Show backend and servo configs
+  6. Config        - Show/export/import config
+  q. Exit
+```
 
-After the AT32F413 backend is deployed and registered:
+### 6.3 Step-by-Step Calibration Inside `3. Calibrate` (`CalibApp`)
+1. Type **`3`** (`Calibrate`) and enter the endpoint name when prompted:
+   * For **Profile 1 (DFR0566):** Enter `12` (or `gpio12`), then repeat for `13` (or `gpio13`).
+   * For **Profile 2 (SunFounder Robot HAT):** Enter `pwm0` (or `p0` / `hat_pwm0`) for Left Wheel, then repeat for `pwm1` (`p1` / `hat_pwm1`) for Right Wheel, plus any extra channels (`pwm2`..`pwm11`).
+   * For **Profile 3 (PCA9685 HAT):** Enter `pwm0` (`hat_pwm0`) for Left Wheel, then repeat for `pwm1` (`hat_pwm1`) for Right Wheel, plus any extra channels (`pwm2`..`pwm15`).
+2. Inside the interactive `CalibApp` screen (defined in [`pi5servo/src/pi5servo/cli/calib.py`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/pi5servo/src/pi5servo/cli/calib.py#L72-L94)), use the real keybindings:
+   * Press **`c`** to select **Center (`0°`)**.
+   * Use **`w` / `s`** for fine pulse adjustments (`+1 µs` / `-1 µs`) or **`Up` / `Down` Arrow Keys** for large adjustments (`+20 µs` / `-20 µs`) until a continuous wheel servo completely stops spinning (or a positional servo points straight ahead).
+   * Press **`Enter`** (or **`Space`**) to save the **Center** pulse to `~/.config/pi5servo/servo.json`!
+   * Press **`v`** to select **Min (`-90°`)**, adjust with `w`/`s` or `Up`/`Down`, and press **`Enter`** to save.
+   * Press **`x`** to select **Max (`+90°`)**, adjust with `w`/`s` or `Up`/`Down`, and press **`Enter`** to save.
+   * Press **`+` / `-`** to adjust the servo speed limit (`10%` steps), then press **`q`** to quit back to the main menu.
 
-1. **Intuitive Channel Selection Using Aliases:**
-   Thanks to the endpoint aliasing implemented in Phase 4 (Task 4.4), users no longer need to type the cumbersome canonical string `hat_pwm0`. Both the interactive tools and CLI commands accept simplified aliases:
-   - `pwm0`, `pwm1`, ... `pwm7` (or up to `pwm11`)
-   - `p0`, `p1`, ... `p7` (matching the exact physical silkscreen printed on the Robot HAT!)
+### 6.4 Verifying Movement from the Command Line (`pi5servo move`)
+Note that `pi5servo move <endpoint> <angle>` (defined in [`pi5servo/src/pi5servo/cli/move.py`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/pi5servo/src/pi5servo/cli/move.py#L19-L85)) takes an **angle in degrees (`-90` to `90`) or position keyword (`min`, `center`, `max`)**, not raw microsecond numbers:
 
-2. **Interactive TUI Calibration (`servo-tool`):**
+```bash
+# Move P0 (hat_pwm0) to calibrated center (0°), then +30°, then -30°
+uv run --frozen --no-sync pi5servo move pwm0 center
+uv run --frozen --no-sync pi5servo move pwm0 30
+uv run --frozen --no-sync pi5servo move pwm0 -30
+```
+
+---
+
+## Phase 7: One-Command Onboarding Wizard (`ninjarobot onboard`) & Agent Control
+
+### 7.1 User Requirement #3: Selecting the Hardware Profile in `ninjarobot onboard`
+
+After installing `NinjaRobotPi5` on any of the three hardware settings, the user simply runs:
+
+```bash
+uv run --frozen --no-sync ninjarobot onboard
+```
+
+In [`ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/setup_wizard.py`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/setup_wizard.py), add a profile selection prompt at the start of `SetupWizard.run()` that presents the exact 3 hardware settings in order:
+
+```
+======================================================================
+Hardware Expansion Profile Selection
+======================================================================
+Select the Expansion HAT installed on your Raspberry Pi 5:
+  1. DFRobot DFR0566 IO Expansion HAT
+  2. SunFounder Robot HAT
+  3. General PCA9685 PWM Expansion HAT
+```
+
+#### Critical `ProgressStore` Compatibility Detail (`setup_wizard.py` lines 145–153):
+* `ProgressStore.load()` strictly validates `progress.steps` keys against `MANDATORY_HARDWARE + OPTIONAL_HARDWARE + ("provider", "mcp", "web_access")`, so adding a new key to `progress.steps` would raise `ValueError("invalid setup progress step; file was not changed")`.
+* However, `progress.selections` is a validated `dict[str, str]` that accepts any string key/value pair!
+* Therefore, store the user's choice in **`progress.selections["hardware_profile"]`** (`"dfr0566"`, `"sunfounder_robot_hat"`, or `"pca9685"`).
+
+---
+
+### 7.2 What Each Profile Selection Automatically Configures
+
+```mermaid
+flowchart TD
+    START["User runs: ninjarobot onboard"] --> SELECT{"Select Hardware Setting:\n1, 2, or 3"}
+
+    SELECT -->|"1. DFRobot DFR0566 IO Expansion HAT"| OPT1["Apply Profile 1 Preset:\n- servo.json: backend = 'auto' (0x10)\n- Endpoints: gpio12, gpio13\n- Power: X1208 (0x36, GPIO6, GPIO16)\n- Audio Step: Bluetooth Speaker"]
+    SELECT -->|"2. SunFounder Robot HAT"| OPT2["Apply Profile 2 Preset:\n- servo.json: backend = 'sunfounder_robot_hat' (0x14)\n- Endpoints: hat_pwm0..hat_pwm11 (P0..P11)\n- Power: SunFounder ADC A4 (0x14, GPIO23)\n- Audio Step: Onboard I2S Speaker (GPIO12)"]
+    SELECT -->|"3. General PCA9685 PWM Expansion HAT"| OPT3["Apply Profile 3 Preset:\n- servo.json: backend = 'pca9685' (0x40)\n- Endpoints: hat_pwm0..hat_pwm15 (PWM0..PWM15)\n- Power: Optional X1208 or Disabled\n- Audio Step: Bluetooth Speaker"]
+
+    OPT1 --> INIT["Initialize Hardware One by One:\n1. Buzzer (buzzer-tool)\n2. Display (display-tool)\n3. Distance Sensor (sensor-tool)\n4. Servo Calibration (servo-tool)\n5. Camera (camera-tool)\n6. Speaker (I2S or Bluetooth)\n7. USB Microphone"]
+    OPT2 --> INIT
+    OPT3 --> INIT
+
+    INIT --> IMPORT["Auto-Run Config Import:\nninjarobot-ide-tool config import --apply\n(Syncs endpoints, servo_roles & output_node)"]
+    IMPORT --> READY["Ready! Start Agent Service:\nninjarobot service start --real"]
+```
+
+When the user picks `1`, `2`, or `3`, `setup_wizard.py` writes the matching `__backend__` block into `~/.config/pi5servo/servo.json` before launching the step-by-step hardware tools:
+
+| Setting Selected | `servo.json` `__backend__` Written | Servo Wizard Prompt Shown in Step 4 (`servo`) | Audio Wizard Behavior in Step 6 (`bluetooth`) |
+| :--- | :--- | :--- | :--- |
+| **`1. DFRobot DFR0566 IO Expansion HAT`** | `{"name": "auto", "kwargs": {"bus_id": 1, "address": 16, "frequency_hz": 50}}` | `"With both wheels raised, choose 3. Calibrate for gpio12 and gpio13."` | Standard Bluetooth speaker pairing + PipeWire sink selection. |
+| **`2. SunFounder Robot HAT`** | `{"name": "sunfounder_robot_hat", "kwargs": {"bus_id": 1, "address": 20, "frequency_hz": 50}}` | `"With both wheels raised, choose 3. Calibrate for pwm0 (P0 Left) and pwm1 (P1 Right), plus any extra P2-P11 servos."` | Enables `GPIO12` amplifier via `lgpio`, selects the onboard I2S HiFiBerry DAC sink in PipeWire, and plays a test tone (no Bluetooth speaker needed!). |
+| **`3. General PCA9685 PWM Expansion HAT`** | `{"name": "pca9685", "kwargs": {"bus_id": 1, "address": 64, "frequency_hz": 50}}` | `"With both wheels raised, choose 3. Calibrate for pwm0 (PWM0 Left) and pwm1 (PWM1 Right), plus any extra PWM2-PWM15 servos."` | Standard Bluetooth speaker pairing + PipeWire sink selection. |
+
+---
+
+### 7.3 Starting & Verifying the AI Agent (`ninjarobot service` & `ninjarobot chat`)
+
+After `ninjarobot onboard` finishes, start the agent service in real hardware mode using the verified `ninjarobot` CLI commands (from [`ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/agent_cli.py`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/agent_cli.py#L269-L284)):
+
+```bash
+# 1. Start the background agent service connected to real hardware
+uv run --frozen --no-sync ninjarobot service start --real
+
+# 2. Check service & hardware health status
+uv run --frozen --no-sync ninjarobot status
+
+# 3. Optionally start the local HTTPS web interface (https://ninjarobotpi5.local:8443)
+uv run --frozen --no-sync ninjarobot web start
+
+# 4. Send a natural-language movement command to verify end-to-end control
+uv run --frozen --no-sync ninjarobot chat "Move forward slowly for 1 second, then stop."
+```
+
+---
+
+## Phase 8: Automated Testing, Validation Gates & Wiki Knowledge Sync
+
+### 8.1 Phased Validation Commands
+Every phase must pass the repository's automated test suite before proceeding:
+
+```bash
+# 1. Run pi5servo unit tests (verifying DFR0566, SunFounder Robot HAT, and PCA9685 backends)
+uv run --frozen --no-sync pytest pi5servo/tests
+
+# 2. Run ninjarobot_pi5_ide unit & integration tests (verifying config, servo runtime, safety, hardware_setup, config_import)
+uv run --frozen --no-sync pytest ninjarobot_pi5_ide/tests
+
+# 3. Run ninjarobot_pi5_agent unit tests (verifying setup_wizard 3-profile flow and MCP tools)
+uv run --frozen --no-sync pytest ninjarobot_pi5_agent/tests
+
+# 4. Run the managed driver modification check
+python3 scripts/check_driver_modifications.py
+
+# 5. Run ruff linter and formatter check
+uv run --frozen --no-sync ruff check .
+```
+
+### 8.2 Canonical `ninjarobot_pi5_wiki` Update Workflow
+Per [`NinjaRobotPi5/AGENTS.md`](file:///Volumes/NINJA_EXT/NinjaRoboticsEducationPlatform/NinjaRobotPi5/AGENTS.md) and `ninjarobot_pi5_wiki/docs/PROJECT_WORKFLOW.md`, once implementation and tests are complete:
+1. Create a new dated directory under `ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/YYYY-MM-DD/` and `ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/YYYY-MM-DD/` documenting the 3-profile multi-HAT architecture (`DFR0566`, `SunFounder Robot HAT v5`, `General PCA9685 PWM Expansion HAT`). *(Never edit previously registered original files in place.)*
+2. Update `ninjarobot_pi5_wiki/project-knowledge.json` and the compiled pages in `ninjarobot_pi5_wiki/wiki/concepts/architecture.md`, `installation.md`, and `features-and-tools.md`.
+3. Validate the wiki knowledge base:
    ```bash
-   cd ~/NinjaRobotPi5
-   uv run --frozen --no-sync pi5servo servo-tool
-   ```
-   - In the tool menu, select **`1. Select / Switch Endpoint`**.
-   - Enter your target channel (e.g. `pwm0` or `p0` for Left Wheel; `pwm1` or `p1` for Right Wheel; `pwm2` or `p2` for Head Pan).
-   - Use **`w`** and **`s`** keys to nudge pulse width in ±1 µs increments.
-   - **For continuous rotation wheel servos:** Nudge until the wheel comes to a complete, dead stop at 1500 µs nominal center. This records the zero-drift trim null point.
-   - **For angular / positional servos (pan/tilt/arm):** Use keys to verify smooth motion across 0° (e.g., 500 µs), 90° center (1500 µs), and 180° (2500 µs) travel limits.
-   - Press **`Enter`** to save the calibration to `~/.config/pi5servo/servo.json`.
-
-3. **Direct CLI Movement & Verification:**
-   Individual channels can also be directly commanded via the CLI using simplified aliases:
-   ```bash
-   # Move Left Wheel servo (P0) to center position
-   uv run --frozen --no-sync pi5servo move pwm0 1500
-
-   # Move Head Pan servo (P2) using silkscreen alias "p2" to 90 degrees
-   uv run --frozen --no-sync pi5servo move p2 1500
+   python3 scripts/wiki.py status
+   python3 scripts/wiki.py check
+   python3 scripts/wiki.py lint
    ```
 
-#### 6.5 Implement Motion Acceleration Ramping
-
-To prevent current spikes when multiple servos start simultaneously:
-
-1. Implement S-curve or trapezoidal velocity profiling in the backend.
-2. When commanding multiple servos at once, stagger their start times by at least 20 ms.
-3. This is especially critical if using MG996R servos, which have high inrush current.
-
-### Validation Gate
-- [ ] All 8 servo connectors are seated in P0–P7
-- [ ] Hardware zeroing (double-click) produces visible centering motion
-- [ ] Each channel responds to `servo-tool` pulse width adjustments
-- [ ] Continuous rotation servos achieve true zero-drift at calibrated neutral
-- [ ] Positional servos reach expected angular limits
-- [ ] Battery voltage remains above 7.0V during simultaneous 8-servo motion
-- [ ] No MCU communication errors in `dmesg` during operation
-- [ ] Servo calibration saved to `~/.config/pi5servo/servo.json`
-
-### Rollback
-Servos can be unplugged at any time. The backend can fall back to GPIO-based PWM by changing the servo configuration file. Calibration data is stored per-channel and per-backend.
-
 ---
 
-## Phase 7: Integration Testing & Validation
+## Appendix A: End-to-End Verification Checklist Against User Requirements
 
-### Objective
-Verify that all subsystems work together as a complete robot system under the new SunFounder Robot HAT architecture.
-
-### Hardware Risk Level: 🔴 HIGH
-Full-system test with live servos, audio, and AI inference.
-
-### Prerequisites
-- All prior phases complete
-
-### Tasks
-
-#### 7.1 Subsystem Interaction Matrix
-
-Test these specific cross-subsystem scenarios:
-
-| Test Case | Subsystems Involved | What to Verify | Pass Criteria |
-|---|---|---|---|
-| **Speak while moving** | Speaker + Servos + Pi 5 CPU | Audio doesn't clip during servo motion | Clear speech output; no voltage sag |
-| **Camera + servos** | Camera + Head Pan/Tilt servos | Camera captures sharp images while head moves | No I2C bus contention between camera and MCU |
-| **Distance + stop** | VL53L0X + Drive servos | Robot stops when obstacle detected | Sensor reads accurately during motor vibration |
-| **AI inference + servos** | Ollama/Whisper + 8 servos | CPU load doesn't cause servo jitter | Smooth servo motion during LLM generation |
-| **Battery drain test** | Battery + All subsystems | Monitor voltage over 20 minutes of mixed use | Voltage stays above 6.9V; LED indicators match |
-| **GPIO 5 safety** | Display init + MCU | Display `rst_pin=17` init doesn't reset MCU | `i2cdetect -y 1` shows `0x14` after display init |
-
-#### 7.2 Run the Full Validation Gate Suite
-
-```bash
-cd ~/NinjaRobotPi5
-
-# 1. Managed driver integrity
-uv run --frozen python scripts/verify_immutable_drivers.py
-uv run --frozen python scripts/verify_workspace_driver_sources.py
-
-# 2. Code compilation
-uv run --frozen python -m compileall -q \
-  ninjarobot_pi5_ide/src ninjarobot_pi5_agent/src scripts tests
-
-# 3. Lint & format
-uv run --frozen ruff check .
-uv run --frozen ruff format --check .
-
-# 4. Type checking
-uv run --frozen mypy \
-  ninjarobot_pi5_ide/src ninjarobot_pi5_agent/src
-
-# 5. Automated tests
-uv run --frozen pytest -q
-
-# 6. Git hygiene
-git diff --check
-```
-
-#### 7.3 Guided Onboarding Hardware Profile Selector Flow (`ninjarobot onboard`)
-
-To ensure any student, educator, or developer can set up the robot on either the new SunFounder Robot HAT or legacy hardware without manual configuration file hacking, the setup wizard (`ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/setup_wizard.py`) provides an interactive hardware profile selection step at the start of onboarding:
-
-```text
-=============================================================
-             NinjaRobotPi5 Setup & Onboarding Wizard         
-=============================================================
-Please select your active Hardware Platform:
-
-  [1] SunFounder Robot HAT (v5) [Recommended]
-      • Single 2S 7.4V battery pack (replaces X1208 UPS)
-      • Onboard 2.5W I2S Chamber Speaker (GPIO 12 Amp Enable)
-      • AT32F413 MCU PWM channels P0–P7 / P0–P11 (I2C 0x14)
-      • ST7789V Display Reset wired to Digital 17
-
-  [2] DFRobot DFR0566 IO Expansion HAT + Geekworm X1208 UPS
-      • Dual power: X1208 UPS battery + DFR0566 HAT
-      • External Bluetooth speaker for voice output
-      • Raspberry Pi RP1 Hardware PWM (GPIO 12 & 13)
-      • ST7789V Display Reset wired to GPIO 5
-
-  [3] Raspberry Pi 5 + General PCA9685 16-Channel PWM Board
-      • External UBEC 5V power to PCA9685 V+ terminal
-      • 16 independent PWM channels over I2C 0x40
-      • External USB/Bluetooth speaker
-
-Enter selection [1-3] (Default: 1): 1
-```
-
-**What the Wizard Automates Behind the Scenes:**
-1. **Display Reset Pin Routing:**
-   - Profile 1 (Robot HAT): Automatically sets `"rst_pin": 17` in `~/.config/pi5disp/display.json` (preventing GPIO 5 MCU reset).
-   - Profile 2 (DFR0566): Sets `"rst_pin": 5`.
-2. **Servo Driver Backend & Endpoints:**
-   - Profile 1: Configures `backend = "sunfounder_robot_hat"`, assigns `left_motor = "pwm0"`, `right_motor = "pwm1"`, `head_pan = "pwm2"`, `head_tilt = "pwm3"`.
-   - Profile 2: Configures `backend = "hardware_pwm"`, assigns `left_motor = "gpio12"`, `right_motor = "gpio13"`.
-   - Profile 3: Configures `backend = "pca9685"`, assigns `left_motor = "pwm0"`, `right_motor = "pwm1"`.
-3. **Audio Routing:**
-   - Profile 1: Configures ALSA HiFiBerry DAC card and GPIO 12 amplifier enable pin.
-   - Profile 2: Prompts for Bluetooth pairing with external speaker.
-4. **Interactive Hardware Walkthrough:**
-   - Sequentially launches `display-tool`, `servo-tool`, and `sensor-tool`, displaying wiring guidance and instructions tailored specifically to the selected board.
-
-#### 7.4 AI Agent Integration & Verification (`ninjarobot_pi5_agent`)
-
-A critical architectural requirement of NinjaRobotPi5 is that **the AI Agent does NOT require any code modifications, prompt redesigns, or brain refactoring to run on the SunFounder Robot HAT.**
-
-**How the Agent Operates Transparently Across Hardware:**
-```text
-┌────────────────────────────────────────────────────────┐
-│               ninjarobot_pi5_agent                     │
-│  (LLM reasoning, speech understanding, goal planning)  │
-└───────────────────────────┬────────────────────────────┘
-                            │ Proposes typed MCP action:
-                            │ robot.behavior.execute_movement(
-                            │   target_speeds={"left_motor": 30.0, "right_motor": -30.0}
-                            │ )
-                            ▼
-┌────────────────────────────────────────────────────────┐
-│                ninjarobot_pi5_ide                      │
-│  • Reads active profile in config.toml                 │
-│  • Maps role "left_motor"  ──► "pwm0" (Robot HAT)      │
-│  • Maps role "right_motor" ──► "pwm1" (Robot HAT)      │
-│  • Distance sensor safety check (VL53L0X at 0x29)      │
-└───────────────────────────┬────────────────────────────┘
-                            │ Dispatches to driver backend
-                            ▼
-┌────────────────────────────────────────────────────────┐
-│           pi5servo (sunfounder_robot_hat)              │
-│  • Converts speeds/angles to pulse widths (µs)         │
-│  • Writes to MCU I2C registers 0x20, 0x21 at 0x14      │
-└────────────────────────────────────────────────────────┘
-```
-
-**Verification Procedure:**
-1. Start the complete integrated system:
-   ```bash
-   ninjarobot start
-   ```
-2. **Voice Interaction Test:**
-   - Speak into the USB microphone: *"Hello Ninja, introduce yourself!"*
-   - Verify speech synthesis plays clearly through the onboard 2.5W chamber speaker (confirming GPIO 12 amplifier enable + I2S data stream).
-3. **Movement & Vision Test:**
-   - Speak: *"Ninja, look up and turn left 45 degrees."*
-   - Verify:
-     - Head tilt servo on P3 tilts camera upward.
-     - Drive servos on P0 (left) and P1 (right) rotate in counter-directions to pivot the robot.
-     - VL53L0X distance sensor actively monitors forward clearance during motion.
-4. **Multi-DOF Actuation Test (if arm installed):**
-   - Command: *"Ninja, wave your gripper."*
-   - Verify Agent dispatches behavior targets for `arm_shoulder` (P5) and `gripper` (P7) smoothly without jitter or audio interference.
-
-#### 7.5 Consolidate Robot Configuration
-
-```bash
-# Preview configuration changes
-uv run --frozen --no-sync ninjarobot-ide-tool config import
-
-# Apply to ~/.config/ninjarobot_pi5/config.toml
-uv run --frozen --no-sync ninjarobot-ide-tool config import --apply
-
-# Run guided setup verification
-ninjarobot onboard --resume
-```
-
-### Validation Gate
-- [ ] All subsystem interaction tests pass (Matrix 7.1)
-- [ ] Full validation gate suite passes (verify_immutable_drivers, compileall, ruff, mypy, pytest)
-- [ ] Onboarding profile selector switches cleanly between `sunfounder_robot_hat`, `dfr0566`, and `pca9685`
-- [ ] Configuration import succeeds
-- [ ] `ninjarobot onboard --resume` completes without errors
-- [ ] AI Agent commands drive servos (P0–P7) via MCP behavioral tools without code changes
-- [ ] Robot responds to voice commands with audio output through onboard 2.5W speaker
-- [ ] Battery telemetry displays correct voltage and charging state
-
-### Rollback
-Individual subsystems can be tested independently. If integration reveals a fundamental issue, each phase has its own rollback procedure.
-
----
-
-## Phase 8: Documentation & Cleanup
-
-### Objective
-Update all project documentation to reflect the new SunFounder Robot HAT architecture while maintaining backward compatibility for DFR0566 and PCA9685 profiles.
-
-### Hardware Risk Level: 🟢 NONE
-Documentation-only changes.
-
-### Tasks
-
-#### 8.1 Update Repository Documentation
-
-| Document | Changes Required |
-|---|---|
-| `README.md` | Update hardware prerequisites, wiring table, power chain description |
-| Wiki source for `InstallationGuide.md` | New HAT installation steps, battery charging, I2S audio setup |
-| Wiki source for `DevelopmentGuide.md` | AT32F413 backend architecture, MCU I2C protocol reference |
-| Wiki source for `DevelopmentLog.md` | Record migration rationale, validation results, servo power audit |
-| `docs/hardware/hardware-profile.md` | Replace DFR0566/X1208 entries with Robot HAT pin assignments |
-| `THIRD_PARTY_NOTICES.md` | Add SunFounder Robot HAT and AT32F413 MCU attribution |
-
-#### 8.2 Update Wiki Knowledge Base
-
-Follow the [ninjarobot-knowledge skill](.agents/skills/ninjarobot-knowledge/SKILL.md):
-
-1. Run `python scripts/wiki.py check` after documentation updates.
-2. Review changed implementation fingerprints.
-3. Update affected wiki sources and pages.
-4. Run wiki lint to verify consistency.
-
-#### 8.3 Clean Up Configuration & Preserve Hardware Profiles
-
-- **Preserve Backward Compatibility:** Do **NOT** delete DFR0566 or PCA9685 driver code. Maintain all three hardware profile presets in `ninjarobot_pi5_ide` so existing robots can continue operating.
-- **Update Default Profile:** Set `sunfounder_robot_hat` as the default hardware profile for all newly generated configurations.
-- **Retire Geekworm X1208 Service:** Disable and mask the standalone `x1208-pwr.service` systemd unit on the Pi 5 when the Robot HAT profile is active, as power is now managed entirely by the Robot HAT.
-- **Update Template Documentation:** Ensure default examples in `docs/` showcase `pwm0`..`pwm7` for servos and GPIO 17 for display reset.
-
-#### 8.4 Git Commit & Tag
-
-```bash
-git add -A
-git commit -m "feat: migrate to SunFounder Robot HAT v5
-
-- Replace DFR0566 IO Expansion HAT with SunFounder Robot HAT v5
-- Retire Geekworm X1208 UPS; use Robot HAT 7.4V battery as sole power source
-- Add AT32F413 MCU I2C backend to pi5servo for 8 PWM channels (P0-P7)
-- Remap display RST from GPIO 5 to GPIO 17 (GPIO 5 = MCU reset)
-- Enable I2S onboard speaker (GPIO 12 amp enable, GPIO 18/19/21 I2S)
-- Add battery telemetry via ADC Channel 4 over I2C"
-```
-
-### Validation Gate
-- [ ] All documentation accurately reflects the new hardware
-- [ ] No stale DFR0566 or X1208 references remain in active documentation
-- [ ] Wiki check passes
-- [ ] `docs/hardware/hardware-profile.md` fully updated
-- [ ] Git commit is clean; `git diff --check` passes
-
----
-
-## Risk Register & Mitigation
-
-| Risk ID | Risk Description | Likelihood | Impact | Mitigation Strategy |
-|:---:|---|:---:|:---:|---|
-| R1 | GPIO 5 display reset crashes MCU | 🔴 High (if wired wrong) | 🔴 High | Wire display RST to GPIO 17; verify with I2C scan after display init. |
-| R2 | MG996R brownout during stall | 🟡 Medium | 🔴 High | Limit to 2x MG996R max on internal power; use external UBEC for more. |
-| R3 | I2C bus contention (MCU + VL53L0X) | 🟢 Low | 🟡 Medium | Addresses `0x14` and `0x29` are distinct. Use bus locking in driver code. |
-| R4 | MCU firmware desync after interrupted I2C | 🟡 Medium | 🟡 Medium | Implement `reset_mcu()` with GPIO 5 pulse; auto-retry on `IOError`. |
-| R5 | Battery 2000 mAh insufficient for extended use | 🟡 Medium | 🟡 Medium | Monitor via telemetry; consider upgraded 3000+ mAh pack if runtime < 30 min. |
-| R6 | WS2812 conflicts with SPI display | 🟢 Low | 🟢 Low | Hardware constraint: WS2812 port shares GPIO 10 (MOSI) with SPI. Cannot use both. Documented; no workaround needed. |
-| R7 | HiFiBerry DAC overlay conflicts with other audio | 🟢 Low | 🟡 Medium | Verify PipeWire/ALSA config; test USB mic input separately from I2S output. |
-| R8 | Servo jitter during heavy AI inference | 🟡 Medium | 🟢 Low | MCU generates PWM independently; jitter only possible if I2C updates are delayed. Add timeout handling. |
-
----
-
-## Complete GPIO Allocation Map
-
-This is the definitive GPIO assignment for NinjaRobotPi5 on the SunFounder Robot HAT:
-
-| BCM GPIO | Robot HAT Label | NinjaRobotPi5 Function | Direction | Shared? |
-|:---:|---|---|:---:|:---:|
-| 2 | SDA | I2C SDA (MCU `0x14` + VL53L0X `0x29`) | Bidir | Bus |
-| 3 | SCL | I2C SCL | Bidir | Bus |
-| 4 | DIGITAL 4 | ST7789V Display DC (Data/Command) | Output | No |
-| 5 | MCU Reset | AT32F413 MCU hardware reset | Output | **Reserved** |
-| 6 | (SPI) BSY | ST7789V Display Backlight PWM | Output | No |
-| 8 | SPI CE0 | ST7789V Display Chip Select | Output | No |
-| 9 | SPI MISO | SPI MISO (unused by display) | — | Available |
-| 10 | SPI MOSI / WS2812 | ST7789V Display Data (MOSI) | Output | **SPI/WS2812 conflict** |
-| 11 | SPI SCLK | ST7789V Display Clock | Output | No |
-| 12 | Speaker Enable | I2S Amplifier Power Enable | Output | No |
-| 13 | NC | **Free** (was servo on DFR0566) | — | Available |
-| 14 | TXD | UART TX (available) | Output | Available |
-| 15 | RXD | UART RX (available) | Input | Available |
-| 16 | RST Button | Robot HAT RST button (customizable) | Input | No |
-| 17 | DIGITAL 17 | ST7789V Display RST (Reset) | Output | No |
-| 18 | I2S BCLK | I2S Bit Clock (Speaker) | Output | I2S Bus |
-| 19 | I2S LRCLK | I2S Word Select (Speaker) | Output | I2S Bus |
-| 20 | I2S DATAIN | I2S Data In (MEMS Microphone) | Input | I2S Bus |
-| 21 | I2S DATAOUT | I2S Data Out (Speaker) | Output | I2S Bus |
-| 22 | DIGITAL 22 | **Free** (Digital header available) | — | Available |
-| 23 | CHG | Charging indicator (read-only) | Input | No |
-| 25 | USR Button | User tactile button (active-low) | Input | No |
-| 26 | USER LED | Programmable status LED | Output | No |
-| 27 | DIGITAL 27 | Passive Buzzer Signal | Output | No |
-
----
-
-## Migration Timeline Summary
-
-```
-                    MIGRATION PHASES & ESTIMATED EFFORT
-                    
-Phase  Description                         Effort        Depends On   Risk
-────── ───────────────────────────────────── ───────────── ──────────── ──────
-  1    Hardware Decommissioning & Mounting   ~1 hour       —            🟡
-  2    OS & Audio Configuration             ~1 hour       Phase 1      🟢
-  3    Display & Sensor Adaptation          ~1–2 hours    Phase 2      🟡
-  4    AT32F413 MCU Backend Development     ~2–4 days     Phase 3      🟢
-  5    Battery Telemetry & Power Mgmt       ~1–2 days     Phase 4      🟢
-  6    Motion Control & Servo Calibration   ~1–2 days     Phase 4 & 5  🔴
-  7    Integration Testing & Validation     ~1–2 days     Phase 6      🔴
-  8    Documentation & Cleanup              ~1 day        Phase 7      🟢
-       ─────────────────────────────────────
-       TOTAL ESTIMATED EFFORT:              ~8–14 days
-```
-
-```
- PHASE DEPENDENCY GRAPH
- 
- Phase 1 ──► Phase 2 ──► Phase 3 ──► Phase 4 ──┬──► Phase 5 ──┐
-                                                │              │
-                                                └──────────────┼──► Phase 6
-                                                               │
-                                                               └──► Phase 7 ──► Phase 8
-```
-
----
-
-## Sign-Off
-
-- **Plan Status:** Ready for review
-- **Code Impact:** No existing code modified in this planning document
-- **Guardrail Verification:** PASS — This plan is documentation-only
-- **Recommended First Action:** Approve this plan, then proceed with Phase 1 (hardware decommissioning) followed by Phase 2 (OS configuration)
-- **Critical Decision Required:** Confirm your target servo configuration (all-MG90S vs. hybrid mix) before entering Phase 6
+| Requirement | How This Plan Guarantees It | Verification Command / Gate |
+| :--- | :--- | :--- |
+| **1. Existing DFRobot DFR0566 + Geekworm X1208 works 100% identically** | Default `RobotConfig` in `config.py` remains `gpio12`/`gpio13` + X1208 `0x36`; `dfr0566.py` and `hardware_pwm.py` are untouched; Selecting Option `1` in `ninjarobot onboard` preserves exact legacy behavior. | `uv run --frozen --no-sync pytest` + hardware run on DFR0566 + X1208 |
+| **2. Smooth support for SunFounder Robot HAT & General PCA9685 PWM Expansion HAT** | `SunFounderRobotHatBackend` (`0x14`, Big-Endian 3-byte protocol, `P0..P11`) and enhanced `PCA9685ServoBackend` (`0x40`, `smbus2` + `hat_pwm0..15`) + dynamic backend loading in `ninjarobot_pi5_ide/servo.py`. | `pi5servo servo-tool --backend sunfounder_robot_hat` & `--backend pca9685` |
+| **3. User runs `ninjarobot onboard`, selects `1`, `2`, or `3`, and initializes hardware one by one** | `SetupWizard` in `setup_wizard.py` prompts for `1. DFRobot DFR0566 IO Expansion HAT`, `2. SunFounder Robot HAT`, or `3. General PCA9685 PWM Expansion HAT`, writes presets, runs each tool (`buzzer`, `display`, `distance`, `servo`, `camera`, `audio`, `mic`), and validates via `hardware_setup_status()`. | `uv run --frozen --no-sync ninjarobot onboard` |
+| **4. `ninjarobot` agent recognizes and controls hardware across all expansion HATs** | `config_import.py` syncs active HAT endpoints and `servo_roles` into `config.toml`; `MotionController` (`safety.py`) and `ServoDevice` (`servo.py`) dispatch wheel and auxiliary joint actions across the active HAT backend. | `uv run --frozen --no-sync ninjarobot service start --real` + `ninjarobot chat` |
