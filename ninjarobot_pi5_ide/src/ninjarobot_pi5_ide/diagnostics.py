@@ -5,11 +5,45 @@ from __future__ import annotations
 import importlib.util
 import platform
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
 from .config import HardwareConfig, RobotConfig
+
+_DEFAULT_FIND_SPEC = importlib.util.find_spec
+
+
+def _find_system_camera_spec(name: str) -> str | None:
+    """Check Raspberry Pi OS /usr/bin/python3 for system camera packages used by camera.py."""
+    if name not in {"picamera2", "libcamera"}:
+        return None
+    if importlib.util.find_spec is not _DEFAULT_FIND_SPEC:
+        return None
+    system_python = Path("/usr/bin/python3")
+    if not system_python.is_file():
+        return None
+    try:
+        completed = subprocess.run(
+            [
+                str(system_python),
+                "-s",
+                "-c",
+                f"import importlib.util; s = importlib.util.find_spec({name!r}); "
+                "print(s.origin or '' if s else '')",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5.0,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if completed.returncode != 0:
+        return None
+    origin = completed.stdout.strip()
+    return origin or None
 
 
 def diagnose_environment(
@@ -69,6 +103,8 @@ def diagnose_environment(
             origin = None if spec is None else spec.origin
         except (ImportError, ValueError, OSError):
             origin = None
+        if origin is None and name in {"picamera2", "libcamera"}:
+            origin = _find_system_camera_spec(name)
         found = origin is not None
         if found and root is not None and name.startswith("pi5"):
             expected = (root / name / "src" / name).resolve()

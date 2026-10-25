@@ -12,10 +12,32 @@ PWM_OVERLAY = "dtoverlay=pwm-2chan,pin=12,func=4,pin2=13,func2=4"
 AUDIO_OFF = "dtparam=audio=off"
 
 
+def _is_conflicting_post_block_directive(stripped: str) -> bool:
+    """Return True if a directive after END_MARKER could alter PWM/audio or section scope."""
+    value = stripped.split("#", 1)[0].strip()
+    if not value:
+        return False
+    if value.startswith("[") and value.endswith("]"):
+        return True
+    if value.startswith("include "):
+        return True
+    if value.startswith("dtparam="):
+        for parameter in value.removeprefix("dtparam=").split(","):
+            if parameter.strip().startswith("audio="):
+                return True
+    if value.startswith("dtoverlay="):
+        name = value.partition("=")[2].partition(",")[0].strip()
+        if name in {"pwm", "pwm-2chan"}:
+            return True
+    return False
+
+
 def _without_managed_block(lines: list[str]) -> list[str]:
     rendered: list[str] = []
     inside = False
     finished = False
+    pre_block_section = "all"
+    emitted_all_for_trailing = False
     for line in lines:
         stripped = line.strip()
         if stripped == BEGIN_MARKER:
@@ -31,7 +53,17 @@ def _without_managed_block(lines: list[str]) -> list[str]:
             continue
         if not inside:
             if finished and stripped and not stripped.startswith("#"):
-                raise ValueError("the managed PWM block must be the final configuration section")
+                if _is_conflicting_post_block_directive(stripped):
+                    raise ValueError(
+                        "the managed PWM block must be the final configuration section"
+                    )
+                if pre_block_section != "all" and not emitted_all_for_trailing:
+                    rendered.append("[all]")
+                    emitted_all_for_trailing = True
+            elif not finished:
+                value = stripped.split("#", 1)[0].strip()
+                if value.startswith("[") and value.endswith("]"):
+                    pre_block_section = "all" if value == "[all]" else "other"
             rendered.append(line)
     if inside:
         raise ValueError("unterminated NinjaRobotPi5 PWM configuration block")

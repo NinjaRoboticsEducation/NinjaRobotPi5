@@ -100,10 +100,59 @@ command -v git >/dev/null 2>&1 || {
   printf 'ERROR: Git is required for the bootstrap. Install Git, then retry.\n' >&2
   exit 1
 }
-[[ ! -e "${INSTALL_DIR}" && ! -L "${INSTALL_DIR}" ]] || {
+
+resolve_ref_in_repo() {
+  local repo_dir="$1"
+  local ref="$2"
+  local target="" branch="" tag=""
+  resolve_commit() {
+    git -C "${repo_dir}" rev-parse --verify --end-of-options "$1^{commit}" 2>/dev/null
+  }
+  case "${ref}" in
+    HEAD|default)
+      target="$(resolve_commit "refs/remotes/origin/HEAD")" || target="$(resolve_commit "HEAD")" || target=""
+      ;;
+    refs/heads/*) target="$(resolve_commit "refs/remotes/origin/${ref#refs/heads/}")" || target="" ;;
+    refs/tags/*) target="$(resolve_commit "${ref}")" || target="" ;;
+    *)
+      branch="$(resolve_commit "refs/remotes/origin/${ref}")" || branch=""
+      tag="$(resolve_commit "refs/tags/${ref}")" || tag=""
+      if [[ -n "${branch}" && -n "${tag}" ]]; then
+        printf 'ERROR: Ambiguous branch/tag %s; use refs/heads/NAME or refs/tags/NAME.\n' "${ref}" >&2
+        return 1
+      fi
+      target="${branch:-${tag}}"
+      if [[ -z "${target}" && "${ref}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+        target="$(resolve_commit "${ref,,}")" || target=""
+      fi
+      ;;
+  esac
+  [[ -n "${target}" ]] || {
+    printf 'ERROR: Cannot resolve %s to a published branch, tag, or full commit in the cloned repository.\n' "${ref}" >&2
+    return 1
+  }
+  printf '%s\n' "${target}"
+}
+
+if [[ -e "${INSTALL_DIR}" || -L "${INSTALL_DIR}" ]]; then
+  if [[ ! -L "${INSTALL_DIR}" && -d "${INSTALL_DIR}/.git" && \
+        -x "${INSTALL_DIR}/scripts/install-rpi.sh" && -f "${INSTALL_DIR}/uv.lock" && \
+        -z "$(git -C "${INSTALL_DIR}" status --porcelain 2>/dev/null)" ]]; then
+    printf 'Updating existing clean NinjaRobotPi5 checkout at %s to %s...\n' "${INSTALL_DIR}" "${INSTALL_REF}"
+    git -C "${INSTALL_DIR}" fetch --quiet --prune origin
+    target="$(resolve_ref_in_repo "${INSTALL_DIR}" "${INSTALL_REF}")" || exit 1
+    git -C "${INSTALL_DIR}" checkout --quiet --detach "${target}"
+    resolved="$(git -C "${INSTALL_DIR}" rev-parse HEAD)"
+    if [[ "${INSTALL_REF}" =~ ^[0-9a-fA-F]{40}$ && "${resolved,,}" != "${INSTALL_REF,,}" ]]; then
+      printf 'ERROR: Downloaded revision does not match --ref.\n' >&2
+      exit 1
+    fi
+    printf 'Verified revision %s at %s.\n' "${resolved}" "${INSTALL_DIR}"
+    exec "${INSTALL_DIR}/install.sh" "${forwarded[@]}"
+  fi
   printf 'ERROR: Refusing to overwrite existing destination: %s\n' "${INSTALL_DIR}" >&2
   exit 1
-}
+fi
 
 install_parent="$(dirname -- "${INSTALL_DIR}")"
 [[ -d "${install_parent}" && ! -L "${install_parent}" ]] || {
@@ -119,35 +168,7 @@ trap cleanup EXIT INT TERM
 printf 'Downloading NinjaRobotPi5 revision %s...\n' "${INSTALL_REF}"
 git clone --quiet --no-checkout --filter=blob:none -- "${REPOSITORY_URL}" "${staging}/checkout"
 checkout_dir="${staging}/checkout"
-resolve_commit() {
-  git -C "${checkout_dir}" rev-parse --verify --end-of-options "$1^{commit}" 2>/dev/null
-}
-
-# Resolve remote branches explicitly: checkout's short-name guessing implicitly
-# creates a tracking branch, which conflicts with --detach.
-case "${INSTALL_REF}" in
-  HEAD|default)
-    target="$(resolve_commit "refs/remotes/origin/HEAD")" || target="$(resolve_commit "HEAD")" || target=""
-    ;;
-  refs/heads/*) target="$(resolve_commit "refs/remotes/origin/${INSTALL_REF#refs/heads/}")" || target="" ;;
-  refs/tags/*) target="$(resolve_commit "${INSTALL_REF}")" || target="" ;;
-  *)
-    branch="$(resolve_commit "refs/remotes/origin/${INSTALL_REF}")" || branch=""
-    tag="$(resolve_commit "refs/tags/${INSTALL_REF}")" || tag=""
-    if [[ -n "${branch}" && -n "${tag}" ]]; then
-      printf 'ERROR: Ambiguous branch/tag %s; use refs/heads/NAME or refs/tags/NAME.\n' "${INSTALL_REF}" >&2
-      exit 1
-    fi
-    target="${branch:-${tag}}"
-    if [[ -z "${target}" && "${INSTALL_REF}" =~ ^[0-9a-fA-F]{40}$ ]]; then
-      target="$(resolve_commit "${INSTALL_REF,,}")" || target=""
-    fi
-    ;;
-esac
-[[ -n "${target}" ]] || {
-  printf 'ERROR: Cannot resolve %s to a published branch, tag, or full commit in the cloned repository.\n' "${INSTALL_REF}" >&2
-  exit 1
-}
+target="$(resolve_ref_in_repo "${checkout_dir}" "${INSTALL_REF}")" || exit 1
 git -C "${checkout_dir}" checkout --quiet --detach "${target}"
 resolved="$(git -C "${staging}/checkout" rev-parse HEAD)"
 if [[ "${INSTALL_REF}" =~ ^[0-9a-fA-F]{40}$ && "${resolved,,}" != "${INSTALL_REF,,}" ]]; then

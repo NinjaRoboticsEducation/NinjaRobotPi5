@@ -456,6 +456,23 @@ def test_later_settings_are_not_silently_moved_ahead_of_managed_block(suffix: st
         render_boot_config(source)
 
 
+@pytest.mark.parametrize(
+    "benign_suffix",
+    [
+        "#Allow 5A Mode Without USB-C PD Handshake\nusb_max_current_enable=1",
+        "dtoverlay=googlevoicehat-soundcard",
+        "dtparam=i2s=on\ndtoverlay=hifiberry-dac",
+    ],
+)
+def test_benign_trailing_all_settings_are_preserved_and_validated(benign_suffix: str) -> None:
+    source = render_boot_config("[all]\n") + "\n" + benign_suffix + "\n"
+    assert validate_boot_config(source)[0] is True
+    rendered = render_boot_config(source)
+    assert benign_suffix in rendered
+    assert rendered.strip().endswith(END_MARKER)
+    assert validate_boot_config(rendered)[0] is True
+
+
 def test_duplicate_unmanaged_overlays_are_rejected() -> None:
     with pytest.raises(ValueError, match="duplicated"):
         render_boot_config(f"{PWM_OVERLAY}\n{PWM_OVERLAY}\n")

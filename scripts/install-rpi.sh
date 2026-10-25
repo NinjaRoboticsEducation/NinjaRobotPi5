@@ -262,14 +262,20 @@ sync_and_verify() {
 }
 
 install_cli_launcher() {
-  local source launcher
+  local source launcher existing_target
   source="${PROJECT_ROOT}/.venv/bin/ninjarobot"
   launcher="${HOME}/.local/bin/ninjarobot"
   [[ -x "${source}" ]] || fail "Installed ninjarobot entry point is missing: ${source}"
   install -d -m 0755 "$(dirname -- "${launcher}")"
-  if [[ -L "${launcher}" && \
-        "$(readlink -f -- "${launcher}")" == "$(readlink -f -- "${source}")" ]]; then
-    return
+  if [[ -L "${launcher}" ]]; then
+    if [[ "$(readlink -f -- "${launcher}" 2>/dev/null || true)" == "$(readlink -f -- "${source}")" ]]; then
+      return
+    fi
+    existing_target="$(readlink -- "${launcher}" 2>/dev/null || true)"
+    if [[ ! -e "${launcher}" || "${existing_target}" == *"/.venv/bin/ninjarobot" ]]; then
+      ln -sfn -- "${source}" "${launcher}"
+      return
+    fi
   fi
   [[ ! -e "${launcher}" && ! -L "${launcher}" ]] || \
     fail "Refusing to replace existing launcher: ${launcher}"
@@ -277,6 +283,7 @@ install_cli_launcher() {
 }
 
 readiness_check() {
+  export PATH="${HOME}/.local/bin:${PATH}"
   local failed=0 config_home data_home actual_commit
   config_home="${XDG_CONFIG_HOME:-${HOME}/.config}"
   data_home="${XDG_DATA_HOME:-${HOME}/.local/share}"
