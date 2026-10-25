@@ -5,11 +5,15 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import math
 import re
 import shutil
+import struct
+import subprocess
 import wave
 from collections.abc import AsyncIterator, Callable, Coroutine
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from .audio_process import run_audio_process
@@ -24,13 +28,43 @@ _I2S_SINK_PATTERNS = (
     "soc_sound",
     "rpi_hifiberry_dac",
     "snd_rpi_hifiberry_dac",
+    "googlevoicehat",
+    "sndrpigooglevoi",
+    "voicehat",
 )
 
 
 def _set_speaker_amplifier(gpio_pin: int | None, enabled: bool) -> None:
-    """Drive the SunFounder Robot HAT speaker amplifier switch (GPIO 12) via lgpio."""
+    """Drive the SunFounder Robot HAT speaker amplifier switch (GPIO 12 + Fusion 0x17 reg 0x31)."""
     if gpio_pin is None:
         return
+    if shutil.which("pinctrl"):
+        try:
+            subprocess.run(
+                ["pinctrl", "set", str(gpio_pin), "op", "dh" if enabled else "dl"],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=2,
+            )
+        except Exception:
+            pass
+    try:
+        sysfs_speaker = Path("/sys/class/fusion_hat/fusion_hat/speaker")
+        if sysfs_speaker.exists():
+            sysfs_speaker.write_text("1\n" if enabled else "0\n", encoding="utf-8")
+    except Exception:
+        pass
+    try:
+        import importlib
+
+        if Path("/dev/i2c-1").exists():
+            smbus2 = importlib.import_module("smbus2")
+            with smbus2.SMBus(1) as bus:
+                bus.read_i2c_block_data(0x17, 0x18, 2)
+                bus.write_byte_data(0x17, 0x31, 1 if enabled else 0)
+    except Exception:
+        pass
     try:
         import importlib
 
@@ -53,35 +87,87 @@ def _set_speaker_amplifier(gpio_pin: int | None, enabled: bool) -> None:
         pass
 
 
-async def discover_i2s_output_node(runner: ProcessRunner = run_audio_process) -> str:
-    """Inspect pw-dump for an onboard I2S DAC sink (HiFiBerry / soc_sound)."""
-    if not shutil.which("pw-dump"):
-        return ""
+def _detect_alsa_i2s_device() -> str | None:
+    """Return an ALSA playback device (e.g. 'plughw:2,0') if an onboard I2S DAC card is present."""
+    if not shutil.which("aplay"):
+        return None
     try:
-        data = await runner(["pw-dump"], timeout=3, output_limit=2_000_000)
-        rows = json.loads(data)
+        completed = subprocess.run(
+            ["aplay", "-l"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
     except Exception:
+        return None
+    if completed.returncode != 0:
+        return None
+    for line in completed.stdout.splitlines():
+        lowered = line.lower()
+        if any(pattern in lowered for pattern in _I2S_SINK_PATTERNS):
+            match = re.match(r"^card\s+(\d+):", line.strip())
+            if match:
+                return f"plughw:{match.group(1)},0"
+    return None
+
+
+def synthesize_test_chime_wav(sample_rate: int = 24000) -> bytes:
+    """Generate a short two-tone PCM16 WAV chime for embedded speaker verification."""
+    notes = ((523.25, 0.18), (659.25, 0.24))
+    frames = bytearray()
+    for freq_hz, duration_s in notes:
+        total_samples = int(sample_rate * duration_s)
+        for idx in range(total_samples):
+            envelope = 1.0
+            fade = min(400, max(1, total_samples // 6))
+            if idx < fade:
+                envelope = idx / fade
+            elif idx > total_samples - fade:
+                envelope = (total_samples - idx) / fade
+            phase = 2.0 * math.pi * freq_hz * idx / sample_rate
+            sample = int(32767 * 0.22 * envelope * math.sin(phase))
+            frames.extend(struct.pack("<h", max(-32768, min(32767, sample))))
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as writer:
+        writer.setnchannels(1)
+        writer.setsampwidth(2)
+        writer.setframerate(sample_rate)
+        writer.writeframes(bytes(frames))
+    return buf.getvalue()
+
+
+async def discover_i2s_output_node(runner: ProcessRunner = run_audio_process) -> str:
+    """Inspect pw-dump (or ALSA aplay -l fallback) for an onboard I2S DAC sink."""
+    if shutil.which("pw-dump"):
+        try:
+            data = await runner(["pw-dump"], timeout=3, output_limit=2_000_000)
+            rows = json.loads(data)
+        except Exception:
+            rows = []
+        if isinstance(rows, list):
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                info = row.get("info")
+                if not isinstance(info, dict):
+                    continue
+                props = info.get("props")
+                if not isinstance(props, dict):
+                    continue
+                if props.get("media.class") != "Audio/Sink":
+                    continue
+                node_name = props.get("node.name")
+                if not isinstance(node_name, str) or not node_name:
+                    continue
+                description = str(props.get("node.description", "")).lower()
+                haystack = f"{node_name.lower()} {description}"
+                if any(pattern in haystack for pattern in _I2S_SINK_PATTERNS):
+                    return node_name
         return ""
-    if not isinstance(rows, list):
-        return ""
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-        info = row.get("info")
-        if not isinstance(info, dict):
-            continue
-        props = info.get("props")
-        if not isinstance(props, dict):
-            continue
-        if props.get("media.class") != "Audio/Sink":
-            continue
-        node_name = props.get("node.name")
-        if not isinstance(node_name, str) or not node_name:
-            continue
-        description = str(props.get("node.description", "")).lower()
-        haystack = f"{node_name.lower()} {description}"
-        if any(pattern in haystack for pattern in _I2S_SINK_PATTERNS):
-            return node_name
+    alsa_dev = await asyncio.to_thread(_detect_alsa_i2s_device)
+    if alsa_dev:
+        return "alsa_output.platform-soc_sound.stereo-fallback"
     return ""
 
 
@@ -191,6 +277,17 @@ class AudioOutput:
         if not self.config.output_node:
             return {"ready": False, "reason": "select_output_node"}
         if not shutil.which("pw-play") or not shutil.which("pw-dump"):
+            if not self.config.output_node.startswith("bluez_output.") and any(
+                pattern in self.config.output_node.lower() for pattern in _I2S_SINK_PATTERNS
+            ):
+                alsa_dev = await asyncio.to_thread(_detect_alsa_i2s_device)
+                if alsa_dev:
+                    self._target_node = self.config.output_node
+                    return {
+                        "ready": True,
+                        "reason": "available",
+                        "selected_output": self.config.output_node,
+                    }
             return {"ready": False, "reason": "pipewire_tools_missing"}
         try:
             available = await self.outputs()
@@ -259,20 +356,24 @@ class AudioOutput:
                     _set_speaker_amplifier, self.config.speaker_enable_gpio, True
                 )
             target = self._target_node
-            arguments = [
-                "pw-play",
-                "--target=" + target,
-                "--volume=" + str(self.config.volume),
-                "--properties="
-                + json.dumps(
-                    {
-                        "node.dont-reconnect": True,
-                        "node.dont-fallback": True,
-                        "node.linger": False,
-                    }
-                ),
-                "-",
-            ]
+            if shutil.which("pw-play"):
+                arguments = [
+                    "pw-play",
+                    "--target=" + target,
+                    "--volume=" + str(self.config.volume),
+                    "--properties="
+                    + json.dumps(
+                        {
+                            "node.dont-reconnect": True,
+                            "node.dont-fallback": True,
+                            "node.linger": False,
+                        }
+                    ),
+                    "-",
+                ]
+            else:
+                alsa_dev = await asyncio.to_thread(_detect_alsa_i2s_device) or "default"
+                arguments = ["aplay", "-q", "-D", alsa_dev, "-"]
             playback = asyncio.create_task(
                 self._runner(
                     arguments,

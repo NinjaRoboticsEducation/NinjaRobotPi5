@@ -163,7 +163,7 @@ def import_pi5_configs(
                 "sunfounder_robot_hat",
                 "sunfounder",
                 "robot_hat",
-            } or backend_addr in {0x14, "0x14"}
+            } or backend_addr in {0x14, 0x17, "0x14", "0x17"}
             is_pca9685 = backend_name == "pca9685" or backend_addr in {0x40, "0x40"}
 
             hat_endpoints: list[str] = []
@@ -179,20 +179,30 @@ def import_pi5_configs(
                     hat_endpoints.append(norm)
 
             if is_sunfounder or is_pca9685:
-                for req in ("hat_pwm0", "hat_pwm1"):
-                    if req not in hat_endpoints:
-                        hat_endpoints.append(req)
                 hat_endpoints.sort(key=lambda ep: int(ep.removeprefix("hat_pwm")))
+                if "hat_pwm0" in hat_endpoints and "hat_pwm1" in hat_endpoints:
+                    left_ep, right_ep = "hat_pwm0", "hat_pwm1"
+                elif len(hat_endpoints) >= 2:
+                    left_ep, right_ep = hat_endpoints[0], hat_endpoints[1]
+                elif len(hat_endpoints) == 1:
+                    companion = "hat_pwm0" if hat_endpoints[0] != "hat_pwm0" else "hat_pwm1"
+                    hat_endpoints.append(companion)
+                    hat_endpoints.sort(key=lambda ep: int(ep.removeprefix("hat_pwm")))
+                    left_ep, right_ep = hat_endpoints[0], hat_endpoints[1]
+                else:
+                    hat_endpoints = ["hat_pwm0", "hat_pwm1"]
+                    left_ep, right_ep = "hat_pwm0", "hat_pwm1"
                 payload["hardware"]["servos"]["endpoints"] = tuple(hat_endpoints)
                 roles = dict(payload["behaviors"].get("servo_roles") or {})
-                roles["left_motor"] = "hat_pwm0"
-                roles["right_motor"] = "hat_pwm1"
+                roles["left_motor"] = left_ep
+                roles["right_motor"] = right_ep
                 payload["behaviors"]["servo_roles"] = roles
                 if is_sunfounder:
+                    fuel_gauge_addr = 0x17 if backend_addr in {0x17, "0x17"} else 0x14
                     payload["speech_output"]["speaker_enable_gpio"] = 12
                     payload["hardware"]["power"] = {
                         "enabled": True,
-                        "fuel_gauge_address": 0x14,
+                        "fuel_gauge_address": fuel_gauge_addr,
                         "warning_voltage": 7.15,
                         "cutoff_voltage": 6.90,
                         "charging_gpio": 23,
@@ -259,6 +269,32 @@ def import_pi5_configs(
             imported.append(
                 f"pi5vl53l0x found at {item.path}; its calibration remains driver-owned"
             )
+
+    imported_libs = {item.library for item in discovered if item.exists}
+    disp_cfg = payload["hardware"]["display"]
+    buz_cfg = payload["hardware"]["buzzer"]
+    disp_pins = {disp_cfg["dc_gpio"], disp_cfg["reset_gpio"], disp_cfg["backlight_gpio"]}
+    if "pi5disp" in imported_libs and "pi5buzzer" not in imported_libs:
+        if buz_cfg.get("enabled") and buz_cfg.get("gpio") in disp_pins:
+            for candidate in (17, 4, 27, 22, 5, 6):
+                if candidate not in disp_pins:
+                    buz_cfg["gpio"] = candidate
+                    break
+    elif "pi5buzzer" in imported_libs and "pi5disp" not in imported_libs:
+        if disp_cfg.get("enabled") and buz_cfg.get("gpio") in disp_pins:
+            for field_name in ("dc_gpio", "reset_gpio", "backlight_gpio"):
+                if disp_cfg[field_name] == buz_cfg.get("gpio"):
+                    used = {
+                        buz_cfg.get("gpio"),
+                        disp_cfg["dc_gpio"],
+                        disp_cfg["reset_gpio"],
+                        disp_cfg["backlight_gpio"],
+                    }
+                    for candidate in (4, 5, 6, 22, 27, 17):
+                        if candidate not in used:
+                            disp_cfg[field_name] = candidate
+                            break
+
     return RobotConfig.model_validate(payload), imported
 
 

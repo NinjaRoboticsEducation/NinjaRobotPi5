@@ -435,8 +435,50 @@ def test_auto_backend_selects_sunfounder_and_pca9685_by_address() -> None:
     )
     assert isinstance(sf_backend, SunFounderRobotHatBackend)
 
+    bus_sf_fusion = FakeSMBus()
+    sf_fusion_backend = create_servo_backend(
+        "auto", pins=["hat_pwm10", "hat_pwm11"], address=0x17, i2c_bus=bus_sf_fusion
+    )
+    assert isinstance(sf_fusion_backend, SunFounderRobotHatBackend)
+    assert sf_fusion_backend.address == 0x17
+
     bus_pca = FakeSMBus()
     pca_backend = create_servo_backend(
         "auto", pins=["hat_pwm0", "hat_pwm15"], address=0x40, i2c_bus=bus_pca
     )
     assert isinstance(pca_backend, PCA9685ServoBackend)
+
+
+def test_sunfounder_fusion_hat_0x17_fallback_and_register_map() -> None:
+    """SunFounder backend should auto-fallback from 0x14 to 0x17 and use 0x50/0x60/0x18 registers."""
+
+    class FakeFusionBus(FakeSMBus):
+        def write_i2c_block_data(self, address: int, register: int, data: list[int]) -> None:
+            if address == 0x14:
+                raise OSError(121, "Remote I/O error")
+            super().write_i2c_block_data(address, register, data)
+
+        def read_i2c_block_data(self, address: int, register: int, length: int) -> list[int]:
+            assert address == 0x17
+            assert register == 0x18
+            assert length == 2
+            return [0x20, 0x26]  # 8230 mV -> 8.23 V
+
+    bus = FakeFusionBus()
+    # Initialize with default 0x14; should auto-detect 0x17 when 0x14 raises Errno 121
+    backend = SunFounderRobotHatBackend(bus=bus, address=0x14)
+    assert backend.address == 0x17
+
+    # Verify Timer 0..2 prescaler (0x40..0x42) and period (0x50..0x52) on 0x17
+    assert (0x17, 0x40, [0x01, 0x5F]) in bus.writes
+    assert (0x17, 0x50, [0x0F, 0xFF]) in bus.writes
+
+    # Set pulse on P11 (hat_pwm11) -> register 0x60 + 11 = 0x6B
+    backend.set_pulse_us("p11", 1500)
+    assert backend.get_pulse_us("hat_pwm11") == 1500
+    assert (0x17, 0x6B, [0x01, 0x33]) in bus.writes
+
+    assert backend.read_battery_voltage() == pytest.approx(8.23, abs=0.01)
+
+    backend.off("pwm11")
+    assert (0x17, 0x6B, [0x00, 0x00]) in bus.writes

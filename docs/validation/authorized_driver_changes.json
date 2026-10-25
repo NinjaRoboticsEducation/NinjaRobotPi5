@@ -602,8 +602,8 @@
     },
     "pi5servo/src/pi5servo/core/backend.py": {
       "approved": {
-        "sha256": "4a8db56e98a7e917fb922552469064c1371a347587b7620e4e3b9998ad9c68ff",
-        "size": 11111
+        "sha256": "a71bedc64641f0af15f3fd57df0fbc3ed639ce40d43ad4cb19a58b10e63df1f5",
+        "size": 11142
       },
       "authorized_by": "Project owner",
       "authorized_on": "2026-10-25",
@@ -611,7 +611,7 @@
         "sha256": "7d1c7bc15beb2cb82af294f2650a299b90b404cd61a5fd7b76f576e791ce5c5d",
         "size": 9850
       },
-      "reason": "Add SunFounder Robot HAT (0x14 Big-Endian 3-byte protocol, P0..P11, ADC A4 battery) and General PCA9685 smbus2/hat_pwm0..15 multi-HAT support while preserving DFR0566 baseline."
+      "reason": "Support SunFounder Robot HAT v4 (0x14) and Fusion HAT / Robot HAT v5 (0x17) I2C MCU register maps and automatic fallback"
     },
     "pi5servo/src/pi5servo/core/backends/__init__.py": {
       "approved": {
@@ -654,13 +654,13 @@
     },
     "pi5servo/src/pi5servo/core/backends/sunfounder_robot_hat.py": {
       "approved": {
-        "sha256": "0ffc461d200ce7917aace71132d5f8c83788576b0590b975bdcc539eedf27289",
-        "size": 9083
+        "sha256": "e5160ebdada065ed1233c2147539f54a1ff519c72b02dc75495abc8d26927157",
+        "size": 11619
       },
       "authorized_by": "Project owner",
       "authorized_on": "2026-10-25",
       "baseline": null,
-      "reason": "Add SunFounder Robot HAT (0x14 Big-Endian 3-byte protocol, P0..P11, ADC A4 battery) and General PCA9685 smbus2/hat_pwm0..15 multi-HAT support while preserving DFR0566 baseline."
+      "reason": "Support SunFounder Robot HAT v4 (0x14) and Fusion HAT / Robot HAT v5 (0x17) I2C MCU register maps and automatic fallback"
     },
     "pi5servo/src/pi5servo/core/endpoint.py": {
       "approved": {
@@ -677,8 +677,8 @@
     },
     "pi5servo/tests/test_backend.py": {
       "approved": {
-        "sha256": "2e5f13a8240cbe7190c029968bc504406f1847bb897679a2bf623b676491b1fe",
-        "size": 15036
+        "sha256": "4a018435db19d557366944a08f6cdafd6138676d8602c40ecc5800e03841ec48",
+        "size": 16788
       },
       "authorized_by": "Project owner",
       "authorized_on": "2026-10-25",
@@ -686,7 +686,7 @@
         "sha256": "c5498ba11e948ca925f5655f88120d2c1ff82ebed3d33ef8a17da130360459ed",
         "size": 11153
       },
-      "reason": "Add SunFounder Robot HAT (0x14 Big-Endian 3-byte protocol, P0..P11, ADC A4 battery) and General PCA9685 smbus2/hat_pwm0..15 multi-HAT support while preserving DFR0566 baseline."
+      "reason": "Support SunFounder Robot HAT v4 (0x14) and Fusion HAT / Robot HAT v5 (0x17) I2C MCU register maps and automatic fallback"
     },
     "pi5servo/tests/test_config.py": {
       "approved": {

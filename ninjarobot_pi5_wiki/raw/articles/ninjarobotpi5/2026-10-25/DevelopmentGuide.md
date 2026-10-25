@@ -6,13 +6,14 @@ The three-layer hardware boundary (`ninjarobot_pi5_agent -> ninjarobot_pi5_ide -
 now supports three Expansion HAT topologies without Agent-to-driver coupling:
 
 1. **`pi5servo` Multi-HAT Backends (`pi5servo/src/pi5servo/core/`)**:
-   - `SunFounderRobotHatBackend` (`backends/sunfounder_robot_hat.py`): drives the
-     SunFounder Robot HAT v5 AT32F413 MCU at I2C `0x14` (`P0`..`P11` / `hat_pwm0`..`hat_pwm11`)
-     using Big-Endian 3-byte `write_i2c_block_data` transactions serialized by a
-     class-level `threading.RLock()`. Configures Timers 0–2 (`0x40`..`0x42` prescaler,
-     `0x44`..`0x46` period `4095`) for 50 Hz servo operation, reads 2S battery voltage
-     on ADC `A4` (register `0x13`), and provides `reset_sunfounder_mcu()` on `GPIO5`
-     via `lgpio`.
+   - `SunFounderRobotHatBackend` (`backends/sunfounder_robot_hat.py`): drives both
+     the SunFounder Robot HAT v4 MCU at I2C `0x14` and the SunFounder Fusion HAT /
+     Robot HAT v5 MCU at I2C `0x17` (`P0`..`P11` / `hat_pwm0`..`hat_pwm11`) using
+     Big-Endian 3-byte `write_i2c_block_data` transactions serialized by a
+     class-level `threading.RLock()`. Automatically falls back between `0x14` and
+     `0x17` during `_initialize_timers()`, dispatches register offsets (`0x44`/`0x20`/`0x13`
+     on `0x14` vs `0x50`/`0x60`/`0x18` on `0x17`), and provides `reset_sunfounder_mcu()`
+     on `GPIO5` via `lgpio`.
    - `PCA9685ServoBackend` (`backends/pca9685.py`): adds a built-in `smbus2`
      controller (`_SMBusPCA9685Controller` at `0x40`) alongside optional
      `adafruit_pca9685` support, and accepts `hat_pwm0`..`hat_pwm15` (`pwm0`..`pwm15`,
@@ -23,28 +24,34 @@ now supports three Expansion HAT topologies without Agent-to-driver coupling:
    - `config.py`: expands `SUPPORTED_SERVO_ENDPOINTS` to `gpio12`, `gpio13`, and
      `hat_pwm0`..`hat_pwm15` (preserving `LEGACY_SERVO_ENDPOINTS` as the default
      `ServoDevice` signature), normalizes endpoint aliases in `ServoConfig` and
-     `BehaviorConfig.servo_roles`, adds `PowerConfig` (`fuel_gauge_address` `0x36`
-     or `0x14`, `warning_voltage = 7.15`, `cutoff_voltage = 6.90`, `charging_gpio`),
+     `BehaviorConfig.servo_roles`, adds `PowerConfig` (`fuel_gauge_address` `0x36`,
+     `0x14`, or `0x17`, `warning_voltage = 7.15`, `cutoff_voltage = 6.90`, `charging_gpio`),
      and adds `SpeechOutputConfig.speaker_enable_gpio` with GPIO conflict validation.
    - `servo.py`: `_load_servo_runtime()` reads `manager.get_backend_config()` from
      `servo.json` and forwards `backend` and `backend_kwargs` to `ServoGroup`;
      `ServoDevice.read_battery_voltage_sync()` delegates to the active backend.
-   - `audio_output.py`: `discover_i2s_output_node()` inspects `pw-dump` for
-     HiFiBerry/I2S sinks, and `_set_speaker_amplifier()` drives `GPIO12` via `lgpio`
-     before `pw-play` and pulls it low on `close()`.
-   - `hardware_setup.py` & `config_import.py`: validate and import `hat_pwm0`/`hat_pwm1`
-     and auxiliary `hat_pwm*` endpoints when `sunfounder_robot_hat` or `pca9685` is
-     active, and provide `apply_hardware_profile_preset()` and
-     `configure_sunfounder_i2s_speaker()` for the onboarding wizard.
+   - `audio_output.py`: `discover_i2s_output_node()` inspects `pw-dump` (with ALSA
+     `aplay -l` fallback for `googlevoicehat`/`hifiberry` sinks), and
+     `_set_speaker_amplifier()` drives `GPIO12` (`pinctrl` + `lgpio`) and `0x17`
+     register `0x31` before playback and pulls it low on `close()`.
+   - `hardware_setup.py` & `config_import.py`: isolate single-component validation
+     in `hardware_setup_status()` so arbitrary Digital pins (`17, 4, 27, 22`) for
+     `pi5disp` (`dc_pin`, `rst_pin`) and `pi5buzzer` (`pin`) never collide with
+     unconfigured default pins; accept any calibrated `hat_pwm0`..`hat_pwm11`
+     channels on SunFounder Robot HAT (`hat_pwm0`..`hat_pwm15` on PCA9685); and
+     provide `apply_hardware_profile_preset()`, `configure_sunfounder_i2s_speaker()`,
+     and `play_sunfounder_speaker_test_tone()`.
    - `safety.py`: `MotionController._resolve_targets()` allows auxiliary-only servo
      role movements (`head_pan`, `head_tilt`, `gripper`, etc.) without requiring
      wheel roles, and `_undervoltage_monitor()` polls `read_battery_voltage_sync()`
-     when `fuel_gauge_address == 0x14`.
+     when `fuel_gauge_address in {0x14, 0x17}`.
 3. **`ninjarobot_pi5_agent` Onboarding Wizard (`setup_wizard.py`)**:
    - Prompts for `1. DFRobot DFR0566 IO Expansion HAT`, `2. SunFounder Robot HAT`,
      or `3. General PCA9685 PWM Expansion HAT`, storing the choice in
-     `progress.selections["hardware_profile"]` and delegating preset and I2S audio
-     configuration to `ninjarobot_pi5_ide`.
+     `progress.selections["hardware_profile"]` (and inferring it from `servo.json`
+     when resuming or bulk-applying), running the Embedded Speaker Initialization
+     flow when SunFounder Robot HAT is active, and running Bluetooth speaker setup
+     when DFR0566 or PCA9685 is active.
 
 ## Onboarding refinement and audit — 23 September 2026
 

@@ -44,6 +44,7 @@ from .hardware_setup import (
     apply_hardware_profile_preset,
     configure_sunfounder_i2s_speaker,
     hardware_setup_status,
+    play_sunfounder_speaker_test_tone,
     run_hardware_setup,
 )
 from .identity import FaceIdentityBackend, FaceIdentityDevice, Pi5CameraFaceIdentityBackend
@@ -133,6 +134,7 @@ __all__ = [
     "apply_hardware_profile_preset",
     "configure_sunfounder_i2s_speaker",
     "hardware_setup_status",
+    "play_sunfounder_speaker_test_tone",
     "IDEClient",
     "IDEError",
     "LifecycleState",

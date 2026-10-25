@@ -28,6 +28,7 @@ from ninjarobot_pi5_ide import (
     configure_sunfounder_i2s_speaker,
     hardware_setup_status,
     load_robot_config,
+    play_sunfounder_speaker_test_tone,
     run_hardware_setup,
 )
 
@@ -283,7 +284,9 @@ async def run_setup_wizard(
             ):
                 _select_hardware_profile(ui, progress, store)
 
-            active_profile = progress.selections.get("hardware_profile", "dfr0566")
+            active_profile = _resolve_active_hardware_profile(progress)
+            if "hardware_profile" not in progress.selections:
+                progress.selections["hardware_profile"] = active_profile
 
             for index, component in enumerate(MANDATORY_HARDWARE, 1):
                 if requested_step and requested_step != component:
@@ -379,6 +382,38 @@ async def run_setup_wizard(
             return SetupOutcome()
 
 
+def _resolve_active_hardware_profile(progress: SetupProgress) -> str:
+    """Resolve the active Expansion HAT profile from progress or saved servo.json."""
+    selected = progress.selections.get("hardware_profile")
+    if selected in {"dfr0566", "sunfounder_robot_hat", "pca9685"}:
+        return selected
+    try:
+        servo_item = next(
+            (item for item in discover_pi5_configs() if item.library == "pi5servo"),
+            None,
+        )
+        if servo_item is not None and servo_item.exists:
+            data = json.loads(servo_item.path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                backend = data.get("__backend__")
+                if isinstance(backend, dict):
+                    name = str(backend.get("name", "") or "").lower()
+                    kwargs = backend.get("kwargs")
+                    addr = kwargs.get("address") if isinstance(kwargs, dict) else None
+                    if name in {"sunfounder_robot_hat", "sunfounder", "robot_hat"} or addr in {
+                        0x14,
+                        0x17,
+                        "0x14",
+                        "0x17",
+                    }:
+                        return "sunfounder_robot_hat"
+                    if name == "pca9685" or addr in {0x40, "0x40"}:
+                        return "pca9685"
+    except Exception:
+        pass
+    return "dfr0566"
+
+
 def _select_hardware_profile(
     ui: SetupConsole,
     progress: SetupProgress,
@@ -442,8 +477,8 @@ def _hardware_step(
         ),
         "sunfounder_robot_hat": (
             "With both wheels raised, choose 3. Calibrate for pwm0 (P0 Left) and pwm1 "
-            "(P1 Right), plus any extra P2-P11 servos. Verify each wheel stops at neutral "
-            "before leaving the tool."
+            "(P1 Right), or any connected pwm0-pwm11 (P0-P11) servo channels. Verify each "
+            "servo stops at neutral before leaving the tool."
         ),
         "pca9685": (
             "With both wheels raised, choose 3. Calibrate for pwm0 (PWM0 Left) and pwm1 "
@@ -544,18 +579,25 @@ async def _optional_hardware(
 ) -> None:
     ui.write("\nOptional hardware")
     if selected in {None, "bluetooth"}:
-        configured_i2s = False
-        if progress.selections.get("hardware_profile") == "sunfounder_robot_hat":
-            if _yes(
-                ui.ask("Configure the SunFounder Robot HAT onboard I2S speaker (GPIO12)? [Y/n]: ")
-                or "y"
-            ):
+        active_profile = _resolve_active_hardware_profile(progress)
+        if active_profile == "sunfounder_robot_hat":
+            ui.write("\nSunFounder Robot HAT — Embedded Speaker Initialization")
+            ui.write(
+                "What is this? The SunFounder Robot HAT includes an embedded I2S speaker "
+                "and onboard amplifier (GPIO12)."
+            )
+            prompt = (
+                "Initialize and test the SunFounder Robot HAT onboard I2S speaker (GPIO12)? [Y/n]: "
+            )
+            if _yes(ui.ask(prompt) or "y"):
                 try:
                     node = await configure_sunfounder_i2s_speaker(config_path)
+                    played = await play_sunfounder_speaker_test_tone(node)
                 except Exception as exc:
                     ui.write(
                         f"Onboard I2S speaker setup failed: {type(exc).__name__}. "
-                        "Check dtoverlay=hifiberry-dac in /boot/firmware/config.txt."
+                        "Check dtoverlay=googlevoicehat-soundcard or dtoverlay=hifiberry-dac "
+                        "in /boot/firmware/config.txt."
                     )
                     _record(progress, "bluetooth", "failed", "unverified", type(exc).__name__)
                 else:
@@ -563,6 +605,8 @@ async def _optional_hardware(
                         "Configured SunFounder onboard I2S speaker "
                         f"(GPIO12 amplifier enabled, sink: {node})."
                     )
+                    if played:
+                        ui.write("Played embedded speaker verification chime.")
                     _record(
                         progress,
                         "bluetooth",
@@ -570,9 +614,10 @@ async def _optional_hardware(
                         "configured",
                         "onboard_i2s_speaker",
                     )
-                configured_i2s = True
-                store.save(progress)
-        if not configured_i2s:
+            else:
+                _record(progress, "bluetooth", "skipped", "unverified", "user_skipped")
+            store.save(progress)
+        else:
             if _yes(ui.ask("Configure a Bluetooth speaker? [y/N]: ")):
                 try:
                     await connect_wizard(config_path)

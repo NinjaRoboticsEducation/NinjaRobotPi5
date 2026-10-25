@@ -222,7 +222,7 @@ class PowerConfig(ConfigModel):
     """Optional battery/UPS monitoring configuration across supported HATs."""
 
     enabled: bool = False
-    fuel_gauge_address: Literal[0x36, 0x14] = 0x36
+    fuel_gauge_address: Literal[0x36, 0x14, 0x17] = 0x36
     warning_voltage: Annotated[float, Field(ge=6.0, le=8.4)] = 7.15
     cutoff_voltage: Annotated[float, Field(ge=6.0, le=8.0)] = 6.90
     charging_gpio: Annotated[int, Field(ge=0, le=27)] | None = None

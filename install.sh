@@ -9,7 +9,7 @@ if [[ -n "${SCRIPT_PATH}" ]]; then
   PROJECT_INSTALLER="${SCRIPT_DIR}/scripts/install-rpi.sh"
 fi
 REPOSITORY_URL="https://github.com/NinjaRoboticsEducation/NinjaRobotPi5.git"
-INSTALL_REF="${NINJAROBOT_INSTALL_REF:-public_v07}"
+INSTALL_REF="${NINJAROBOT_INSTALL_REF:-HEAD}"
 INSTALL_DIR="${NINJAROBOT_INSTALL_DIR:-${HOME}/NinjaRobotPi5}"
 
 if [[ -n "${PROJECT_INSTALLER}" && -x "${PROJECT_INSTALLER}" && -f "${SCRIPT_DIR}/uv.lock" ]]; then
@@ -50,7 +50,7 @@ repository installer. Inside an existing checkout, this script continues to
 delegate directly to scripts/install-rpi.sh.
 
 Bootstrap options:
-  --ref          Git commit, tag, or branch to install (default: public_v07).
+  --ref          Git commit, tag, or branch to install (default: HEAD, the repository default branch).
   --install-dir  New checkout location (default: $HOME/NinjaRobotPi5).
 
 Installer options are forwarded unchanged: --profile, --yes, --check,
@@ -126,6 +126,9 @@ resolve_commit() {
 # Resolve remote branches explicitly: checkout's short-name guessing implicitly
 # creates a tracking branch, which conflicts with --detach.
 case "${INSTALL_REF}" in
+  HEAD|default)
+    target="$(resolve_commit "refs/remotes/origin/HEAD")" || target="$(resolve_commit "HEAD")" || target=""
+    ;;
   refs/heads/*) target="$(resolve_commit "refs/remotes/origin/${INSTALL_REF#refs/heads/}")" || target="" ;;
   refs/tags/*) target="$(resolve_commit "${INSTALL_REF}")" || target="" ;;
   *)

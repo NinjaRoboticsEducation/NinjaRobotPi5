@@ -11,25 +11,39 @@ preserving 100% of existing features and wiring compatibility:
      I2C address `0x10`.
    - Power monitoring uses the Geekworm X1208 UPS fuel gauge (`0x36`).
    - Audio output uses a paired Bluetooth speaker via PipeWire.
-2. **SunFounder Robot HAT v5**:
-   - Onboard AT32F413 MCU at I2C address `0x14` provides 12 hardware PWM servo
-     channels `P0`..`P11` (`hat_pwm0`..`hat_pwm11`, or `pwm0`..`pwm11` / `p0`..`p11`).
-     Connect the left wheel servo to `P0` (`hat_pwm0`) and the right wheel servo
-     to `P1` (`hat_pwm1`), with `P2`..`P11` available for auxiliary joints (`head_pan`,
-     `head_tilt`, `arm`, `gripper`).
-   - Onboard 2S Li-ion battery voltage monitoring uses MCU ADC channel `A4`
-     (register `0x13` at `0x14`), with warning at `7.15 V` and protective motion
-     cutoff at `6.90 V` (`GPIO23` indicates USB-C charging state; `GPIO5` is MCU reset).
-   - Built-in I2S mono speaker uses `dtoverlay=hifiberry-dac` (`GPIO18`/`GPIO19`/`GPIO21`)
-     and amplifier enable switch on `GPIO12` (driven via `lgpio`).
-   - Recommended ST7789V display control pins on SunFounder Robot HAT v5:
-     `DC=GPIO4`, `RST=GPIO22`, `BL=GPIO26` (avoiding `GPIO5` MCU reset and `GPIO23`
-     charge state).
+2. **SunFounder Robot HAT (Robot HAT v4 `0x14` and Fusion HAT / Robot HAT v5 `0x17`)**:
+   - Onboard MCU at I2C address `0x14` (Robot HAT v4) or `0x17` (Fusion HAT / Robot HAT v5,
+     auto-detected with automatic fallback) provides 12 hardware PWM servo channels
+     `P0`..`P11` (`hat_pwm0`..`hat_pwm11`, or `pwm0`..`pwm11` / `p0`..`p11`).
+     You may freely connect wheel or auxiliary servos to any channels `pwm0`..`pwm11`
+     (for example `pwm0`/`pwm1` or `pwm10`/`pwm11`).
+   - Onboard 2S Li-ion battery voltage monitoring uses MCU ADC (`0x13` on `0x14` or
+     `0x18` on `0x17`), with warning at `7.15 V` and protective motion cutoff at `6.90 V`
+     (`GPIO23` indicates USB-C charging state; `GPIO5` is MCU reset).
+   - Built-in embedded I2S mono speaker uses `dtoverlay=googlevoicehat-soundcard` or
+     `dtoverlay=hifiberry-dac` and amplifier enable on `GPIO12` (and `0x17` register `0x31`).
+   - Flexible Digital header pin assignment: you may freely connect the Buzzer and the
+     ST7789V SPI Display `DC`/`RST` pins to any of the Digital header pins (`17, 4, 27, 22`,
+     with `BL` on `BSY / GPIO6`), for example Buzzer on `GPIO17` and Display on
+     `DC=GPIO27, RST=GPIO22, BL=GPIO6`.
 3. **General PCA9685 PWM Expansion HAT**:
    - 16-channel I2C PWM driver at address `0x40` provides channels `PWM0`..`PWM15`
      (`hat_pwm0`..`hat_pwm15`, or `pwm0`..`pwm15`).
-   - Connect the left wheel servo to `PWM0` (`hat_pwm0`) and the right wheel servo
-     to `PWM1` (`hat_pwm1`), with `PWM2`..`PWM15` available for up to 14 additional servos.
+   - Connect wheel or auxiliary servos to any channels `PWM0`..`PWM15`.
+
+### Default-branch cURL installation from GitHub
+
+To always install the latest confirmed default branch on GitHub:
+
+```bash
+# Preview first (no files written):
+curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/HEAD/install.sh | bash -s -- --dry-run
+
+# Install the latest default branch:
+curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/HEAD/install.sh | bash
+```
+
+Use `--ref <BRANCH_OR_TAG>` if you want to pin a specific branch, tag, or commit.
 
 ### Guided onboarding with Expansion HAT profile selection
 
@@ -54,13 +68,16 @@ Select the Expansion HAT installed on your Raspberry Pi 5:
 
 Selecting `1`, `2`, or `3` automatically writes the matching `__backend__` preset
 into `~/.config/pi5servo/servo.json`, tailors the Step 4 (`servo`) calibration
-instructions (`GPIO12`/`GPIO13` for Profile 1, `pwm0`/`pwm1` for Profiles 2 and 3),
-and in Step 6 (`bluetooth`) offers automatic configuration of the SunFounder
-onboard I2S speaker (`GPIO12` amplifier enable + PipeWire HiFiBerry DAC sink
-discovery) when Profile 2 is selected. When hardware setup completes,
-`ninjarobot-ide-tool config import` automatically syncs the active HAT endpoints,
-`servo_roles`, `speaker_enable_gpio`, and `[hardware.power]` settings into
-`~/.config/ninjarobot_pi5/config.toml`.
+instructions (`GPIO12`/`GPIO13` for Profile 1, any `pwm0`..`pwm11` for Profile 2,
+or `pwm0`..`pwm15` for Profile 3), and in Step 6:
+- When **Profile 2 (SunFounder Robot HAT)** is selected, runs the **Embedded Speaker
+  Initialization** process (enables the onboard I2S speaker amplifier, configures the
+  I2S DAC sink, and plays a verification chime — without prompting for Bluetooth).
+- When **Profile 1 (DFR0566)** or **Profile 3 (PCA9685)** is selected, runs the
+  **Bluetooth speaker** onboarding flow.
+When hardware setup completes, `ninjarobot-ide-tool config import` automatically
+syncs the active HAT endpoints, `servo_roles`, `speaker_enable_gpio`, and
+`[hardware.power]` settings into `~/.config/ninjarobot_pi5/config.toml`.
 
 ### Calibrating servos with `pi5servo servo-tool`
 

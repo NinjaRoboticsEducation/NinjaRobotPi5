@@ -205,3 +205,51 @@ def test_import_sunfounder_and_pca9685_servo_configs(tmp_path: Path) -> None:
     assert imported_pca.behaviors.servo_roles["right_motor"] == "hat_pwm1"
     assert imported_pca.speech_output.speaker_enable_gpio is None
     assert imported_pca.hardware.power.enabled is False
+
+
+def test_import_sunfounder_arbitrary_digital_and_pwm_pins(tmp_path: Path) -> None:
+    buzzer = tmp_path / "buzzer.json"
+    display = tmp_path / "display.json"
+    servo = tmp_path / "servo.json"
+    write_json(buzzer, {"pin": 17, "volume": 128})
+    write_json(
+        display,
+        {
+            "display_profile": "st7789v_2inch8",
+            "dc_pin": 27,
+            "rst_pin": 22,
+            "backlight_pin": 6,
+            "width": 240,
+            "height": 320,
+            "rotation": 90,
+            "brightness": 75,
+            "spi_speed_mhz": 32,
+        },
+    )
+    write_json(
+        servo,
+        {
+            "__backend__": {
+                "name": "sunfounder_robot_hat",
+                "kwargs": {"bus_id": 1, "address": 23, "frequency_hz": 50},
+            },
+            "hat_pwm10": {"pulse_center": 1500},
+            "hat_pwm11": {"pulse_center": 1500},
+        },
+    )
+    imported, _ = import_pi5_configs(
+        default_robot_config(),
+        [
+            DiscoveredConfig("pi5buzzer", buzzer, True),
+            DiscoveredConfig("pi5disp", display, True),
+            DiscoveredConfig("pi5servo", servo, True),
+        ],
+    )
+    assert imported.hardware.buzzer.gpio == 17
+    assert imported.hardware.display.dc_gpio == 27
+    assert imported.hardware.display.reset_gpio == 22
+    assert imported.hardware.display.backlight_gpio == 6
+    assert imported.hardware.servos.endpoints == ("hat_pwm10", "hat_pwm11")
+    assert imported.behaviors.servo_roles["left_motor"] == "hat_pwm10"
+    assert imported.behaviors.servo_roles["right_motor"] == "hat_pwm11"
+    assert imported.hardware.power.fuel_gauge_address == 0x17

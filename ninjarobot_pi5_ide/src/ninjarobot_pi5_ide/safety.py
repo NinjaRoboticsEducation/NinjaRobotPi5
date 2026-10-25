@@ -609,7 +609,10 @@ class MotionController:
                     await self.stop_motion("undervoltage", latch=True)
                     return
 
-            if self._power_config.enabled and self._power_config.fuel_gauge_address == 0x14:
+            if self._power_config.enabled and self._power_config.fuel_gauge_address in {
+                0x14,
+                0x17,
+            }:
                 reader = getattr(self._servo, "read_battery_voltage_sync", None)
                 if callable(reader):
                     try:

@@ -12,6 +12,8 @@ from ..backend_errors import BackendConfigurationError, BackendUnavailableError
 from ..endpoint import ServoEndpoint, parse_servo_endpoint
 
 SUNFOUNDER_DEFAULT_ADDRESS = 0x14
+SUNFOUNDER_FUSION_ADDRESS = 0x17
+SUNFOUNDER_ADDRESSES = (SUNFOUNDER_DEFAULT_ADDRESS, SUNFOUNDER_FUSION_ADDRESS)
 SUNFOUNDER_DEFAULT_BUS_ID = 1
 SUNFOUNDER_DEFAULT_FREQUENCY_HZ = 50
 SUNFOUNDER_PWM_CHANNELS = range(0, 12)  # P0 through P11 (0-indexed)
@@ -124,6 +126,20 @@ class SunFounderRobotHatBackend:
                     f"Failed to write to SunFounder Robot HAT MCU at 0x{self.address:02X}: {exc}"
                 ) from exc
 
+    @property
+    def _pwm_register_base(self) -> int:
+        return 0x60 if self.address == SUNFOUNDER_FUSION_ADDRESS else 0x20
+
+    @property
+    def _period_register_base(self) -> int:
+        return 0x50 if self.address == SUNFOUNDER_FUSION_ADDRESS else 0x44
+
+    def _write_timer_registers(self, prescaler: int) -> None:
+        with self._io_lock:
+            for timer_idx in range(3):  # Timers 0, 1, 2 -> Channels P0..P11
+                self._write_u16_be(0x40 + timer_idx, prescaler)
+                self._write_u16_be(self._period_register_base + timer_idx, SUNFOUNDER_PWM_PERIOD)
+
     def _initialize_timers(self) -> None:
         """Configure Timers 0, 1, and 2 (covering P0..P11) for 50Hz PWM."""
         prescaler = max(
@@ -132,10 +148,33 @@ class SunFounderRobotHatBackend:
             - 1,
         )
         try:
-            with self._io_lock:
-                for timer_idx in range(3):  # Timers 0, 1, 2 -> Channels P0..P11
-                    self._write_u16_be(0x40 + timer_idx, prescaler)
-                    self._write_u16_be(0x44 + timer_idx, SUNFOUNDER_PWM_PERIOD)
+            try:
+                self._write_timer_registers(prescaler)
+                return
+            except BackendUnavailableError as first_exc:
+                if self.address not in SUNFOUNDER_ADDRESSES:
+                    raise
+                orig_address = self.address
+                alt_address = (
+                    SUNFOUNDER_FUSION_ADDRESS
+                    if orig_address == SUNFOUNDER_DEFAULT_ADDRESS
+                    else SUNFOUNDER_DEFAULT_ADDRESS
+                )
+                try:
+                    self.address = alt_address
+                    self._write_timer_registers(prescaler)
+                    return
+                except BackendUnavailableError:
+                    self.address = orig_address
+                if reset_sunfounder_mcu():
+                    for candidate in (orig_address, alt_address):
+                        try:
+                            self.address = candidate
+                            self._write_timer_registers(prescaler)
+                            return
+                        except BackendUnavailableError:
+                            self.address = orig_address
+                raise first_exc
         except Exception as exc:
             if self._owns_bus and hasattr(self._bus, "close"):
                 self._bus.close()
@@ -177,7 +216,7 @@ class SunFounderRobotHatBackend:
         self.claim(identifier)
         ticks = int(round((float(pulse_width_us) / self.period_us) * float(SUNFOUNDER_PWM_PERIOD)))
         ticks = max(0, min(SUNFOUNDER_PWM_PERIOD, ticks))
-        self._write_u16_be(0x20 + channel, ticks)
+        self._write_u16_be(self._pwm_register_base + channel, ticks)
         self._pulses[channel] = int(round(pulse_width_us))
 
     def get_pulse_us(self, identifier: int | str | ServoEndpoint) -> int:
@@ -187,7 +226,7 @@ class SunFounderRobotHatBackend:
     def off(self, identifier: int | str | ServoEndpoint) -> None:
         self.claim(identifier)
         channel = self._resolve_channel(identifier)
-        self._write_u16_be(0x20 + channel, 0)
+        self._write_u16_be(self._pwm_register_base + channel, 0)
         self._pulses[channel] = 0
 
     def release(self, identifier: int | str | ServoEndpoint) -> None:
@@ -201,7 +240,23 @@ class SunFounderRobotHatBackend:
         self._pulses.pop(channel, None)
 
     def read_battery_voltage(self) -> float:
-        """Thread-safe read of onboard 2S battery voltage via ADC channel A4 (Reg 0x13)."""
+        """Thread-safe read of onboard 2S battery voltage (Reg 0x13 on 0x14, Reg 0x18 on 0x17)."""
+        if self.address == SUNFOUNDER_FUSION_ADDRESS:
+            with self._io_lock:
+                try:
+                    if hasattr(self._bus, "read_i2c_block_data"):
+                        block = self._bus.read_i2c_block_data(self.address, 0x18, 2)
+                        msb, lsb = int(block[0]), int(block[1])
+                    else:
+                        msb = int(self._bus.read_byte_data(self.address, 0x18))
+                        lsb = int(self._bus.read_byte_data(self.address, 0x19))
+                except OSError as exc:
+                    raise BackendUnavailableError(
+                        f"Failed to read battery ADC from SunFounder Robot HAT at 0x{self.address:02X}: {exc}"
+                    ) from exc
+            raw_mv = ((msb & 0xFF) << 8) | (lsb & 0xFF)
+            return round(raw_mv / 1000.0, 2)
+
         channel_reg = (7 - SUNFOUNDER_ADC_BATTERY_CHANNEL) | 0x10  # 0x13
         with self._io_lock:
             self._write_u16_be(channel_reg, 0)
@@ -225,7 +280,7 @@ class SunFounderRobotHatBackend:
                 pass
         for ch in list(self._pulses):
             try:
-                self._write_u16_be(0x20 + ch, 0)
+                self._write_u16_be(self._pwm_register_base + ch, 0)
             except Exception:
                 pass
         self._pulses.clear()

@@ -530,3 +530,23 @@ def test_sunfounder_optional_hardware_configures_onboard_i2s_speaker(monkeypatch
     assert configured_paths == [config_path]
     assert saved.steps["bluetooth"].status == "complete"
     assert saved.steps["bluetooth"].detail == "onboard_i2s_speaker"
+    assert "Configure a Bluetooth speaker?" not in "\n".join(ui.messages)
+
+
+def test_sunfounder_skip_embedded_speaker_does_not_prompt_bluetooth(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(
+        setup_wizard,
+        "connect_wizard",
+        lambda *_a, **_kw: pytest.fail("Bluetooth setup must not run on SunFounder Robot HAT"),
+    )
+    path = tmp_path / "state" / "progress.json"
+    progress = setup_wizard.SetupProgress(selections={"hardware_profile": "sunfounder_robot_hat"})
+    ui = _Console(("n", "n"))
+    config_path = tmp_path / "config.toml"
+
+    with setup_wizard.ProgressStore(path) as store:
+        asyncio.run(setup_wizard._optional_hardware(progress, store, ui, config_path))
+        saved = store.load()
+
+    assert saved.steps["bluetooth"].status == "skipped"
+    assert saved.steps["bluetooth"].detail == "user_skipped"

@@ -210,7 +210,10 @@ def _create_hat_backend(kwargs: dict[str, Any]) -> ServoPulseBackend:
         except ValueError:
             address = None
 
-    if hat_backend_name in {"sunfounder_robot_hat", "sunfounder", "robot_hat"} or address == 0x14:
+    if hat_backend_name in {"sunfounder_robot_hat", "sunfounder", "robot_hat"} or address in {
+        0x14,
+        0x17,
+    }:
         return SunFounderRobotHatBackend(
             **_filter_backend_kwargs(kwargs, SUNFOUNDER_ROBOT_HAT_BACKEND_KWARGS)
         )

@@ -311,10 +311,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=(
             "gpio12",
             "gpio13",
-            "hat_pwm1",
-            "hat_pwm2",
-            "hat_pwm3",
-            "hat_pwm4",
+            *(f"hat_pwm{i}" for i in range(16)),
         ),
         help="One explicit V4 servo endpoint.",
     )
@@ -884,10 +881,7 @@ def _build_servo_engine(
         endpoints = (
             "gpio12",
             "gpio13",
-            "hat_pwm1",
-            "hat_pwm2",
-            "hat_pwm3",
-            "hat_pwm4",
+            *(f"hat_pwm{i}" for i in range(16)),
         )
         simulated_group = _SimulatedServoGroup(endpoints)
         device = ServoDevice(

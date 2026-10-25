@@ -87,9 +87,38 @@ def hardware_setup_status(component: str) -> dict[str, object]:
             # Reuse the integrated schema for fields that the IDE consumes.
             from .config_import import DiscoveredConfig
 
-            import_pi5_configs(
-                default_robot_config(), [DiscoveredConfig(tool.component, configuration, True)]
-            )
+            base_config = default_robot_config()
+            if component == "display":
+                base_config = base_config.model_copy(
+                    update={
+                        "hardware": base_config.hardware.model_copy(
+                            update={
+                                "buzzer": base_config.hardware.buzzer.model_copy(
+                                    update={"enabled": False}
+                                ),
+                                "servos": base_config.hardware.servos.model_copy(
+                                    update={"enabled": False}
+                                ),
+                            }
+                        )
+                    }
+                )
+            elif component == "buzzer":
+                base_config = base_config.model_copy(
+                    update={
+                        "hardware": base_config.hardware.model_copy(
+                            update={
+                                "display": base_config.hardware.display.model_copy(
+                                    update={"enabled": False}
+                                ),
+                                "servos": base_config.hardware.servos.model_copy(
+                                    update={"enabled": False}
+                                ),
+                            }
+                        )
+                    }
+                )
+            import_pi5_configs(base_config, [DiscoveredConfig(tool.component, configuration, True)])
             fields = {
                 "buzzer": ("pin", "volume"),
                 "display": ("width", "height", "rotation", "brightness", "dc_pin", "rst_pin"),
@@ -122,26 +151,31 @@ def hardware_setup_status(component: str) -> dict[str, object]:
                 backend_cfg = manager.get_backend_config()
                 backend_name = str(backend_cfg.get("name", "auto") or "auto").lower()
                 backend_addr = backend_cfg.get("kwargs", {}).get("address")
-                is_hat_backend = backend_name in {
+                is_sunfounder = backend_name in {
                     "sunfounder_robot_hat",
                     "sunfounder",
                     "robot_hat",
-                    "pca9685",
-                } or backend_addr in {0x14, 0x40, "0x14", "0x40"}
+                } or backend_addr in {0x14, 0x17, "0x14", "0x17"}
+                is_pca9685 = backend_name == "pca9685" or backend_addr in {0x40, "0x40"}
+                is_hat_backend = is_sunfounder or is_pca9685
                 all_calibrated = manager.get_all_endpoint_calibrations()
 
                 if is_hat_backend or any(k.startswith("hat_pwm") for k in all_calibrated):
-                    required_endpoints = ("hat_pwm0", "hat_pwm1")
-                    for ep in required_endpoints:
+                    max_channel = 11 if (is_sunfounder and not is_pca9685) else 15
+                    valid_hat_calibrations = {}
+                    for ep, cal in all_calibrated.items():
+                        if not ep.startswith("hat_pwm"):
+                            continue
                         ch_num = ep.removeprefix("hat_pwm")
+                        if not ch_num.isdigit() or not (0 <= int(ch_num) <= max_channel):
+                            continue
                         entry = data.get(ep) or data.get(f"pwm{ch_num}") or data.get(f"p{ch_num}")
-                        if not isinstance(entry, dict) or "pulse_center" not in entry:
-                            raise ValueError("missing saved wheel neutral calibration")
-                    if not set(required_endpoints) <= set(all_calibrated):
-                        raise ValueError("calibrate both hat_pwm0 and hat_pwm1")
-                    selected_calibrations = {
-                        ep: cal for ep, cal in all_calibrated.items() if ep.startswith("hat_pwm")
-                    }
+                        if isinstance(entry, dict) and "pulse_center" in entry:
+                            valid_hat_calibrations[ep] = cal
+                    min_required = 1 if (is_sunfounder and not is_pca9685) else 2
+                    if len(valid_hat_calibrations) < min_required:
+                        raise ValueError("missing saved wheel or servo calibration")
+                    selected_calibrations = valid_hat_calibrations
                 else:
                     for pin in (12, 13):
                         entry = data.get(str(pin), data.get(f"gpio{pin}"))
@@ -310,11 +344,82 @@ def apply_hardware_profile_preset(profile: str) -> Path:
     return servo_path
 
 
-async def configure_sunfounder_i2s_speaker(config_path: Path) -> str:
+def _ensure_sunfounder_i2s_overlay() -> None:
+    """Load the runtime I2S soundcard overlay on Raspberry Pi if no I2S ALSA card is active yet."""
+    from .audio_output import _detect_alsa_i2s_device
+
+    if _detect_alsa_i2s_device() is not None:
+        return
+    if not shutil.which("dtoverlay") or not Path("/proc/device-tree").exists():
+        return
+    try:
+        subprocess.run(
+            ["sudo", "-n", "dtoverlay", "googlevoicehat-soundcard"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        )
+    except Exception:
+        pass
+
+
+async def play_sunfounder_speaker_test_tone(
+    output_node: str = "alsa_output.platform-soc_sound.stereo-fallback",
+) -> bool:
+    """Play a short verification chime through the SunFounder embedded I2S speaker."""
+    import asyncio
+    import os
+
+    if "PYTEST_CURRENT_TEST" in os.environ:
+        return False
+
+    from .audio_output import (
+        _detect_alsa_i2s_device,
+        _set_speaker_amplifier,
+        synthesize_test_chime_wav,
+    )
+    from .audio_process import run_audio_process
+
+    await asyncio.to_thread(_ensure_sunfounder_i2s_overlay)
+    await asyncio.to_thread(_set_speaker_amplifier, 12, True)
+    wav_bytes = synthesize_test_chime_wav()
+    try:
+        if shutil.which("pw-play"):
+            await run_audio_process(
+                ["pw-play", f"--target={output_node}", "--volume=0.35", "-"],
+                input_data=wav_bytes,
+                timeout=5.0,
+                output_limit=65536,
+            )
+            return True
+        alsa_dev = await asyncio.to_thread(_detect_alsa_i2s_device)
+        if alsa_dev and shutil.which("aplay"):
+            await run_audio_process(
+                ["aplay", "-q", "-D", alsa_dev, "-"],
+                input_data=wav_bytes,
+                timeout=5.0,
+                output_limit=65536,
+            )
+            return True
+    except Exception:
+        return False
+    return False
+
+
+async def configure_sunfounder_i2s_speaker(
+    config_path: Path,
+    *,
+    play_test_tone: bool = False,
+) -> str:
     """Enable GPIO12 amplifier, discover I2S sink, and persist in ``config.toml``."""
+    import asyncio
+
     from .audio_output import _set_speaker_amplifier, discover_i2s_output_node
     from .config_import import load_effective_config, save_robot_config
 
+    if play_test_tone:
+        await asyncio.to_thread(_ensure_sunfounder_i2s_overlay)
     _set_speaker_amplifier(12, True)
     node = await discover_i2s_output_node() or "alsa_output.platform-soc_sound.stereo-fallback"
     resolved_path = config_path.expanduser()
@@ -322,10 +427,16 @@ async def configure_sunfounder_i2s_speaker(config_path: Path) -> str:
     payload = current.model_dump()
     servos_endpoints = tuple(payload["hardware"]["servos"].get("endpoints") or ())
     if "gpio12" in servos_endpoints or "12" in servos_endpoints:
-        payload["hardware"]["servos"]["endpoints"] = ("hat_pwm0", "hat_pwm1")
+        hat_eps = [ep for ep in servos_endpoints if str(ep).startswith("hat_pwm")]
+        if len(hat_eps) >= 2:
+            payload["hardware"]["servos"]["endpoints"] = tuple(hat_eps)
+            left_ep, right_ep = hat_eps[0], hat_eps[1]
+        else:
+            payload["hardware"]["servos"]["endpoints"] = ("hat_pwm0", "hat_pwm1")
+            left_ep, right_ep = "hat_pwm0", "hat_pwm1"
         roles = dict(payload["behaviors"].get("servo_roles") or {})
-        roles["left_motor"] = "hat_pwm0"
-        roles["right_motor"] = "hat_pwm1"
+        roles["left_motor"] = left_ep
+        roles["right_motor"] = right_ep
         payload["behaviors"]["servo_roles"] = roles
     payload["speech_output"]["enabled"] = True
     payload["speech_output"]["output_node"] = node
@@ -334,4 +445,6 @@ async def configure_sunfounder_i2s_speaker(config_path: Path) -> str:
 
     updated = RobotConfig.model_validate(payload)
     save_robot_config(updated, resolved_path, overwrite=resolved_path.exists())
+    if play_test_tone:
+        await play_sunfounder_speaker_test_tone(node)
     return node

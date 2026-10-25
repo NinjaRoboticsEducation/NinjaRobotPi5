@@ -1,43 +1,45 @@
 # NinjaRobotPi5V4 Development Log
 
-## Multi-HAT expansion upgrade (DFR0566, SunFounder Robot HAT v5, PCA9685) — 25 October 2026
+## Multi-HAT expansion upgrade and physical SunFounder hardware audit (DFR0566, SunFounder Robot HAT, PCA9685) — 25 October 2026
 
-Implemented multi-HAT hardware support across `pi5servo`, `ninjarobot_pi5_ide`,
-and `ninjarobot_pi5_agent` while preserving 100% backward compatibility with the
+Implemented multi-HAT hardware support and completed a physical SunFounder hardware
+validation audit across `install.sh`, `pi5servo`, `ninjarobot_pi5_ide`, and
+`ninjarobot_pi5_agent` while preserving 100% backward compatibility with the
 existing DFRobot DFR0566 IO Expansion HAT + Geekworm X1208 UPS baseline:
 
-- **`pi5servo` upgrade**: Added `SunFounderRobotHatBackend` (`0x14`, Big-Endian
-  3-byte I2C protocol, Timers 0–2 prescaler/period setup, `P0`..`P11` PWM channels,
-  ADC `A4` battery voltage reader at `0x13`, and `GPIO5` MCU reset via `lgpio`).
+- **Default-branch `install.sh` bootstrap**: Updated `INSTALL_REF` default from
+  `public_v07` to `HEAD` (resolving `refs/remotes/origin/HEAD` or `HEAD` in the
+  cloned repository) so `curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/HEAD/install.sh | bash`
+  always installs the latest confirmed default branch on GitHub.
+- **`pi5servo` dual `0x14` / `0x17` SunFounder MCU upgrade**: Added `SunFounderRobotHatBackend`
+  supporting both SunFounder Robot HAT v4 (`0x14`, period `0x44`, PWM `0x20`, battery `0x13`)
+  and SunFounder Fusion HAT / Robot HAT v5 (`0x17`, period `0x50`, PWM `0x60`, battery `0x18`)
+  with automatic fallback from `0x14` to `0x17` when `0x14` returns `[Errno 121] Remote I/O error`.
   Upgraded `PCA9685ServoBackend` (`0x40`) with a built-in `smbus2` controller and
   direct `hat_pwm0`..`hat_pwm15` (`pwm0`..`pwm15`, `p0`..`p15`) endpoint resolution.
-  Expanded `ServoEndpoint` to `hat_pwm0`..`hat_pwm15` and registered
-  `sunfounder_robot_hat` in `create_servo_backend()` and CLI `--backend` choices.
-  Recorded all 8 modified/new `pi5servo` files in
-  `docs/validation/authorized_driver_changes.json`.
-- **`ninjarobot_pi5_ide` upgrade**: Expanded `SUPPORTED_SERVO_ENDPOINTS` to
-  `hat_pwm0`..`hat_pwm15`, added `PowerConfig` (`0x36` and `0x14`), and added
-  `SpeechOutputConfig.speaker_enable_gpio` with `lgpio` amplifier control and
-  PipeWire HiFiBerry/I2S sink discovery in `audio_output.py`. Updated `servo.py`
-  to load `__backend__` from `servo.json` and expose `read_battery_voltage_sync()`.
-  Updated `hardware_setup.py` and `config_import.py` to validate and import
-  `sunfounder_robot_hat` and `pca9685` endpoints, roles, audio, and power settings.
-  Updated `MotionController` in `safety.py` to allow auxiliary-only servo movements
-  and monitor SunFounder 2S battery voltage (`7.15 V` warning, `6.90 V` cutoff).
-  Also fixed `CameraDevice(simulated=True)` to use the in-process stub capture
-  without requiring `picamera2` when `camera_factory` is not passed.
-- **`ninjarobot_pi5_agent` upgrade**: Added the 3-profile Hardware Expansion
-  Profile Selection menu (`1. DFRobot DFR0566 IO Expansion HAT`,
-  `2. SunFounder Robot HAT`, `3. General PCA9685 PWM Expansion HAT`) to
-  `setup_wizard.py`, storing selections in `progress.selections["hardware_profile"]`,
-  tailoring Step 4 servo instructions, and offering automatic SunFounder onboard
-  I2S speaker setup in Step 6.
-- **Validation**: 1,077 root/IDE/Agent tests passed (`uv run --frozen pytest -q`)
-  and 138 `pi5servo` tests passed (`uv run --frozen pytest pi5servo/tests -q`).
+  Recorded all 8 authorized `pi5servo` changes in `docs/validation/authorized_driver_changes.json`.
+- **`ninjarobot_pi5_ide` pin-collision fix, flexible PWM channels, and embedded speaker**:
+  Fixed single-component validation in `hardware_setup_status()` and `import_pi5_configs()`
+  so connecting `pi5disp` (`dc_pin=27, rst_pin=22, backlight_pin=6`) or `pi5buzzer`
+  (`pin=17, 4, 27, 22`) to any SunFounder Digital header pins never collides with
+  unconfigured default sibling pins. Updated `hardware_setup_status("servo")` and
+  `import_pi5_configs()` to allow any calibrated `hat_pwm0`..`hat_pwm11` channels
+  (such as `pwm10` and `pwm11`) without forcing `hat_pwm0`/`hat_pwm1`. Enhanced
+  `audio_output.py` and `hardware_setup.py` to support both PipeWire and ALSA
+  (`aplay` + `googlevoicehat-soundcard` / `hifiberry-dac`), drive `GPIO12` (`pinctrl` +
+  `lgpio`) and `0x17` register `0x31`, and play a verification chime via
+  `play_sunfounder_speaker_test_tone()`.
+- **`ninjarobot_pi5_agent` onboarding speaker flow**: Updated `setup_wizard.py` to
+  infer the active HAT profile from `progress.selections` or `servo.json`, run the
+  SunFounder Embedded Speaker Initialization process (without prompting for Bluetooth)
+  when `sunfounder_robot_hat` is active, and run the Bluetooth speaker onboarding
+  flow when `dfr0566` or `pca9685` is active.
+- **Validation**: 1,087 root/IDE/Agent tests passed (`uv run --frozen pytest -q`)
+  and 139 `pi5servo` tests passed (`uv run --frozen pytest pi5servo/tests -q`).
   `verify_immutable_drivers.py` (223 tracked files, 63 authorized repairs),
   `verify_workspace_driver_sources.py`, `ruff check .`, `ruff format --check .`,
   and `mypy` (121 source files) all passed with zero errors. Wiki raw sources
-  were added under `2026-10-25/` without running wiki ingestion/review per owner
+  were updated under `2026-10-25/` without running wiki ingestion/review per owner
   instruction.
 
 ## Onboarding interface, reuse, and OAuth repair — 23 September 2026

@@ -71,6 +71,8 @@ def local_bootstrap(tmp_path):
 @pytest.mark.parametrize(
     "ref",
     [
+        "HEAD",
+        "default",
         "main",
         "public_v07",
         "release/public_v08",
