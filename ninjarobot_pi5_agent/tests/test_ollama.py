@@ -336,3 +336,67 @@ async def _tool_turn():
         return await provider.generate(request(tools=(tool(),)))
     finally:
         await client.aclose()
+
+
+def test_ollama_cloud_authenticates_with_bearer_token_and_lists_cloud_models(tmp_path) -> None:
+    from ninjarobot_pi5_agent.cloud_common import APIKeyCredential
+    from ninjarobot_pi5_agent.secrets import SecretStore
+
+    async def exercise() -> None:
+        store = SecretStore(tmp_path / "secrets.env")
+        store.set("OLLAMA_API_KEY", "ollama-test-key")
+        creds = APIKeyCredential(store, "OLLAMA_API_KEY", "Authorization", "Bearer ")
+        seen_requests: list[tuple[str, str, str | None]] = []
+
+        def handler(http_request: httpx.Request) -> httpx.Response:
+            seen_requests.append(
+                (
+                    http_request.method,
+                    http_request.url.path,
+                    http_request.headers.get("Authorization"),
+                )
+            )
+            if http_request.url.path == "/api/me":
+                return httpx.Response(200, json={"name": "tester"})
+            if http_request.url.path == "/api/tags":
+                return httpx.Response(
+                    200,
+                    json={
+                        "models": [
+                            {"name": "gemma4:31b", "size": 0, "details": {"family": "gemma4"}},
+                            {"name": "glm-5.1", "size": 0, "details": {"family": "glm5"}},
+                        ]
+                    },
+                )
+            if http_request.url.path == "/api/chat":
+                body = json.loads(http_request.content)
+                assert body["model"] == "gemma4:31b"
+                return httpx.Response(
+                    200,
+                    json={
+                        "message": {"role": "assistant", "content": "Cloud reply"},
+                        "done": True,
+                        "done_reason": "stop",
+                    },
+                )
+            raise AssertionError(f"unexpected path: {http_request.url.path}")
+
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            base_url="https://ollama.com",
+        )
+        provider = OllamaProvider(
+            OllamaConfig(base_url="https://ollama.com", model="gemma4:31b-cloud"),
+            credentials=creds,
+            client=client,
+        )
+        models = await provider.list_models()
+        assert [m.name for m in models] == ["gemma4:31b", "glm-5.1"]
+        health = await provider.health()
+        assert health.status is ProviderHealthStatus.READY
+        turn = await provider.generate(request())
+        assert turn.text == "Cloud reply"
+        assert all(auth == "Bearer ollama-test-key" for _, _, auth in seen_requests)
+        await client.aclose()
+
+    asyncio.run(exercise())

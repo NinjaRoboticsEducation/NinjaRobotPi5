@@ -550,3 +550,61 @@ def test_sunfounder_skip_embedded_speaker_does_not_prompt_bluetooth(monkeypatch,
 
     assert saved.steps["bluetooth"].status == "skipped"
     assert saved.steps["bluetooth"].detail == "user_skipped"
+
+
+def test_ollama_provider_setup_prompts_api_key_lists_cloud_models_and_selects_model(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    from datetime import UTC, datetime
+
+    from ninjarobot_pi5_agent.model_selection import ModelCatalogEntry
+    from ninjarobot_pi5_agent.models import ProviderHealth, ProviderHealthStatus
+
+    seen_providers: list[tuple[str, bool]] = []
+
+    async def fake_catalog(self, provider_id: str) -> tuple[ModelCatalogEntry, ...]:
+        seen_providers.append((provider_id, self._secrets.contains("OLLAMA_API_KEY")))
+        return (
+            ModelCatalogEntry(provider="ollama", name="gemma4:31b"),
+            ModelCatalogEntry(provider="ollama", name="glm-5.1"),
+        )
+
+    class _FakeAdapter:
+        async def health(self) -> ProviderHealth:
+            return ProviderHealth(
+                provider="ollama",
+                status=ProviderHealthStatus.READY,
+                checked_at=datetime.now(UTC),
+                detail="Ollama cloud model 'glm-5.1' is available.",
+            )
+
+        async def close(self) -> None:
+            return
+
+    monkeypatch.setattr(setup_wizard.ConfiguredProviderRegistry, "catalog", fake_catalog)
+    monkeypatch.setattr(
+        setup_wizard.ConfiguredProviderRegistry,
+        "create",
+        lambda self, provider_id, model: _FakeAdapter(),
+    )
+
+    path = tmp_path / "state" / "progress.json"
+    progress = setup_wizard.SetupProgress()
+    # Flow: 1) Select 1. Ollama -> 2) Input Ollama API key twice -> 3) Input model number 2
+    ui = _Console(("1", "ollama-secret-key", "ollama-secret-key", "2"))
+    args = _arguments(tmp_path, benchmark_dir=tmp_path / "benchmarks")
+
+    with setup_wizard.ProgressStore(path) as store:
+        asyncio.run(setup_wizard._provider_setup(progress, store, ui, args))
+        saved = store.load()
+
+    assert seen_providers == [("ollama", True)]
+    assert saved.steps["provider"].status == "complete"
+    assert saved.selections["provider"] == "ollama"
+    assert saved.selections["model"] == "glm-5.1"
+    secret_store = setup_wizard.SecretStore(args.secret_file)
+    assert secret_store.get("OLLAMA_API_KEY") == "ollama-secret-key"
+    rendered = "\n".join(ui.messages)
+    assert "1) gemma4:31b" in rendered
+    assert "2) glm-5.1" in rendered

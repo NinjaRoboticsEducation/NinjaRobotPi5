@@ -44,7 +44,7 @@ def test_openai_menu_does_not_offer_web_login(
     assert "Web Login" not in output
 
 
-@pytest.mark.parametrize("provider_choice", ["2", "3", "4"])
+@pytest.mark.parametrize("provider_choice", ["1", "2", "3", "4"])
 def test_every_cloud_provider_menu_is_api_key_only(
     provider_choice: str,
     tmp_path: Path,

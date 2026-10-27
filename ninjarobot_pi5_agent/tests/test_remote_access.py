@@ -354,3 +354,67 @@ def test_remote_enable_persistence_changes_only_validated_switch(tmp_path: Path)
     assert disabled.onboarding.enabled is False
     assert enabled.hardware == before.hardware
     assert enabled.providers == before.providers
+
+
+def test_pyngrok_backend_falls_back_without_traffic_policy_on_free_tier_err_2263(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    executable = tmp_path / "bin" / "ngrok"
+    executable.parent.mkdir()
+    executable.write_bytes(b"fake executable")
+    executable.chmod(0o700)
+    ca = tmp_path / "local-ca.pem"
+    ca.write_text("fake CA", encoding="utf-8")
+    private_config = tmp_path / "ngrok.yml"
+    settings = RemoteAccessConfig().model_copy(
+        update={
+            "executable": str(executable),
+            "config_file": str(private_config),
+        }
+    )
+    secrets = SecretStore(tmp_path / "secrets.env")
+    secrets.set("NGROK_AUTHTOKEN", "private-ngrok-token")
+    connect_calls: list[dict[str, object]] = []
+
+    class FakeConfig:
+        def __init__(self, **kwargs) -> None:
+            self.ngrok_path = kwargs["ngrok_path"]
+
+    class FakeNgrok:
+        @staticmethod
+        def connect(**kwargs):
+            connect_calls.append(kwargs)
+            if "traffic_policy" in kwargs:
+                raise RuntimeError(
+                    "failed to start tunnel: This policy includes paid traffic policy "
+                    "features that are not allowed on your current plan.\r\n\r\nERR_NGROK_2263\r\n"
+                )
+            return SimpleNamespace(public_url="https://free-plan.ngrok-free.dev")
+
+        @staticmethod
+        def disconnect(public_url: str, **kwargs) -> None:
+            return
+
+        @staticmethod
+        def kill(**kwargs) -> None:
+            return
+
+    module = ModuleType("pyngrok")
+    module.conf = SimpleNamespace(PyngrokConfig=FakeConfig)
+    module.ngrok = FakeNgrok
+    monkeypatch.setitem(sys.modules, "pyngrok", module)
+    backend = PyngrokTunnelBackend(
+        config=settings,
+        secrets=secrets,
+        local_ca_certificate=ca,
+        remote_header_secret=REMOTE_MARKER,
+    )
+
+    public_url = asyncio.run(backend.connect())
+    asyncio.run(backend.close(public_url))
+
+    assert public_url == "https://free-plan.ngrok-free.dev"
+    assert len(connect_calls) == 2
+    assert "traffic_policy" in connect_calls[0]
+    assert "traffic_policy" not in connect_calls[1]

@@ -6,6 +6,8 @@ from pathlib import Path
 
 from ninjarobot_pi5_ide import load_robot_config, save_robot_config
 
+from .ollama import DEFAULT_OLLAMA_API_KEY_ENV
+
 
 def persist_api_key_authentication(
     config_path: str | Path,
@@ -16,10 +18,15 @@ def persist_api_key_authentication(
     if provider_id not in config.providers:
         raise ValueError(f"unknown configured provider: {provider_id}")
     provider = config.providers[provider_id]
-    if provider.kind == "ollama" or provider.api_key_env is None:
+    api_key_env = provider.api_key_env or (
+        DEFAULT_OLLAMA_API_KEY_ENV if provider.kind == "ollama" else None
+    )
+    if api_key_env is None:
         raise ValueError(f"{provider.kind} does not have an API-key configuration")
     payload = config.model_dump(mode="python")
     payload["providers"][provider_id]["auth_method"] = "api_key"
+    if provider.kind == "ollama" and not payload["providers"][provider_id].get("api_key_env"):
+        payload["providers"][provider_id]["api_key_env"] = api_key_env
     payload["providers"][provider_id].pop("oauth_profile", None)
     validated = type(config).model_validate(payload)
     save_robot_config(validated, config_path, overwrite=True)

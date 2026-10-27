@@ -105,19 +105,74 @@ Below is how each component connects to the Raspberry Pi 5 through the DFR0566 e
  (Left)      (Right)
 ```
 
-#### Pin Connections
+#### Recommended Default Electronic Module Pin Wiring by Expansion HAT
 
-| Component | Connection Type | Pin / Address |
+Use the tables below as the recommended default electronic module pin wiring reference for each supported expansion board.
+
+##### a. DFRobot DFR0566 IO Expansion HAT
+
+| Electronic Module | Module Pin / Role | Connection on DFR0566 IO Expansion HAT |
 |---|---|---|
-| Wheel / primary servos | Native PWM (Profile 1) or I2C HAT PWM (Profiles 2 & 3) | Profile 1: `D12`/`gpio12`, `D13`/`gpio13`; Profile 2 (SunFounder): any `P0`–`P11` (`pwm0`–`pwm11`, e.g. `pwm10`/`pwm11`); Profile 3: `PWM0`–`PWM15` |
-| Auxiliary servos *(optional)* | I2C HAT PWM | Profile 2: `P0`–`P11` (`pwm0`–`pwm11`); Profile 3: `PWM0`–`PWM15` (`pwm0`–`pwm15`) |
-| Passive buzzer | GPIO | Profile 1 & 3: `GPIO27`; Profile 2 (SunFounder Digital header): any of `GPIO17`, `GPIO4`, `GPIO27`, `GPIO22` (e.g. `GPIO17`) |
-| VL53L0X distance sensor | I2C bus 1 | Address 0x29 (`VCC=3V3, GND=GND, SCL=SCL, SDA=SDA`) |
-| ST7789V display – SPI & BL | SPI0 | `GND=GND, VCC=3V3, SCL=SCK (GPIO11), SDA=MO (GPIO10), CS=CS (GPIO8), BL=BSY (GPIO6)` |
-| ST7789V display – DC / RST | GPIO | Profile 1 & 3: `DC=GPIO4, RST=GPIO5, BL=GPIO6`; Profile 2 (SunFounder Digital header): any distinct Digital pins (`17, 4, 27, 22`), e.g. `DC=GPIO27, RST=GPIO22, BL=GPIO6` |
-| SunFounder embedded I2S speaker *(Profile 2)* | I2S0 + GPIO / I2C | I2S (`googlevoicehat-soundcard` / `hifiberry-dac`); Amplifier enable = `GPIO12` + `0x17` reg `0x31` |
-| Camera (OV5647) | CSI ribbon cable | CSI port on Pi 5 |
-| USB microphone | USB | Any USB port |
+| **Buzzer** | `+` | `GPIO 17` (Digital on DFR0566) |
+| | `-` | `GND` (Digital on DFR0566) |
+| **SPI Display (ST7789B)** | `VCC` | `+` (SPI on DFR0566) |
+| | `GND` | `-` (SPI on DFR0566) |
+| | `SCL` | `SCLK` (SPI on DFR0566) |
+| | `SDA` | `MOSI` (SPI on DFR0566) |
+| | `CS` | `SS` (SPI on DFR0566) |
+| | `BL` | `GPIO 4` (Digital on DFR0566) |
+| | `DC` | `GPIO 5` (Digital on DFR0566) |
+| | `RST` | `GPIO 6` (Digital on DFR0566) |
+| **VL53L0X Distance Sensor** | `GND` | `-` (IIC on DFR0566) |
+| | `VCC` | `+` (IIC on DFR0566) |
+| | `SDA` | `D` (IIC on DFR0566) |
+| | `SCL` | `C` (IIC on DFR0566) |
+| **Servo** | Left wheel servo | `GPIO 12` (on DFR0566) |
+| | Right wheel servo | `GPIO 13` (on DFR0566) |
+
+##### b. SunFounder Robot HAT
+
+| Electronic Module | Module Pin / Role | Connection on SunFounder Robot HAT |
+|---|---|---|
+| **Buzzer** | `+` | `GPIO 17` (Digital on SunFounder) |
+| | `-` | `GND` (Digital on SunFounder) |
+| **SPI Display (ST7789B)** | `VCC` | `3V3` (SPI on SunFounder) |
+| | `GND` | `-` (SPI on SunFounder) |
+| | `SCL` | `SCK` (SPI on SunFounder) |
+| | `SDA` | `MO` (SPI on SunFounder) |
+| | `CS` | `CS` (SPI on SunFounder) |
+| | `BL` | `GPIO 6` (SPI on SunFounder) |
+| | `DC` | `GPIO 27` (Digital on SunFounder) |
+| | `RST` | `GPIO 22` (Digital on SunFounder) |
+| **VL53L0X Distance Sensor** | `GND` | `-` (IIC on SunFounder) |
+| | `VCC` | `3V3` (IIC on SunFounder) |
+| | `SDA` | `SDA` (IIC on SunFounder) |
+| | `SCL` | `SCL` (IIC on SunFounder) |
+| **Servo** | Servo 1~12 | `pwm 0~11` (on SunFounder) |
+
+##### c. PCA9685 HAT
+
+| Electronic Module | Module Pin / Role | Connection on Raspberry Pi / PCA9685 HAT |
+|---|---|---|
+| **Buzzer** | `+` | `Pin11/GPIO17` (RaspberryPi) |
+| | `GND` | `Pin20/GND` (RaspberryPi) |
+| **SPI Display (ST7789B)** | `VCC` | `Pin17/3V3` (RaspberryPi) |
+| | `GND` | `Pin30/GND` (RaspberryPi) |
+| | `SCL` | `Pin23/GPIO11` (RaspberryPi) |
+| | `SDA` | `Pin19/GPIO10` (RaspberryPi) |
+| | `CS` | `Pin24/GPIO08` (RaspberryPi) |
+| | `BL` | `Pin31/GPIO06` (RaspberryPi) |
+| | `DC` | `Pin13/GPIO27` (RaspberryPi) |
+| | `RST` | `Pin15/GPIO22` (RaspberryPi) |
+| **VL53L0X Distance Sensor** | `GND` | `Pin06/GND` (RaspberryPi) |
+| | `VCC` | `Pin01/3V3` (RaspberryPi) |
+| | `SDA` | `Pin03/GPIO02` (RaspberryPi) |
+| | `SCL` | `Pin05/GPIO03` (RaspberryPi) |
+| **Servo (PCA9685 Board & Channels)** | `SCL` | `Pin05/GPIO3` (RaspberryPi) |
+| | `SDA` | `Pin03/GPIO2` (RaspberryPi) |
+| | `VCC` | `Pin02/5V` (RaspberryPi) |
+| | `GND` | `Pin06/GND` (RaspberryPi) |
+| | Servo 1~12 | `pwm 0~11` (on PCA9685) |
 
 > ⚠️ **Safety reminder:** Never change wiring while the robot is powered on. In Profile 1, D12/D13 use native Pi PWM. In Profile 2 (SunFounder Robot HAT v5), `GPIO5` is reserved for onboard MCU reset, `GPIO23` is the USB-C charge indicator, and `GPIO12` enables the onboard I2S speaker amplifier (`dtoverlay=hifiberry-dac` in `/boot/firmware/config.txt`). Verify servo voltage and grounding against the [confirmed hardware profile](docs/hardware/hardware-profile.md). Follow the [X1208 manufacturer instructions](https://wiki.geekworm.com/X1208) or SunFounder 2S battery instructions for battery type, polarity, and power input.
 
@@ -184,11 +239,20 @@ The installed global command is `ninjarobot`. The equivalent `ninjarobot-agent` 
 
 ### 2.5 Onboarding — Set Up Your Robot
 
-After installation and reboot, run the guided setup wizard:
+After installation and reboot, enter your installation directory and either activate the project virtual environment or run the onboarding tool via `uv run`:
 
 ```bash
+cd ~/NinjaRobotPi5
+
+# Option A: Activate the virtual environment, then run onboarding
+source .venv/bin/activate
 ninjarobot onboard
+
+# Option B: Run onboarding directly via uv
+uv run ninjarobot onboard
 ```
+
+*(If `~/.local/bin` is already in your shell `PATH`, you can also run `ninjarobot onboard` from any directory.)*
 
 The wizard shows a NINJAROBOT welcome screen and walks you through:
 
@@ -198,16 +262,19 @@ The wizard shows a NINJAROBOT welcome screen and walks you through:
 | **1. Hardware setup** | Opens existing setup tools one by one for buzzer, display, distance sensor, servos (`GPIO12`/`GPIO13` for Option 1, any `pwm0`..`pwm11` for Option 2, or `pwm0`..`pwm15` for Option 3), and camera; checks saved configuration afterward and automatically imports HAT endpoints, `servo_roles`, and power monitoring into `config.toml`. Existing valid settings can be applied together. Configuration checks do not certify physical operation. |
 | **2. Speaker setup** *(optional)* | When **Option 2 (SunFounder Robot HAT)** is selected, runs the **Embedded Speaker Initialization** process (enables the onboard I2S speaker amplifier, configures the I2S DAC sink, and plays a verification chime — without prompting for Bluetooth). When **Option 1 (DFR0566)** or **Option 3 (PCA9685)** is selected, runs the **Bluetooth speaker** onboarding flow. |
 | **3. Microphone setup** *(optional)* | Configures your USB mic, local `whisper.cpp` speech-to-text, and the bundled `hey_Ninja.onnx` wake model. |
-| **4. AI provider** | Choose between Ollama (free, local), OpenAI, Gemini, or Anthropic. |
+| **4. AI provider** | Choose **`1. Ollama`**, **`2. Google (Gemini)`**, **`3. OpenAI`**, or **`4. Anthropic`**, input your provider API key (`OLLAMA_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`), review the numbered list of available cloud AI models, and input the model number to run the Ninja agent with the selected model. |
 | **5. External MCP tools** *(optional)* | Set up Tavily web search, Google Calendar, or Notion. |
 | **6. Ngrok remote access** *(optional)* | Configure remote access from outside your home network. See [Appendix D](#appendix-d-ngrok-account-setup). |
 | **7. Launch** | Start the robot in simulation mode (safe) or real-hardware mode. |
 
 #### Step-by-Step Multi-HAT Onboarding & Servo Calibration Guide
 
-1. **Run Onboarding & Select Your Expansion HAT (`1`, `2`, or `3`):**
+1. **Activate the Environment & Select Your Expansion HAT (`1`, `2`, or `3`):**
    ```bash
+   cd ~/NinjaRobotPi5
+   source .venv/bin/activate
    ninjarobot onboard
+   # Or without activating first: uv run ninjarobot onboard
    ```
    When prompted at **Hardware Expansion Profile Selection**, enter:
    - **`1`** for **DFRobot DFR0566 IO Expansion HAT** (+ Geekworm X1208 UPS)
@@ -215,7 +282,7 @@ The wizard shows a NINJAROBOT welcome screen and walks you through:
    - **`3`** for **General PCA9685 PWM Expansion HAT** (16-channel I2C PWM at `0x40`)
 2. **Initialize Each Hardware Module One by One:**
    - **Step 1 (Buzzer):** Open `buzzer-tool`, choose `Init` (on SunFounder Robot HAT you may connect the buzzer to any Digital pin `17, 4, 27, 22`, e.g. `GPIO 17`), verify the short beep and silence, then exit.
-   - **Step 2 (Display):** Open `display-tool`, choose `Init` (on SunFounder Robot HAT connect SPI pins `GND, 3V3, SCK, MO, CS, BL=BSY(GPIO6)` and connect `DC` and `RST` to any free Digital pins from `17, 4, 27, 22`, e.g. `DC=27, RST=22, BL=6`), test `Show Text` and `Clear`, then exit.
+   - **Step 2 (Display):** Open `display-tool`, choose `Init` (on SunFounder Robot HAT connect SPI pins `GND, 3V3, SCK, MO, CS, BL=GPIO6` and connect `DC` and `RST` to any free Digital pins from `17, 4, 27, 22`, e.g. `DC=27, RST=22, BL=6`), test `Show Text` and `Clear`, then exit.
    - **Step 3 (Distance Sensor):** Open `sensor-tool`, run `Health Check`, `Single Read`, and `Calibrate` against a target at a known distance (`0x29` on I2C-1).
    - **Step 4 (Servo Calibration — Raise Both Wheels First!):**
      Type `WHEELS RAISED` when prompted to open `pi5servo servo-tool`:
@@ -229,7 +296,12 @@ The wizard shows a NINJAROBOT welcome screen and walks you through:
      - If you selected **SunFounder Robot HAT (Option 2)**, confirm the **Embedded Speaker Initialization** prompt (`[Y/n]`) to enable the onboard I2S speaker and play a verification chime.
      - If you selected **DFR0566 (Option 1)** or **PCA9685 (Option 3)**, optionally pair a Bluetooth speaker.
      - Optionally configure the USB microphone (`mic-tool`).
-3. **Save Integrated Configuration & Start the Agent:**
+3. **Configure AI Model Provider (e.g. Ollama Cloud):**
+   - Select **`1. Ollama`** as the AI model provider (or `2. Google`, `3. OpenAI`, `4. Anthropic`).
+   - Input your Ollama API key (`OLLAMA_API_KEY`, created at [ollama.com/settings/keys](https://ollama.com/settings/keys)) to link to Ollama's service.
+   - Review the numbered list of available cloud models retrieved from Ollama.
+   - Input the model number to validate and run the Ninja agent with the selected model.
+4. **Save Integrated Configuration & Start the Agent:**
    Press **Enter** at the integrated configuration preview to save `~/.config/ninjarobot_pi5/config.toml`, complete provider setup, and start the Agent service (`ninjarobot service start --real`).
 
 When saved hardware settings exist, choose **2) Apply existing settings for all modules** to reuse valid settings and set up missing modules. New users see **1) Open setup tool** and **Q) Save and exit**. Review configuration summaries and press Enter to continue. **Exit onboarding** does not start the Agent. Skipping ngrok selects authenticated same-Wi-Fi HTTPS for final launch.

@@ -333,10 +333,12 @@ def create_web_app(
     ) -> Response:
         if pairing is None:
             return await call_next(request)
+        loopback_proxy = _is_loopback_proxy_request(request.client, request.headers)
         try:
             scope = pairing.request_scope(
                 request.headers.get("host", ""),
                 remote_marker=request.headers.get(REMOTE_MARKER_HEADER),
+                forwarded_by_loopback_proxy=loopback_proxy,
             )
         except PairingError:
             return PlainTextResponse("Invalid request host.", status_code=421)
@@ -358,6 +360,7 @@ def create_web_app(
                 origin=request.headers.get("origin"),
                 host=request.headers.get("host", ""),
                 remote_marker=request.headers.get(REMOTE_MARKER_HEADER),
+                forwarded_by_loopback_proxy=loopback_proxy,
                 require_origin=False,
             )
         except PairingError:
@@ -389,6 +392,7 @@ def create_web_app(
         raw = await request.body()
         if len(raw) > 2048:
             return JSONResponse({"paired": False}, status_code=413)
+        loopback_proxy = _is_loopback_proxy_request(request.client, request.headers)
         try:
             payload = json.loads(raw)
             token = payload.get("token") if isinstance(payload, dict) else None
@@ -399,6 +403,7 @@ def create_web_app(
                 origin=request.headers.get("origin"),
                 host=request.headers.get("host", ""),
                 remote_marker=request.headers.get(REMOTE_MARKER_HEADER),
+                forwarded_by_loopback_proxy=loopback_proxy,
             )
         except (json.JSONDecodeError, PairingError):
             return JSONResponse({"paired": False}, status_code=401)
@@ -440,10 +445,12 @@ def create_web_app(
         remote_connection = False
         paired_connection = False
         if pairing is not None:
+            loopback_proxy = _is_loopback_proxy_request(websocket.client, websocket.headers)
             try:
                 scope = pairing.request_scope(
                     websocket.headers.get("host", ""),
                     remote_marker=websocket.headers.get(REMOTE_MARKER_HEADER),
+                    forwarded_by_loopback_proxy=loopback_proxy,
                 )
                 if scope == "denied":
                     raise PairingError("unknown request host")
@@ -460,6 +467,7 @@ def create_web_app(
                         origin=websocket.headers.get("origin"),
                         host=websocket.headers.get("host", ""),
                         remote_marker=websocket.headers.get(REMOTE_MARKER_HEADER),
+                        forwarded_by_loopback_proxy=loopback_proxy,
                     )
                 except PairingError:
                     paired_connection = False
@@ -632,6 +640,20 @@ def create_web_app(
             await leases.disconnect(lease.lease_id)
 
     return app
+
+
+def _is_loopback_proxy_request(client: Any, headers: Any) -> bool:
+    """Return True when the local ngrok agent forwards an HTTPS request over loopback."""
+    client_host = getattr(client, "host", None)
+    if client_host not in {"127.0.0.1", "::1", "testclient"}:
+        try:
+            if not ipaddress.ip_address(str(client_host)).is_loopback:
+                return False
+        except ValueError:
+            return False
+    forwarded_proto = str(headers.get("x-forwarded-proto", "")).strip().lower()
+    forwarded_for = str(headers.get("x-forwarded-for", "")).strip()
+    return forwarded_proto == "https" and bool(forwarded_for)
 
 
 async def _dispatch_web_message(

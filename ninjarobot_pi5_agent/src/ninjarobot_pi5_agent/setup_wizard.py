@@ -44,7 +44,7 @@ from .mcp_config import (
     save_mcp_configuration,
     tavily_server_config,
 )
-from .model_selection import BenchmarkRegistry, persist_model_selection
+from .model_selection import persist_model_selection
 from .models import ProviderHealthStatus
 from .remote_access import install_ngrok_binary, persist_remote_access_enabled
 from .secrets import SecretStore, _validate_name
@@ -689,22 +689,24 @@ async def _provider_setup(
     secret_store = _CandidateSecrets(Path(getattr(arguments, "secret_file")))
     config = load_robot_config(config_path)
     provider = config.providers[provider_id]
-    if provider_id != "ollama":
-        assert provider.api_key_env is not None
-        ui.write("Create the provider API key in its official account console.")
-        keep_existing = secret_store.contains(provider.api_key_env) and _yes(
-            ui.ask("A private key is already configured. Keep and validate it? [Y/n]: ") or "y"
-        )
-        if not keep_existing:
-            value = ui.secret(f"Enter {provider.api_key_env}: ")
-            confirmation = ui.secret(f"Enter {provider.api_key_env} again: ")
-            if not value or value != confirmation:
-                raise ValueError("API key values were empty or did not match")
-            secret_store.set(provider.api_key_env, value)
-    else:
+    api_key_env = provider.api_key_env or ("OLLAMA_API_KEY" if provider_id == "ollama" else None)
+    assert api_key_env is not None
+    if provider_id == "ollama":
         ui.write(
-            "Ollama runs locally. Install a model with `ollama pull MODEL` if the list is empty."
+            "Create an Ollama API key at https://ollama.com/settings/keys "
+            "to link to Ollama's service and retrieve available cloud AI models."
         )
+    else:
+        ui.write("Create the provider API key in its official account console.")
+    keep_existing = secret_store.contains(api_key_env) and _yes(
+        ui.ask("A private key is already configured. Keep and validate it? [Y/n]: ") or "y"
+    )
+    if not keep_existing:
+        value = ui.secret(f"Enter {api_key_env}: ")
+        confirmation = ui.secret(f"Enter {api_key_env} again: ")
+        if not value or value != confirmation:
+            raise ValueError("API key values were empty or did not match")
+        secret_store.set(api_key_env, value)
     registry = ConfiguredProviderRegistry(config_path, secret_store)
     catalog = await registry.catalog(provider_id)
     if not catalog:
@@ -712,14 +714,8 @@ async def _provider_setup(
         store.save(progress)
         ui.write("No selectable models were returned. Install or enable a model, then retry.")
         raise RuntimeError("no models available")
-    benchmarks = BenchmarkRegistry(Path(getattr(arguments, "benchmark_dir")))
     for number, entry in enumerate(catalog, 1):
-        benchmark = ""
-        if provider_id == "ollama":
-            benchmark = (
-                " — accepted benchmark" if benchmarks.accepted(entry.name) else " — not benchmarked"
-            )
-        ui.write(f"  {number}) {entry.name}{benchmark}")
+        ui.write(f"  {number}) {entry.name}")
     selected_raw = _choice(
         ui, "Choose a model [1]: ", {str(n) for n in range(1, len(catalog) + 1)}, "1"
     )
@@ -740,11 +736,6 @@ async def _provider_setup(
     secret_store.commit_configuration(
         lambda: persist_model_selection(config_path, provider_id, selected.name)
     )
-    if provider_id == "ollama" and not benchmarks.accepted(selected.name):
-        ui.write(
-            "This local model has no accepted Raspberry Pi benchmark report. "
-            "Run `ninjarobot benchmark ollama` before relying on it for Agent work."
-        )
     progress.selections.update(provider=provider_id, model=selected.name)
     _record(progress, "provider", "complete", "software_verified", "health_ready")
     store.save(progress)

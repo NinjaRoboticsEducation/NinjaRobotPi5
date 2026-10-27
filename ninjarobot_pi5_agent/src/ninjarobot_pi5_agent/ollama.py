@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
 
+from .cloud_common import CredentialSource
 from .models import (
     FinishReason,
     ModelMessage,
@@ -25,13 +26,17 @@ from .models import (
     ToolDefinition,
 )
 
+DEFAULT_OLLAMA_LOCAL_URL = "http://127.0.0.1:11434"
+DEFAULT_OLLAMA_CLOUD_URL = "https://ollama.com"
+DEFAULT_OLLAMA_API_KEY_ENV = "OLLAMA_API_KEY"
+
 
 class OllamaError(RuntimeError):
-    """Base error for local provider failures."""
+    """Base error for local or cloud Ollama provider failures."""
 
 
 class OllamaUnavailableError(OllamaError):
-    """Raised when the local Ollama service or model is unavailable."""
+    """Raised when the Ollama service or model is unavailable."""
 
 
 class OllamaProtocolError(OllamaError):
@@ -39,11 +44,11 @@ class OllamaProtocolError(OllamaError):
 
 
 class OllamaConfig(BaseModel):
-    """Pi-oriented local model settings with bounded memory and output."""
+    """Pi-oriented Ollama settings with bounded memory and output."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
-    base_url: str = "http://127.0.0.1:11434"
+    base_url: str = DEFAULT_OLLAMA_LOCAL_URL
     model: Annotated[str, StringConstraints(min_length=1, max_length=100)] = "qwen3:4b"
     context_window: Annotated[int, Field(ge=1024, le=16_384)] = 4096
     max_output_tokens: Annotated[int, Field(ge=32, le=4096)] = 1024
@@ -55,17 +60,27 @@ class OllamaConfig(BaseModel):
     @field_validator("base_url")
     @classmethod
     def base_url_must_be_local_http(cls, value: str) -> str:
-        """Keep the default provider local to the Raspberry Pi."""
+        """Allow local Ollama HTTP or official Ollama Cloud HTTPS."""
         parsed = urlparse(value)
-        if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
-            raise ValueError("Ollama base_url must be a local HTTP address")
+        is_local_http = parsed.scheme == "http" and parsed.hostname in {
+            "127.0.0.1",
+            "localhost",
+            "::1",
+        }
+        is_ollama_cloud = (
+            parsed.scheme == "https"
+            and parsed.hostname == "ollama.com"
+            and parsed.port in {None, 443}
+        )
+        if not (is_local_http or is_ollama_cloud):
+            raise ValueError("Ollama base_url must be a local HTTP address or https://ollama.com")
         if parsed.username is not None or parsed.password is not None:
             raise ValueError("Ollama base_url must not contain credentials")
         return value.rstrip("/")
 
 
 class OllamaModelInfo(BaseModel):
-    """Safe subset of one locally installed Ollama model record."""
+    """Safe subset of one locally installed or cloud Ollama model record."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
@@ -84,9 +99,11 @@ class OllamaProvider:
         self,
         config: OllamaConfig | None = None,
         *,
+        credentials: CredentialSource | None = None,
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self.config = config or OllamaConfig()
+        self._credentials = credentials
         self._client = client or httpx.AsyncClient(base_url=self.config.base_url)
         self._owns_client = client is None
         self._closed = False
@@ -110,6 +127,7 @@ class OllamaProvider:
         try:
             response = await self._client.post(
                 "/api/chat",
+                headers=await self._headers(),
                 json=self._payload(request, stream=False),
                 timeout=request.timeout_seconds,
             )
@@ -125,6 +143,7 @@ class OllamaProvider:
         """Yield private activity, text deltas, then one normalized turn."""
         self._ensure_open()
         attempts = 0
+        headers = await self._headers()
         while True:
             accumulated_text: list[str] = []
             accumulated_calls: list[dict[str, Any]] = []
@@ -134,6 +153,7 @@ class OllamaProvider:
                 async with self._client.stream(
                     "POST",
                     "/api/chat",
+                    headers=headers,
                     json=self._payload(request, stream=True),
                     timeout=request.timeout_seconds,
                 ) as response:
@@ -207,23 +227,55 @@ class OllamaProvider:
     async def health(self) -> ProviderHealth:
         """Check service reachability and whether the configured model is installed."""
         self._ensure_open()
+        is_cloud = self._is_cloud_url()
         try:
-            response = await self._client.get("/api/tags", timeout=5.0)
+            headers = await self._headers()
+            if is_cloud and self._credentials is not None:
+                auth_response = await self._client.post(
+                    "/api/me",
+                    headers=headers,
+                    timeout=10.0,
+                )
+                if auth_response.status_code in {401, 403}:
+                    return ProviderHealth(
+                        provider="ollama",
+                        status=ProviderHealthStatus.UNAVAILABLE,
+                        checked_at=datetime.now(UTC),
+                        detail="Ollama rejected the configured API key.",
+                    )
+            response = await self._client.get(
+                "/api/tags",
+                headers=headers,
+                timeout=10.0 if is_cloud else 5.0,
+            )
             response.raise_for_status()
             payload = response.json()
             models = payload.get("models", []) if isinstance(payload, dict) else []
             installed = {
                 item.get("name") or item.get("model") for item in models if isinstance(item, dict)
             }
-            if self.config.model in installed:
+            effective_model = self._effective_model()
+            if self.config.model in installed or effective_model in installed:
                 status = ProviderHealthStatus.READY
-                detail = f"Local model '{self.config.model}' is installed."
+                detail = (
+                    f"Ollama cloud model '{self.config.model}' is available."
+                    if is_cloud
+                    else f"Local model '{self.config.model}' is installed."
+                )
             else:
                 status = ProviderHealthStatus.DEGRADED
-                detail = f"Local model '{self.config.model}' is not installed."
-        except (httpx.HTTPError, json.JSONDecodeError):
+                detail = (
+                    f"Ollama cloud model '{self.config.model}' is not available."
+                    if is_cloud
+                    else f"Local model '{self.config.model}' is not installed."
+                )
+        except Exception:
             status = ProviderHealthStatus.UNAVAILABLE
-            detail = "The local Ollama service is unavailable."
+            detail = (
+                "The Ollama cloud service is unavailable."
+                if is_cloud
+                else "The local Ollama service is unavailable."
+            )
         return ProviderHealth(
             provider="ollama",
             status=status,
@@ -232,12 +284,28 @@ class OllamaProvider:
         )
 
     async def list_models(self) -> tuple[OllamaModelInfo, ...]:
-        """Return installed local models without loading any model into memory."""
+        """Return installed local or cloud models without loading any model into memory."""
         self._ensure_open()
+        is_cloud = self._is_cloud_url()
         try:
-            response = await self._client.get("/api/tags", timeout=5.0)
+            headers = await self._headers()
+            if is_cloud and self._credentials is not None:
+                auth_response = await self._client.post(
+                    "/api/me",
+                    headers=headers,
+                    timeout=10.0,
+                )
+                if auth_response.status_code in {401, 403}:
+                    raise OllamaUnavailableError("Ollama rejected the configured API key")
+            response = await self._client.get(
+                "/api/tags",
+                headers=headers,
+                timeout=10.0 if is_cloud else 5.0,
+            )
             response.raise_for_status()
             payload = response.json()
+        except OllamaUnavailableError:
+            raise
         except (httpx.HTTPError, json.JSONDecodeError) as exc:
             raise OllamaUnavailableError(
                 f"Ollama model catalog failed: {type(exc).__name__}"
@@ -277,10 +345,23 @@ class OllamaProvider:
         if self._owns_client:
             await self._client.aclose()
 
+    async def _headers(self) -> dict[str, str]:
+        if self._credentials is None:
+            return {}
+        return await self._credentials.headers()
+
+    def _is_cloud_url(self) -> bool:
+        return urlparse(self.config.base_url).hostname == "ollama.com"
+
+    def _effective_model(self) -> str:
+        if self._is_cloud_url() and self.config.model.endswith("-cloud"):
+            return self.config.model.removesuffix("-cloud")
+        return self.config.model
+
     def _payload(self, request: ModelRequest, *, stream: bool) -> dict[str, Any]:
         max_output = min(request.max_output_tokens, self.config.max_output_tokens)
         payload: dict[str, Any] = {
-            "model": self.config.model,
+            "model": self._effective_model(),
             "messages": [_message_payload(message) for message in request.messages],
             "stream": stream,
             "think": self.config.think,

@@ -1651,26 +1651,32 @@ async def _run_provider_command(arguments: argparse.Namespace) -> int:
     if arguments.provider_command == "login":
         web_login_removed(arguments.provider_id)
     if arguments.provider_command == "set-api-key":
-        if provider.kind == "ollama" or provider.api_key_env is None:
+        api_key_env = provider.api_key_env or (
+            "OLLAMA_API_KEY" if provider.kind == "ollama" else None
+        )
+        if api_key_env is None:
             raise ValueError(f"{provider.kind} does not have an API-key configuration")
-        value = getpass.getpass(f"Enter {provider.api_key_env}: ")
-        confirmation = getpass.getpass(f"Enter {provider.api_key_env} again: ")
+        value = getpass.getpass(f"Enter {api_key_env}: ")
+        confirmation = getpass.getpass(f"Enter {api_key_env} again: ")
         if value != confirmation:
             raise ValueError("API key values did not match")
-        secrets.set(provider.api_key_env, value)
+        secrets.set(api_key_env, value)
         persist_api_key_authentication(arguments.config, arguments.provider_id)
         _print_json(
             {
                 "provider": arguments.provider_id,
                 "authenticated": True,
                 "method": "api_key",
-                "secret_name": provider.api_key_env,
+                "secret_name": api_key_env,
             }
         )
         return 0
     if arguments.provider_command == "logout":
-        if provider.api_key_env is not None:
-            removed = secrets.delete(provider.api_key_env)
+        api_key_env = provider.api_key_env or (
+            "OLLAMA_API_KEY" if provider.kind == "ollama" else None
+        )
+        if api_key_env is not None:
+            removed = secrets.delete(api_key_env)
         else:
             raise ValueError(f"{provider.kind} does not have removable credentials")
         _print_json(
@@ -1678,8 +1684,7 @@ async def _run_provider_command(arguments: argparse.Namespace) -> int:
                 "provider": arguments.provider_id,
                 "credentials_removed": removed,
                 "environment_override_may_remain": (
-                    provider.api_key_env is not None
-                    and secrets.get(provider.api_key_env) is not None
+                    api_key_env is not None and secrets.get(api_key_env) is not None
                 ),
             }
         )
@@ -2177,28 +2182,28 @@ async def _interactive_model_selection(arguments: argparse.Namespace) -> None:
     except (ValueError, IndexError):
         print("Please select one of the displayed provider numbers.")
         return
-    if provider.kind != "ollama":
-        registry = ConfiguredProviderRegistry(
-            arguments.config,
-            SecretStore(arguments.secret_file),
-        )
-        status = registry.credential_status(provider_id)
-        configured = status.get("configured") is True
-        print(
-            f"\n{provider_id} authentication is set to {provider.auth_method}. "
-            f"Credential source ready: {'yes' if configured else 'not confirmed'}."
-        )
-        print("1. Enter API Key")
-        print("2. Continue with Current API Key")
-        print("0. Back")
-        auth_choice = input("Select authentication: ").strip()
-        if auth_choice == "0":
-            return
-        if auth_choice == "1":
-            await _interactive_set_api_key(arguments, provider_id, provider.api_key_env)
-        elif auth_choice != "2":
-            print("Please choose 0, 1, or 2.")
-            return
+    api_key_env = provider.api_key_env or ("OLLAMA_API_KEY" if provider.kind == "ollama" else None)
+    registry = ConfiguredProviderRegistry(
+        arguments.config,
+        SecretStore(arguments.secret_file),
+    )
+    status = registry.credential_status(provider_id)
+    configured = status.get("configured") is True
+    print(
+        f"\n{provider_id} authentication is set to {provider.auth_method}. "
+        f"Credential source ready: {'yes' if configured else 'not confirmed'}."
+    )
+    print("1. Enter API Key")
+    print("2. Continue with Current API Key")
+    print("0. Back")
+    auth_choice = input("Select authentication: ").strip()
+    if auth_choice == "0":
+        return
+    if auth_choice == "1":
+        await _interactive_set_api_key(arguments, provider_id, api_key_env)
+    elif auth_choice != "2":
+        print("Please choose 0, 1, or 2.")
+        return
     models = await _available_models(arguments, provider=provider_id)
     if not models:
         print(f"No compatible {provider_id} models are available.")

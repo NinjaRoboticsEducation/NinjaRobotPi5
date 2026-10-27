@@ -143,6 +143,20 @@ def test_host_scope_preserves_private_lan_and_denies_unknown_public_hosts() -> N
     assert pairing.request_scope("192.168.1.20:8443") == "local"
     assert pairing.request_scope("ninjarobot.local:8443") == "local"
     assert pairing.request_scope("robot.example") == "denied"
+    assert (
+        pairing.request_scope(
+            "robot.example",
+            forwarded_by_loopback_proxy=True,
+        )
+        == "remote"
+    )
+    assert (
+        pairing.request_scope(
+            "attacker.example",
+            forwarded_by_loopback_proxy=True,
+        )
+        == "denied"
+    )
     assert pairing.request_scope("robot.example", remote_marker="wrong" * 10) == "denied"
     assert pairing.request_scope("robot.example", remote_marker=REMOTE_MARKER) == "remote"
     assert pairing.request_scope("192.168.1.20", remote_marker=REMOTE_MARKER) == "denied"

@@ -133,12 +133,14 @@ class PairingSessionManager:
         origin: str | None,
         host: str,
         remote_marker: str | None,
+        forwarded_by_loopback_proxy: bool = False,
     ) -> str:
         """Consume one exact fragment token and return a new opaque session token."""
         self._require_endpoint_request(
             origin=origin,
             host=host,
             remote_marker=remote_marker,
+            forwarded_by_loopback_proxy=forwarded_by_loopback_proxy,
             require_origin=True,
         )
         if not _valid_token(token):
@@ -166,6 +168,7 @@ class PairingSessionManager:
         origin: str | None,
         host: str,
         remote_marker: str | None,
+        forwarded_by_loopback_proxy: bool = False,
         require_origin: bool = True,
     ) -> bool:
         """Validate a remote cookie and same-origin browser request."""
@@ -174,8 +177,16 @@ class PairingSessionManager:
                 origin=origin,
                 host=host,
                 remote_marker=remote_marker,
+                forwarded_by_loopback_proxy=forwarded_by_loopback_proxy,
             )
-        elif self.request_scope(host, remote_marker=remote_marker) != "remote":
+        elif (
+            self.request_scope(
+                host,
+                remote_marker=remote_marker,
+                forwarded_by_loopback_proxy=forwarded_by_loopback_proxy,
+            )
+            != "remote"
+        ):
             raise PairingError("request did not use the active remote endpoint")
         if session is None or not _valid_token(session):
             return False
@@ -191,6 +202,7 @@ class PairingSessionManager:
         origin: str | None,
         host: str,
         remote_marker: str | None,
+        forwarded_by_loopback_proxy: bool = False,
         require_origin: bool = True,
     ) -> bool:
         """Validate a browser session against the currently displayed endpoint."""
@@ -198,6 +210,7 @@ class PairingSessionManager:
             origin=origin,
             host=host,
             remote_marker=remote_marker,
+            forwarded_by_loopback_proxy=forwarded_by_loopback_proxy,
             require_origin=require_origin,
         )
         if session is None or not _valid_token(session):
@@ -206,19 +219,28 @@ class PairingSessionManager:
         expiry = self._sessions.get(self._digest(self._session_secret, session))
         return expiry is not None and self._clock() < expiry
 
-    def request_scope(self, host: str, *, remote_marker: str | None = None) -> str:
+    def request_scope(
+        self,
+        host: str,
+        *,
+        remote_marker: str | None = None,
+        forwarded_by_loopback_proxy: bool = False,
+    ) -> str:
         """Classify a Host header as local, the active remote endpoint, or denied."""
         hostname, port = _host_parts(host)
+        is_active_remote_host = (
+            self._remote_origin is not None
+            and hostname == urlsplit(self._remote_origin).hostname
+            and port in {None, 443}
+        )
         if remote_marker is not None:
             if not hmac.compare_digest(remote_marker, self._remote_header_secret):
                 return "denied"
-            if (
-                self._remote_origin is not None
-                and hostname == urlsplit(self._remote_origin).hostname
-                and port in {None, 443}
-            ):
+            if is_active_remote_host:
                 return "remote"
             return "denied"
+        if forwarded_by_loopback_proxy and is_active_remote_host:
+            return "remote"
         if _is_local_hostname(hostname):
             return "local"
         return "denied"
@@ -253,13 +275,21 @@ class PairingSessionManager:
         origin: str | None,
         host: str,
         remote_marker: str | None,
+        forwarded_by_loopback_proxy: bool = False,
         require_origin: bool,
     ) -> None:
         expected_origin = self._pairing_origin
         expected_scope = self._pairing_scope
         if expected_origin is None or expected_scope is None:
             raise PairingError("pairing endpoint is not ready")
-        if self.request_scope(host, remote_marker=remote_marker) != expected_scope:
+        if (
+            self.request_scope(
+                host,
+                remote_marker=remote_marker,
+                forwarded_by_loopback_proxy=forwarded_by_loopback_proxy,
+            )
+            != expected_scope
+        ):
             raise PairingError("request did not use the active pairing endpoint")
         if require_origin and origin != expected_origin:
             raise PairingError("pairing request origin does not match")
@@ -270,8 +300,16 @@ class PairingSessionManager:
         origin: str | None,
         host: str,
         remote_marker: str | None,
+        forwarded_by_loopback_proxy: bool = False,
     ) -> None:
-        if self.request_scope(host, remote_marker=remote_marker) != "remote":
+        if (
+            self.request_scope(
+                host,
+                remote_marker=remote_marker,
+                forwarded_by_loopback_proxy=forwarded_by_loopback_proxy,
+            )
+            != "remote"
+        ):
             raise PairingError("request did not use the active remote endpoint")
         if origin != self._remote_origin:
             raise PairingError("remote request origin does not match")

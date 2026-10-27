@@ -13,7 +13,13 @@ from .anthropic_provider import AnthropicConfig, AnthropicProvider
 from .cloud_common import APIKeyCredential, CredentialSource
 from .gemini_provider import GeminiConfig, GeminiProvider
 from .model_selection import ModelCatalogEntry, ProviderRegistration
-from .ollama import OllamaConfig, OllamaProvider
+from .ollama import (
+    DEFAULT_OLLAMA_API_KEY_ENV,
+    DEFAULT_OLLAMA_CLOUD_URL,
+    DEFAULT_OLLAMA_LOCAL_URL,
+    OllamaConfig,
+    OllamaProvider,
+)
 from .openai_provider import OpenAIConfig, OpenAIProvider
 from .providers import LLMProvider
 from .secrets import SecretStore
@@ -42,15 +48,32 @@ class ConfiguredProviderRegistry:
         if not provider.enabled:
             raise ValueError(f"configured provider is disabled: {provider_id}")
         if provider.kind == "ollama":
+            api_key_env = provider.api_key_env or DEFAULT_OLLAMA_API_KEY_ENV
+            has_api_key = self._secrets.contains(api_key_env)
+            if self._ollama_base_url_override:
+                base_url = self._ollama_base_url_override
+            elif has_api_key and (
+                provider.base_url is None or provider.base_url == DEFAULT_OLLAMA_LOCAL_URL
+            ):
+                base_url = DEFAULT_OLLAMA_CLOUD_URL
+            else:
+                base_url = provider.base_url or DEFAULT_OLLAMA_LOCAL_URL
+            ollama_credentials: CredentialSource | None = (
+                APIKeyCredential(
+                    self._secrets,
+                    api_key_env,
+                    "Authorization",
+                    "Bearer ",
+                )
+                if has_api_key or base_url == DEFAULT_OLLAMA_CLOUD_URL
+                else None
+            )
             return OllamaProvider(
                 OllamaConfig(
                     model=model,
-                    base_url=(
-                        self._ollama_base_url_override
-                        or provider.base_url
-                        or "http://127.0.0.1:11434"
-                    ),
-                )
+                    base_url=base_url,
+                ),
+                credentials=ollama_credentials,
             )
         credentials = self._credentials(provider_id)
         if provider.kind == "openai":
@@ -132,37 +155,36 @@ class ConfiguredProviderRegistry:
 
     def credential_status(self, provider_id: str) -> dict[str, object]:
         config = load_robot_config(self._config_path)
-        try:
-            provider = config.providers[provider_id]
-        except KeyError as exc:
-            raise ValueError(f"unknown configured provider: {provider_id}") from exc
-        if provider.kind == "ollama":
-            return {"method": "local", "configured": True}
+        if provider_id not in config.providers:
+            raise ValueError(f"unknown configured provider: {provider_id}")
         return self._credentials(provider_id).status()
 
     def _credentials(self, provider_id: str) -> CredentialSource:
         config = load_robot_config(self._config_path)
         provider = config.providers[provider_id]
         if provider.auth_method == "api_key":
-            if provider.api_key_env is None:
+            api_key_env = provider.api_key_env or (
+                DEFAULT_OLLAMA_API_KEY_ENV if provider.kind == "ollama" else None
+            )
+            if api_key_env is None:
                 raise ValueError(f"{provider_id} API-key environment name is not configured")
-            if provider.kind == "openai":
+            if provider.kind in {"ollama", "openai"}:
                 return APIKeyCredential(
                     self._secrets,
-                    provider.api_key_env,
+                    api_key_env,
                     "Authorization",
                     "Bearer ",
                 )
             if provider.kind == "gemini":
                 return APIKeyCredential(
                     self._secrets,
-                    provider.api_key_env,
+                    api_key_env,
                     "x-goog-api-key",
                 )
             if provider.kind == "anthropic":
                 return APIKeyCredential(
                     self._secrets,
-                    provider.api_key_env,
+                    api_key_env,
                     "x-api-key",
                 )
         raise ValueError(f"{provider.kind} does not have an API-key credential mapping")

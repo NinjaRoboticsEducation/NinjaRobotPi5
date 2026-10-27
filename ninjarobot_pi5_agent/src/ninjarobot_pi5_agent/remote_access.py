@@ -107,15 +107,23 @@ class PyngrokTunnelBackend:
                 config_version="2",
             )
             pyngrok_config.auth_token = None
-            tunnel = ngrok.connect(
-                addr=self._settings.local_upstream,
-                proto="http",
-                bind_tls=True,
-                upstream_tls_verify=True,
-                upstream_tls_verify_cas=str(self._ca_certificate),
-                traffic_policy=_remote_marker_traffic_policy(self._remote_header_secret),
-                pyngrok_config=pyngrok_config,
-            )
+            connect_kwargs: dict[str, object] = {
+                "addr": self._settings.local_upstream,
+                "proto": "http",
+                "bind_tls": True,
+                "upstream_tls_verify": True,
+                "upstream_tls_verify_cas": str(self._ca_certificate),
+                "pyngrok_config": pyngrok_config,
+            }
+            try:
+                tunnel = ngrok.connect(
+                    **connect_kwargs,
+                    traffic_policy=_remote_marker_traffic_policy(self._remote_header_secret),
+                )
+            except Exception as policy_exc:
+                if not _is_paid_traffic_policy_rejection(policy_exc):
+                    raise
+                tunnel = ngrok.connect(**connect_kwargs)
             public_url = validate_public_https_origin(str(tunnel.public_url))
         except RemoteAccessError:
             raise
@@ -547,6 +555,19 @@ def _write_private_ngrok_config(path: Path, *, token: str | None) -> None:
             pass
         temporary.unlink(missing_ok=True)
         raise
+
+
+def _is_paid_traffic_policy_rejection(error: Exception) -> bool:
+    """Detect ngrok Free-tier rejection of custom header traffic policies (ERR_NGROK_2263)."""
+    message = str(error).casefold()
+    return any(
+        token in message
+        for token in (
+            "err_ngrok_2263",
+            "paid traffic policy",
+            "not allowed on your current plan",
+        )
+    )
 
 
 def _classify_ngrok_failure(error: Exception) -> str:
