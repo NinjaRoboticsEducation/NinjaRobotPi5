@@ -1,0 +1,16 @@
+id: src-20261027-installationguide
+path: raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md
+media_type: text/markdown
+kind: text
+title: InstallationGuide.md
+added_at: '2026-10-27T00:00:02Z'
+content_hash: sha256:39799fdf6b229fb7fb64288bf54c1339ac110a3a173af9b6f48c846ec9304065
+state: ingested
+original_uri: urn:llmwiki:source:src-20261027-installationguide
+source_version: multi-hat-expansion-261025
+retrieved_at: null
+normalized_at: '2026-10-27T00:00:24Z'
+normalizer: llmwiki-text/0.2
+error: null
+ingested_at: '2026-10-27T00:12:03Z'
+last_plan: multi-hat-expansion-261027

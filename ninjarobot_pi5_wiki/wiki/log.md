@@ -1,5 +1,9 @@
 # Wiki Update Log
 
+## 2026-10-27
+
+* **Update**: Applied plan `multi-hat-expansion-261027` — Ingest 2026-10-25 Multi-HAT expansion upgrade and physical SunFounder hardware audit manuals; update eleven knowledge pages with dual 0x14/0x17 SunFounder Robot HAT MCU, PCA9685 PWM, flexible digital/servo pin mapping, embedded I2S speaker, default HEAD installer bootstrap, and onboarding profile selection.. Sources: `src-20260907-knowledgeintegration`, `src-20261027-developmentguide`, `src-20261027-installationguide`, `src-20261027-ninjarobot-mcp-skill`, `src-20261027-developmentlog`.
+
 ## 2026-09-23
 
 * **Update**: Applied plan `onboarding-refinement-260923` — Ingest 2026-09-23 refined onboarding, bulk settings reuse, Mac Calendar OAuth, and installer repair manuals; update eleven knowledge pages with ASCII welcome, bulk reuse, Mac SSH port forwarding, and installer disambiguation.. Sources: `src-20260907-knowledgeintegration`, `src-20260923-developmentguide-2`, `src-20260923-installationguide-2`, `src-20260923-ninjarobot-mcp-skill`, `src-20260923-developmentlog-2`.

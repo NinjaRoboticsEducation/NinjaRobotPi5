@@ -4,29 +4,28 @@ Start here for project documentation, architecture, development history, and
 AI-assisted development. Open this folder in your coding tool for wiki questions,
 or open the parent project for development and implementation verification.
 
-## Current full manuals — refined onboarding and Mac Calendar setup
+## Current full manuals — Multi-HAT expansion and SunFounder hardware audit
 
-These 22 September successor manuals are ingested and semantically reviewed in the wiki.
-They add the `ninjarobot` CLI entry point with resumable onboarding wizard, direct curl
-streaming installer bootstrap, prompt-toolkit multiline terminal chat, and external MCP
-presets (Tavily, Google Calendar stdio MCP, Notion OAuth) while retaining earlier Calendar,
-project-help, and hardware guidance. The registered document map is updated to the 22 September checkpoint.
-The 16 September 2026 hand-placement correction and 15 September follow-up repairs
-(normal-stop and obstacle recovery rules, automatic sensor recovery, repeated-game
-buzzer preparation, visible web errors, chat guidance, rolling context in AgentLoop,
-and default distance game enablement) are consolidated alongside completed Phase 4
-information work (T04 calendar planning, T05 research, and T06 notes/checklists/requested
-briefings), Phase 4 foundations, and system clock access.
+These 25 October successor manuals are ingested and semantically reviewed in the wiki.
+They add Multi-HAT hardware support (DFRobot DFR0566 IO Expansion HAT, SunFounder Robot HAT
+v4 `0x14` and Fusion HAT / Robot HAT v5 `0x17` with auto-fallback, and General PCA9685 `0x40`
+PWM Expansion HAT), default-branch `install.sh` bootstrap (`HEAD`), flexible digital pins for
+Buzzer (`17, 4, 27, 22`) and ST7789V Display (`DC=27, RST=22, BL=6`), arbitrary calibrated PWM
+channels (`hat_pwm0`..`hat_pwm11` on SunFounder, `0`..`15` on PCA9685), embedded I2S speaker
+(`GPIO12` amp enable and `0x17` register `0x31` with `googlevoicehat`/`hifiberry` sink), and
+onboarding Hardware Expansion Profile Selection menu, while retaining earlier guided onboarding,
+prompt-toolkit terminal chat, external MCP presets, Calendar, project-help, and hardware guidance.
+The registered document map is updated to the 25 October checkpoint.
 Use [the document map](project-knowledge.json) for registered source provenance;
 use the links below for the full manuals:
 
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md)
-- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-23-02/NinjaRobot_MCP_Skill.md)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md)
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-10-25/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md)
 
-These source revisions document guided onboarding, curl bootstrap,
-editable terminal chat, and the three external MCP presets. They are ingested and
+These source revisions document Multi-HAT hardware expansion, dual MCU auto-detection,
+embedded I2S speaker, and default-branch curl installation. They are ingested and
 semantically reviewed; `project-knowledge.json` describes this registered checkpoint.
 
 - [Onboarding refinement and Mac Calendar tests](../docs/validation/onboarding_refinement_walkthrough_260923.md)
@@ -44,13 +43,21 @@ semantically reviewed; `project-knowledge.json` describes this registered checkp
 - [Phase 5 handoff](../docs/validation/refinement_phase5_handoff_260913.md)
 - [Clock fix and manual tests](../docs/validation/system_time_fix_260912.md)
 
-The earlier 15 September sources remain preserved under their original date
+The earlier sources remain preserved under their original date
 folders. The root README links directly to these latest full manuals.
 
 Runtime project help is separate from developer wiki search. It searches bounded
 sections of current registered public manuals and explicitly listed unpublished
 successors, with hashes, citations, and honest review labels. It does not run wiki
 ingestion or expose private files. The owner will ingest after manual validation.
+
+## Historical full manuals — earlier checkpoints
+
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-09-23-02/NinjaRobot_MCP_Skill.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md)
+- [Onboarding refinement and Mac Calendar tests](../docs/validation/onboarding_refinement_walkthrough_260923.md)
 
 ## Historical full manuals — earlier checkpoints
 

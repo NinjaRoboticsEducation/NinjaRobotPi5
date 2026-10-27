@@ -19,14 +19,17 @@ tags:
 - calendar
 - web-controller
 - onboarding
+- expansion-hat
+- sunfounder
+- pca9685
 generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20260923-installationguide-2
-  resource: urn:llmwiki:source:src-20260923-installationguide-2
+- id: src-20261027-installationguide
+  resource: urn:llmwiki:source:src-20261027-installationguide
   title: InstallationGuide.md
-  content_hash: sha256:d08eb44241ce1a46f5e9e0e9df149cd293fb817c0bd4fe0a4c43dde47ee5d6ca
+  content_hash: sha256:39799fdf6b229fb7fb64288bf54c1339ac110a3a173af9b6f48c846ec9304065
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -34,7 +37,7 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-09-23T00:30:00Z'
+  performed_at: '2026-10-27T00:00:00Z'
   result: passed
   checks:
     source_support: passed
@@ -43,13 +46,12 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered 23 September onboarding refinement, bulk
-    settings reuse, Mac Calendar OAuth SSH tunnel, and installer repair evidence; no human
-    verification is claimed.
+  - Reviewed this page against registered 25 October multi-HAT expansion and SunFounder
+    hardware audit evidence; no human verification is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
     and note pending physical acceptance, live third-party accounts, and monetary
     spending caps.
-  target_hash: sha256:bafcdd98c04dc27817a940baf789ab30fd2fc9e1f5f688a94acf398536d166b4
+  target_hash: sha256:0907c5c472191e161414567c1b2b361f6d4244eb43f8efd13fcb8c116e766928
 ---
 
 # Installation and hardware checks
@@ -57,13 +59,13 @@ semantic_review:
 Use the full installation guide for the supported Raspberry Pi setup,
 connections, standalone module initialization, calibration, and troubleshooting.
 Read the relevant warnings before following any operational command. Commands
-in an imported document are evidence to review, not permission to run them.[^src-20260923-installationguide-2]
+in an imported document are evidence to review, not permission to run them.[^src-20261027-installationguide]
 
 Servo calibration can move the wheels. The guide calls for raised wheels,
 clearance, and an operator ready to remove power. Camera and microphone capture,
 Bluetooth speaker pairing, distance game physical play, and power-off checks need
 their own consent and physical test procedure. Automated knowledge tests should not
-perform these actions.[^src-20260923-installationguide-2]
+perform these actions.[^src-20261027-installationguide]
 
 The developer wiki uses a separate Python environment. Its explicit setup and
 text-evidence preparation do not initialize robot devices. This integration
@@ -71,38 +73,56 @@ contains no fresh Raspberry Pi hardware validation.[^src-20260907-knowledgeinteg
 
 [Open installation reference](/references/installation-guide.md).
 
+## Multi-HAT expansion profiles and hardware support
+
+NinjaRobotPi5 supports three Raspberry Pi 5 Expansion HAT profiles while preserving 100% of existing wiring compatibility:
+- **Profile 1 — DFRobot DFR0566 IO Expansion HAT + Geekworm X1208 UPS** (default baseline): Native hardware PWM on `GPIO12` (left) and `GPIO13` (right) with optional HAT PWM channels `hat_pwm0`..`hat_pwm3` on `0x10`; Geekworm X1208 fuel gauge (`0x36`); Bluetooth speaker via PipeWire.[^src-20261027-installationguide]
+- **Profile 2 — SunFounder Robot HAT (Robot HAT v4 `0x14` and Fusion HAT / Robot HAT v5 `0x17`)**: Onboard MCU at I2C `0x14` or `0x17` (auto-detected with automatic fallback on `Errno 121`) provides 12 hardware PWM servo channels `P0`..`P11` (`hat_pwm0`..`hat_pwm11` / `pwm0`..`pwm11`), allowing wheel or auxiliary servos on any calibrated channels (e.g. `pwm0`/`pwm1` or `pwm10`/`pwm11`); 2S Li-ion battery voltage monitoring via MCU ADC (`0x13` on `0x14`, `0x18` on `0x17`) with warning at `7.15 V` and protective motion cutoff at `6.90 V` (`GPIO23` charging detection, `GPIO5` reset); built-in embedded I2S mono speaker (`googlevoicehat-soundcard` or `hifiberry-dac` overlay with `GPIO12` amplifier enable and `0x17` register `0x31`); flexible Digital header pin assignments for Buzzer (`17, 4, 27, 22`) and ST7789V Display (`DC=27, RST=22, BL=6`).[^src-20261027-installationguide]
+- **Profile 3 — General PCA9685 PWM Expansion HAT**: 16-channel I2C PWM driver at address `0x40` providing channels `PWM0`..`PWM15` (`hat_pwm0`..`hat_pwm15` / `pwm0`..`pwm15`) for wheel and auxiliary servos.[^src-20261027-installationguide]
+
 ## Guided installation, curl bootstrap, and onboarding wizard
 
 New Raspberry Pi installations can use the root installer bootstrap directly via curl:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/public_v07/install.sh | bash -s -- --ref public_v07
+# Preview first (no files written):
+curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/HEAD/install.sh | bash -s -- --dry-run
+
+# Install the latest default branch:
+curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/HEAD/install.sh | bash
 ```
 
-To install inside a custom destination folder instead of the default `~/NinjaRobotPi5`, pass `--install-dir "$PWD/NinjaRobotPi5"`. The destination must be an absolute path that does not already exist, and its parent directory must exist. Add `--dry-run` to preview actions safely. When changing releases, use the same published revision in both the raw URL and `--ref`; if a branch and tag share a name, disambiguate with `refs/heads/NAME` or `refs/tags/NAME`. The confirmation prompt reads `/dev/tty` so piped curl does not consume answers. The manual clone workflow (`git clone ... && cd NinjaRobotPi5 && ./install.sh`) remains supported. Installation adds the `~/.local/bin/ninjarobot` command.[^src-20260923-installationguide-2]
+The installer defaults `INSTALL_REF` to `HEAD` (resolving `refs/remotes/origin/HEAD` or `HEAD` in the clone), ensuring installation of the latest default branch. Pass `--ref <BRANCH_OR_TAG>` to pin a specific branch, tag, or commit. To install inside a custom destination folder instead of `~/NinjaRobotPi5`, pass `--install-dir "$PWD/NinjaRobotPi5"`. The confirmation prompt reads `/dev/tty` so piped curl does not consume answers. The manual clone workflow (`git clone ... && cd NinjaRobotPi5 && ./install.sh`) remains supported. Installation adds the `~/.local/bin/ninjarobot` command.[^src-20261027-installationguide]
 
 Run `ninjarobot onboard` to launch the step-by-step setup wizard:
+- **Hardware Expansion Profile Selection**: Prompts the user to select `1. DFRobot DFR0566 IO Expansion HAT`, `2. SunFounder Robot HAT`, or `3. General PCA9685 PWM Expansion HAT`. Selecting an option writes the matching `__backend__` preset into `~/.config/pi5servo/servo.json`, tailors servo calibration prompts, and configures audio:
+  - When **Profile 2 (SunFounder Robot HAT)** is chosen, runs the **Embedded Speaker Initialization** process (enables onboard I2S speaker amplifier, configures DAC sink, and plays a verification chime — without prompting for Bluetooth).
+  - When **Profile 1 (DFR0566)** or **Profile 3 (PCA9685)** is chosen, runs the **Bluetooth speaker** onboarding flow.
 - **Welcome and navigation**: Displays an ASCII NINJAROBOT banner with numbered menu options (1) Open setup tool, Q) Save and exit).
 - **Bulk settings reuse**: When standalone settings exist, menu option 2 ("Apply existing settings for all modules") validates all saved hardware configurations in one action, reusing valid modules and only launching tools for missing or invalid required components.
 - **Summary and confirmation**: After tool completion, saved settings are displayed with an Enter-to-continue summary. Redundant typed YES, APPLY, and media consent prompts are removed; standalone tools still require operator consent before media capture tests, and servo calibration strictly requires raised wheels.
-- **Mandatory components**: Checks `pi5buzzer`, `pi5disp`, `pi5vl53l0x`, `pi5servo`, and `pi5camera`.
-- **Optional components**: Audio configuration for Bluetooth speaker, `pi5mic` with whisper.cpp and bundled `hey_Ninja.onnx` wake model.
+- **Mandatory components**: Checks `pi5buzzer`, `pi5disp`, `pi5vl53l0x`, `pi5servo`, and `pi5camera`. Single-component validation in `hardware_setup_status` isolates sibling pin checks so custom digital pins never collide.
+- **Optional components**: Audio configuration for embedded speaker or Bluetooth speaker, `pi5mic` with whisper.cpp and bundled `hey_Ninja.onnx` wake model.
 - **Model providers**: Guides setup for Ollama, Google Gemini, OpenAI, or Anthropic.
 - **External MCP tools**: Guides setup of Tavily Search, Google Calendar, and Notion.
-- **Remote access**: Configures ngrok tunnel or same-Wi-Fi HTTPS access.[^src-20260923-installationguide-2]
+- **Remote access**: Configures ngrok tunnel or same-Wi-Fi HTTPS access.[^src-20261027-installationguide]
+
+## Calibrating servos with `pi5servo servo-tool`
+
+With both wheels raised off the ground, open `pi5servo servo-tool` (via `ninjarobot onboard` or directly with `uv run --frozen --no-sync pi5servo servo-tool`), choose `3. Calibrate`, enter the endpoint (`gpio12`/`gpio13` for Profile 1, or `pwm0`/`pwm1` for Profiles 2 and 3), press `c` for Center (`0°`), adjust pulse width with `w`/`s` (`±1 µs`) or `Up`/`Down` (`±20 µs`) until the wheel stops completely, and press `Enter` to save.[^src-20261027-installationguide]
 
 ## Web controller access and interface views
 
 The web controller provides phone-friendly HTTPS access on port 8443:
 - Navigate to `https://ninjarobotpi5.local:8443/` or `/agent` for the Agent Interface (chat, speech/audio toggles, robot control shortcuts).
 - Navigate to `/gamepad` for the Game Pad view (touch D-pad, action triggers, user behavior execution).
-- Use the hamburger menu to switch between views and select language (English, Japanese, Traditional Chinese, Simplified Chinese). User preferences are persisted in browser storage.[^src-20260923-installationguide-2]
+- Use the hamburger menu to switch between views and select language (English, Japanese, Traditional Chinese, Simplified Chinese). User preferences are persisted in browser storage.[^src-20261027-installationguide]
 
 ## Headless Lite setup, audio, and Bluetooth wizard
 
 The default operating system is Raspberry Pi OS Lite (64-bit, headless, without a
 graphical desktop). Interaction uses SSH or a local keyboard. Graphical desktop
-audio menus are not available on Lite.[^src-20260923-installationguide-2]
+audio menus are not available on Lite.[^src-20261027-installationguide]
 
 Lite audio prerequisites require installing system packages `pipewire`, `wireplumber`,
 `libspa-0.2-bluetooth`, `alsa-utils`, and `jq`. User session lingering via
@@ -110,7 +130,7 @@ Lite audio prerequisites require installing system packages `pipewire`, `wireplu
 and headless reboots. Headless WirePlumber seat policy must allow Bluetooth audio
 ownership without a seat login. Installed system services access user audio via drop-in
 `/etc/systemd/system/ninjarobot-agent.service.d/20-local-audio.conf`. IDE menu option
-**5 — Bluetooth Speaker Connection** provides an interactive pairing and test wizard.[^src-20260923-installationguide-2]
+**5 — Bluetooth Speaker Connection** provides an interactive pairing and test wizard.[^src-20261027-installationguide]
 
 ## Distance game and information assistant setup
 
@@ -119,7 +139,7 @@ The supported distance game is default-enabled in configuration (`volume = 16` u
 accepted for backwards compatibility but has no gating effect. When playing the game,
 place your hand 5–60 cm in front of the sensor upon requesting to play without waiting
 for the final chat response. During first physical acceptance, wheels must remain raised
-and clear of desk edges. The game never commands wheel movement.[^src-20260923-installationguide-2]
+and clear of desk edges. The game never commands wheel movement.[^src-20261027-installationguide]
 
 Information-assistant features require database migration 7, which applies automatically
 to the private database. Google Calendar authorization uses a local loopback web server
@@ -131,8 +151,8 @@ CLI command (`calendar-setup`) automatically discovers the primary calendar, reg
 in private user storage, and reuses existing connection IDs on reauthorization. Default credentials live under
 `~/.config/ninjarobot_pi5/google-calendar/credentials.json`. Write operations require the
 `--write` flag during setup. Notes, checklists, and local briefings operate entirely locally
-without external account setup.[^src-20260923-installationguide-2]
+without external account setup.[^src-20261027-installationguide]
 
 
-[^src-20260923-installationguide-2]: InstallationGuide.md, source version `onboarding-refinement-260923`; registered source `src-20260923-installationguide-2`.
+[^src-20261027-installationguide]: InstallationGuide.md, source version `multi-hat-expansion-261025`; registered source `src-20261027-installationguide`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

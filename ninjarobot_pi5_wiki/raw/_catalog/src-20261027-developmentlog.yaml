@@ -1,0 +1,16 @@
+id: src-20261027-developmentlog
+path: raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md
+media_type: text/markdown
+kind: text
+title: DevelopmentLog.md
+added_at: '2026-10-27T00:00:19Z'
+content_hash: sha256:037599cf40c9a4e13efcd885d7ef6a1d77d52fa14cad75ade77b0149f806c821
+state: ingested
+original_uri: urn:llmwiki:source:src-20261027-developmentlog
+source_version: multi-hat-expansion-261025
+retrieved_at: null
+normalized_at: '2026-10-27T00:00:26Z'
+normalizer: llmwiki-text/0.2
+error: null
+ingested_at: '2026-10-27T00:12:03Z'
+last_plan: multi-hat-expansion-261027
