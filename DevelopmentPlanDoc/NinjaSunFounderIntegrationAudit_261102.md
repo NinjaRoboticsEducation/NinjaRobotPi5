@@ -1,7 +1,7 @@
 # NinjaRobotPi5 multi-HAT integration audit
 
 Audit date: 2026-11-02. Inspected checkout: `bad557d`.
-Requested filename retained. Status: **audit findings and constrained roadmap; Fusion motion release blocked**.
+Filename corrected to the audit date at owner request. Status: **audit findings and constrained roadmap; Fusion motion release blocked**.
 This document records source-confirmed findings, not physical hardware certification.
 No runtime code, private configuration, boot settings, or managed drivers were changed.
 
@@ -379,3 +379,53 @@ source behavior and reproduction separately from deployed root causes still
 requiring observations. Physical backward compatibility, complete service-unit
 inspection and exhaustive peripheral regression remain outstanding; the report
 is not a certification that every project subsystem has been validated.
+
+## Issue 4: Ollama local models disappear after cloud authentication
+
+### Confirmed source cause
+
+`cloud_registry.py:ConfiguredProviderRegistry.create` checks whether the secret
+store contains the Ollama key. If so, an absent base URL or even the explicit
+standard local URL is replaced with `https://ollama.com`. `catalog` constructs
+one adapter and queries only its endpoint. It never merges local and cloud
+catalogs. This explains the reported behavior without requiring a failed local
+installation. The adapter itself supports both endpoint types.
+
+`agent_cli.py` interactive provider selection always displays API-key choices
+before calling `_available_models`. `_provider_setup` in `setup_wizard.py`
+explicitly requires a nonempty Ollama key. `OllamaProvider.list_models` queries
+`/api/tags` against its single configured server. `ModelCatalogEntry` identifies
+entries by provider and name without a distinct execution destination. Adding
+local names to the cloud list alone would therefore be insufficient: selection
+must carry the destination through runtime creation and persistence.
+
+Additional source-confirmed concern: `create` attaches a credential whenever a
+key exists, including when a local override is selected. Cloud credentials should
+not be sent to the local daemon. Existing benchmark acceptance also matches model
+name alone; local and cloud entries with identical names must not accidentally
+share acceptance evidence.
+
+### Intended behavior and boundaries
+
+Show downloaded models reported by the configured local Ollama daemon alongside
+available cloud catalog entries. Label execution location explicitly. A local
+Ollama entry can itself proxy cloud execution; transport locality alone must not
+be presented as proof of offline inference. Do not promise all downloadable
+models from the public library or models stored under a different daemon account.
+
+Local discovery requires no cloud key. Cloud errors must not hide local results.
+Selecting a local model must preserve local routing even after adding a key;
+selecting a cloud model must preserve cloud routing after restart. Do not download,
+load, benchmark, or send user text merely to populate the menu. Keep explicit
+cloud consent and existing deterministic hardware safety gates.
+
+Official evidence: [Ollama authentication](https://github.com/ollama/ollama/blob/main/docs/api/authentication.mdx)
+distinguishes unauthenticated local access from authenticated direct cloud access;
+[Ollama cloud documentation](https://github.com/ollama/ollama/blob/main/docs/cloud.mdx)
+describes the cloud catalog. These are moving upstream sources; pin the reviewed
+API behavior in implementation fixtures rather than hardcoding current model names.
+
+This is an Agent configuration/discovery defect, independent of HAT selection.
+No real credentials, local model inventory, or cloud inference were accessed in
+this audit. See [the implementation plan](NinjaSunFounderIntegrationImplementation_261102.md)
+for route-aware selection, migration, and regression gates.
