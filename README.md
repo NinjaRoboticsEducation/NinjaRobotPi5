@@ -196,6 +196,60 @@ Use the tables below as the recommended default electronic module pin wiring ref
 
    Replace `YOUR_USERNAME` with the username you set in the Imager. If `.local` does not resolve, use the Pi’s IP address. See the [official SSH setup instructions](https://www.raspberrypi.com/documentation/computers/remote-access.html).
 
+8. Update System
+Open a terminal and run:
+
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+This may take 10-20 minutes depending on your internet speed.
+
+9. Enable Required Interfaces
+
+Open the Raspberry Pi configuration tool:
+   ```bash
+   sudo raspi-config
+   ```
+Navigate to **"3 Interface Options"**
+Enable the following:
+   - **I2C**: Select **"I5 I2C"** → **"Yes"**
+   - **SPI**: Select **"I4 SPI"** → **"Yes"**
+
+Select **"Finish"** and reboot when prompted:
+   ```bash
+   sudo reboot
+   ```
+
+
+
+10. Install git and uv:
+To install Git and uv (Astral's fast Python package manager) on your Raspberry Pi, run the following standalone installation commands in your terminal:
+
+**Install git** 
+
+Git is available directly in the official Raspberry Pi OS repositories. Update your package lists and install it via apt:
+```bash
+sudo apt install git -y
+```
+Verify the installation: 
+```bash
+git --version
+```
+
+**Install uv** (Optional)
+The recommended way to install uv on Linux/ARM is via standalone script, which automatically downloads the correct binary for your Raspberry Pi architecture: 
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+Once the uv installer finishes, restart your shell or reload your environment to start using the uv command:
+```bash
+source $HOME/.local/bin/env
+```
+Verify the installation: 
+```bash
+uv --version
+```
+
 ### 2.4 Project Installation
 
 #### Default installation (recommended)
