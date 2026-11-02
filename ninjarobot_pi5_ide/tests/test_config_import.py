@@ -253,3 +253,20 @@ def test_import_sunfounder_arbitrary_digital_and_pwm_pins(tmp_path: Path) -> Non
     assert imported.behaviors.servo_roles["left_motor"] == "hat_pwm10"
     assert imported.behaviors.servo_roles["right_motor"] == "hat_pwm11"
     assert imported.hardware.power.fuel_gauge_address == 0x17
+
+
+def test_import_single_hat_servo_does_not_invent_a_wheel(tmp_path):
+    path = tmp_path / "servo.json"
+    write_json(
+        path,
+        {
+            "__backend__": {"name": "sunfounder_robot_hat", "kwargs": {"address": 23}},
+            "hat_pwm3": {"pulse_center": 1500},
+        },
+    )
+    config, _ = import_pi5_configs(
+        load_robot_config(EXAMPLE), [DiscoveredConfig("pi5servo", path, True)]
+    )
+    assert config.hardware.servos.endpoints == ("hat_pwm3",)
+    assert config.behaviors.servo_roles == {}
+    assert config.hardware.power.charging_gpio is None

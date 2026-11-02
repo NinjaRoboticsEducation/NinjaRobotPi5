@@ -404,6 +404,7 @@ def build_parser() -> argparse.ArgumentParser:
     select_model = model_commands.add_parser("select", help="Select an installed model.")
     select_model.add_argument("model_name")
     select_model.add_argument("--provider")
+    select_model.add_argument("--route", choices=("local", "cloud"))
 
     provider = commands.add_parser("provider", help="Configure cloud provider access.")
     provider_commands = provider.add_subparsers(dest="provider_command", required=True)
@@ -1594,6 +1595,7 @@ async def _run_model_command(arguments: argparse.Namespace) -> int:
             arguments,
             model=arguments.model_name,
             provider=arguments.provider,
+            route=arguments.route,
         )
         _print_json(selected)
         return 0
@@ -1739,6 +1741,7 @@ async def _select_model(
     *,
     model: str,
     provider: str | None,
+    route: str | None = None,
 ) -> dict[str, Any]:
     provider_id, _provider_config = _configured_provider(arguments)
     selected_provider = provider or provider_id
@@ -1746,6 +1749,7 @@ async def _select_model(
     try:
         response = await client.request(
             {
+                **({"route": route} if route else {}),
                 "command": "model_select",
                 "provider": selected_provider,
                 "model": model,
@@ -1758,14 +1762,16 @@ async def _select_model(
             arguments,
             provider=selected_provider,
         )
-        selected = next(
-            (
-                entry
-                for entry in catalog
-                if entry.provider == selected_provider and entry.name == model
-            ),
-            None,
-        )
+        matches = [
+            entry
+            for entry in catalog
+            if entry.provider == selected_provider
+            and entry.name == model
+            and (route is None or entry.route == route)
+        ]
+        if len(matches) > 1:
+            raise ModelSelectionError("Model name is ambiguous; pass --route local or cloud")
+        selected = matches[0] if matches else None
         if selected is None:
             raise ModelSelectionError(
                 f"model '{model}' is not installed for provider '{selected_provider}'"
@@ -1774,7 +1780,7 @@ async def _select_model(
             arguments.config,
             SecretStore(arguments.secret_file),
         )
-        candidate = registry.create(selected_provider, model)
+        candidate = registry.create(selected_provider, model, route=selected.route)
         try:
             health = await candidate.health()
         finally:
@@ -1783,7 +1789,7 @@ async def _select_model(
             raise ModelSelectionError(
                 health.detail or "selected model did not pass its provider health check"
             )
-        persist_model_selection(arguments.config, selected_provider, model)
+        persist_model_selection(arguments.config, selected_provider, model, route=selected.route)
         return {
             **selected.model_copy(update={"current": True}).model_dump(mode="json"),
             "service_running": False,
@@ -1817,8 +1823,15 @@ async def _offline_provider_catalog(
                 "current": (
                     provider_id == config.agent.default_provider
                     and entry.name == provider_config.model
+                    and (
+                        entry.route is None
+                        or entry.route
+                        == (
+                            "cloud" if provider_config.base_url == "https://ollama.com" else "local"
+                        )
+                    )
                 ),
-                "accepted": benchmarks.accepted(entry.name),
+                "accepted": entry.route != "cloud" and benchmarks.accepted(entry.name),
             }
         )
         for entry in await registry.catalog(provider_id)
@@ -2194,7 +2207,10 @@ async def _interactive_model_selection(arguments: argparse.Namespace) -> None:
         f"Credential source ready: {'yes' if configured else 'not confirmed'}."
     )
     print("1. Enter API Key")
-    print("2. Continue with Current API Key")
+    print(
+        "2. Continue with Current API Key"
+        + (" (optional; local Ollama needs no key)" if provider.kind == "ollama" else "")
+    )
     print("0. Back")
     auth_choice = input("Select authentication: ").strip()
     if auth_choice == "0":
@@ -2222,7 +2238,10 @@ async def _interactive_model_selection(arguments: argparse.Namespace) -> None:
             if value
         )
         suffix = f" · {details}" if details else ""
-        print(f"{index}. {model['name']}{current} · {accepted}{suffix}")
+        print(
+            f"{index}. {model['name']} [{model.get('route') or provider_id}]"
+            f"{current} · {accepted}{suffix}"
+        )
     print("0. Back")
     choice = input("Select a model: ").strip()
     if choice == "0":
@@ -2236,6 +2255,7 @@ async def _interactive_model_selection(arguments: argparse.Namespace) -> None:
         arguments,
         model=str(selected["name"]),
         provider=provider_id,
+        route=selected.get("route"),
     )
     print(f"Agent model changed to {result['provider']}/{result['name']}.")
     if result.get("accepted") is not True:

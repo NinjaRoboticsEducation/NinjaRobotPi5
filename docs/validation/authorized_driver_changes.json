@@ -654,13 +654,13 @@
     },
     "pi5servo/src/pi5servo/core/backends/sunfounder_robot_hat.py": {
       "approved": {
-        "sha256": "e5160ebdada065ed1233c2147539f54a1ff519c72b02dc75495abc8d26927157",
-        "size": 11619
+        "sha256": "2321796ef2a129b3348ec32e0a2765e71352431b267e9452a1432717795ddbb8",
+        "size": 12154
       },
       "authorized_by": "Project owner",
-      "authorized_on": "2026-10-25",
+      "authorized_on": "2026-11-02",
       "baseline": null,
-      "reason": "Support SunFounder Robot HAT v4 (0x14) and Fusion HAT / Robot HAT v5 (0x17) I2C MCU register maps and automatic fallback"
+      "reason": "Owner-approved 2026-11-02 implementation plan Phase 4: correct Fusion register stride and restrict reset recovery; independently verify both register layouts across all channels."
     },
     "pi5servo/src/pi5servo/core/endpoint.py": {
       "approved": {
@@ -677,16 +677,16 @@
     },
     "pi5servo/tests/test_backend.py": {
       "approved": {
-        "sha256": "4a018435db19d557366944a08f6cdafd6138676d8602c40ecc5800e03841ec48",
-        "size": 16788
+        "sha256": "0e1e7da4df4d5daeb0a202b02686ad73e00c3bde04c91a98e73a58b8e6ff14f5",
+        "size": 17546
       },
       "authorized_by": "Project owner",
-      "authorized_on": "2026-10-25",
+      "authorized_on": "2026-11-02",
       "baseline": {
         "sha256": "c5498ba11e948ca925f5655f88120d2c1ff82ebed3d33ef8a17da130360459ed",
         "size": 11153
       },
-      "reason": "Support SunFounder Robot HAT v4 (0x14) and Fusion HAT / Robot HAT v5 (0x17) I2C MCU register maps and automatic fallback"
+      "reason": "Owner-approved 2026-11-02 implementation plan Phase 4: correct Fusion register stride and restrict reset recovery; independently verify both register layouts across all channels."
     },
     "pi5servo/tests/test_config.py": {
       "approved": {

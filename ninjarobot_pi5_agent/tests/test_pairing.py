@@ -205,3 +205,13 @@ def test_local_pairing_is_origin_bound_and_remote_recovery_revokes_it() -> None:
         remote_marker=REMOTE_MARKER,
     )
     assert pairing.status().active_scope == "remote"
+
+
+def test_proxy_transport_peer_rejects_forged_lan_headers() -> None:
+    from ninjarobot_pi5_agent.web_app import _is_loopback_proxy_request
+    from starlette.datastructures import Address, Headers
+
+    headers = Headers({"x-forwarded-proto": "https", "x-forwarded-for": "203.0.113.8"})
+    assert _is_loopback_proxy_request(Address("127.0.0.1", 1234), headers)
+    assert _is_loopback_proxy_request(Address("::1", 1234), headers)
+    assert not _is_loopback_proxy_request(Address("192.168.1.50", 1234), headers)

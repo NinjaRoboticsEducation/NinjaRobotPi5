@@ -1,5 +1,15 @@
 # NinjaRobotPi5
 
+
+Runtime remediation successor manuals (2 November, pending owner manual validation
+and wiki ingestion/review):
+
+- [InstallationGuide successor](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md)
+- [DevelopmentGuide successor](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md)
+- [DevelopmentLog successor](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md)
+
+The registered document map remains at its previous reviewed checkpoint.
+
 <div align="center">
 
 **An AI-Powered Raspberry Pi 5 Robot — Talk to It, Control It, Teach It**

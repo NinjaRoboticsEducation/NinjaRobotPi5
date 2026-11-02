@@ -2129,7 +2129,9 @@ class AgentRuntime:
             raise RuntimeError("runtime model selection is not configured")
         return self.models.selection()
 
-    async def select_model(self, provider_id: str, model: str) -> ModelCatalogEntry:
+    async def select_model(
+        self, provider_id: str, model: str, *, route: str | None = None
+    ) -> ModelCatalogEntry:
         """Switch only while the service has no active chat or robot action."""
         self._ensure_started()
         if self.models is None:
@@ -2140,7 +2142,9 @@ class AgentRuntime:
             )
         self._switching_model = True
         try:
-            selected = await self.models.select(provider_id, model)
+            selected = await self.models.select(
+                provider_id, model, **({"route": route} if route else {})
+            )
             self._disarm_all_motion()
             self.camera_grants.revoke_all()
             await self.events.publish(

@@ -562,7 +562,10 @@ def test_agent_cli_lists_and_persists_an_offline_ollama_selection(
 
     monkeypatch.setattr(OllamaProvider, "list_models", list_models)
     monkeypatch.setattr(OllamaProvider, "health", health)
+    monkeypatch.delenv("OLLAMA_API_KEY", raising=False)
     common = [
+        "--secret-file",
+        str(tmp_path / "secrets.env"),
         "--config",
         str(config),
         "--service-socket",

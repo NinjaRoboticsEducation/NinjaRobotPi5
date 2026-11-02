@@ -278,3 +278,35 @@ def test_discover_i2s_output_node_and_speaker_enable_gpio(monkeypatch):
         assert gpio_calls[-1] == (12, False)
 
     asyncio.run(exercise())
+
+
+def test_embedded_audio_uses_alsa_when_installed_pipewire_has_no_sink(monkeypatch):
+    from ninjarobot_pi5_ide import audio_output
+
+    async def exercise():
+        commands = []
+
+        async def runner(args, **kwargs):
+            commands.append(args)
+            return b"[]" if args[0] == "pw-dump" else b""
+
+        @asynccontextmanager
+        async def scene():
+            yield
+
+        monkeypatch.setattr(audio_output.shutil, "which", lambda name: name)
+        monkeypatch.setattr(audio_output, "_detect_alsa_i2s_device", lambda: "plughw:2,0")
+        output = AudioOutput(
+            SpeechOutputConfig(output_node="alsa_output.platform-soc_sound.stereo-fallback"),
+            voice=AsyncMock(),
+            microphone=Microphone(),
+            permitted=lambda: True,
+            scene=scene,
+            runner=runner,
+        )
+        assert (await output.health())["ready"]
+        assert (await output.play(audio()))["played"]
+        assert any(args[:4] == ["aplay", "-q", "-D", "plughw:2,0"] for args in commands)
+        assert not any(args[0] == "pw-play" for args in commands)
+
+    asyncio.run(exercise())

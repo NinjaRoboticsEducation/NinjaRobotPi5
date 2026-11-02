@@ -465,3 +465,58 @@ def test_model_switch_preserves_session_history_and_long_term_memory_context(tmp
         await runtime.close()
 
     asyncio.run(exercise())
+
+
+def test_ollama_route_persistence_is_independent_of_model_name(tmp_path):
+    from pathlib import Path
+
+    from ninjarobot_pi5_agent.model_selection import persist_model_selection
+
+    from ninjarobot_pi5_ide import load_robot_config
+
+    original = Path(__file__).resolve().parents[2] / "config/ninjarobot_pi5.toml.example"
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(original.read_text())
+    for route, endpoint in [("cloud", "https://ollama.com"), ("local", "http://127.0.0.1:11434")]:
+        persist_model_selection(config_path, "ollama", "same-name", route=route)
+        config = load_robot_config(config_path)
+        assert config.providers["ollama"].base_url == endpoint
+        assert config.providers["ollama"].model == "same-name"
+
+
+def test_runtime_selection_keeps_duplicate_name_routes_through_factory_and_save(tmp_path):
+    async def exercise():
+        routes_created = []
+        routes_saved = []
+
+        async def catalog():
+            return tuple(
+                ModelCatalogEntry(provider="ollama", name="same", route=route)
+                for route in ("local", "cloud")
+            )
+
+        def factory(model, *, route=None):
+            routes_created.append(route)
+            return _Provider(model)
+
+        manager = ModelManager(
+            active_provider_id="ollama",
+            active_model="initial",
+            active_provider=_Provider("initial"),
+            registrations=(
+                ProviderRegistration(provider_id="ollama", factory=factory, catalog=catalog),
+            ),
+            benchmarks=BenchmarkRegistry(tmp_path / "benchmarks"),
+            selection_writer=lambda provider, model, route=None: routes_saved.append(route),
+        )
+        with pytest.raises(ModelSelectionError, match="ambiguous"):
+            await manager.select("ollama", "same")
+        assert not routes_created and not routes_saved
+        for route in ("cloud", "local"):
+            selected = await manager.select("ollama", "same", route=route)
+            assert selected.route == route
+            assert manager.selection()["route"] == route
+        assert routes_created == routes_saved == ["cloud", "local"]
+        await manager.close()
+
+    asyncio.run(exercise())

@@ -6,6 +6,7 @@ import threading
 import time
 from collections.abc import Callable
 from importlib import import_module
+from pathlib import Path
 from typing import Any
 
 from ..backend_errors import BackendConfigurationError, BackendUnavailableError
@@ -134,11 +135,21 @@ class SunFounderRobotHatBackend:
     def _period_register_base(self) -> int:
         return 0x50 if self.address == SUNFOUNDER_FUSION_ADDRESS else 0x44
 
+    @property
+    def _register_stride(self) -> int:
+        return 2 if self.address == SUNFOUNDER_FUSION_ADDRESS else 1
+
+    def _pwm_register(self, channel: int) -> int:
+        return self._pwm_register_base + channel * self._register_stride
+
     def _write_timer_registers(self, prescaler: int) -> None:
         with self._io_lock:
             for timer_idx in range(3):  # Timers 0, 1, 2 -> Channels P0..P11
-                self._write_u16_be(0x40 + timer_idx, prescaler)
-                self._write_u16_be(self._period_register_base + timer_idx, SUNFOUNDER_PWM_PERIOD)
+                self._write_u16_be(0x40 + timer_idx * self._register_stride, prescaler)
+                self._write_u16_be(
+                    self._period_register_base + timer_idx * self._register_stride,
+                    SUNFOUNDER_PWM_PERIOD,
+                )
 
     def _initialize_timers(self) -> None:
         """Configure Timers 0, 1, and 2 (covering P0..P11) for 50Hz PWM."""
@@ -166,7 +177,11 @@ class SunFounderRobotHatBackend:
                     return
                 except BackendUnavailableError:
                     self.address = orig_address
-                if reset_sunfounder_mcu():
+                if (
+                    orig_address == SUNFOUNDER_DEFAULT_ADDRESS
+                    and not Path("/sys/class/fusion_hat").exists()
+                    and reset_sunfounder_mcu()
+                ):
                     for candidate in (orig_address, alt_address):
                         try:
                             self.address = candidate
@@ -216,7 +231,7 @@ class SunFounderRobotHatBackend:
         self.claim(identifier)
         ticks = int(round((float(pulse_width_us) / self.period_us) * float(SUNFOUNDER_PWM_PERIOD)))
         ticks = max(0, min(SUNFOUNDER_PWM_PERIOD, ticks))
-        self._write_u16_be(self._pwm_register_base + channel, ticks)
+        self._write_u16_be(self._pwm_register(channel), ticks)
         self._pulses[channel] = int(round(pulse_width_us))
 
     def get_pulse_us(self, identifier: int | str | ServoEndpoint) -> int:
@@ -226,7 +241,7 @@ class SunFounderRobotHatBackend:
     def off(self, identifier: int | str | ServoEndpoint) -> None:
         self.claim(identifier)
         channel = self._resolve_channel(identifier)
-        self._write_u16_be(self._pwm_register_base + channel, 0)
+        self._write_u16_be(self._pwm_register(channel), 0)
         self._pulses[channel] = 0
 
     def release(self, identifier: int | str | ServoEndpoint) -> None:
@@ -280,7 +295,7 @@ class SunFounderRobotHatBackend:
                 pass
         for ch in list(self._pulses):
             try:
-                self._write_u16_be(self._pwm_register_base + ch, 0)
+                self._write_u16_be(self._pwm_register(ch), 0)
             except Exception:
                 pass
         self._pulses.clear()

@@ -221,10 +221,13 @@ async def run_service(arguments: argparse.Namespace) -> None:
                 Path("~/.local/share/ninjarobot_pi5/benchmarks"),
             )
         ),
-        selection_writer=lambda selected_provider, selected_model: persist_model_selection(
-            arguments.config,
-            selected_provider,
-            selected_model,
+        selection_writer=lambda selected_provider, selected_model, route=None: (
+            persist_model_selection(
+                arguments.config,
+                selected_provider,
+                selected_model,
+                route=route,
+            )
         ),
         fallback_provider_ids=config.agent.fallback_providers,
     )

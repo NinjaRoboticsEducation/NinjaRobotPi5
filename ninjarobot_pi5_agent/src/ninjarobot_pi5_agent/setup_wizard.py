@@ -693,7 +693,8 @@ async def _provider_setup(
     assert api_key_env is not None
     if provider_id == "ollama":
         ui.write(
-            "Create an Ollama API key at https://ollama.com/settings/keys "
+            "Local Ollama needs no API key. Optionally create a cloud key at "
+            "https://ollama.com/settings/keys "
             "to link to Ollama's service and retrieve available cloud AI models."
         )
     else:
@@ -701,7 +702,11 @@ async def _provider_setup(
     keep_existing = secret_store.contains(api_key_env) and _yes(
         ui.ask("A private key is already configured. Keep and validate it? [Y/n]: ") or "y"
     )
-    if not keep_existing:
+    local_only = provider_id == "ollama" and _yes(
+        ui.ask("Continue without changing cloud credentials (local models need no key)? [Y/n]: ")
+        or "y"
+    )
+    if not keep_existing and not local_only:
         value = ui.secret(f"Enter {api_key_env}: ")
         confirmation = ui.secret(f"Enter {api_key_env} again: ")
         if not value or value != confirmation:
@@ -715,7 +720,7 @@ async def _provider_setup(
         ui.write("No selectable models were returned. Install or enable a model, then retry.")
         raise RuntimeError("no models available")
     for number, entry in enumerate(catalog, 1):
-        ui.write(f"  {number}) {entry.name}")
+        ui.write(f"  {number}) {entry.name} [{entry.route or provider_id}]")
     selected_raw = _choice(
         ui, "Choose a model [1]: ", {str(n) for n in range(1, len(catalog) + 1)}, "1"
     )
@@ -723,7 +728,9 @@ async def _provider_setup(
         selected = catalog[int(selected_raw) - 1]
     except (ValueError, IndexError) as exc:
         raise ValueError("choose one of the listed models") from exc
-    adapter = registry.create(provider_id, selected.name)
+    adapter = registry.create(
+        provider_id, selected.name, **({"route": selected.route} if selected.route else {})
+    )
     try:
         health = await adapter.health()
     finally:
@@ -734,7 +741,9 @@ async def _provider_setup(
         ui.write("Provider validation failed. The previous model selection was preserved.")
         raise RuntimeError("provider validation failed")
     secret_store.commit_configuration(
-        lambda: persist_model_selection(config_path, provider_id, selected.name)
+        lambda: persist_model_selection(
+            config_path, provider_id, selected.name, route=selected.route
+        )
     )
     progress.selections.update(provider=provider_id, model=selected.name)
     _record(progress, "provider", "complete", "software_verified", "health_ready")

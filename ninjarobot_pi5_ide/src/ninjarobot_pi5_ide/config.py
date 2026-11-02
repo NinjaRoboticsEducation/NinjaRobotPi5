@@ -203,10 +203,6 @@ class BehaviorConfig(ConfigModel):
         """Require two distinct logical motor roles mapped to supported endpoints."""
         if self.left_motor_role == self.right_motor_role:
             raise ValueError("left and right motor role names must be distinct")
-        required = {self.left_motor_role, self.right_motor_role}
-        missing = sorted(required - set(self.servo_roles))
-        if missing:
-            raise ValueError(f"servo_roles is missing required roles: {', '.join(missing)}")
         endpoints = tuple(self.servo_roles.values())
         if len(endpoints) != len(set(endpoints)):
             raise ValueError("servo_roles must map to distinct servo endpoints")
@@ -562,6 +558,24 @@ class RobotConfig(ConfigModel):
                     f"GPIO{self.speech_output.speaker_enable_gpio} conflict: "
                     "speech_output.speaker_enable_gpio overlaps servo endpoint"
                 )
+        speaker = self.speech_output.speaker_enable_gpio
+        reserved = {2, 3}
+        if self.hardware.display.enabled:
+            reserved.update(
+                {
+                    8,
+                    9,
+                    10,
+                    11,
+                    self.hardware.display.dc_gpio,
+                    self.hardware.display.reset_gpio,
+                    self.hardware.display.backlight_gpio,
+                }
+            )
+        if self.hardware.buzzer.enabled:
+            reserved.add(self.hardware.buzzer.gpio)
+        if speaker is not None and speaker in reserved:
+            raise ValueError(f"GPIO{speaker} conflict: speaker overlaps configured peripheral")
         return self
 
 

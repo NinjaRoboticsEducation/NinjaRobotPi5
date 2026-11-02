@@ -904,6 +904,7 @@ class WebServerManager:
             ssl_keyfile=str(key),
             access_log=False,
             log_level="warning",
+            proxy_headers=False,
         )
         server = _EmbeddedUvicornServer(config)
         task = asyncio.create_task(server.serve(), name="ninjarobot-web-server")

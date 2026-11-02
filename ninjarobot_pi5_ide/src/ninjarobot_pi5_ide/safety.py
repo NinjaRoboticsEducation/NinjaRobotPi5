@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import os
 import subprocess
 import tempfile
@@ -67,6 +68,10 @@ def stop_guidance(reason: str | None, *, fault_detail: str | None = None) -> Sto
     causes = {
         "operator_stop": "The Emergency Stop was requested by an operator.",
         "undervoltage": "The Raspberry Pi reported undervoltage while the robot was moving.",
+        "battery_undervoltage": (
+            "The expansion HAT battery voltage dropped below the safe cutoff. "
+            "Recharge the battery before resuming."
+        ),
         "software_watchdog": "The motion-control watchdog stopped receiving timely updates.",
         "driver_interrupted": "The servo driver reported that movement was interrupted.",
         "driver_failure": "A robot hardware driver failed during behavior execution.",
@@ -152,7 +157,7 @@ class SafetyStateStore:
                     updated_at=_utc_now(),
                 )
 
-    def latch_motion(self, reason: str) -> SafetySnapshot:
+    def latch_motion(self, reason: str, *, fault_detail: str | None = None) -> SafetySnapshot:
         """Persist a Level 1 motion latch."""
         current = self.read()
         if current.system_latched:
@@ -161,6 +166,7 @@ class SafetyStateStore:
             motion_latched=True,
             system_latched=current.system_latched,
             reason=reason,
+            fault_detail=fault_detail[:1000] if fault_detail is not None else None,
             updated_at=_utc_now(),
         )
         self._write(snapshot)
@@ -535,14 +541,16 @@ class MotionController:
             result.update(cause=guidance.cause, recovery_instruction=guidance.recovery_instruction)
         return result
 
-    async def stop_motion(self, reason: str, *, latch: bool) -> dict[str, Any]:
+    async def stop_motion(
+        self, reason: str, *, latch: bool, fault_detail: str | None = None
+    ) -> dict[str, Any]:
         """Stop both motors and optionally persist a Level 1 restart gate."""
         self._stop_generation += 1
         if reason == "front_obstacle":
             self._obstacle_blocked = True
-        guidance = stop_guidance(reason)
+        guidance = stop_guidance(reason, fault_detail=fault_detail)
         if latch:
-            self._state.latch_motion(reason)
+            self._state.latch_motion(reason, fault_detail=fault_detail)
             LOGGER.error(
                 "Persistent motion stop activated: reason=%s cause=%s recovery=%s",
                 reason,
@@ -620,9 +628,22 @@ class MotionController:
                     except Exception:
                         await self._warn("battery voltage status unavailable; movement continues")
                     else:
-                        if isinstance(voltage, (int, float)):
+                        if isinstance(voltage, (int, float)) and not isinstance(voltage, bool):
+                            if not math.isfinite(voltage) or voltage <= 0.5 or voltage > 15.0:
+                                await self._warn(
+                                    "battery voltage telemetry invalid; movement continues"
+                                )
+                                await asyncio.sleep(0.5)
+                                continue
                             if voltage < self._power_config.cutoff_voltage:
-                                await self.stop_motion("undervoltage", latch=True)
+                                await self.stop_motion(
+                                    "battery_undervoltage",
+                                    latch=True,
+                                    fault_detail=(
+                                        f"measured={voltage:.2f}V "
+                                        f"cutoff={self._power_config.cutoff_voltage:.2f}V"
+                                    ),
+                                )
                                 return
                             if voltage < self._power_config.warning_voltage:
                                 warn_v = self._power_config.warning_voltage
@@ -737,37 +758,41 @@ class SystemSafetyController:
                 guidance.cause,
                 guidance.recovery_instruction,
             )
-            results = await asyncio.gather(
-                self._motion.stop_motion(reason, latch=False),
-                self._silence_buzzer(),
-                *(sensor.suspend() for sensor in self._sensors),
-                return_exceptions=True,
-            )
-            cleanup_errors = [
-                f"{type(result).__name__}: {result}"
-                for result in results
-                if isinstance(result, BaseException)
-            ]
             try:
-                display_result = await self._show_stopped()
-                if isinstance(display_result, Mapping):
-                    warning = display_result.get("emergency_icon_error")
-                    if warning:
-                        cleanup_errors.append(f"display: {warning}")
-            except Exception as exc:
-                cleanup_errors.append(f"display: {type(exc).__name__}: {exc}")
-            if self._display_hold_seconds > 0:
-                await asyncio.sleep(self._display_hold_seconds)
-            return {
-                "level": 2,
-                "reason": reason,
-                "latched": latch,
-                "cause": guidance.cause,
-                "recovery_instruction": guidance.recovery_instruction,
-                "user_message": f"{guidance.cause} Recovery: {guidance.recovery_instruction}",
-                "persistent_state": asdict(snapshot),
-                "cleanup_errors": cleanup_errors,
-            }
+                results = await asyncio.gather(
+                    self._motion.stop_motion(reason, latch=False),
+                    self._silence_buzzer(),
+                    *(sensor.suspend() for sensor in self._sensors),
+                    return_exceptions=True,
+                )
+                cleanup_errors = [
+                    f"{type(result).__name__}: {result}"
+                    for result in results
+                    if isinstance(result, BaseException)
+                ]
+                try:
+                    display_result = await self._show_stopped()
+                    if isinstance(display_result, Mapping):
+                        warning = display_result.get("emergency_icon_error")
+                        if warning:
+                            cleanup_errors.append(f"display: {warning}")
+                except Exception as exc:
+                    cleanup_errors.append(f"display: {type(exc).__name__}: {exc}")
+                if self._display_hold_seconds > 0:
+                    await asyncio.sleep(self._display_hold_seconds)
+                return {
+                    "level": 2,
+                    "reason": reason,
+                    "latched": latch,
+                    "cause": guidance.cause,
+                    "recovery_instruction": guidance.recovery_instruction,
+                    "user_message": f"{guidance.cause} Recovery: {guidance.recovery_instruction}",
+                    "persistent_state": asdict(snapshot),
+                    "cleanup_errors": cleanup_errors,
+                }
+            finally:
+                if not latch and not self._state.read().system_latched:
+                    self._locally_stopped = False
 
     async def resume_system(
         self,

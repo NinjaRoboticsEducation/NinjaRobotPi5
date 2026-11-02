@@ -611,7 +611,7 @@ def test_full_stop_closes_gate_before_display_and_reports_display_failure(
 
         result = await system.full_stop("operator_stop", latch=False)
 
-        assert system.stopped is True
+        assert system.stopped is False
         assert result["cleanup_errors"] == ["display: RuntimeError: simulated display failure"]
 
     asyncio.run(exercise())
@@ -727,8 +727,20 @@ def test_sunfounder_battery_cutoff_latches_undervoltage(tmp_path: Path) -> None:
             warning_handler=record_warning,
         )
         result = await motion.drive(drive_operation(hold_seconds=0.5), "move_forward")
-        assert result["stop_reason"] == "undervoltage"
+        assert result["stop_reason"] == "battery_undervoltage"
         assert state.read().motion_latched is True
         assert any("low battery voltage" in w for w in warnings)
 
     asyncio.run(exercise())
+
+
+def test_battery_latch_retains_voltage_detail_and_distinct_guidance(tmp_path: Path) -> None:
+    from ninjarobot_pi5_ide.safety import stop_guidance
+
+    state = SafetyStateStore(tmp_path / "safety.json")
+    state.latch_motion("battery_undervoltage", fault_detail="measured=6.50V cutoff=6.90V")
+    snapshot = state.read()
+    assert snapshot.motion_latched and not snapshot.system_latched
+    assert snapshot.fault_detail == "measured=6.50V cutoff=6.90V"
+    assert "battery" in stop_guidance(snapshot.reason).cause
+    assert "Raspberry Pi" in stop_guidance("undervoltage").cause

@@ -1,5 +1,15 @@
 # NinjaRobotPi5 local knowledge base
 
+
+Runtime remediation successor manuals (2 November, pending owner manual validation
+and wiki ingestion/review):
+
+- [InstallationGuide successor](raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md)
+- [DevelopmentGuide successor](raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md)
+- [DevelopmentLog successor](raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md)
+
+The registered document map remains at its previous reviewed checkpoint.
+
 Start here for project documentation, architecture, development history, and
 AI-assisted development. Open this folder in your coding tool for wiki questions,
 or open the parent project for development and implementation verification.

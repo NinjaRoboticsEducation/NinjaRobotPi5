@@ -339,7 +339,10 @@ def apply_hardware_profile_preset(profile: str) -> Path:
                 data = loaded
         except (OSError, ValueError):
             data = {}
-    data["__backend__"] = dict(HARDWARE_PROFILE_BACKENDS[profile])
+    backend = dict(HARDWARE_PROFILE_BACKENDS[profile])
+    if profile == "sunfounder_robot_hat" and Path("/sys/class/fusion_hat").exists():
+        backend["kwargs"] = {"bus_id": 1, "address": 0x17, "frequency_hz": 50}
+    data["__backend__"] = backend
     servo_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return servo_path
 
@@ -420,7 +423,6 @@ async def configure_sunfounder_i2s_speaker(
 
     if play_test_tone:
         await asyncio.to_thread(_ensure_sunfounder_i2s_overlay)
-    _set_speaker_amplifier(12, True)
     node = await discover_i2s_output_node() or "alsa_output.platform-soc_sound.stereo-fallback"
     resolved_path = config_path.expanduser()
     current = load_effective_config(resolved_path if resolved_path.exists() else None)
@@ -428,22 +430,19 @@ async def configure_sunfounder_i2s_speaker(
     servos_endpoints = tuple(payload["hardware"]["servos"].get("endpoints") or ())
     if "gpio12" in servos_endpoints or "12" in servos_endpoints:
         hat_eps = [ep for ep in servos_endpoints if str(ep).startswith("hat_pwm")]
-        if len(hat_eps) >= 2:
-            payload["hardware"]["servos"]["endpoints"] = tuple(hat_eps)
-            left_ep, right_ep = hat_eps[0], hat_eps[1]
-        else:
-            payload["hardware"]["servos"]["endpoints"] = ("hat_pwm0", "hat_pwm1")
-            left_ep, right_ep = "hat_pwm0", "hat_pwm1"
-        roles = dict(payload["behaviors"].get("servo_roles") or {})
-        roles["left_motor"] = left_ep
-        roles["right_motor"] = right_ep
-        payload["behaviors"]["servo_roles"] = roles
+        if not hat_eps:
+            raise ValueError("Import calibrated HAT endpoints before enabling embedded audio")
+        payload["hardware"]["servos"]["endpoints"] = tuple(hat_eps)
+        payload["behaviors"]["servo_roles"] = {
+            role: ep for role, ep in payload["behaviors"]["servo_roles"].items() if ep in hat_eps
+        }
     payload["speech_output"]["enabled"] = True
     payload["speech_output"]["output_node"] = node
     payload["speech_output"]["speaker_enable_gpio"] = 12
     from .config import RobotConfig
 
     updated = RobotConfig.model_validate(payload)
+    _set_speaker_amplifier(12, True)
     save_robot_config(updated, resolved_path, overwrite=resolved_path.exists())
     if play_test_tone:
         await play_sunfounder_speaker_test_tone(node)

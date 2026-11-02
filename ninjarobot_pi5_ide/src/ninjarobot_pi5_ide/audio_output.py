@@ -35,36 +35,21 @@ _I2S_SINK_PATTERNS = (
 
 
 def _set_speaker_amplifier(gpio_pin: int | None, enabled: bool) -> None:
-    """Drive the SunFounder Robot HAT speaker amplifier switch (GPIO 12 + Fusion 0x17 reg 0x31)."""
+    """Control the speaker through Fusion sysfs or the legacy amplifier GPIO."""
     if gpio_pin is None:
         return
+    sysfs_speaker = Path("/sys/class/fusion_hat/fusion_hat/speaker")
+    if sysfs_speaker.exists():
+        sysfs_speaker.write_text("1\n" if enabled else "0\n", encoding="utf-8")
+        return
     if shutil.which("pinctrl"):
-        try:
-            subprocess.run(
-                ["pinctrl", "set", str(gpio_pin), "op", "dh" if enabled else "dl"],
-                check=False,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=2,
-            )
-        except Exception:
-            pass
-    try:
-        sysfs_speaker = Path("/sys/class/fusion_hat/fusion_hat/speaker")
-        if sysfs_speaker.exists():
-            sysfs_speaker.write_text("1\n" if enabled else "0\n", encoding="utf-8")
-    except Exception:
-        pass
-    try:
-        import importlib
-
-        if Path("/dev/i2c-1").exists():
-            smbus2 = importlib.import_module("smbus2")
-            with smbus2.SMBus(1) as bus:
-                bus.read_i2c_block_data(0x17, 0x18, 2)
-                bus.write_byte_data(0x17, 0x31, 1 if enabled else 0)
-    except Exception:
-        pass
+        subprocess.run(
+            ["pinctrl", "set", str(gpio_pin), "op", "dh" if enabled else "dl"],
+            check=True,
+            capture_output=True,
+            timeout=2,
+        )
+        return
     try:
         import importlib
 
@@ -276,18 +261,10 @@ class AudioOutput:
             return {"ready": True, "simulated": True, "selected_output": "simulation"}
         if not self.config.output_node:
             return {"ready": False, "reason": "select_output_node"}
+        self._alsa_device: str | None = None
         if not shutil.which("pw-play") or not shutil.which("pw-dump"):
-            if not self.config.output_node.startswith("bluez_output.") and any(
-                pattern in self.config.output_node.lower() for pattern in _I2S_SINK_PATTERNS
-            ):
-                alsa_dev = await asyncio.to_thread(_detect_alsa_i2s_device)
-                if alsa_dev:
-                    self._target_node = self.config.output_node
-                    return {
-                        "ready": True,
-                        "reason": "available",
-                        "selected_output": self.config.output_node,
-                    }
+            if await self._alsa_i2s_fallback_ready():
+                return {"ready": True, "reason": "available", "selected_output": self._target_node}
             return {"ready": False, "reason": "pipewire_tools_missing"}
         try:
             available = await self.outputs()
@@ -302,13 +279,34 @@ class AudioOutput:
                 selected = matches[0] if len(matches) == 1 else ""
             ready = bool(selected) and any(row["name"] == selected for row in available)
             self._target_node = selected
+            if not ready and await self._alsa_i2s_fallback_ready():
+                ready = True
+                selected = self._target_node
             return {
                 "ready": ready,
                 "reason": "available" if ready else "selected_output_unavailable",
                 "selected_output": selected,
             }
         except Exception:
+            if await self._alsa_i2s_fallback_ready():
+                return {"ready": True, "reason": "available", "selected_output": self._target_node}
             return {"ready": False, "reason": "audio_session_unavailable"}
+
+    async def _alsa_i2s_fallback_ready(self) -> bool:
+        """Use only the configured embedded output, never a default Bluetooth fallback."""
+        node = self.config.output_node
+        if node.startswith("bluez_output.") or not any(
+            pattern in node.lower() for pattern in _I2S_SINK_PATTERNS
+        ):
+            return False
+        if not shutil.which("aplay"):
+            return False
+        device = await asyncio.to_thread(_detect_alsa_i2s_device)
+        if not device:
+            return False
+        self._alsa_device = device
+        self._target_node = node
+        return True
 
     @asynccontextmanager
     async def _intake_paused(self) -> AsyncIterator[None]:
@@ -356,7 +354,7 @@ class AudioOutput:
                     _set_speaker_amplifier, self.config.speaker_enable_gpio, True
                 )
             target = self._target_node
-            if shutil.which("pw-play"):
+            if shutil.which("pw-play") and not self._alsa_device:
                 arguments = [
                     "pw-play",
                     "--target=" + target,
@@ -372,7 +370,11 @@ class AudioOutput:
                     "-",
                 ]
             else:
-                alsa_dev = await asyncio.to_thread(_detect_alsa_i2s_device) or "default"
+                alsa_dev = (
+                    self._alsa_device
+                    or await asyncio.to_thread(_detect_alsa_i2s_device)
+                    or "default"
+                )
                 arguments = ["aplay", "-q", "-D", alsa_dev, "-"]
             playback = asyncio.create_task(
                 self._runner(

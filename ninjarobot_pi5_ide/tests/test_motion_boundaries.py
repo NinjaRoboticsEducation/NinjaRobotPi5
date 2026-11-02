@@ -49,7 +49,7 @@ def test_raw_and_behavior_motion_reject_stop_before_driver_write(tmp_path, monke
         elif stop == "motion":
             client.robot.safety_state.latch_motion("undervoltage")
         else:
-            await client.robot.stop()
+            await client.robot.system_safety.full_stop("operator_stop", latch=True)
 
         async def forbidden(*args, **kwargs):
             pytest.fail("stopped motion reached a driver")
@@ -243,7 +243,7 @@ def test_system_stop_blocks_low_level_output_and_sensor_actions(tmp_path, capabi
         client = client_for(tmp_path)
         try:
             await client.start()
-            await client.robot.stop()
+            await client.robot.system_safety.full_stop("operator_stop", latch=True)
             result = await client.execute(action("stopped", capability, arguments))
             assert result.status is ActionStatus.FAILED
             assert result.error.code == "SYSTEM_STOPPED"

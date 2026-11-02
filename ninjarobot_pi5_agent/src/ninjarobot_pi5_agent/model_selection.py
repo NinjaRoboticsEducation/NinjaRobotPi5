@@ -22,12 +22,12 @@ from .models import (
     ProviderHealth,
     ProviderHealthStatus,
 )
-from .ollama import OllamaUnavailableError
+from .ollama import OllamaProvider, OllamaUnavailableError
 from .providers import LLMProvider
 
-ProviderFactory = Callable[[str], LLMProvider]
+ProviderFactory = Callable[..., LLMProvider]
 CatalogLoader = Callable[[], Awaitable[tuple["ModelCatalogEntry", ...]]]
-SelectionWriter = Callable[[str, str], None]
+SelectionWriter = Callable[..., None]
 
 
 def _safe_provider_failure(error: CloudProviderError | OllamaUnavailableError) -> str:
@@ -46,6 +46,7 @@ class ModelCatalogEntry(BaseModel):
 
     provider: Annotated[str, StringConstraints(min_length=1, max_length=64)]
     name: Annotated[str, StringConstraints(min_length=1, max_length=100)]
+    route: str | None = None
     size_bytes: Annotated[int, Field(ge=0)] | None = None
     parameter_size: str | None = None
     quantization: str | None = None
@@ -111,6 +112,11 @@ class ModelManager:
         self._provider_id = active_provider_id
         self._model = active_model
         self._provider = active_provider
+        self._route = (
+            ("cloud" if active_provider._is_cloud_url() else "local")
+            if isinstance(active_provider, OllamaProvider)
+            else None
+        )
         self._registrations = registrations_by_id
         self._benchmarks = benchmarks
         self._selection_writer = selection_writer
@@ -137,7 +143,7 @@ class ModelManager:
 
     @property
     def accepted(self) -> bool:
-        return self._benchmarks.accepted(self._model)
+        return self._route != "cloud" and self._benchmarks.accepted(self._model)
 
     async def generate(self, request: ModelRequest) -> ModelTurn:
         self._ensure_open()
@@ -221,32 +227,51 @@ class ModelManager:
                     entry.model_copy(
                         update={
                             "current": (
-                                identifier == self._provider_id and entry.name == self._model
+                                identifier == self._provider_id
+                                and entry.name == self._model
+                                and (entry.route is None or entry.route == self._route)
                             ),
-                            "accepted": self._benchmarks.accepted(entry.name),
+                            "accepted": entry.route != "cloud"
+                            and self._benchmarks.accepted(entry.name),
                         }
                     )
                 )
         return tuple(entries)
 
-    async def select(self, provider_id: str, model: str) -> ModelCatalogEntry:
+    async def select(
+        self, provider_id: str, model: str, *, route: str | None = None
+    ) -> ModelCatalogEntry:
         """Health-check, persist, and atomically replace the active provider."""
         self._ensure_open()
-        if provider_id == self._provider_id and model == self._model:
+        if route is None and provider_id == self._provider_id and model == self._model:
             return self._selection_entry()
         entries = await self.catalog(provider_id)
-        selected = next((entry for entry in entries if entry.name == model), None)
+        matches = [
+            entry
+            for entry in entries
+            if entry.name == model and (route is None or entry.route == route)
+        ]
+        if len(matches) > 1:
+            raise ModelSelectionError("Model name is ambiguous; select local or cloud route")
+        selected = matches[0] if matches else None
         if selected is None:
             raise ModelSelectionError(
                 f"model '{model}' is not installed for provider '{provider_id}'"
             )
         registration = self._registrations[provider_id]
-        candidate = registration.factory(model)
+        candidate = (
+            registration.factory(model, route=selected.route)
+            if selected.route
+            else registration.factory(model)
+        )
         try:
             health = await candidate.health()
             if health.status is not ProviderHealthStatus.READY:
                 raise ModelSelectionError(health.detail or "selected model is not ready")
-            self._selection_writer(provider_id, model)
+            if selected.route:
+                self._selection_writer(provider_id, model, route=selected.route)
+            else:
+                self._selection_writer(provider_id, model)
         except BaseException:
             await candidate.close()
             raise
@@ -254,6 +279,7 @@ class ModelManager:
         self._provider = candidate
         self._provider_id = provider_id
         self._model = model
+        self._route = selected.route
         await previous.close()
         return selected.model_copy(update={"current": True})
 
@@ -262,6 +288,7 @@ class ModelManager:
         return {
             "provider": self._provider_id,
             "model": self._model,
+            **({"route": self._route} if self._route else {}),
             "accepted": self.accepted,
         }
 
@@ -275,6 +302,7 @@ class ModelManager:
         return ModelCatalogEntry(
             provider=self._provider_id,
             name=self._model,
+            route=self._route,
             current=True,
             accepted=self.accepted,
         )
@@ -288,6 +316,8 @@ def persist_model_selection(
     config_path: str | Path,
     provider_id: str,
     model: str,
+    *,
+    route: str | None = None,
 ) -> None:
     """Atomically update only the selected provider and model."""
     config = load_robot_config(config_path)
@@ -298,7 +328,16 @@ def persist_model_selection(
     if not provider.enabled:
         raise ModelSelectionError(f"configured provider is disabled: {provider_id}")
     updated_providers = dict(config.providers)
-    updated_providers[provider_id] = provider.model_copy(update={"model": model})
+    changes: dict[str, object] = {"model": model}
+    if route is not None:
+        if provider.kind != "ollama" or route not in {"local", "cloud"}:
+            raise ModelSelectionError("invalid model route")
+        from .ollama import DEFAULT_OLLAMA_CLOUD_URL, DEFAULT_OLLAMA_LOCAL_URL
+
+        changes["base_url"] = (
+            DEFAULT_OLLAMA_LOCAL_URL if route == "local" else DEFAULT_OLLAMA_CLOUD_URL
+        )
+    updated_providers[provider_id] = provider.model_copy(update=changes)
     updated = config.model_copy(
         update={
             "agent": config.agent.model_copy(update={"default_provider": provider_id}),

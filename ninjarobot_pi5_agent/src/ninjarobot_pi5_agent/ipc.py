@@ -283,6 +283,7 @@ class AgentIPCServer:
             selected = await self._runtime.select_model(
                 _required_text(payload, "provider"),
                 _required_text(payload, "model"),
+                **({"route": _required_text(payload, "route")} if payload.get("route") else {}),
             )
             await _write_message(
                 writer,

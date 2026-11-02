@@ -177,20 +177,30 @@ class SpeechService:
         if not visible:
             return {"status": "empty", "played": False}
 
+        stage = "playback_health"
+
         async def work() -> dict[str, Any]:
+            nonlocal stage
             acquired = False
             # Bind output generation before queueing, so safety/foreground interruption
             # also invalidates work waiting behind another utterance.
             health = await self.ide.speech_health()
             if not health.get("ready"):
-                return {"status": "output_unavailable", "played": False}
+                return {
+                    "status": "output_unavailable",
+                    "played": False,
+                    "stage": "playback_health",
+                    "reason": health.get("reason", "output_unavailable"),
+                }
             try:
                 async with asyncio.timeout(5):
                     await self._lock.acquire()
                     acquired = True
                 if self._closed or not self.enabled:
                     return {"status": "disabled", "played": False}
+                stage = "synthesis"
                 audio = await self.synthesizer.synthesize(visible, language or self.language)
+                stage = "playback"
                 result = await self.ide.play_speech(audio, generation=health.get("generation"))
                 return {
                     **result,
@@ -215,6 +225,7 @@ class SpeechService:
                 "status": "failed",
                 "played": False,
                 "reason": "speech_unavailable_or_interrupted; text retained",
+                "stage": stage,
             }
         finally:
             self._jobs.discard(job)

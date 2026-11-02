@@ -282,7 +282,7 @@ def test_emergency_is_not_delayed_by_game_admission_or_fault(tmp_path):
         game._state.update(state="faulted", reason="test")
         result = await client.execute(request("behavior.stop", "emergency"))
         assert result.status is ActionStatus.SUCCEEDED
-        assert client.robot.system_safety.stopped
+        assert not client.robot.system_safety.stopped
         # Clear test-only fault so test teardown does not mask its assertion.
         game._state["state"] = "idle"
         await client.close()

@@ -98,3 +98,42 @@ def test_api_key_persistence_rewrites_legacy_oauth_metadata(
 def test_cloud_credentials_cannot_be_redirected_to_an_unapproved_host(factory) -> None:
     with pytest.raises(ValidationError, match="credentials may be sent only"):
         factory()
+
+
+@pytest.mark.parametrize("failed_route", [None, "local", "cloud"])
+def test_ollama_catalog_keeps_routes_and_survives_partial_failure(
+    tmp_path, monkeypatch, failed_route
+):
+    from ninjarobot_pi5_agent.ollama import OllamaModelInfo, OllamaUnavailableError
+
+    store = SecretStore(tmp_path / "secret.env")
+    store.set("OLLAMA_API_KEY", "test-only")
+    registry = ConfiguredProviderRegistry(EXAMPLE, store)
+
+    async def listing(adapter):
+        route = "cloud" if adapter._is_cloud_url() else "local"
+        headers = await adapter._headers()
+        assert bool(headers) == (route == "cloud")
+        if route == failed_route:
+            raise OllamaUnavailableError("synthetic failure")
+        return (OllamaModelInfo(name="same-name", size_bytes=1),)
+
+    monkeypatch.setattr(OllamaProvider, "list_models", listing)
+    entries = asyncio.run(registry.catalog("ollama"))
+    assert {entry.route for entry in entries} == {"local", "cloud"} - {failed_route}
+
+
+def test_ollama_local_route_never_receives_stored_cloud_credentials(tmp_path):
+    store = SecretStore(tmp_path / "secret.env")
+    store.set("OLLAMA_API_KEY", "test-only")
+    registry = ConfiguredProviderRegistry(EXAMPLE, store)
+
+    async def exercise():
+        adapter = registry.create("ollama", "same-name", route="local")
+        try:
+            assert adapter.config.base_url == "http://127.0.0.1:11434"
+            assert await adapter._headers() == {}
+        finally:
+            await adapter.close()
+
+    asyncio.run(exercise())

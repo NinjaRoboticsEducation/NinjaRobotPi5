@@ -473,12 +473,31 @@ def test_sunfounder_fusion_hat_0x17_fallback_and_register_map() -> None:
     assert (0x17, 0x40, [0x01, 0x5F]) in bus.writes
     assert (0x17, 0x50, [0x0F, 0xFF]) in bus.writes
 
-    # Set pulse on P11 (hat_pwm11) -> register 0x60 + 11 = 0x6B
+    # Set pulse on P11 (hat_pwm11) -> register 0x60 + 11 = 0x76
     backend.set_pulse_us("p11", 1500)
     assert backend.get_pulse_us("hat_pwm11") == 1500
-    assert (0x17, 0x6B, [0x01, 0x33]) in bus.writes
+    assert (0x17, 0x76, [0x01, 0x33]) in bus.writes
 
     assert backend.read_battery_voltage() == pytest.approx(8.23, abs=0.01)
 
     backend.off("pwm11")
-    assert (0x17, 0x6B, [0x00, 0x00]) in bus.writes
+    assert (0x17, 0x76, [0x00, 0x00]) in bus.writes
+
+
+@pytest.mark.parametrize(
+    "address,stride,pwm_base,period_base", [(0x14, 1, 0x20, 0x44), (0x17, 2, 0x60, 0x50)]
+)
+def test_sunfounder_all_channel_register_contract(address, stride, pwm_base, period_base):
+    bus = FakeSMBus()
+    backend = SunFounderRobotHatBackend(bus=bus, address=address)
+    assert [row[1] for row in bus.writes[:6]] == [
+        value
+        for timer in range(3)
+        for value in (0x40 + timer * stride, period_base + timer * stride)
+    ]
+    for channel in range(12):
+        backend.set_pulse_us(f"pwm{channel}", 1500)
+        assert bus.writes[-1][1] == pwm_base + channel * stride
+        backend.off(f"pwm{channel}")
+        assert bus.writes[-1] == (address, pwm_base + channel * stride, [0, 0])
+    backend.close()

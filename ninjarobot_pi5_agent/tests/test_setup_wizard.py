@@ -592,7 +592,7 @@ def test_ollama_provider_setup_prompts_api_key_lists_cloud_models_and_selects_mo
     path = tmp_path / "state" / "progress.json"
     progress = setup_wizard.SetupProgress()
     # Flow: 1) Select 1. Ollama -> 2) Input Ollama API key twice -> 3) Input model number 2
-    ui = _Console(("1", "ollama-secret-key", "ollama-secret-key", "2"))
+    ui = _Console(("1", "n", "ollama-secret-key", "ollama-secret-key", "2"))
     args = _arguments(tmp_path, benchmark_dir=tmp_path / "benchmarks")
 
     with setup_wizard.ProgressStore(path) as store:

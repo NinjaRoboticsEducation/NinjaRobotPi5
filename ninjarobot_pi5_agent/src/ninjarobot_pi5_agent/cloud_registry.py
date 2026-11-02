@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from functools import partial
 from pathlib import Path
 
@@ -39,7 +40,7 @@ class ConfiguredProviderRegistry:
         self._secrets = secrets
         self._ollama_base_url_override = ollama_base_url_override
 
-    def create(self, provider_id: str, model: str) -> LLMProvider:
+    def create(self, provider_id: str, model: str, *, route: str | None = None) -> LLMProvider:
         config = load_robot_config(self._config_path)
         try:
             provider = config.providers[provider_id]
@@ -50,11 +51,15 @@ class ConfiguredProviderRegistry:
         if provider.kind == "ollama":
             api_key_env = provider.api_key_env or DEFAULT_OLLAMA_API_KEY_ENV
             has_api_key = self._secrets.contains(api_key_env)
-            if self._ollama_base_url_override:
+            if route not in {None, "local", "cloud"}:
+                raise ValueError("invalid Ollama route")
+            if route is not None:
+                base_url = (
+                    DEFAULT_OLLAMA_LOCAL_URL if route == "local" else DEFAULT_OLLAMA_CLOUD_URL
+                )
+            elif self._ollama_base_url_override:
                 base_url = self._ollama_base_url_override
-            elif has_api_key and (
-                provider.base_url is None or provider.base_url == DEFAULT_OLLAMA_LOCAL_URL
-            ):
+            elif has_api_key and (provider.base_url is None):
                 base_url = DEFAULT_OLLAMA_CLOUD_URL
             else:
                 base_url = provider.base_url or DEFAULT_OLLAMA_LOCAL_URL
@@ -65,7 +70,7 @@ class ConfiguredProviderRegistry:
                     "Authorization",
                     "Bearer ",
                 )
-                if has_api_key or base_url == DEFAULT_OLLAMA_CLOUD_URL
+                if base_url.rstrip("/") == DEFAULT_OLLAMA_CLOUD_URL
                 else None
             )
             return OllamaProvider(
@@ -124,6 +129,49 @@ class ConfiguredProviderRegistry:
             selected_model = config.providers[provider_id].model
         except KeyError as exc:
             raise ValueError(f"unknown configured provider: {provider_id}") from exc
+        if config.providers[provider_id].kind == "ollama":
+            routes = ["local"]
+            key = config.providers[provider_id].api_key_env or DEFAULT_OLLAMA_API_KEY_ENV
+            if self._secrets.contains(key):
+                routes.append("cloud")
+
+            async def load_route(route: str) -> tuple[ModelCatalogEntry, ...]:
+                adapter = self.create(provider_id, selected_model, route=route)
+                assert isinstance(adapter, OllamaProvider)
+                try:
+                    return tuple(
+                        ModelCatalogEntry(
+                            provider=provider_id,
+                            name=model.name,
+                            route=route,
+                            size_bytes=model.size_bytes,
+                            parameter_size=model.parameter_size,
+                            quantization=model.quantization,
+                            family=model.family,
+                            modified_at=model.modified_at,
+                        )
+                        for model in await adapter.list_models()
+                    )
+                finally:
+                    await adapter.close()
+
+            results = await asyncio.gather(
+                *(load_route(route) for route in routes), return_exceptions=True
+            )
+            entries_list: list[ModelCatalogEntry] = []
+            successes = 0
+            for result in results:
+                if isinstance(result, BaseException):
+                    if isinstance(result, asyncio.CancelledError):
+                        raise result
+                    continue
+                successes += 1
+                entries_list.extend(result)
+            if not successes:
+                from .ollama import OllamaUnavailableError
+
+                raise OllamaUnavailableError("No Ollama catalog endpoint is available")
+            return tuple(entries_list)
         provider = self.create(provider_id, selected_model)
         try:
             if isinstance(provider, OllamaProvider):

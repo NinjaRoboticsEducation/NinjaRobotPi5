@@ -180,23 +180,17 @@ def import_pi5_configs(
 
             if is_sunfounder or is_pca9685:
                 hat_endpoints.sort(key=lambda ep: int(ep.removeprefix("hat_pwm")))
-                if "hat_pwm0" in hat_endpoints and "hat_pwm1" in hat_endpoints:
-                    left_ep, right_ep = "hat_pwm0", "hat_pwm1"
-                elif len(hat_endpoints) >= 2:
-                    left_ep, right_ep = hat_endpoints[0], hat_endpoints[1]
-                elif len(hat_endpoints) == 1:
-                    companion = "hat_pwm0" if hat_endpoints[0] != "hat_pwm0" else "hat_pwm1"
-                    hat_endpoints.append(companion)
-                    hat_endpoints.sort(key=lambda ep: int(ep.removeprefix("hat_pwm")))
-                    left_ep, right_ep = hat_endpoints[0], hat_endpoints[1]
-                else:
-                    hat_endpoints = ["hat_pwm0", "hat_pwm1"]
-                    left_ep, right_ep = "hat_pwm0", "hat_pwm1"
-                payload["hardware"]["servos"]["endpoints"] = tuple(hat_endpoints)
-                roles = dict(payload["behaviors"].get("servo_roles") or {})
-                roles["left_motor"] = left_ep
-                roles["right_motor"] = right_ep
-                payload["behaviors"]["servo_roles"] = roles
+                if hat_endpoints:
+                    payload["hardware"]["servos"]["endpoints"] = tuple(hat_endpoints)
+                    old_roles = dict(payload["behaviors"].get("servo_roles") or {})
+                    roles = {role: ep for role, ep in old_roles.items() if ep in hat_endpoints}
+                    if (
+                        not roles
+                        and len(hat_endpoints) >= 2
+                        and old_roles == {"left_motor": "gpio12", "right_motor": "gpio13"}
+                    ):
+                        roles = dict(zip(("left_motor", "right_motor"), hat_endpoints[:2]))
+                    payload["behaviors"]["servo_roles"] = roles
                 if is_sunfounder:
                     fuel_gauge_addr = 0x17 if backend_addr in {0x17, "0x17"} else 0x14
                     payload["speech_output"]["speaker_enable_gpio"] = 12
@@ -205,7 +199,7 @@ def import_pi5_configs(
                         "fuel_gauge_address": fuel_gauge_addr,
                         "warning_voltage": 7.15,
                         "cutoff_voltage": 6.90,
-                        "charging_gpio": 23,
+                        "charging_gpio": None if fuel_gauge_addr == 0x17 else 23,
                     }
                     imported.append(
                         f"pi5servo SunFounder Robot HAT profile "
