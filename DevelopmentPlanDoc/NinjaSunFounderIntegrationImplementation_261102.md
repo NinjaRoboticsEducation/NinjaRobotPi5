@@ -355,5 +355,5 @@ git diff --check
 
 ### 6.3 Canonical `ninjarobot_pi5_wiki` Documentation Sync
 Once all code phases and tests pass:
-1. Create a new dated source folder under `ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/` (`InstallationGuide.md`, `DevelopmentGuide.md`) and `raw/notes/ninjarobotpi5/2026-11-02/` (`DevelopmentLog.md`) without editing older dated folders in place.
-2. Update `ninjarobot_pi5_wiki/project-knowledge.json` and the compiled wiki pages (`wiki/concepts/architecture.md`, `wiki/concepts/installation.md`, `wiki/concepts/features-and-tools.md`) to document the Fusion HAT+ (`0x17`) 2-byte register stride, `proxy_headers=False` loopback boundary, split `pi_undervoltage` / `battery_undervoltage` diagnostics, ALSA fallback in `AudioOutput.health()`, and unified Local + Cloud Ollama routing.
+1. Create a new dated source folder under `ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/` (`InstallationGuide.md`, `DevelopmentGuide.md`) and `raw/notes/ninjarobotpi5/2026-11-02/` (`DevelopmentLog.md`) without editing dated folders in place. Ensuring it reflects and convered all new implemented featues.
+2. Do not run wiki ingestion and review workflow, I will do wiki ingestion and review workflow on my own after maual validated.
