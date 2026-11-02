@@ -1,43 +1,34 @@
 # NinjaRobotPi5 local knowledge base
 
-
-Runtime remediation successor manuals (2 November, pending owner manual validation
-and wiki ingestion/review):
-
-- [InstallationGuide successor](raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md)
-- [DevelopmentGuide successor](raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md)
-- [DevelopmentLog successor](raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md)
-
-The registered document map remains at its previous reviewed checkpoint.
-
 Start here for project documentation, architecture, development history, and
 AI-assisted development. Open this folder in your coding tool for wiki questions,
 or open the parent project for development and implementation verification.
 
-## Current full manuals — Multi-HAT expansion and SunFounder hardware audit
+## Current full manuals — Runtime remediation and Multi-HAT hardware refinement
 
-These 25 October successor manuals are ingested and semantically reviewed in the wiki.
-They add Multi-HAT hardware support (DFRobot DFR0566 IO Expansion HAT, SunFounder Robot HAT
-v4 `0x14` and Fusion HAT / Robot HAT v5 `0x17` with auto-fallback, and General PCA9685 `0x40`
-PWM Expansion HAT), default-branch `install.sh` bootstrap (`HEAD`), flexible digital pins for
-Buzzer (`17, 4, 27, 22`) and ST7789V Display (`DC=27, RST=22, BL=6`), arbitrary calibrated PWM
-channels (`hat_pwm0`..`hat_pwm11` on SunFounder, `0`..`15` on PCA9685), embedded I2S speaker
-(`GPIO12` amp enable and `0x17` register `0x31` with `googlevoicehat`/`hifiberry` sink), and
-onboarding Hardware Expansion Profile Selection menu, while retaining earlier guided onboarding,
-prompt-toolkit terminal chat, external MCP presets, Calendar, project-help, and hardware guidance.
-The registered document map is updated to the 25 October checkpoint.
+These 2 November successor manuals are ingested and semantically reviewed in the wiki.
+They document web startup proxy-header disabling (`proxy_headers=False`), distinct battery
+undervoltage cutoff (`battery_undervoltage`) with persisted fault details and non-finite safeguards,
+sysfs-informed `0x17` SunFounder preset avoiding probing and legacy charging GPIO23, transient full
+stop presentation gate clearance, embedded audio using Fusion kernel speaker control without raw I2C
+`0x31` writes, PipeWire/ALSA audio health alignment, 2-byte register stride for Fusion PWM/timers
+at `0x17`, config import preserving explicit servo roles without companion fabrication, and
+route-persisting local/cloud Ollama selection, alongside Multi-HAT hardware support (DFRobot DFR0566,
+SunFounder Robot HAT v4 `0x14` and Fusion HAT `0x17` with auto-fallback, and PCA9685 `0x40`).
+The registered document map is updated to the 2 November checkpoint.
 Use [the document map](project-knowledge.json) for registered source provenance;
 use the links below for the full manuals:
 
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-10-25/DevelopmentGuide.md)
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md)
 - [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md)
 
-These source revisions document Multi-HAT hardware expansion, dual MCU auto-detection,
-embedded I2S speaker, and default-branch curl installation. They are ingested and
-semantically reviewed; `project-knowledge.json` describes this registered checkpoint.
+These source revisions document runtime remediation, Multi-HAT hardware refinement,
+and dual MCU auto-detection. They are ingested and semantically reviewed;
+`project-knowledge.json` describes this registered checkpoint.
 
+- [Multi-HAT runtime remediation validation](../docs/validation/sunfounder_runtime_remediation_261102.md)
 - [Onboarding refinement and Mac Calendar tests](../docs/validation/onboarding_refinement_walkthrough_260923.md)
 - [Guided onboarding walkthrough](../docs/validation/onboarding_install_chat_walkthrough_260922.md)
 - [Calendar CONFIRM walkthrough](../docs/validation/calendar_confirm_walkthrough_260917.md)
@@ -59,9 +50,14 @@ folders. The root README links directly to these latest full manuals.
 Runtime project help is separate from developer wiki search. It searches bounded
 sections of current registered public manuals and explicitly listed unpublished
 successors, with hashes, citations, and honest review labels. It does not run wiki
-ingestion or expose private files. The owner will ingest after manual validation.
+ingestion or expose private files.
 
 ## Historical full manuals — earlier checkpoints
+
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-10-25/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md)
 
 - [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md)
 - [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md)

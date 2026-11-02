@@ -1,5 +1,5 @@
 version: 2
-generated_at: '2026-10-27T00:12:04Z'
+generated_at: '2026-11-02T13:28:25Z'
 sources:
 - id: src-20260906-developmentguide
   title: DevelopmentGuide.md
@@ -444,5 +444,20 @@ sources:
 - id: src-20261027-ninjarobot-mcp-skill
   title: NinjaRobot_MCP_Skill.md
   path: raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md
+  kind: text
+  state: ingested
+- id: src-20261102-developmentguide
+  title: DevelopmentGuide.md
+  path: raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md
+  kind: text
+  state: ingested
+- id: src-20261102-developmentlog
+  title: DevelopmentLog.md
+  path: raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md
+  kind: text
+  state: ingested
+- id: src-20261102-installationguide
+  title: InstallationGuide.md
+  path: raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md
   kind: text
   state: ingested

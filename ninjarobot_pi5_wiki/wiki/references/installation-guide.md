@@ -9,10 +9,10 @@ generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20261027-installationguide
-  resource: urn:llmwiki:source:src-20261027-installationguide
+- id: src-20261102-installationguide
+  resource: urn:llmwiki:source:src-20261102-installationguide
   title: InstallationGuide.md
-  content_hash: sha256:39799fdf6b229fb7fb64288bf54c1339ac110a3a173af9b6f48c846ec9304065
+  content_hash: sha256:802998dc63e28cf49612c003f69965ab6f0f9b408ea185415292a58a1a428e06
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -20,7 +20,7 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-10-27T00:00:00Z'
+  performed_at: '2026-11-02T00:00:00Z'
   result: passed
   checks:
     source_support: passed
@@ -29,17 +29,17 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered 25 October multi-HAT expansion and SunFounder
-    hardware audit evidence; no human verification is claimed.
+  - Reviewed this page against registered 2 November runtime remediation and Multi-HAT
+    hardware refinement evidence; no human verification is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
     and note pending physical acceptance, live third-party accounts, and monetary
     spending caps.
-  target_hash: sha256:04a71262fed5307f0ee24555222fc25202a2e9743187e2e3b98f537f902f36f1
+  target_hash: sha256:5f22e653056b2a99589d03a9230316a5b8d4398d53194b0ee4f5ef9053e29296
 ---
 
 # Installation guide
 
-The full guide covers beginner setup, hardware initialization and calibration, startup, and troubleshooting. Hardware commands require stated operator precautions.[^src-20261027-installationguide]
+The full guide covers beginner setup, hardware initialization and calibration, startup, and troubleshooting. Hardware commands require stated operator precautions.[^src-20261102-installationguide]
 
 Use the source identifier below to resolve the complete manual through the raw
 source catalog. The outer wiki README also links directly to the current full
@@ -48,22 +48,10 @@ Read the relevant full section before acting on an abbreviated explanation.[^src
 
 [Return to project overview](/overview.md).
 
-## Current checkpoint: Multi-HAT expansion support and SunFounder hardware audit
+## Current checkpoint: Runtime remediation and Multi-HAT hardware refinement
 
-The 25 October 2026 revision (`2026-10-25`) documents support for three Raspberry Pi 5 Expansion HAT profiles
-(DFRobot DFR0566 IO Expansion HAT + Geekworm X1208 UPS, SunFounder Robot HAT v4 `0x14` and Fusion HAT / Robot HAT v5 `0x17` with
-auto-detection and fallback, and General PCA9685 PWM Expansion HAT `0x40`), default-branch cURL bootstrap from GitHub (`INSTALL_REF=HEAD`),
-onboarding Hardware Expansion Profile Selection menu with automatic preset writing to `servo.json` and sync via `config import`,
-SunFounder Embedded Speaker Initialization and verification chime (without Bluetooth prompt), flexible Digital header pin
-assignments for Buzzer (`17, 4, 27, 22`) and ST7789V Display (`DC=27, RST=22, BL=6`), and battery voltage protection (warning at
-`7.15 V`, motion cutoff at `6.90 V`), alongside 23 September 2026 refined onboarding interface with ASCII welcome, bulk settings reuse,
-Mac Calendar OAuth SSH forwarding (`-L 127.0.0.1:8765:127.0.0.1:8765`), waiting updates, callback receipt acknowledgment, read-only
-Calendar MCP validation, candidate credential cleanup, key rollback, root installer branch disambiguation and `--install-dir`,
-22 September guided onboarding, prompt-toolkit multiline chat, 18 September web controller dual views, 17 September Google Calendar
-guided setup and unified `CONFIRM` / `CANCEL` chat authorization, 16 September distance game hand-placement procedure, Phase 4
-information setup, Phase 4 foundations, and headless Lite audio with Bluetooth wizard. Software tests do not substitute for
-physical hardware validation.[^src-20261027-installationguide]
+The 2 November 2026 revision (`2026-11-02`) documents web startup proxy-header disabling (`proxy_headers=False`) to inspect actual loopback peers under ngrok fallback while denying forged LAN requests; distinct `battery_undervoltage` reason keeping measured voltage/cutoff in persisted fault detail; SunFounder sysfs-informed `0x17` preset avoiding probing and legacy charging GPIO23; completed transient full stop clearing local presentation gate; embedded audio using Fusion kernel speaker node when present, removing raw I2C `0x31` write; Fusion PWM/timer registers advancing by two bytes at `0x17`; config import preserving explicit servo roles without companion fabrication; Ollama catalog discovery querying local models without credentials and cloud models when an API key is stored, carrying route through CLI/IPC/runtime/persistence as `base_url`; CLI model selection (`ninjarobot model list/select --route local|cloud`); and audio inspection via `/speech status` and `/speech outputs`, alongside 25 October 2026 Multi-HAT expansion support (DFRobot DFR0566 IO Expansion HAT + Geekworm X1208 UPS, SunFounder Robot HAT v4 `0x14` and Fusion HAT / Robot HAT v5 `0x17` with auto-detection and fallback, and General PCA9685 PWM Expansion HAT `0x40`), default-branch cURL bootstrap from GitHub (`INSTALL_REF=HEAD`), onboarding Hardware Expansion Profile Selection menu, flexible Digital header pin assignments for Buzzer and Display, battery voltage protection, 23 September onboarding refinements, Mac Calendar SSH forwarding, and earlier checkpoints. Software tests do not substitute for physical hardware validation.[^src-20261102-installationguide]
 
 
-[^src-20261027-installationguide]: InstallationGuide.md, source version `multi-hat-expansion-261025`; registered source `src-20261027-installationguide`.
+[^src-20261102-installationguide]: InstallationGuide.md, source version `runtime-remediation-261102`; registered source `src-20261102-installationguide`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

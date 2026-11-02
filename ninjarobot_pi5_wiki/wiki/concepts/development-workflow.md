@@ -29,14 +29,14 @@ sources:
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
   content_hash: sha256:776049c49cbf2bf69cd0d59db1cbdfaaaea88ffa962f05548a604fec80071622
-- id: src-20261027-developmentguide
-  resource: urn:llmwiki:source:src-20261027-developmentguide
+- id: src-20261102-developmentguide
+  resource: urn:llmwiki:source:src-20261102-developmentguide
   title: DevelopmentGuide.md
-  content_hash: sha256:3ab4adc6f8052f7975b17a7ebcdd893df425e47b9f16e2127a2751f71d9e73c7
+  content_hash: sha256:d106f1e107b08da8a11f85ef97a4195e2483dcda7753aaa167f762457ee3eeb4
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-10-27T00:00:00Z'
+  performed_at: '2026-11-02T00:00:00Z'
   result: passed
   checks:
     source_support: passed
@@ -45,12 +45,12 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered 25 October multi-HAT expansion and SunFounder
-    hardware audit evidence; no human verification is claimed.
+  - Reviewed this page against registered 2 November runtime remediation and Multi-HAT
+    hardware refinement evidence; no human verification is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
     and note pending physical acceptance, live third-party accounts, and monetary
     spending caps.
-  target_hash: sha256:12fc0b9c3e70b08cf5a585a99e6028016321380c3dcda1ca75b6a50596d7c060
+  target_hash: sha256:43b62602b8752a2c577de252ea50325c95e1da035820983fc3deb971909d9f10
 ---
 
 # Development and documentation workflow
@@ -58,7 +58,7 @@ semantic_review:
 Before significant development, consult the local wiki and current full
 manuals, inspect relevant code, and identify missing or conflicting evidence.
 The root project policy requires an approved phased plan and preservation of
-robot interfaces and managed-driver rules.[^src-20261027-developmentguide]
+robot interfaces and managed-driver rules.[^src-20261102-developmentguide]
 
 Feature completion includes a wiki impact assessment. Update affected manual
 versions, topic pages, specifications, and architecture guidance, then record
@@ -77,8 +77,8 @@ AI review is distinct from human verification.[^src-20260907-knowledgeintegratio
 
 ## Milestones and source consolidation
 
-The active manuals are versioned under `raw/articles/ninjarobotpi5/2026-10-25/`
-and `raw/notes/ninjarobotpi5/2026-10-25/`. This version consolidates:
+The active manuals are versioned under `raw/articles/ninjarobotpi5/2026-11-02/`
+and `raw/notes/ninjarobotpi5/2026-11-02/`. This version consolidates:
 1. System clock access (`/time` and `system.time.get`, `2026-09-12-02`),
 2. Refinement Phase 5 software foundations and distance game (`2026-09-13`),
 3. Narrowed Phase 4 foundations (M03 memory ranking, M04 read-only recipes, X01 v2 skills, X05 help, `2026-09-13-02`),
@@ -94,13 +94,12 @@ and `raw/notes/ninjarobotpi5/2026-10-25/`. This version consolidates:
 13. Web interface refinement into dedicated Game Pad and Agent Interface surfaces, modular frontend (`app-shared.js`, `app-gamepad.js`, `app-agent.js`), user-created behavior execution with motion safety modals, button toggle states, 4-language i18n parity, and IDE terminal menu consolidation (1–5, Q, `2026-09-18`),
 14. Guided onboarding CLI (`ninjarobot onboard`) orchestrating 5 mandatory hardware components, model providers, and external read-only MCP presets (Tavily, Calendar, Notion), standalone curl bootstrap installer (`install.sh`), and prompt-toolkit interactive chat (`2026-09-22`),
 15. Root installer branch disambiguation, custom installation directory (`--install-dir`), and controlling terminal prompt (`2026-09-23`),
-16. Refined onboarding wizard with ASCII welcome, bulk settings reuse option, Enter-to-continue summaries, Mac Calendar OAuth SSH tunnel (`-L 127.0.0.1:8765:127.0.0.1:8765`), waiting updates, callback acknowledgment, read-only Calendar MCP validation, candidate credential cleanup, key rollback, microphone subprocess import containment, and simulation isolation (`2026-09-23-02`), and
-17. Multi-HAT expansion upgrade and physical SunFounder hardware audit across `install.sh` (`INSTALL_REF=HEAD`), `pi5servo` (dual `0x14`/`0x17` SunFounder MCU backend with automatic fallback, PCA9685 smbus2 controller at `0x40` accepting `hat_pwm0`..`15`, 8 authorized changes recorded in `docs/validation/authorized_driver_changes.json`), `ninjarobot_pi5_ide` (pin collision fix for arbitrary Digital pins for display/buzzer, flexible PWM calibration, embedded I2S speaker with GPIO12 amp enable and `0x17` register `0x31`, auxiliary-only servo roles in behaviors, battery undervoltage monitoring at 7.15V/6.90V for `0x14`/`0x17`), and `ninjarobot_pi5_agent` (onboarding hardware profile selection and embedded speaker flow, `2026-10-25`).[^src-20261027-developmentguide]
+16. Refined onboarding wizard with ASCII welcome, bulk settings reuse option, Enter-to-continue summaries, Mac Calendar OAuth SSH tunnel (`-L 127.0.0.1:8765:127.0.0.1:8765`), waiting updates, callback acknowledgment, read-only Calendar MCP validation, candidate credential cleanup, key rollback, microphone subprocess import containment, and simulation isolation (`2026-09-23-02`),
+17. Multi-HAT expansion upgrade and physical SunFounder hardware audit across `install.sh` (`INSTALL_REF=HEAD`), `pi5servo` (dual `0x14`/`0x17` SunFounder MCU backend with automatic fallback, PCA9685 smbus2 controller at `0x40` accepting `hat_pwm0`..`15`, 8 authorized changes recorded in `docs/validation/authorized_driver_changes.json`), `ninjarobot_pi5_ide` (pin collision fix for arbitrary Digital pins for display/buzzer, flexible PWM calibration, embedded I2S speaker with GPIO12 amp enable and `0x17` register `0x31`, auxiliary-only servo roles in behaviors, battery undervoltage monitoring at 7.15V/6.90V for `0x14`/`0x17`), and `ninjarobot_pi5_agent` (onboarding hardware profile selection and embedded speaker flow, `2026-10-25`), and
+18. Runtime remediation and Multi-HAT hardware refinement (`2026-11-02`): Web startup `proxy_headers=False` for loopback proxy pairing inspection; distinct `battery_undervoltage` reason keeping measured voltage and cutoff in persisted fault details with non-finite reading safeguards; sysfs-informed SunFounder preset selecting `0x17` without probing or assigning legacy charging GPIO23; transient full stop local gate cleanup upon completion; embedded audio using Fusion kernel speaker node without raw I2C `0x31` write; ALSA/PipeWire audio health alignment; 2-byte register stride for Fusion PWM/timers at `0x17`; config import preserving explicit servo roles without companion fabrication; and route-persisting local/cloud Ollama catalog discovery and selection.[^src-20261102-developmentguide]
 
-Automated validation covers extensive unit tests (1,087 root/IDE/Agent tests, 139 pi5servo tests), compilation, linting, formatting,
-type checks, and driver verification gates (`verify_immutable_drivers.py`, `verify_workspace_driver_sources.py`). Passing software gates does not
-substitute for owner physical acceptance testing on real hardware with raised wheels.[^src-20261027-developmentguide]
+Automated validation covers extensive unit tests (1,104 root/IDE/Agent tests, 464 driver tests across 6 separate processes), compilation, linting, formatting, mypy typing, and immutable driver verification. Software validation does not replace physical hardware acceptance or live power testing.[^src-20261102-developmentguide]
 
 
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.
-[^src-20261027-developmentguide]: DevelopmentGuide.md, source version `multi-hat-expansion-261025`; registered source `src-20261027-developmentguide`.
+[^src-20261102-developmentguide]: DevelopmentGuide.md, source version `runtime-remediation-261102`; registered source `src-20261102-developmentguide`.

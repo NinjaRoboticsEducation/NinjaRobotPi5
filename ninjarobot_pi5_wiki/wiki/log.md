@@ -1,5 +1,9 @@
 # Wiki Update Log
 
+## 2026-11-02
+
+* **Update**: Applied plan `runtime-remediation-261102` — Ingest 2026-11-02 runtime remediation and Multi-HAT hardware refinement manuals; update ten knowledge pages with proxy-header disabling, battery undervoltage reason and telemetry safeguards, sysfs-informed 0x17 SunFounder preset, transient full stop local gate clearance, Fusion kernel speaker node audio control, 2-byte register stride at 0x17, explicit servo role preservation, and route-persisting local/cloud Ollama selection.. Sources: `src-20260907-knowledgeintegration`, `src-20261102-developmentguide`, `src-20261102-installationguide`, `src-20261102-developmentlog`, `src-20261027-ninjarobot-mcp-skill`.
+
 ## 2026-10-27
 
 * **Update**: Applied plan `multi-hat-expansion-261027` — Ingest 2026-10-25 Multi-HAT expansion upgrade and physical SunFounder hardware audit manuals; update eleven knowledge pages with dual 0x14/0x17 SunFounder Robot HAT MCU, PCA9685 PWM, flexible digital/servo pin mapping, embedded I2S speaker, default HEAD installer bootstrap, and onboarding profile selection.. Sources: `src-20260907-knowledgeintegration`, `src-20261027-developmentguide`, `src-20261027-installationguide`, `src-20261027-ninjarobot-mcp-skill`, `src-20261027-developmentlog`.

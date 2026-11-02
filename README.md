@@ -1,15 +1,5 @@
 # NinjaRobotPi5
 
-
-Runtime remediation successor manuals (2 November, pending owner manual validation
-and wiki ingestion/review):
-
-- [InstallationGuide successor](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md)
-- [DevelopmentGuide successor](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md)
-- [DevelopmentLog successor](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md)
-
-The registered document map remains at its previous reviewed checkpoint.
-
 <div align="center">
 
 **An AI-Powered Raspberry Pi 5 Robot — Talk to It, Control It, Teach It**
@@ -891,10 +881,10 @@ The principal `/` commands are listed below; `/help` is the current in-app refer
 
 | Document | Description |
 |---|---|
-| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md) ([2026-10-25 Multi-HAT Update](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md)) | Complete step-by-step guide from blank Pi to running robot |
-| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md) ([2026-10-25 Multi-HAT Update](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/DevelopmentGuide.md)) | Architecture, API reference, and developer workflow |
-| [MCP and Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/NinjaRobot_MCP_Skill.md) ([2026-10-25 Multi-HAT Update](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md)) | Beginner guide to external tools and reusable Skills |
-| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md) ([2026-10-25 Multi-HAT Update](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md)) | Implementation history and decisions |
+| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md)) | Complete step-by-step guide from blank Pi to running robot |
+| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/DevelopmentGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md)) | Architecture, API reference, and developer workflow |
+| [MCP and Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md) ([2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/NinjaRobot_MCP_Skill.md)) | Beginner guide to external tools and reusable Skills |
+| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md)) | Implementation history and decisions |
 | [Hardware Profile](docs/hardware/hardware-profile.md) | Confirmed wiring and electrical records |
 | [Documentation Index](docs/README.md) | Index of all project documents |
 | [v1.0.0 Support Matrix](docs/architecture/v1.0.0-support-matrix.md) | Historical release baseline; see current manuals for later additions such as speech output |
