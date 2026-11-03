@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 
 import click
 
 from ..config import ConfigManager, get_default_config_path
 from ..core import Servo, ServoCalibration
+from ..core.endpoint import parse_servo_endpoint
 from ._common import (
     backend_options,
     close_runtime_handle,
@@ -50,6 +52,10 @@ class CalibApp:
         self.owns_servo = owns_servo
         self.manager = manager
         self.calibration = self.manager.get_calibration(pin)
+        self.draft_mode = (
+            manager.get_backend_config().get("name") == "fusion_hat_plus"
+            or getattr(getattr(servo, "backend", None), "name", None) == "fusion_hat_plus"
+        )
 
         self.pulse_min = self.calibration.pulse_min
         self.pulse_center = self.calibration.pulse_center
@@ -84,6 +90,8 @@ class CalibApp:
             "=": lambda: self.adjust_speed(10),
             "-": lambda: self.adjust_speed(-10),
             "_": lambda: self.adjust_speed(-10),
+            "f": self.finish_calibration,
+            "F": self.finish_calibration,
             "KEY_ENTER": self.set_calibration,
             " ": self.set_calibration,
             "h": self.display_help,
@@ -100,6 +108,10 @@ class CalibApp:
             return
 
         click.echo("\nServo Calibration Tool: 'h' for help, 'q' to quit")
+        if self.draft_mode:
+            click.echo(
+                "Fusion: Enter/Space stages a point; F finishes and saves; Q discards draft."
+            )
         self.show()
         self.servo.set_pulse(self.pulse_center)
         self.cur_pulse = self.pulse_center
@@ -135,6 +147,10 @@ class CalibApp:
         click.echo(f"   Center ({self.TARGET_CENTER}°): pulse = {self.pulse_center}")
         click.echo(f"   Max ({self.TARGET_MAX}°): pulse = {self.pulse_max}")
         click.echo(f"   Speed: {self.speed}%")
+        if self.draft_mode:
+            click.echo(
+                "   Fusion: Enter/Space stages only; F saves all and exits; Q discards draft."
+            )
         click.echo()
 
     def print_prompt(self) -> None:
@@ -179,6 +195,22 @@ class CalibApp:
             click.echo(f"Speed: {self.speed}%")
 
     def set_calibration(self) -> None:
+        if self.draft_mode:
+            if not HARDWARE_PULSE_MIN <= self.cur_pulse <= HARDWARE_PULSE_MAX:
+                click.echo("Error: pulse must be between 500 and 2500 microseconds.")
+                return
+            field = {
+                self.TARGET_MIN: "pulse_min",
+                self.TARGET_CENTER: "pulse_center",
+                self.TARGET_MAX: "pulse_max",
+            }[self.cur_target]
+            setattr(self, field, self.cur_pulse)
+            click.echo(
+                f"Staged {self.TARGET_NAMES[self.cur_target]} = {self.cur_pulse}; "
+                "not written to disk. Set the other points, then press F to finish and save."
+            )
+            self.show()
+            return
         if self.has_blessed:
             print(f"\r{self.term.clear_eol()}", end="")
 
@@ -218,6 +250,49 @@ class CalibApp:
         self.manager.save()
         click.echo(f"✓ Saved! {target_str} for {self.endpoint_label} = pulse {self.cur_pulse}")
 
+    def finish_calibration(self) -> None:
+        """Commit a complete Fusion draft once; failed saves leave the session open."""
+        if not self.draft_mode:
+            return
+        if not (
+            HARDWARE_PULSE_MIN
+            <= self.pulse_min
+            < self.pulse_center
+            < self.pulse_max
+            <= HARDWARE_PULSE_MAX
+        ):
+            click.echo(
+                "Cannot finish: require 500 <= Min < Center < Max <= 2500. "
+                "Keep calibrating; Enter/Space stages each point. Nothing was saved."
+            )
+            return
+        identifier = parse_servo_endpoint(self.pin).identifier
+        existed = identifier in self.manager.get_all_endpoint_calibrations()
+        previous = self.manager.get_calibration(self.pin)
+        candidate = replace(
+            self.calibration,
+            pulse_min=self.pulse_min,
+            pulse_center=self.pulse_center,
+            pulse_max=self.pulse_max,
+            speed=self.speed,
+        )
+        try:
+            self.manager.set_calibration(self.pin, candidate)
+            if not self.manager.save():
+                raise OSError("configuration write failed; check directory access and disk space")
+        except (OSError, ValueError) as exc:
+            if existed:
+                self.manager.set_calibration(self.pin, previous)
+            else:
+                self.manager.remove_calibration(self.pin)
+            click.echo(
+                f"Could not save calibration: {exc}. Draft retained; retry F or Q to discard."
+            )
+            return
+        self.calibration = candidate
+        click.echo(f"Saved complete calibration for {self.endpoint_label}.")
+        self.running = False
+
     def display_help(self) -> None:
         click.echo(
             """
@@ -238,17 +313,25 @@ Speed Control:
   [+] / [-] : Adjust speed limit (±10%)
 
 Save:
-  [Enter] / [Space] : Save current pulse AND speed for selected target
+  [Enter] / [Space] : Confirm selected point (Fusion: stage in memory only)
 
 Misc:
   [q] : Quit
   [h] : Show this help
 """
         )
+        if self.draft_mode:
+            click.echo(
+                "Fusion: Enter/Space stages only; F validates, saves all points and exits; Q discards draft."
+            )
         self.show()
 
     def quit(self) -> None:
-        click.echo("\n=== Quit ===")
+        click.echo(
+            "\n=== Draft discarded; saved configuration unchanged ==="
+            if self.draft_mode
+            else "\n=== Quit ==="
+        )
         self.running = False
 
     def end(self) -> None:

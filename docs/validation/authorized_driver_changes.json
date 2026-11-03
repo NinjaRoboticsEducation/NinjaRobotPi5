@@ -511,16 +511,16 @@
     },
     "pi5servo/src/pi5servo/cli/calib.py": {
       "approved": {
-        "sha256": "b67f67502bac2cf6c4a4df8b14dc25a8ece3c98562516095d494ae9399635eac",
-        "size": 11851
+        "sha256": "5eb4271ecb833e257b4f255fa79d17e75024c6ee12b3cd90284a19710daf1d0b",
+        "size": 15293
       },
-      "authorized_by": "project owner",
-      "authorized_on": "2026-08-14",
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-11-03",
       "baseline": {
         "sha256": "fb36a8ad2501e8ef497a11e713bc45328faaad265f3837d37f9033146d130179",
         "size": 11808
       },
-      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+      "reason": "Owner-requested Fusion calibration drafts: stage independent points, commit complete valid range once, preserve prior settings on cancellation or save failure"
     },
     "pi5servo/src/pi5servo/cli/cmd.py": {
       "approved": {
@@ -697,6 +697,16 @@
         "size": 11153
       },
       "reason": "Owner-approved 2026-11-02 implementation plan Phase 4: correct Fusion register stride and restrict reset recovery; independently verify both register layouts across all channels."
+    },
+    "pi5servo/tests/test_calibration_draft.py": {
+      "approved": {
+        "sha256": "dafa782c5fb11dd26b9cf2ddb2aaafe5ba8dd43478a5561c3037b46da7958cb2",
+        "size": 4593
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-11-03",
+      "baseline": null,
+      "reason": "Owner-requested Fusion calibration drafts: stage independent points, commit complete valid range once, preserve prior settings on cancellation or save failure"
     },
     "pi5servo/tests/test_config.py": {
       "approved": {

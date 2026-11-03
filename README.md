@@ -189,7 +189,7 @@ Use the tables below as the recommended default electronic module pin wiring ref
 | | `GND` | `Pin06/GND` (RaspberryPi) |
 | | Servo 1~12 | `pwm 0~11` (on PCA9685) |
 
-> **Safety:** Power off before changing wiring. Fusion reserves GPIO16/18/19/20/21; use the reviewed kernel installer, not legacy GPIO12 amplifier or GPIO5 reset instructions. Verify servo supply and grounding against the board documentation. See the [Fusion manual](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-03/InstallationGuide.md#fusion-installation-and-onboarding).
+> **Safety:** Power off before changing wiring. Fusion reserves GPIO16/18/19/20/21; use the reviewed kernel installer, not legacy GPIO12 amplifier or GPIO5 reset instructions. Verify servo supply and grounding against the board documentation. See the [Fusion manual](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/InstallationGuide.md#fusion-installation-and-onboarding).
 
 ### 2.3 Raspberry Pi OS Installation
 
@@ -358,7 +358,7 @@ The wizard shows a NINJAROBOT welcome screen and walks you through:
      1. Choose **`3. Calibrate`** from the menu.
      2. Enter your servo endpoint: `gpio12` / `gpio13` (Option 1), any `pwm0`..`pwm11` / `p0`..`p11` channel such as `pwm10` or `pwm11` (Option 2), or `pwm0`..`pwm15` (Option 3).
      3. Press **`c`** to select **Center (`0°`)**, adjust the pulse using **`w` / `s`** (`±1 µs`) or **`Up` / `Down`** arrow keys (`±20 µs`) until a continuous servo stops spinning (or a positional servo reaches center), and press **`Enter`** to save.
-     4. For Fusion, calibrate Min/Center/Max to satisfy `pulse_min < pulse_center < pulse_max`; neutral-only ranges are incomplete. Use safe mechanical limits, save, then exit.
+     4. For Fusion, Enter/Space stages each point in memory. Press **F** to validate and save all points once, or **Q** to discard. Calibrate Min/Center/Max to satisfy `pulse_min < pulse_center < pulse_max`; neutral-only ranges are incomplete. Use safe mechanical limits, save, then exit.
      5. Repeat **`3. Calibrate`** for any additional connected servos, then press **`q`** to exit `servo-tool`.
    - **Step 5 (Camera):** Open `camera-tool`, run the setup wizard and `Doctor`, then exit.
    - **Step 6 (Speaker & Microphone):**
@@ -896,10 +896,10 @@ The principal `/` commands are listed below; `/help` is the current in-app refer
 
 | Document | Description |
 |---|---|
-| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-03/InstallationGuide.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md)) | Complete step-by-step guide from blank Pi to running robot |
-| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-03/DevelopmentGuide.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/DevelopmentGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md)) | Architecture, API reference, and developer workflow |
+| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/InstallationGuide.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md)) | Complete step-by-step guide from blank Pi to running robot |
+| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/DevelopmentGuide.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/DevelopmentGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md)) | Architecture, API reference, and developer workflow |
 | [MCP and Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md) ([2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/NinjaRobot_MCP_Skill.md)) | Beginner guide to external tools and reusable Skills |
-| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-03-03/DevelopmentLog.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md)) | Implementation history and decisions |
+| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-03-04/DevelopmentLog.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md)) | Implementation history and decisions |
 | [Hardware Profile](docs/hardware/hardware-profile.md) | Confirmed wiring and electrical records |
 | [Documentation Index](docs/README.md) | Index of all project documents |
 | [v1.0.0 Support Matrix](docs/architecture/v1.0.0-support-matrix.md) | Historical release baseline; see current manuals for later additions such as speech output |
