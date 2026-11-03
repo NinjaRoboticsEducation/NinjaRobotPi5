@@ -1,5 +1,9 @@
 # Fusion servo setup prerequisite failure and repair
 
+Follow-up: for a missing prepared `driver/sunfounder-fusionhat-overlay.dts`, use
+[the source-preparation recovery instructions](fusion_source_preparation_repair_261103.md).
+The `install` command without `--apply` is a preview, not installation.
+
 The reported `FileNotFoundError` proves that the Fusion kernel `version` interface
 was absent when calibration started. It occurs before PWM writes, and is not an
 undervoltage or servo-calibration failure. The previous implementation allowed

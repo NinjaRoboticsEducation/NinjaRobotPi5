@@ -13,6 +13,7 @@ import json
 import os
 import platform
 import shutil
+import stat
 import subprocess
 import tarfile
 import tempfile
@@ -35,15 +36,42 @@ def manifest() -> dict:
 
 
 def verify_source(source: Path) -> None:
+    """Validate every pinned input before building or changing system files."""
+    recovery = (
+        "Run prepare --source DIR first, then install --source DIR using the same directory. "
+        "If DIR already exists but is incomplete or changed, preserve it and prepare into "
+        "a new empty path. Prefer a directory under ~/.cache/ninjarobot over /tmp, "
+        "which may be cleared on reboot."
+    )
+    if source.is_symlink() or source.absolute().resolve() != source.absolute():
+        raise ValueError(f"Unreviewed source directory: symlink path rejected. {recovery}")
+    if not source.is_dir():
+        raise ValueError(
+            f"Prepared Fusion source directory is missing or not a directory. {recovery}"
+        )
     for name, expected in manifest()["build_files"].items():
         path = source / name
-        if path.is_symlink() or digest(path.read_bytes()) != expected:
-            raise ValueError(f"Unreviewed build input: {name}")
+        if path.is_symlink() or path.resolve() != path.absolute():
+            raise ValueError(f"Unreviewed build input: {name} uses a symlink. {recovery}")
+        try:
+            if not stat.S_ISREG(path.stat().st_mode):
+                raise ValueError(
+                    f"Unreviewed build input: {name} is not a regular file. {recovery}"
+                )
+            actual = digest(path.read_bytes())
+        except FileNotFoundError as exc:
+            raise ValueError(
+                f"Prepared Fusion source is incomplete; missing {name}. {recovery}"
+            ) from exc
+        except OSError as exc:
+            raise ValueError(f"Prepared Fusion input cannot be read: {name}. {recovery}") from exc
+        if actual != expected:
+            raise ValueError(f"Unreviewed build input: {name} checksum differs. {recovery}")
 
 
 def prepare(destination: Path) -> None:
     spec = manifest()
-    if destination.exists():
+    if destination.exists() or destination.is_symlink():
         verify_source(destination)
         print("Prepared source already verified; unchanged.")
         return
@@ -124,9 +152,15 @@ def _write(path: Path, content: bytes) -> None:
 
 
 def install(source: Path, *, apply: bool) -> None:
-    print(json.dumps(preview(), indent=2))
     verify_source(source)
+    details = preview()
+    details.update(action="install" if apply else "preview", source_verified=True)
+    print(json.dumps(details, indent=2))
     if not apply:
+        print(
+            "Preview only: no driver installed. After reviewing, use install --source DIR "
+            "--apply with administrator privilege. Reboot manually after installation."
+        )
         return
     if os.geteuid() != 0:
         raise PermissionError("Explicit installation requires root; preview needs no privilege")
@@ -296,14 +330,19 @@ def main() -> None:
     parser.add_argument("--source", type=Path, default=Path("/tmp/ninjarobot-fusion-source"))
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
-    if args.action == "prepare":
-        prepare(args.source.absolute())
-    elif args.action == "install":
-        install(args.source, apply=args.apply)
-    elif args.action == "rollback":
-        rollback(apply=args.apply)
-    else:
-        print(json.dumps(check(), indent=2))
+    if args.apply and args.action not in {"install", "rollback"}:
+        parser.error("--apply is valid only with install or rollback")
+    try:
+        if args.action == "prepare":
+            prepare(args.source.expanduser().absolute())
+        elif args.action == "install":
+            install(args.source.expanduser(), apply=args.apply)
+        elif args.action == "rollback":
+            rollback(apply=args.apply)
+        else:
+            print(json.dumps(check(), indent=2))
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+        parser.exit(1, f"Fusion setup failed: {exc}\n")
 
 
 if __name__ == "__main__":
