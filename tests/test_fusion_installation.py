@@ -118,3 +118,19 @@ def test_partial_installation_rollback_restores_only_transaction_files(monkeypat
     assert not absent.exists()
     assert not state.exists()
     assert commands == [["depmod", "-a", "test"]]
+
+
+def test_check_reports_unreadable_interfaces_without_traceback(monkeypatch):
+    original = Path.read_text
+
+    def read(path, *args, **kwargs):
+        if str(path) in {"/sys/class/fusion_hat/fusion_hat/version", "/proc/asound/cards"}:
+            raise PermissionError("simulated access denial")
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", read)
+    result = setup.check()
+    assert result["installed_version"] is None
+    assert result["version_error"] == "PermissionError"
+    assert result["sound_card_ready"] is False
+    assert result["ready"] is False

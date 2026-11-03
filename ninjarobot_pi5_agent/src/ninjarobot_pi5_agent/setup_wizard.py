@@ -22,6 +22,7 @@ from ninjarobot_pi5_ide.config_import import (
     load_effective_config,
     save_robot_config,
 )
+from ninjarobot_pi5_ide.fusion import FusionPrerequisiteError
 
 from ninjarobot_pi5_ide import (
     apply_hardware_profile_preset,
@@ -262,7 +263,9 @@ async def run_setup_wizard(
                         _select_hardware_profile(ui, progress, store)
                     if choice == "2":
                         for name, status in saved.items():
-                            if status.get("configuration_valid"):
+                            if status.get("configuration_valid") and status.get(
+                                "prerequisite_ready", True
+                            ):
                                 _show_hardware(ui, name, status)
                                 _record(
                                     progress,
@@ -304,6 +307,7 @@ async def run_setup_wizard(
                     and prior.status == "complete"
                     and prior.verification != "simulated"
                     and current_status.get("configuration_valid") is True
+                    and current_status.get("prerequisite_ready", True)
                 ):
                     ui.write(
                         f"\nStep {index} of {len(MANDATORY_HARDWARE)} — "
@@ -319,7 +323,10 @@ async def run_setup_wizard(
                 )
                 _record(progress, component, *outcome)
                 store.save(progress)
-                if outcome[0] == "needs_attention" and outcome[2] == "saved_for_later":
+                if outcome[0] == "needs_attention" and outcome[2] in {
+                    "saved_for_later",
+                    "prerequisite_missing",
+                }:
                     return SetupOutcome()
 
             if requested_step in MANDATORY_HARDWARE:
@@ -359,6 +366,7 @@ async def run_setup_wizard(
                 if progress.steps.get(component, StepRecord()).status != "complete"
                 or progress.steps[component].verification == "simulated"
                 or not hardware_setup_status(component).get("configuration_valid")
+                or not hardware_setup_status(component).get("prerequisite_ready", True)
             ]
             progress.completed = not incomplete
             store.save(progress)
@@ -544,6 +552,9 @@ def _hardware_step(
                 "Setup needs attention: "
                 + str(refreshed.get("message", "tool did not finish successfully"))
             )
+        except FusionPrerequisiteError as exc:
+            ui.write(f"Setup prerequisite missing: {exc}")
+            return "needs_attention", "unverified", "prerequisite_missing"
         except (OSError, RuntimeError, ValueError):
             ui.write("Could not open setup. Check installation and ensure the Agent is stopped.")
         ui.write("Retry the setup tool or save and exit to fix the problem.")

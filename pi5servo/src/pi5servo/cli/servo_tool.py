@@ -10,6 +10,7 @@ import click
 
 from ..config import ConfigManager, get_default_config_path
 from ..core import Servo, ServoCalibration, ServoGroup
+from ..core.backend_errors import BackendConfigurationError, BackendUnavailableError
 from ._common import (
     LEGACY_BACKENDS,
     backend_options,
@@ -511,6 +512,8 @@ def servo_tool(
                 click.echo("Invalid choice")
                 input("\nPress Enter to continue...")
 
+    except (BackendConfigurationError, BackendUnavailableError) as exc:
+        raise click.ClickException(str(exc)) from exc
     except Exception as exc:
         click.echo(f"❌ Error: {exc}")
         import traceback
@@ -519,12 +522,13 @@ def servo_tool(
     finally:
         try:
             if persistent_group is not None and persistent_group.pins:
-                persistent_group.move_all_sync(
-                    [0.0] * len(persistent_group.pins),
-                    speed_mode="M",
-                    force=True,
-                )
-                click.echo(term.green("✓ All servos centered (0°) on exit"))
+                if resolved_backend != "fusion_hat_plus":
+                    persistent_group.move_all_sync(
+                        [0.0] * len(persistent_group.pins),
+                        speed_mode="M",
+                        force=True,
+                    )
+                    click.echo(term.green("✓ All servos centered (0°) on exit"))
                 persistent_group.off()
                 persistent_group.close()
         except Exception:

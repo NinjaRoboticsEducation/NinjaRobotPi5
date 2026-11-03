@@ -12,10 +12,10 @@ manual hardware acceptance. `project-knowledge.json` and compiled wiki pages sti
 refer to the registered 2 November checkpoint; its older Robot HAT fallback and
 raw-controller guidance does not describe the new Fusion-only path.
 
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-11-03/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-11-03/DevelopmentGuide.md)
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-11-03-02/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-11-03-02/DevelopmentGuide.md)
 - [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md) (unchanged public tools)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-11-03/DevelopmentLog.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-11-03-02/DevelopmentLog.md)
 - [Fusion implementation and manual acceptance](../docs/validation/fusion_implementation_261103.md)
 
 Original registered sources are preserved:

@@ -529,3 +529,44 @@ def test_servo_tool_single_move_releases_persistent_group_for_unconfigured_nativ
     assert captured["persistent_group_closed_before_servo"] is True
     assert first_group.closed is True
     assert second_group.execute_calls == []
+
+
+def test_fusion_exit_disables_without_centering(monkeypatch, tmp_path):
+    path = tmp_path / "servo.json"
+    manager = ConfigManager(path)
+    manager.set_backend_config("fusion_hat_plus", {})
+    manager.set_calibration("hat_pwm1", ServoCalibration(pulse_min=800, pulse_max=2200))
+    manager.save()
+    group = FakePersistentGroup(pins=["hat_pwm1"], backend=object())
+    monkeypatch.setattr(servo_tool_module, "HAS_BLESSED", True)
+    monkeypatch.setattr(servo_tool_module, "Terminal", FakeTerminal)
+    monkeypatch.setattr(
+        servo_tool_module,
+        "create_group_from_config",
+        lambda **kw: (group, manager, None, "fusion_hat_plus", {}),
+    )
+    result = CliRunner().invoke(servo_tool_module.servo_tool, ["--config", str(path)], input="q\n")
+    assert result.exit_code == 0, result.output
+    assert not group.centered and group.move_calls == []
+    assert group.off_called and group.closed
+
+
+def test_missing_fusion_driver_is_nonzero_without_traceback(monkeypatch, tmp_path):
+    from pi5servo.core.backend_errors import BackendUnavailableError
+
+    path = tmp_path / "servo.json"
+    manager = ConfigManager(path)
+    manager.set_backend_config("fusion_hat_plus", {})
+    manager.set_calibration("hat_pwm1", ServoCalibration(pulse_min=800, pulse_max=2200))
+    manager.save()
+    monkeypatch.setattr(servo_tool_module, "HAS_BLESSED", True)
+    monkeypatch.setattr(servo_tool_module, "Terminal", FakeTerminal)
+
+    def missing(**kwargs):
+        raise BackendUnavailableError("Fusion kernel interface is missing")
+
+    monkeypatch.setattr(servo_tool_module, "create_group_from_config", missing)
+    result = CliRunner().invoke(servo_tool_module.servo_tool, ["--config", str(path)])
+    assert result.exit_code == 1
+    assert "kernel interface is missing" in result.output
+    assert "Traceback" not in result.output

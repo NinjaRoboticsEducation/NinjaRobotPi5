@@ -248,7 +248,11 @@ def check() -> dict:
     result = preview()
     root = Path("/sys/class/fusion_hat/fusion_hat")
     version = root / "version"
-    result["installed_version"] = version.read_text().strip() if version.exists() else None
+    try:
+        result["installed_version"] = version.read_text().strip()
+    except OSError as exc:
+        result["installed_version"] = None
+        result["version_error"] = type(exc).__name__
     attributes = [
         root / "pwm" / f"pwm{channel}" / name
         for channel in range(12)
@@ -259,8 +263,12 @@ def check() -> dict:
     result["speaker_ready"] = os.access(root / "speaker", os.W_OK)
     result["session_lock_ready"] = os.access("/run/lock/ninjarobot-fusion.lock", os.R_OK | os.W_OK)
     cards = Path("/proc/asound/cards")
-    result["sound_card_ready"] = cards.exists() and any(
-        token in cards.read_text().lower() for token in ("googlevoicehat", "sndrpigooglevoi")
+    try:
+        card_text = cards.read_text().lower()
+    except OSError:
+        card_text = ""
+    result["sound_card_ready"] = any(
+        token in card_text for token in ("googlevoicehat", "sndrpigooglevoi")
     )
     try:
         voltage = int(Path("/sys/class/power_supply/fusion-hat/voltage_now").read_text())

@@ -619,3 +619,24 @@ def test_ollama_provider_setup_prompts_api_key_lists_cloud_models_and_selects_mo
     rendered = "\n".join(ui.messages)
     assert "1) gemma4:31b" in rendered
     assert "2) glm-5.1" in rendered
+
+
+def test_servo_prerequisite_failure_shows_actionable_reason(monkeypatch):
+    from ninjarobot_pi5_ide.fusion import FusionPrerequisiteError
+
+    monkeypatch.setattr(
+        setup_wizard, "hardware_setup_status", lambda name: {"configuration_saved": True}
+    )
+
+    def missing(component):
+        raise FusionPrerequisiteError(
+            "Fusion kernel interface is missing. Run scripts/fusion_hat_setup.py check."
+        )
+
+    monkeypatch.setattr(setup_wizard, "run_hardware_setup", missing)
+    ui = _Console(("1", "WHEELS RAISED"))
+    result = setup_wizard._hardware_step(
+        ui, "servo", index=4, total=5, hardware_profile="fusion_hat_plus"
+    )
+    assert result == ("needs_attention", "unverified", "prerequisite_missing")
+    assert "fusion_hat_setup.py check" in "\n".join(ui.messages)

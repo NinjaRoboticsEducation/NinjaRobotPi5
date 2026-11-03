@@ -45,7 +45,7 @@ def test_embedded_microphone_selection_does_not_record(monkeypatch, tmp_path):
 
 def test_fusion_amp_never_uses_gpio_fallback(monkeypatch, tmp_path):
     monkeypatch.setattr(fusion, "ROOT", tmp_path)
-    with pytest.raises(RuntimeError, match="prerequisite"):
+    with pytest.raises(RuntimeError, match="kernel interface is missing"):
         fusion.set_fusion_speaker(True)
     assert not (tmp_path / "speaker").exists()
     (tmp_path / "version").write_text(fusion.VERSION)
@@ -89,3 +89,47 @@ def test_amplifier_enable_is_joined_before_cancel_cleanup(monkeypatch):
         assert calls == [True, False]
 
     asyncio.run(exercise())
+
+
+@pytest.mark.parametrize(
+    "version,reason", [(None, "kernel interface is missing"), ("1.1.0", "incompatible")]
+)
+def test_fusion_prerequisite_reason_is_specific(monkeypatch, tmp_path, version, reason):
+    monkeypatch.setattr(fusion, "ROOT", tmp_path)
+    if version is not None:
+        (tmp_path / "version").write_text(version)
+    with pytest.raises(fusion.FusionPrerequisiteError, match=reason):
+        fusion.require_fusion_driver()
+
+
+def test_setup_never_launches_servo_when_fusion_driver_missing(monkeypatch, tmp_path):
+    import json
+
+    path = tmp_path / "servo.json"
+    path.write_text(json.dumps({"__backend__": {"name": "fusion_hat_plus"}}))
+    monkeypatch.setattr(
+        hardware_setup, "discover_pi5_configs", lambda: [DiscoveredConfig("pi5servo", path, True)]
+    )
+    monkeypatch.setattr(hardware_setup.shutil, "which", lambda name: "/fake/pi5servo")
+    monkeypatch.setattr(fusion, "ROOT", tmp_path / "missing")
+    with pytest.raises(fusion.FusionPrerequisiteError, match="kernel interface is missing"):
+        hardware_setup.run_hardware_setup(
+            "servo",
+            ownership_path=tmp_path / "owner",
+            runner=lambda cmd: pytest.fail("must not launch"),
+        )
+    assert not (tmp_path / "owner").exists()
+
+
+def test_fusion_preflight_rejects_missing_channel_and_permissions(monkeypatch, tmp_path):
+    monkeypatch.setattr(fusion, "ROOT", tmp_path)
+    (tmp_path / "version").write_text(fusion.VERSION)
+    with pytest.raises(fusion.FusionPrerequisiteError, match="PWM0 period interface is missing"):
+        fusion.require_fusion_servo()
+    channel = tmp_path / "pwm/pwm0"
+    channel.mkdir(parents=True)
+    (channel / "period").write_text("20000")
+    monkeypatch.setattr(fusion.os, "access", lambda *args: False)
+    with pytest.raises(fusion.FusionPrerequisiteError, match="not writable"):
+        fusion.require_fusion_servo()
+    assert (channel / "period").read_text() == "20000"

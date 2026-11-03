@@ -563,8 +563,8 @@
     },
     "pi5servo/src/pi5servo/cli/servo_tool.py": {
       "approved": {
-        "sha256": "8c5eeb0e580c7798262dfa25fcf51930effab682720c2762950ae6f619b67f97",
-        "size": 19287
+        "sha256": "622c9223eb062e7e7577e37dfce9529355a2cb098017d29a44bc9f0504756753",
+        "size": 19580
       },
       "authorized_by": "Project owner",
       "authorized_on": "2026-11-03",
@@ -572,7 +572,7 @@
         "sha256": "4b27b6529af9893dc4320e394a73617acf9edc333dba0cc8ba6cd572637fbf9f",
         "size": 18891
       },
-      "reason": "Owner-approved Fusion standalone session ownership and no automatic startup movement"
+      "reason": "Owner-requested Fusion missing-driver diagnostics, nonzero CLI failure and no exit centering; independently tested"
     },
     "pi5servo/src/pi5servo/cli/status.py": {
       "approved": {
@@ -628,13 +628,13 @@
     },
     "pi5servo/src/pi5servo/core/backends/fusion_hat_plus.py": {
       "approved": {
-        "sha256": "5a1d988b3a1a68c7baa811b714e3d7455e24bd78a882d13fe9c3ef14fefc2b87",
-        "size": 6344
+        "sha256": "7278e45510228420f40b34a274b144e1d1bfdc87e9032a296bff46b4213c9cc4",
+        "size": 7042
       },
       "authorized_by": "Project owner",
       "authorized_on": "2026-11-03",
       "baseline": null,
-      "reason": "Owner-approved Fusion-only kernel transport, exclusive servo ownership, explicit CLI backend and atomic Fusion calibration validation; 145 standalone tests passed"
+      "reason": "Owner-requested Fusion missing-driver diagnostics, nonzero CLI failure and no exit centering; independently tested"
     },
     "pi5servo/src/pi5servo/core/backends/hardware_pwm.py": {
       "approved": {
@@ -733,6 +733,19 @@
         "size": 8616
       },
       "reason": "Add SunFounder Robot HAT (0x14 Big-Endian 3-byte protocol, P0..P11, ADC A4 battery) and General PCA9685 smbus2/hat_pwm0..15 multi-HAT support while preserving DFR0566 baseline."
+    },
+    "pi5servo/tests/test_servo_tool.py": {
+      "approved": {
+        "sha256": "7b18029f115b35162087c90add9f54621cbd0580f42af8a40b676b80a2bede03",
+        "size": 20270
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-11-03",
+      "baseline": {
+        "sha256": "069fad2da01798ce771ca6a20360ae1e729c0ac14bf154abc41b1a2fec98c256",
+        "size": 18424
+      },
+      "reason": "Owner-requested Fusion missing-driver diagnostics, nonzero CLI failure and no exit centering; independently tested"
     },
     "pi5vl53l0x/README.md": {
       "approved": {

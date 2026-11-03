@@ -12,15 +12,55 @@ VERSION = "1.1.0-ninja1"
 ROOT = Path("/sys/class/fusion_hat/fusion_hat")
 
 
+class FusionPrerequisiteError(RuntimeError):
+    """A safe diagnostic that onboarding may display without private file contents."""
+
+
 def require_fusion_driver() -> None:
     try:
-        ready = (ROOT / "version").read_text().strip() == VERSION
-    except OSError:
-        ready = False
-    if not ready:
-        raise RuntimeError(
-            "Fusion driver prerequisite missing or outdated. Run scripts/fusion_hat_setup.py "
-            "check, review prepare/install, then reboot manually."
+        version = (ROOT / "version").read_text().strip()
+    except FileNotFoundError as exc:
+        raise FusionPrerequisiteError(
+            "Fusion kernel interface is missing (driver not installed, not bound, or reboot "
+            "pending). Run: uv run --frozen python scripts/fusion_hat_setup.py check. "
+            "Follow the Fusion installation guide: prepare, preview, explicit install, "
+            "then manually reboot. Re-selecting the HAT does not install its driver."
+        ) from exc
+    except OSError as exc:
+        raise FusionPrerequisiteError(
+            "Fusion driver version cannot be read. Check device permissions and kernel logs. "
+            "Run scripts/fusion_hat_setup.py check as the normal robot user."
+        ) from exc
+    if version != VERSION:
+        raise FusionPrerequisiteError(
+            f"Fusion driver is incompatible; reviewed version {VERSION} is required. "
+            "Review scripts/fusion_hat_setup.py check and schedule driver replacement "
+            "and manual reboot; do not use a raw I2C fallback."
+        )
+
+
+def require_fusion_servo() -> None:
+    """Read-only preflight: never instantiate a backend or write a PWM file."""
+    require_fusion_driver()
+    for channel in range(12):
+        for attribute in ("period", "duty_cycle", "enable"):
+            path = ROOT / "pwm" / f"pwm{channel}" / attribute
+            if not path.is_file():
+                raise FusionPrerequisiteError(
+                    f"Fusion PWM{channel} {attribute} interface is missing. "
+                    "Check kernel probe logs and the reviewed driver installation after reboot."
+                )
+            if not os.access(path, os.W_OK):
+                raise FusionPrerequisiteError(
+                    f"Fusion PWM{channel} is not writable by this user. Check gpio group "
+                    "membership and the installed udev rule; log in again after group changes. "
+                    "Do not run onboarding as root."
+                )
+    lock = Path("/run/lock/ninjarobot-fusion.lock")
+    if lock.is_symlink() or not lock.is_file() or not os.access(lock, os.R_OK | os.W_OK):
+        raise FusionPrerequisiteError(
+            "Fusion shared session lock is missing or inaccessible. Verify the installed "
+            "tmpfiles rule, gpio group membership and reboot. Do not create a per-user lock."
         )
 
 

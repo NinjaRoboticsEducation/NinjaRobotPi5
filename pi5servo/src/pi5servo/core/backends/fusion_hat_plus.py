@@ -66,6 +66,19 @@ class FusionHatPlusBackend:
                 self._write(channel, "enable", 0)
             for channel in (0, 4, 8):
                 self._write(channel, "period", 20_000)
+        except FileNotFoundError as exc:
+            self._unlock()
+            raise BackendUnavailableError(
+                "Fusion kernel interface or shared lock is missing. Run "
+                "scripts/fusion_hat_setup.py check; follow the reviewed installation guide "
+                "and reboot manually. Selecting Fusion does not install its driver."
+            ) from exc
+        except PermissionError as exc:
+            self._unlock()
+            raise BackendUnavailableError(
+                "Fusion permission denied. Check gpio group membership, udev and tmpfiles "
+                "rules; log in again after group changes. Do not run the tool as root."
+            ) from exc
         except Exception as exc:
             self._unlock()
             if isinstance(exc, BackendUnavailableError):

@@ -75,6 +75,7 @@ def hardware_setup_status(component: str) -> dict[str, object]:
     discovered = next(item for item in discover_pi5_configs() if item.library == tool.component)
     configuration = discovered.path
     valid = False
+    prerequisite_ready = True
     summary: dict[str, object] = {}
     problem = "No saved configuration found."
     if (
@@ -235,7 +236,23 @@ def hardware_setup_status(component: str) -> dict[str, object]:
                 "Saved settings are invalid or incomplete. Open the setup tool to repair them."
             )
 
+    if component == "servo" and configuration.is_file() and not configuration.is_symlink():
+        try:
+            if configuration.stat().st_size <= 1_048_576:
+                saved_data = json.loads(configuration.read_text())
+                backend = saved_data.get("__backend__", {}) if isinstance(saved_data, dict) else {}
+                if isinstance(backend, dict) and backend.get("name") == "fusion_hat_plus":
+                    from .fusion import FusionPrerequisiteError, require_fusion_servo
+
+                    try:
+                        require_fusion_servo()
+                    except FusionPrerequisiteError as exc:
+                        prerequisite_ready = False
+                        problem = str(exc) if valid else problem + " Prerequisite: " + str(exc)
+        except (OSError, ValueError):
+            pass  # Configuration diagnostics above remain authoritative.
     return {
+        "prerequisite_ready": prerequisite_ready,
         "component": tool.component,
         "executable": executable,
         "tool_available": executable is not None,
@@ -261,6 +278,18 @@ def run_hardware_setup(
     executable = shutil.which(tool.command[0])
     if executable is None:
         raise RuntimeError(f"{tool.command[0]} is not installed in PATH")
+    if component == "servo":
+        saved = next(item for item in discover_pi5_configs() if item.library == "pi5servo")
+        if saved.path.is_file():
+            if saved.path.is_symlink() or saved.path.stat().st_size > 1_048_576:
+                raise ValueError("servo configuration must be a bounded regular file")
+            data = json.loads(saved.path.read_text())
+            if not isinstance(data, dict) or not isinstance(data.get("__backend__", {}), dict):
+                raise ValueError("invalid servo backend configuration")
+            if data.get("__backend__", {}).get("name") == "fusion_hat_plus":
+                from .fusion import require_fusion_servo
+
+                require_fusion_servo()
     command = (executable, *tool.command[1:])
     execute = runner or _run_attached
     ownership = HardwareOwnership(ownership_path)
