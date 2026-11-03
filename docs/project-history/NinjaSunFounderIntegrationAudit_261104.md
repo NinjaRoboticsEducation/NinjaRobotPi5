@@ -1,9 +1,9 @@
 # NinjaRobotPi5 SunFounder Fusion HAT+ post-integration system audit and implementation plan
 
-This document records the comprehensive system audit conducted on 4 November 2026
-following the integration of the SunFounder Fusion HAT+ kernel driver
-(`1.1.0-ninja1`), ALSA sound card (`sndrpigooglevoi`), and staged onboarding
-workflow documented in
+This document records the comprehensive system audit and refined implementation
+plan conducted on 4 November 2026 following the integration of the SunFounder
+Fusion HAT+ kernel driver (`1.1.0-ninja1`), ALSA sound card (`sndrpigooglevoi`),
+and staged onboarding workflow documented in
 [NinjaSunFounderRegressionInvestigation_261103.md](NinjaSunFounderRegressionInvestigation_261103.md)
 and
 [fusion_implementation_261103.md](../validation/fusion_implementation_261103.md).
@@ -54,7 +54,7 @@ that **the Fusion HAT+ hardware and kernel driver are healthy**:
 - `/proc/asound/cards` reports card `0` as `sndrpigooglevoi`
   (`snd_rpi_googlevoicehat_soundcard`).
 - `~/.config/pi5servo/servo.json` contains valid calibrations for `hat_pwm0` and
-  `hat_pwm1` with backend `"fusion_hat"`, imported into `config.toml` with
+  `hat_pwm1` with backend `"fusion_hat_plus"`, imported into `config.toml` with
   `motion_enabled = true` and `group_motion_enabled = true`.
 
 All four reported issues stem from **software state, configuration-import gaps,
@@ -63,10 +63,10 @@ prompt/tool-contract omissions, and audio/speech lifecycle defects** between
 
 | Issue | Confirmed primary root cause | Confirmed compounding causes |
 | --- | --- | --- |
-| **1. Servo blocked by undervoltage** | A persistent Level 1 motion latch (`"motion_latched": true, "reason": "undervoltage"`) recorded on `2026-11-02T03:09:04Z` in `~/.local/state/ninjarobot_pi5/safety.json` remains active across service restarts and re-onboarding. | 1) User's `/resume` attempt (`action_ledger` row 11) failed because `/resume` calls `system.resume` (requiring all 6 devices, including an unconfigured microphone on Nov 2) instead of `motion.resume`.<br>2) `MotionController._check_stop_state()` reports a historical latch in the present tense without checking current power telemetry or showing `updated_at`.<br>3) `servo.status` and LLM `runtime_state` omit `motion_latched`.<br>4) `config_import.py` sets `behaviors.servo_roles = {}` for Fusion HAT+, breaking `behavior.execute_movement` and Gamepad D-pad moves. |
-| **2. Embedded speaker refusal & TTS failure** | **Two independent faults:**<br>**2A (LLM refusal):** `IDENTITY_PROMPT` and `runtime_state` never inform the LLM that text replies are automatically spoken via the post-reply `SpeechService` pipeline, while exposed tools only list `buzzer` (`tone`/`melody`).<br>**2B (Silent TTS failure):** `configure_sunfounder_i2s_speaker()` enables `speech_output.enabled = true` in `config.toml` after playing a synthetic sine chime, but Piper TTS (`~/.local/share/ninjarobot_pi5/speech/bin/python`) and voice models (`english_model = ""`, `chinese_model = ""`) were never installed or configured. | 1) `SpeechService.speak()` catches `ValueError("speech_model_not_configured")` and collapses it into a generic `"Spoken output unavailable or stopped; the text reply is retained."` notice.<br>2) `AgentRuntime._append_memory_notice()` both streams that notice into the assistant reply text (without a separator space) and appends a duplicate assistant row in `conversations.sqlite3`, poisoning subsequent LLM turns into repeating that speech hardware does not exist. |
-| **3. Web Power Off button disabled** | `app-shared.js` disables `#powerOffButton` unless four gates pass (`poweroffEnabled && poweroffReady && poweroffAuthorized && leaseId`). Currently `deployment.web_poweroff_enabled = false` in `config.toml` and `/usr/libexec/ninjarobot-poweroff` + `/etc/sudoers.d/ninjarobot-agent-poweroff` are not installed. | 1) `ninjarobot onboard` (`setup_wizard.py`) has no step to install the privileged poweroff helper or enable web power-off.<br>2) `DeploymentManager.enable()` couples `web_poweroff_enabled = true` to `systemd enable ninjarobot-agent.service` (`auto_start_enabled = true`), preventing interactive users from enabling web power-off without boot auto-start. |
-| **4. Web-based voice input unstable** | **Both web voice paths have confirmed defects:**<br>**4A (`#webMicButton` Browser Speech API):** `onresult` loops from `event.resultIndex` instead of `0` and overwrites `chatInput.value`, discarding earlier segments; `state.speechListening` races between `click`, `onstart`, and `onend`; browser cloud STT fails on Chromium/LAN self-signed TLS.<br>**4B (`#usbMicButton` Robot Voice Input):** `VoiceInputController` aborts on any single PortAudio `overflowed` flag (`VoiceInputError("audio_overflow")`) or empty Whisper result (`VoiceInputError("transcription_failed")`) and permanently enters `FAILED` after `retry_limit = 2` (3 occurrences). | 1) `import_pi5_configs()` ignores `mic.json` `voiceinput` settings (`enabled = true`, `silence_rms_threshold = 500`, `silence_timeout_seconds = 3.0`).<br>2) `_pcm_rms()` does not remove DC offset on the I2S MEMS mic (`sndrpigooglevoi`), causing VAD to either hang until `max_command_seconds` (`6.0s`) or never detect speech start.<br>3) `_PCMFrameAssembler.feed()` resamples 48 kHz -> 16 kHz sample-by-sample in pure Python on the asyncio event loop thread.<br>4) PulseAudio (`PID 875`) wakes on default ALSA queries and holds `hw:0,0` for 5s, causing `PaErrorCode -9985 (Device unavailable)`. |
+| **1. Servo blocked by undervoltage** | A persistent Level 1 motion latch (`"motion_latched": true, "reason": "undervoltage"`) recorded on `2026-11-02T03:09:04Z` in `~/.local/state/ninjarobot_pi5/safety.json` remains active across service restarts and re-onboarding. | 1) User's `/resume` attempt (`action_ledger` row 11) failed because `AgentRuntime.resume_system()` always invokes `robot.system.resume` (Level 2 recovery requiring all 6 devices, which failed on `microphone (reported unavailable)`) instead of `robot.motion.resume`.<br>2) `MicrophoneDevice.start()` latches `_start_attempted = True` on first failure and never re-probes during `_microphone_health()` unless `suspend()` is called first, nor does it acquire `manual_access()` to pause `VoiceInputController`.<br>3) `MotionController._check_stop_state()` reports a historical latch in the present tense without `snapshot.updated_at`.<br>4) `ServoDevice.status()`, `AgentRuntime._recovery_status()`, and LLM `runtime_state` omit `motion_latched`.<br>5) `IDENTITY_PROMPT` forces all movement requests onto `robot.behavior.execute_movement` (requiring `behaviors.servo_roles`), which is `{}` on Fusion HAT+ because positional servos must not silently become wheels (`config_import.py:222`). |
+| **2. Embedded speaker refusal & TTS failure** | **Two independent faults:**<br>**2A (LLM refusal):** `IDENTITY_PROMPT` and `runtime_state` never inform the LLM that text replies are automatically spoken via the post-reply `SpeechService` pipeline, while exposed tools only list `buzzer` (`tone`/`melody`).<br>**2B (Silent TTS failure):** `configure_sunfounder_i2s_speaker()` (`hardware_setup.py:436-463`) sets `speech_output.enabled = true` in `config.toml` after playing a synthetic sine chime (`play_sunfounder_speaker_test_tone`), even though the isolated Piper environment (`~/.local/share/ninjarobot_pi5/speech/bin/python`, `requirements/local-speech.txt`) and voice model (`english_model = ""`) were never installed or configured. | 1) `SpeechService.speak()` (`speech.py:223-229`) catches `ValueError("speech_model_not_configured")` and collapses it into a generic `"speech_unavailable_or_interrupted; text retained"` reason.<br>2) `AgentRuntime._append_memory_notice()` (`runtime.py:1485-1501`) persists a standalone `MessageRole.ASSISTANT` row (`metadata={"workflow": "memory-notice"}`) into `conversations.sqlite3` on every failed TTS turn, and `AgentLoop` (`agent_loop.py:299-305`) loads those rows unfiltered into the LLM prompt context, conditioning the model to repeat that speech output is unavailable. |
+| **3. Web Power Off button disabled** | `app-shared.js:427-435` disables `#powerOffButton` unless four gates pass (`poweroffEnabled && poweroffReady && poweroffAuthorized && leaseId`). Currently `deployment.web_poweroff_enabled = false` in `config.toml` and `/usr/libexec/ninjarobot-poweroff` + `/etc/sudoers.d/ninjarobot-agent-poweroff` are not installed (`poweroffReady = false`). | 1) `ninjarobot onboard` (`setup_wizard.py`) has no step to install the privileged poweroff helper or enable web power-off.<br>2) `DeploymentManager.enable()` (`deployment.py:314-342`) couples `web_poweroff_enabled = true` to `sudo systemctl enable ninjarobot-agent.service` (`auto_start_enabled = true`), preventing interactive users from enabling web power-off without boot auto-start.<br>3) When `require_local_pairing` is `False`, local LAN controllers can acquire a lease without `/pair`, leaving `paired_connection` (`poweroff_authorized`) `False`. |
+| **4. Web-based voice input unstable** | **Both web voice paths have confirmed defects:**<br>**4A (`#webMicButton` Browser Speech API in `app-agent.js:240-309`):** `recognition.continuous = false` stops on the first pause, and a subsequent utterance overwrites `elements.chatInput.value = transcript.trim()`, erasing earlier text; `state.recognitionActive` is set only in `onstart` (race on rapid clicks); browser cloud STT is unsupported/blocked on Chromium and self-signed LAN HTTPS and never falls back to the existing `usb_microphone` robot Whisper endpoint.<br>**4B (`#usbMicButton` Robot Voice Input in `voice_input.py` & `microphone.py`):** `VoiceInputController` aborts on any single PortAudio `overflowed` flag (`VoiceInputError("audio_overflow")`) or empty Whisper transcript (`VoiceInputError("transcription_failed")`) and permanently enters `FAILED` after `retry_limit = 2` (3 occurrences). | 1) `import_pi5_configs()` (`config_import.py:283-297`) omits `voiceinput.enabled` (`true` in `mic.json`) and `stt.whisper_cpp` paths/threads.<br>2) `#usbMicButton` click handler (`app-agent.js:230-235`) has `.catch(() => {})`, silently swallowing startup failures.<br>3) `_pcm_rms()` (`voice_input.py:589-593`) does not remove DC offset on the I2S MEMS mic (`sndrpigooglevoi`), and post-wake silence when `speech_started` stays `False` hangs for the full `max_command_seconds` (`15.0s`).<br>4) `_PCMFrameAssembler.feed()` (`voice_input.py:553-576`) resamples 48 kHz -> 16 kHz sample-by-sample in pure Python on the asyncio event loop thread.<br>5) PulseAudio (`PID 875`) wakes on default ALSA queries and holds `hw:0,0` for 5s, causing `PaErrorCode -9985 (Device unavailable)`. |
 
 ## Issue 1 root cause analysis: servo control blocked by undervoltage
 
@@ -80,6 +80,7 @@ prompt/tool-contract omissions, and audio/speech lifecycle defects** between
      "fault_detail": null,
      "motion_latched": true,
      "reason": "undervoltage",
+     "schema_version": 1,
      "system_latched": false,
      "updated_at": "2026-11-02T03:09:04.813631Z"
    }
@@ -124,36 +125,37 @@ prompt/tool-contract omissions, and audio/speech lifecycle defects** between
 
 ### 1.2 Code trace across layers
 
-1. **Pre-move latch gate (`ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/safety.py:372-386`):**
+1. **Pre-move latch gate (`ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/safety.py:404-419`):**
    Before touching hardware or checking live voltage, `MotionController.move_endpoint()`
-   calls `self._check_stop_state("servo.move")`:
+   enters `_guarded_motion()` (`safety.py:441-448`), which calls `self._check_stop_state()`:
 
    ```python
    snapshot = self._state.read()
-   if snapshot.motion_latched:
+   system_stopped = snapshot.system_latched or self._system_stopped()
+   if system_stopped or snapshot.motion_latched:
        guidance = stop_guidance(
-           snapshot.reason or "operator_stop",
-           fault_detail=snapshot.fault_detail,
+           snapshot.reason or "operator_stop", fault_detail=snapshot.fault_detail
        )
        raise IDEError(
            ErrorDetails(
-               code="MOTION_STOPPED",
+               code="SYSTEM_STOPPED" if system_stopped else "MOTION_STOPPED",
                message=f"{guidance.cause} Recovery: {guidance.recovery_instruction}",
                ...
            )
        )
    ```
 
-   Because `stop_guidance("undervoltage")` (`safety.py:80-95`) returns the static
+   Because `stop_guidance("undervoltage")` (`safety.py:66-92`) returns the static
    string `"The Raspberry Pi reported undervoltage while the robot was moving."`
-   without including `snapshot.updated_at` (`2026-11-02T03:09:04Z`) or checking
-   whether undervoltage is *currently* active (`await self._undervoltage_detected()`),
-   both the LLM and the operator are told that an electrical fault is happening
-   right now.
+   without including `snapshot.updated_at` (`2026-11-02T03:09:04.813631Z`),
+   both the LLM and the operator are told that an electrical fault is occurring
+   right now rather than that a persistent safety latch from `2026-11-02` is
+   waiting for `/resume`.
 
-2. **Resume level mismatch (`runtime.py:1934-1959`, `web_control.py:394-403`, `robot.py:621-655`):**
+2. **Resume level mismatch (`runtime.py:1935-1960`, `web_control.py:416-426`, `robot.py:621-655`):**
    - `ninjarobot_pi5_ide` defines two distinct recovery capabilities in
-     `integrated.py:450-498`:
+     `integrated.py:450-498` (documented in
+     `ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/DevelopmentGuide.md:1410-1425`):
      - `motion.resume` (`RobotAssembly.resume_motion`, `robot.py:621-628`):
        verifies live power readiness (`ensure_power_ready()`) and clears a
        **Level 1 (`motion_latched`)** stop.
@@ -161,14 +163,30 @@ prompt/tool-contract omissions, and audio/speech lifecycle defects** between
        verifies live power readiness AND runs health probes across all enabled
        devices (`display`, `buzzer`, `servo`, `distance`, `camera`, `microphone`)
        to clear a **Level 2 (`system_latched`)** stop.
-   - However, `AgentRuntime.resume_system()` (`runtime.py:1934-1959`), CLI `/resume`
-     (`agent_cli.py:1189-1218`), and Web UI `Resume` (`web_control.py:394-403`)
-     **always invoke `robot.system.resume`**, never `robot.motion.resume`!
+   - However, `AgentRuntime.resume_system()` (`runtime.py:1935-1960`), CLI `/resume`
+     (`agent_cli.py:1189-1218`), and Web UI `Resume` (`web_control.py:416-426`)
+     **always invoke `robot.system.resume`**, never `robot.motion.resume`.
    - When only `motion_latched` is `True` (`system_latched` is `False`), forcing
-     `system.resume` causes unrelated optional sensors (such as an unconfigured
-     microphone) to block motion recovery.
+     `system.resume` causes unrelated non-motion peripherals (such as an
+     unconfigured or busy microphone) to block motion recovery.
 
-3. **Hidden latch state in `servo.status`, `startup_status`, and LLM `runtime_state`:**
+3. **Sticky `_start_attempted` in `MicrophoneDevice.start()` and missing `manual_access()` in `_microphone_health()` (`microphone.py:704-740`, `robot.py:929-931`):**
+   - Even when a genuine Level 2 `system.resume` runs, `RobotAssembly._microphone_health()`
+     (`robot.py:929-931`) simply calls `await self.microphone.start()` followed
+     by `await self.microphone.health() is ResourceHealth.READY`.
+   - In `MicrophoneDevice.start()` (`microphone.py:708-709`), `self._start_attempted`
+     is set to `True` before `_inspect_backend()` runs and is **never reset on
+     exception** (`microphone.py:734-740`). If `MicrophoneDevice.start()` fails
+     once at service boot (for example, because PulseAudio or `VoiceInputController`
+     briefly held `hw:0,0`), every subsequent `await self.microphone.start()` is
+     a no-op and `health()` permanently returns `ResourceHealth.UNAVAILABLE`
+     unless `await self.microphone.suspend()` is called first.
+   - Furthermore, `_microphone_health()` does not acquire
+     `async with self.microphone.manual_access():`, so if Always-On Voice Input
+     is active when `system.resume` runs, `_inspect_backend()` collides with
+     `ManagedVoiceAudioSource` on `hw:0,0`.
+
+4. **Hidden latch state in `servo.status`, `startup_status`, and LLM `runtime_state`:**
    - `ServoDevice.status()` (`servo.py:240-252`) returns `endpoints`, `calibrated`,
      `motion_enabled`, `group_motion_enabled`, `driver_available`, and `simulated`,
      but **omits `motion_latched` and `stop_reason`**. In `conversations.sqlite3`
@@ -176,36 +194,30 @@ prompt/tool-contract omissions, and audio/speech lifecycle defects** between
      `motion_enabled: true` and `calibrated: true`, and had no idea motion was
      latched until `robot.servo.move` failed.
    - `AgentRuntime._recovery_status()` (`runtime.py:881-897`) sets
-     `"required": system_latched`, ignoring `motion_latched`.
-   - `service_main.py:216-247` (`runtime_state`) omits `safety` (`motion_latched`,
-     `system_latched`, `reason`, `updated_at`).
-   - `ninjarobot onboard` (`setup_wizard.py`) never inspects `safety.json` during
-     hardware reconfiguration or offers to clear a stale latch after verifying
-     healthy power.
+     `"required": system_latched`, ignoring `motion_latched` even though
+     `startup_status()` (`runtime.py:857-858`) sets
+     `operational_state = "motion_latched"`.
+   - `service_main.py:250-281` (`runtime_state`) omits `safety` (`motion_latched`,
+     `system_latched`, `reason`, `updated_at`) and configured `servo_roles` /
+     `servo_endpoints`.
 
-4. **Compounding defect: empty `behaviors.servo_roles` on Fusion HAT+ (`config_import.py:194-205`):**
-   - In `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/config_import.py:204`:
-
-     ```python
-     elif is_fusion:
-         roles = {}
-     ```
-
-   - When migrating to `fusion_hat_plus` from default legacy roles (`gpio12`/`gpio13`),
-     `import_pi5_configs()` wipes `behaviors.servo_roles` to `{}` instead of
-     mapping calibrated endpoints or prompting the user.
-   - Consequently:
-     - Pressing D-pad buttons in the Web Gamepad UI (`action_ledger` rows 22, 25,
-       43, 46, 49, 52) fails with
-       `MOTION_STOPPED: movement contains unmapped servo roles: left_motor, right_motor`.
-     - Meanwhile, `IDENTITY_PROMPT` (`prompts.py:88-89`) instructs the LLM:
-       `"Any request containing servo or physical movement must use robot.behavior.execute_movement, never robot.behavior.execute_expression."`
-       When the LLM obeys this prompt (`action_ledger` rows 2 and 27),
-       `behavior.execute_movement` fails with
-       `BEHAVIOR_DRAFT_INVALID: movement preset references unconfigured logical roles: left_motor, right_motor`!
-       For single-endpoint angle commands (such as `"rotate PWM0 servo to 90 degrees"`),
-       the prompt should direct the LLM to `robot.servo.move` when a specific
-       endpoint and angle are requested, or `servo_roles` must be populated.
+5. **Compounding defect: `IDENTITY_PROMPT` forces `robot.behavior.execute_movement` while `behaviors.servo_roles` is `{}` on Fusion HAT+ (`prompts.py:88-96`, `config_import.py:219-228`):**
+   - Per `InstallationGuide.md:190-191` ("One calibrated Fusion servo is
+     sufficient. Assign wheel roles only to actual wheel servos; positional
+     servos must not silently become wheels"), `config_import.py:222`
+     intentionally includes `not is_fusion` so calibrated `hat_pwm*` ports are
+     not silently assigned to `left_motor` and `right_motor`. As a result,
+     `config.toml` has `[behaviors.servo_roles]` empty (`{}`).
+   - However, `IDENTITY_PROMPT` (`prompts.py:88-89`) instructs the LLM:
+     `"Any request containing servo or physical movement must use robot.behavior.execute_movement, never robot.behavior.execute_expression."`
+   - When the LLM obeys this rule (`action_ledger` rows 2 and 27),
+     `robot.behavior.execute_movement` fails with
+     `BEHAVIOR_DRAFT_INVALID: movement preset references unconfigured logical roles: left_motor, right_motor`.
+   - Meanwhile, the operator has no onboarding prompt in `setup_wizard.py` to
+     explicitly assign `left_motor` and `right_motor` when `hat_pwm0` and
+     `hat_pwm1` *are* used as wheels, causing Web Gamepad D-pad commands
+     (`action_ledger` rows 22, 25, 43, 46, 49, 52) to fail with
+     `MOTION_STOPPED: movement contains unmapped servo roles: left_motor, right_motor`.
 
 ## Issue 2 root cause analysis: embedded speaker refusal and TTS failure
 
@@ -216,19 +228,26 @@ prompt/tool-contract omissions, and audio/speech lifecycle defects** between
    ```toml
    [speech_output]
    enabled = true
+   language = "en"
    piper_python = "~/.local/share/ninjarobot_pi5/speech/bin/python"
    english_model = ""
    chinese_model = ""
    output_node = "alsa:sndrpigooglevoi"
+   volume = 0.35
+   max_characters = 500
+   synthesis_timeout_seconds = 30.0
+   playback_timeout_seconds = 60.0
+   bluetooth_lead_in_seconds = 0.5
+   fusion_speaker = true
    ```
 
 2. **Filesystem verification:**
    - `~/.local/share/ninjarobot_pi5/speech/` **does not exist**.
    - `~/.local/share/ninjarobot_pi5/voices/` **does not exist**.
-   - Neither `english_model` nor `chinese_model` is configured.
+   - Neither `english_model` nor `chinese_model` is configured in `config.toml`.
 
 3. **Conversation transcript evidence (`~/.local/share/ninjarobot_pi5/conversations.sqlite3`):**
-   Across every turn in `conversations.sqlite3` (rows 4–9, 17–22, 27–32, 34–41,
+   Across turns in `conversations.sqlite3` (rows 4–9, 17–22, 27–32, 34–41,
    43–45, 51–53, 55, 62, 65), two symptoms appear simultaneously:
    - When asked `"can you speak now"` (row 33), `"now try to speak out loud"`
      (row 36), or `"Can you speak out lout with embeded speaker?"` (row 50), the
@@ -237,18 +256,17 @@ prompt/tool-contract omissions, and audio/speech lifecycle defects** between
      > `"I truly wish I could, Master, but I do not have an embedded speaker capable of speech or playing audio files. My only way to make sound is through a small buzzer, which can only play simple tones and melodies."`
 
    - Immediately after the LLM generates its text reply, `AgentRuntime.chat()`
-     attempts automatic TTS synthesis, fails, concatenates
-     `Spoken output unavailable or stopped; the text reply is retained.` onto the
-     streamed message without a leading space, **and** inserts a duplicate
-     `assistant` message row containing
+     attempts automatic TTS synthesis, fails, streams
+     `\n\nSpoken output unavailable or stopped; the text reply is retained.` onto
+     the reply, **and** inserts a separate `assistant` message row containing
      `Spoken output unavailable or stopped; the text reply is retained.` into
      `conversations.sqlite3`.
 
 ### 2.2 Code trace across layers
 
-1. **Root Cause 2A — Why the LLM claims it only has a buzzer (`prompts.py:32-118`, `service_main.py:216-247`):**
+1. **Root Cause 2A — Why the LLM claims it only has a buzzer (`prompts.py:32-118`, `service_main.py:250-281`):**
    - Spoken reply synthesis in NinjaRobot is a **post-reply runtime pipeline hook**
-     in `AgentRuntime.chat()` (`runtime.py:540-553`): after the LLM finishes its
+     in `AgentRuntime.chat()` (`runtime.py:547-555`): after the LLM finishes its
      turn (`reply = await self._chat_with_task(...)`), `AgentRuntime` calls
      `await self.speech.speak(reply.spoken_summary or reply.text)`.
    - There is **no `robot.speaker.*` or `robot.speech.*` tool** in the LLM tool
@@ -256,35 +274,40 @@ prompt/tool-contract omissions, and audio/speech lifecycle defects** between
      `robot.buzzer.play_tone` and `robot.behavior.execute_expression` (which
      supports `tone` and `melody` on the buzzer).
    - Neither `IDENTITY_PROMPT` (`prompts.py:32-118`) nor `runtime_state`
-     (`service_main.py:216-247`) informs the LLM that:
+     (`service_main.py:250-281`) informs the LLM that:
      1. The robot has an audio output pipeline (`speech_output`) that
-        automatically speaks the assistant's text replies through the configured
-        speaker (`alsa:sndrpigooglevoi` on Fusion HAT+ or Bluetooth speaker)
-        whenever `/speech on` (`speech_output.enabled = true`) is active; and
+        automatically synthesizes and speaks the assistant's text replies through
+        the configured speaker (`alsa:sndrpigooglevoi` on Fusion HAT+ or
+        Bluetooth speaker) whenever `/speech on` (`speech_output.enabled = true`)
+        is active; and
      2. To speak out loud through the embedded speaker, the assistant simply
-        writes the desired spoken words in its normal text reply (and `spoken_summary`)
-        rather than searching for a speaker tool.
-   - Compounding this, once earlier turns recorded assistant messages claiming
-     `"I do not have a speaker"` and `"Spoken output unavailable or stopped"` in
-     `conversations.sqlite3`, those messages remained in the 24-message rolling
-     context window (`context.py`), conditioning the LLM to repeat the refusal.
+        writes the desired spoken words in its normal text reply (and optional
+        `spoken_summary`) rather than looking for a speaker tool.
 
-2. **Root Cause 2B — Why onboarding speaker setup succeeded while runtime TTS failed (`setup_wizard.py:604-631`, `bluetooth_setup.py:238-315`, `speech.py:36-74`):**
+2. **Root Cause 2B — Why onboarding speaker setup succeeded while runtime TTS failed (`setup_wizard.py:594-639`, `hardware_setup.py:412-462`, `speech.py:29-70`):**
    - During `ninjarobot onboard`, the Fusion HAT+ **"Embedded Speaker Initialization"**
-     step (`setup_wizard.py:604-631`) calls:
-     1. `configure_sunfounder_i2s_speaker(config_path)` (`bluetooth_setup.py:238-259`),
-        which sets `speech_output.enabled = True` and
-        `speech_output.output_node = "alsa:sndrpigooglevoi"`.
-     2. `play_sunfounder_speaker_test_tone(node)` (`bluetooth_setup.py:262-315`),
+     step (`setup_wizard.py:594-639`) calls:
+     1. `configure_sunfounder_i2s_speaker(config_path)`
+        (`ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/hardware_setup.py:435-462`),
+        which unconditionally sets `payload["speech_output"]["enabled"] = True`,
+        `payload["speech_output"]["output_node"] = node` (`"alsa:sndrpigooglevoi"`),
+        and `payload["speech_output"]["fusion_speaker"] = True`.
+     2. `play_sunfounder_speaker_test_tone(node)`
+        (`ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/hardware_setup.py:412-432`),
         which generates a pure 440/660 Hz sine-wave WAV in Python
-        (`synthesize_test_chime_wav`) and plays it via `aplay -q -D plughw:sndrpigooglevoi`.
-   - Because `play_sunfounder_speaker_test_tone()` does **not** use Piper TTS, the
-     test tone plays through the Fusion HAT+ speaker even when Piper TTS and voice
-     models are completely absent!
-   - Onboarding never checks `speech_health()`, never runs
-     `scripts/prepare_speech_voice.py`, and never configures `piper_python`,
-     `english_model`, or `chinese_model` in `config.toml`.
-   - At runtime, `LocalSynthesizer._paths()` (`speech.py:36-45`) checks:
+        (`synthesize_test_chime_wav()`) and plays it via
+        `aplay -q -D plughw:CARD=sndrpigooglevoi,DEV=0 -`.
+   - As noted in `InstallationGuide.md:214-215`, a successful onboarding tone
+     verifies ALSA playback only, not Piper TTS engine or voice model availability.
+     Installing Piper TTS requires creating the isolated Python 3.11 venv at
+     `~/.local/share/ninjarobot_pi5/speech` (`requirements/local-speech.txt`),
+     downloading the 114 MB English voice via `scripts/prepare_speech_voice.py --apply`,
+     and setting `english_model = "~/.local/share/ninjarobot_pi5/voices/en/en_US-ljspeech-high.onnx"`
+     (`InstallationGuide.md:830-850, 1154-1160`).
+   - Because `configure_sunfounder_i2s_speaker()` sets `speech_output.enabled = True`
+     even when `english_model` is `""` and `~/.local/share/ninjarobot_pi5/speech/bin/python`
+     is absent, every subsequent chat reply invokes `LocalSynthesizer._paths()`
+     (`speech.py:33-52`):
 
      ```python
      model = self.config.english_model if language == "en" else self.config.chinese_model
@@ -292,45 +315,57 @@ prompt/tool-contract omissions, and audio/speech lifecycle defects** between
          raise ValueError("speech_model_not_configured")
      ```
 
-   - `SpeechService.speak()` (`speech.py:216-222`) catches `Exception` and hides
-     the specific `speech_model_not_configured` / `piper_python_missing` reason
-     behind `"speech_unavailable_or_interrupted; text retained"`.
+   - `SpeechService.speak()` (`speech.py:223-229`) catches `Exception` and hides
+     the specific `ValueError` code (`speech_model_not_configured`,
+     `piper_not_installed`, `speech_model_missing`) behind the generic string
+     `"speech_unavailable_or_interrupted; text retained"`.
 
-3. **Root Cause 2C — Duplicate and unspaced notice corruption in `AgentRuntime._append_memory_notice` (`runtime.py:546-553, 711-728`):**
-   - In `AgentRuntime.chat()` (`runtime.py:546-553`):
+3. **Root Cause 2C — Conversation history pollution from persisted `memory-notice` rows (`runtime.py:547-555, 1485-1501`, `agent_loop.py:299-305`):**
+   - In `AgentRuntime.chat()` (`runtime.py:547-555`):
 
      ```python
-     spoken = await self.speech.speak(reply.spoken_summary or reply.text)
-     if spoken.get("status") == "failed":
-         notice = "Spoken output unavailable or stopped; the text reply is retained."
-         reply = await self._append_memory_notice(
-             session_id, reply, notice, on_text_delta=on_text_delta
-         )
+     if self.speech is not None and self.speech.enabled:
+         spoken = await self.speech.speak(reply.spoken_summary or reply.text)
+         if spoken.get("status") not in {"played", "simulated", "disabled"}:
+             notice = "Spoken output unavailable or stopped; the text reply is retained."
+             await self._append_memory_notice(
+                 session_id, notice, on_text_delta=on_text_delta
+             )
+             reply = reply.model_copy(update={"text": reply.text + "\n\n" + notice})
      ```
 
-   - And in `_append_memory_notice()` (`runtime.py:711-728`):
+   - And in `_append_memory_notice()` (`runtime.py:1485-1501`):
 
      ```python
-     if on_text_delta is not None:
-         res = on_text_delta(notice)
-         if inspect.isawaitable(res):
-             await res
      await self.store.append_message(
          session_id,
-         MessageRole.ASSISTANT,
-         notice,
-         user_id=user_id,
+         ModelMessage(role=MessageRole.ASSISTANT, content=notice),
+         message_id=f"message-{uuid.uuid4().hex}",
+         user_id=self._active_users.get(session_id),
+         metadata={"workflow": "memory-notice"},
      )
-     return reply.model_copy(update={"text": f"{reply.text}\n\n{notice}"})
+     if on_text_delta is not None:
+         await on_text_delta("\n\n" + notice)
      ```
 
-   - This has two bugs:
-     1. `on_text_delta(notice)` streams `notice` without a leading `\n\n`, so UI
-        clients concatenate `...today?Spoken output unavailable...`.
-     2. `self.store.append_message(session_id, MessageRole.ASSISTANT, notice)`
-        persists a separate assistant turn in `conversations.sqlite3` for every
-        failed TTS attempt, polluting the conversation history and wasting half
-        of the 24-message LLM context window on error notices.
+   - When `AgentLoop.chat()` (`agent_loop.py:299-305`) loads conversation history
+     on the next turn:
+
+     ```python
+     history = tuple(
+         stored.message
+         for stored in await self._store.messages(
+             session_id,
+             user_id=self._active_user(session_id),
+         )
+     )
+     ```
+
+     it includes every `metadata={"workflow": "memory-notice"}` row as a standalone
+     `MessageRole.ASSISTANT` turn in the LLM prompt context! Over repeated turns,
+     the LLM sees its own history filled with assistant messages saying
+     `"Spoken output unavailable or stopped; the text reply is retained."`,
+     reinforcing its refusal to speak.
 
 ## Issue 3 root cause analysis: web power-off button disabled
 
@@ -347,59 +382,61 @@ export function updatePowerOffState() {
     !state.poweroffReady ||
     !state.poweroffAuthorized ||
     !state.leaseId;
-  ...
+  if (elements.powerAvailability) {
+    elements.powerAvailability.textContent =
+      !state.poweroffEnabled ? t("power.disabled") :
+      !state.poweroffReady ? t("power.helperUnavailable") :
+      (!state.poweroffAuthorized || !state.leaseId) ? t("power.pairingRequired") : t("power.enabled");
+  }
 }
 ```
 
-The four gates are populated by `/api/status` (`web_app.py:446-475`) and WebSocket
-`status` frames (`web_app.py:854-882`):
+The four gates are populated by `/api/status` (`web_app.py:424-441`) and WebSocket
+`lease` / `status` frames (`web_app.py:554-580`):
 
 | Gate in `app-shared.js` | Backend source (`web_app.py` / `shutdown.py`) | Current value on host | Why |
 | --- | --- | --- | --- |
-| `state.poweroffEnabled` | `config.deployment.web_poweroff_enabled` (`shutdown.py:118`) | `false` | `~/.config/ninjarobot_pi5/config.toml` has `[deployment] web_poweroff_enabled = false`. |
-| `state.poweroffReady` | `PoweroffCoordinator._probe_poweroff_helper()` (`shutdown.py:201-235`) | `false` | `/usr/libexec/ninjarobot-poweroff` and `/etc/sudoers.d/ninjarobot-agent-poweroff` do not exist on this Raspberry Pi. |
-| `state.poweroffAuthorized` | `paired_connection` (`web_app.py:458, 868`) | `true` only after `/pair` | Requires an active paired browser session cookie (`ninjarobot_web_session`). |
+| `state.poweroffEnabled` | `config.deployment.web_poweroff_enabled` (`service_main.py:246, 401`) | `false` | `~/.config/ninjarobot_pi5/config.toml` has `[deployment] web_poweroff_enabled = false`. |
+| `state.poweroffReady` | `PoweroffCoordinator._probe_poweroff_helper()` (`shutdown.py:64-76, 202-260`) | `false` | `/usr/libexec/ninjarobot-poweroff` and `/etc/sudoers.d/ninjarobot-agent-poweroff` are not installed on this Raspberry Pi. |
+| `state.poweroffAuthorized` | `paired_connection` (`web_app.py:446, 465, 577`) | `true` only after `/pair` | Requires a paired browser session cookie (`ninjarobot_web_session`). |
 | `state.leaseId` | Active WebSocket controller lease | `true` when connected | Assigned on WebSocket controller connection. |
 
 ### 3.2 Why deployment artifacts and `web_poweroff_enabled` were never configured
 
-1. **Onboarding (`setup_wizard.py`) completely omits deployment / power-off setup:**
-   `run_setup_wizard()` (`setup_wizard.py:215-392`) walks the user through:
-   - Hardware profile selection (`fusion_hat_plus` vs `legacy_pi5`)
-   - Mandatory hardware (`buzzer`, `display`, `distance`, `servo`, `camera`)
-   - Optional hardware (`bluetooth`/embedded speaker, `microphone`)
-   - Config import (`_import_hardware_configuration`)
-   - AI model provider (`_provider_setup`)
-   - MCP servers (`_mcp_setup`)
-   - Remote access (`_remote_setup`)
-   - Service start (`ninjarobot-agent service start --real`)
-   It **never** offers to install `/usr/libexec/ninjarobot-poweroff` +
+1. **Onboarding (`setup_wizard.py`) omits power-off / deployment helper setup:**
+   `run_setup_wizard()` (`setup_wizard.py:215-392`) walks the user through
+   hardware profile selection, mandatory hardware, optional speaker/microphone,
+   config import, AI model provider, MCP servers, and remote access
+   (`_remote_setup`), then offers to start `ninjarobot-agent service start --real`.
+   It never offers to install `/usr/libexec/ninjarobot-poweroff` +
    `/etc/sudoers.d/ninjarobot-agent-poweroff` or enable `web_poweroff_enabled`.
 
-2. **`DeploymentManager` (`deployment.py:322-372`) couples `web_poweroff_enabled` to systemd boot auto-start:**
-   - Currently, the only way to install `/usr/libexec/ninjarobot-poweroff` and set
-     `web_poweroff_enabled = true` is by running `ninjarobot-agent deployment setup --confirm`
+2. **`DeploymentManager` (`deployment.py:314-342, 554-561`) couples `web_poweroff_enabled` to systemd boot auto-start:**
+   - Currently, the only CLI path that installs `/usr/libexec/ninjarobot-poweroff`
+     and sets `web_poweroff_enabled = true` is `ninjarobot-agent deployment setup --confirm`
      (or `deployment install --confirm` followed by `deployment enable --confirm`).
-   - However, `DeploymentManager.enable()` (`deployment.py:322-347`) unconditionally
+   - Note that on `fusion_hat_plus`, `DeploymentManager._requires_full_poweroff()`
+     (`deployment.py:495-499`) and `PoweroffCoordinator` (`service_main.py:408`)
+     already set `require_full_poweroff = False` (orderly OS shutdown without
+     requiring Raspberry Pi EEPROM `POWER_OFF_ON_HALT=1` changes).
+   - However, `DeploymentManager.enable()` (`deployment.py:314-342`) unconditionally
      runs `sudo systemctl enable ninjarobot-agent.service` and sets
      `auto_start_enabled = True` alongside `web_poweroff_enabled = True`.
-   - Operators who start the agent via `ninjarobot onboard` or
-     `ninjarobot-agent service start --real` (without wanting boot-time systemd
-     auto-start) have no supported path to install just the root-owned poweroff
-     helper + narrow sudoers rule and enable `web_poweroff_enabled`.
+   - Operators who launch the agent manually (`ninjarobot-agent service start --real`)
+     without wanting boot-time systemd auto-start have no supported command to
+     install only the root-owned poweroff helper + narrow sudoers rule and set
+     `web_poweroff_enabled = True`.
 
-3. **Local LAN un-paired connection authorization edge case (`service_main.py:199-203`, `web_app.py:456-462`):**
-   - In `web_app.py:456-462`, `poweroff_authorized` is set to
-     `bool(poweroff.get("enabled") and poweroff.get("ready") and paired_connection)`.
-   - When `remote_access.enabled = false` and `deployment.auto_start_enabled = false`,
-     `_effective_onboarding_enabled()` (`service_main.py:43-50`) returns `False`,
-     which sets `require_local_pairing = False` (`service_main.py:202`).
+3. **Local LAN un-paired connection authorization edge case (`service_main.py:239-243, 421`, `web_app.py:354, 465-475, 577`):**
+   - In `web_app.py:577`, `poweroff_authorized` is set to `paired_connection`.
+   - When `onboarding.enabled = false`, `remote_access.enabled = false`, and
+     `deployment.auto_start_enabled = false`, `_effective_onboarding_enabled()`
+     (`service_main.py:66-73`) returns `False`, which sets
+     `require_local_pairing = False` (`service_main.py:421`).
    - When `require_local_pairing` is `False`, a local LAN browser can open
-     `https://<pi-ip>:8443/` and acquire a WebSocket controller lease **without**
-     visiting `/pair` first, meaning `paired_connection` is `False` (no session
-     cookie) even though the user holds the active local controller lease! In that
-     mode, `poweroff_authorized` remains `False` despite the UI message saying
-     `"Connect as the active controller to use power-off."` (`app-shared.js:445`).
+     `https://<pi-ip>:8443/` and acquire the active WebSocket controller lease
+     without visiting `/pair` first (`web_app.py:354, 474`), leaving
+     `paired_connection = False` (`poweroff_authorized = False`).
 
 ## Issue 4 root cause analysis: web-based voice input instability
 
@@ -407,100 +444,144 @@ The web interface (`ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/age
 exposes two voice input controls in `.audio-controls`:
 
 1. **`#webMicButton` ("WEB MICROPHONE / Fill the message box")** — browser-side
-   speech recognition (`window.SpeechRecognition || window.webkitSpeechRecognition`).
+   speech recognition (`window.SpeechRecognition || window.webkitSpeechRecognition`)
+   configured in `app-agent.js:240-309`.
 2. **`#usbMicButton` ("VOICE INPUT / Always-on Ninja: Off")** — robot-side
    always-on wake-word + command capture (`voice_enable` / `voice_disable` ->
    `VoiceInputService` -> `VoiceInputController` -> `ManagedVoiceAudioSource` +
    `WhisperCppTranscriber`).
-3. Additionally, `web_app.py:701` (`usb_microphone`) implements a robot-side
-   push-to-talk transcription endpoint (`WebRobotController.transcribe()` ->
-   `robot.microphone.transcribe`), which is **not wired to any button** in
-   `agent.html` or `app-agent.js`.
+3. Additionally, `web_app.py:705-718` (`usb_microphone` / `usb_microphone_stop`)
+   and `WebRobotController.transcribe()` (`web_control.py:441-486`) implement a
+   robot-side push-to-talk transcription endpoint (`robot.microphone.transcribe`),
+   which is currently **unused by `agent.html` and `app-agent.js`**.
 
-Both active paths (`#webMicButton` and `#usbMicButton`) contain confirmed bugs
+Both active paths (`#webMicButton` and `#usbMicButton`) contain confirmed defects
 that cause intermittent recording and recognition failures.
 
 ### 4.1 Path A: Browser `#webMicButton` (`app-agent.js:240-309`)
 
-1. **`event.resultIndex` transcript truncation bug (`app-agent.js:262-269`):**
+Inspection of `configureSpeechRecognition()` in
+`ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/app-agent.js:240-309`
+shows:
 
-   ```javascript
-   recognition.onresult = (event) => {
-     let transcript = "";
-     for (let index = event.resultIndex; index < event.results.length; index += 1) {
-       transcript += event.results[index][0].transcript;
-     }
-     if (elements.chatInput) elements.chatInput.value = transcript.trim();
-     setSpeechStatus(transcript.trim() ? `${t("browserMic.heard")}: ${transcript.trim()}` : "");
-   };
-   ```
+```javascript
+export function configureSpeechRecognition() {
+  if (!elements.webMic) return;
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    elements.webMic.disabled = true;
+    const small = elements.webMic.querySelector("small");
+    if (small) small.textContent = t("speech.notSupported");
+    return;
+  }
+  const recognition = new SpeechRecognition();
+  recognition.interimResults = true;
+  recognition.continuous = false;
+  recognition.onstart = () => {
+    state.recognitionActive = true;
+    ...
+  };
+  recognition.onresult = (event) => {
+    let transcript = "";
+    for (let index = 0; index < event.results.length; index += 1) {
+      transcript += event.results[index][0].transcript;
+    }
+    elements.chatInput.value = transcript.trim();
+    if (event.results[event.results.length - 1].isFinal && transcript.trim()) {
+      elements.chatInput.focus();
+      toast(t("speech.added"));
+    }
+  };
+```
 
-   Because `recognition.interimResults = true`, the browser emits multiple
-   `onresult` callbacks. Whenever an initial phrase is finalized
-   (`event.results[0].isFinal === true`) and a second segment begins
-   (`event.results[1]`), the browser advances `event.resultIndex` to `1`. Starting
-   the loop at `event.resultIndex` instead of `0` while assigning
-   `elements.chatInput.value = transcript.trim()` **overwrites and discards all
-   earlier finalized segments (`event.results[0 .. resultIndex - 1]`)**.
+This implementation has three confirmed issues:
 
-2. **Lifecycle race between `click`, `onstart`, `onerror`, and `onend` (`app-agent.js:252-308`):**
-   - `state.speechListening` is only set to `true` inside `recognition.onstart`
-     (after asynchronous microphone permission and cloud STT startup). Clicking
-     `#webMicButton` twice during startup calls `recognition.start()` twice and
-     throws `InvalidStateError`.
-   - Clicking `#webMicButton` to stop calls `recognition.stop()` and immediately
-     sets `setSpeechStatus(t("browserMic.stopped"))`, which gets overwritten by
-     any trailing `onresult` or `onerror` event, or leaves `state.speechListening`
-     stuck if the browser session hangs before `onend`.
-
-3. **Browser cloud STT unreliability vs robot-side Whisper STT:**
-   - `window.SpeechRecognition` / `webkitSpeechRecognition` depends on browser
-     vendor cloud services (unavailable on Raspberry Pi Chromium, blocked or
-     flaky on mobile browsers over self-signed LAN HTTPS, and immediately aborted
-     with `no-speech` on a 1-second pause when `continuous = false`).
-   - Meanwhile, the robot already has a working local `whisper.cpp` installation
-     (`~/whisper.cpp/build/bin/whisper-cli` + `ggml-base.bin`) and an already-built
-     push-to-talk backend handler (`usb_microphone` / `usb_microphone_stop` in
-     `web_app.py:701-730` and `web_control.py:415-472`), which `#webMicButton`
-     never uses as a fallback or primary push-to-talk capture mechanism!
+1. **Browser `SpeechRecognition` unreliability and lack of robot-microphone push-to-talk fallback (`app-agent.js:242-248, 272-284`):**
+   - `window.SpeechRecognition` / `webkitSpeechRecognition` relies on browser
+     vendor cloud speech services. On Raspberry Pi Chromium ( lacks Google API
+     keys), Firefox, or mobile browsers connected over LAN to a self-signed TLS
+     certificate (`https://<pi-ip>:8443`), `SpeechRecognition` is either
+     undefined (disabling `#webMicButton` completely at line 244) or fails
+     intermittently with `network`, `service-not-allowed`, `not-allowed`, or
+     `no-speech`.
+   - Meanwhile, the backend already provides a complete, privacy-gated
+     push-to-talk handler (`usb_microphone` and `usb_microphone_stop` in
+     `web_app.py:705-718` -> `WebRobotController.transcribe()` in
+     `web_control.py:441-486` -> `MicrophoneTranscribeAdapter` in
+     `microphone.py:1159-1292`) that records from the robot's microphone and
+     transcribes locally with `whisper.cpp`, but `app-agent.js` never falls back
+     to it!
+2. **Single-utterance cutoff (`continuous = false`) and input overwrite (`app-agent.js:251, 266`):**
+   - Because `recognition.continuous = false`, any brief pause ends the browser
+     recognition session. If the user clicks `#webMicButton` again to dictate a
+     second sentence (or had already typed text in `#chatInput`),
+     `elements.chatInput.value = transcript.trim()` overwrites the entire input
+     box instead of appending to the existing prefix saved when recording started.
+3. **Startup race on rapid clicks (`app-agent.js:253, 295-308`):**
+   - `state.recognitionActive` is only set to `true` inside `recognition.onstart`
+     (after asynchronous mic permission and cloud handshake). Clicking
+     `#webMicButton` twice before `onstart` fires calls `recognition.start()`
+     twice and throws `InvalidStateError`.
 
 ### 4.2 Path B: Robot `#usbMicButton` ("VOICE INPUT") and Fusion HAT+ microphone pipeline
 
 Comparing `pi5mic/src/pi5mic/core/voiceinput.py` (which works reliably in the
 onboard tool) against `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/voice_input.py`,
-`microphone.py`, and `config_import.py` reveals five confirmed defects in the
-integrated agent voice pipeline:
+`microphone.py`, `config_import.py`, and `app-agent.js` reveals six confirmed
+defects in the integrated agent voice pipeline:
 
-1. **`import_pi5_configs()` drops `voiceinput` settings from `mic.json` (`config_import.py:216-256`):**
-   - The user's `~/.config/pi5mic/mic.json` contains:
-     - `"voiceinput": {"enabled": true, "silence_rms_threshold": 500, "silence_timeout_seconds": 3.0, "max_capture_seconds": 10.0}`
-   - `import_pi5_configs()` only imports `audio.input_device`, `audio.sample_rate`,
-     `audio.channels`, and `audio.duration_seconds`. It leaves `config.toml` at:
-     - `voice_input.enabled = false`
-     - `voice_input.silence_rms_threshold = 200`
-     - `voice_input.silence_stop_seconds = 1.25`
-     - `voice_input.max_command_seconds = 6.0`
-   - Additionally, `configure_fusion_microphone()` (`fusion.py:111-120`) loads
-     `mic.json` (or `{}` if missing) and writes only `audio.input_device` before
-     `mic-tool` runs.
+1. **`import_pi5_configs()` omits `voiceinput.enabled` and `stt.whisper_cpp` from `mic.json` (`config_import.py:255-297`, `integrated.py:795-797`):**
+   - Inspection of `~/.config/pi5mic/mic.json` shows:
+     - `"audio": {"input_device": "snd_rpi_googlevoicehat_soundcar: ...", "sample_rate": 48000, "channels": 1}`
+     - `"wakeword": {"enabled": true, "threshold": 0.5, "vad_threshold": 0.3}`
+     - `"voiceinput": {"enabled": true, "silence_timeout_seconds": 1.25, "max_capture_seconds": 15.0, "cooldown_seconds": 1.0, "vad_rms_threshold": 200.0}`
+     - `"stt": {"selected": "whisper_cpp", "whisper_cpp": {"command": "/home/rogerchang/whisper.cpp/build/bin/whisper-cli", "model_path": "/home/rogerchang/whisper.cpp/models/ggml-base.bin", "language": "auto", "threads": 2, "timeout_seconds": 120}}`
+   - While `import_pi5_configs()` (`config_import.py:283-297`) imports
+     `max_capture_seconds`, `silence_timeout_seconds`, `cooldown_seconds`, and
+     `vad_rms_threshold`, it **does not import `voiceinput.enabled`** (leaving
+     `voice_input.enabled = false` in `config.toml` after onboarding) and **does
+     not import `stt.whisper_cpp`** (`command`, `model_path`, `threads`,
+     `timeout_seconds`).
 
-2. **Zero-tolerance `audio_overflow` handling kills the listener (`voice_input.py:362-375, 445-446`):**
+2. **Silent error swallowing on `#usbMicButton` in `app-agent.js:229-236`:**
+   - In `app-agent.js:230-235`:
+
+     ```javascript
+     elements.voiceInput.addEventListener("click", () => {
+       const request = state.voiceEnabled ? "voice_disable" : "voice_enable";
+       send(request)
+         .then((data) => updateVoiceInput(data))
+         .catch(() => {});
+     });
+     ```
+
+   - And in `app-agent.js:211`, `const enabled = status.enabled === true && status.state !== "disabled";`
+     treats `status.state === "failed"` (when `status.enabled` is still `true` in
+     `VoiceInputController._run()`, `voice_input.py:345-391`) as `enabled = true`!
+     When `VoiceInputController` transitions to `FAILED`, the button stays
+     highlighted as `VOICE INPUT ON` (`Always-on Ninja: failed`), and clicking it
+     sends `voice_disable` instead of `voice_enable`, confusing the user.
+
+3. **Zero-tolerance `audio_overflow` handling kills the listener (`voice_input.py:345-378, 444-447`, `microphone.py:503`):**
    - In `pi5mic` (`pi5mic/src/pi5mic/core/voiceinput.py:644-676`), a PortAudio
      `overflowed` flag on `stream.read()` is logged, clears the frame buffer, and
      continues reading; only 3 consecutive overflows trigger stream recreation,
      and the loop never terminates.
-   - In `VoiceInputController._listen_once()` (`voice_input.py:445-446`):
+   - In `VoiceInputController._listen_once()` (`voice_input.py:444-447`):
 
      ```python
      pcm, overflowed = await source.read()
+     if not self._resume_event.is_set() or self._stop_event.is_set():
+         break
      if overflowed:
          raise VoiceInputError("audio_overflow")
      ```
 
-   - And in `ManagedVoiceAudioSource` (`microphone.py:505`), `block_frames` is
-     hardcoded to `1280` samples. At the Fusion HAT+ I2S microphone's native
-     `48000 Hz` sample rate, `1280` samples is only **26.67 ms** per read while
-     `openWakeWord` inference (`detector.process`) runs on every 80 ms frame.
+   - And in `ManagedVoiceAudioSource.__init__()` (`microphone.py:503`),
+     `block_frames` is hardcoded to `1280` samples. At the Fusion HAT+ I2S
+     microphone's `48000 Hz` sample rate, `1280` samples is only **26.67 ms** per
+     read while `openWakeWord` inference (`detector.process`) runs on every 80 ms
+     frame.
    - Any transient CPU spike (such as LLM HTTP streaming, display SPI rendering,
      or ONNX wake-word inference) that delays a 26.67 ms read causes PortAudio to
      set `overflowed = True`. `VoiceInputController` immediately closes the audio
@@ -508,27 +589,25 @@ integrated agent voice pipeline:
      `retry_limit = 2` (3 occurrences), permanently transitions to `FAILED` and
      stops listening!
 
-3. **Empty Whisper transcripts are treated as fatal `transcription_failed` errors (`microphone.py:200-201`, `voice_input.py:362-375, 505-517`):**
+4. **Empty Whisper transcripts are treated as fatal `transcription_failed` errors (`microphone.py:200-202`, `voice_input.py:345-378, 505-517`):**
    - In `pi5mic` (`pi5mic/src/pi5mic/core/voiceinput.py:509-518`), when no speech
      is detected after the wake word, `NoSpeechDetectedError` is caught, `failures`
      is not incremented, and the listener immediately re-arms.
-   - In `WhisperCppTranscriber.transcribe()` (`microphone.py:200-201`), an empty
-     transcript (or Whisper noise tokens like `[BLANK_AUDIO]`) raises
-     `RuntimeError("whisper.cpp returned an empty transcript")`, which
-     `VoiceInputController._transcribe()` (`voice_input.py:516-517`) wraps into
-     `VoiceInputError("transcription_failed")`.
-   - In `VoiceInputController._run()` (`voice_input.py:362-375`), both
-     `no_speech_detected` and `transcription_failed` increment `failures += 1`,
-     put the listener into `DEGRADED` backoff, and after 3 occurrences **permanently
-     shut down Always-On Voice Input (`VoiceInputState.FAILED`)**!
+   - In `WhisperCppTranscriber.transcribe()` (`microphone.py:200-202`), an empty
+     transcript raises `RuntimeError("whisper.cpp returned an empty transcript")`,
+     which `VoiceInputController._transcribe()` (`voice_input.py:516-517`) wraps
+     into `VoiceInputError("transcription_failed")` (and even if `no_speech_detected`
+     were raised, `VoiceInputController._run()` at `voice_input.py:345-360` treats
+     *all* `VoiceInputError` codes as fatal strikes!).
+   - Consequently, 3 empty/blank-audio captures after wake-word triggers
+     permanently shut down Always-On Voice Input (`VoiceInputState.FAILED`).
 
-4. **VAD RMS calculation lacks DC-offset removal and mishandles post-wake silence (`voice_input.py:448-462, 590-594`):**
-   - `_pcm_rms(frame)` (`voice_input.py:590-594`) computes raw RMS around `0`
+5. **VAD RMS calculation lacks DC-offset removal and hangs for `max_command_seconds` (`15.0s`) on post-wake silence (`voice_input.py:451-463, 589-593`):**
+   - `_pcm_rms(pcm)` (`voice_input.py:589-593`) computes raw RMS around `0`
      (`sqrt(mean(x^2))`) without subtracting the frame's DC mean. I2S MEMS
-     microphones (`snd_rpi_googlevoicehat_soundcar`) commonly exhibit a small DC
-     bias whose raw RMS exceeds the default `silence_rms_threshold = 200` (which
-     is why `mic.json` was tuned to `500`).
-   - Furthermore, in `voice_input.py:450-460`:
+     microphones (`snd_rpi_googlevoicehat_soundcar`) commonly exhibit a DC bias
+     whose raw RMS exceeds `silence_rms_threshold = 200`.
+   - Furthermore, in `voice_input.py:451-463`:
 
      ```python
      if self._vad_enabled:
@@ -539,23 +618,26 @@ integrated agent voice pipeline:
          else:
              speech_started = True
              silent_frames = 0
+     if len(capture) >= max_capture_bytes or (
+         self._vad_enabled and speech_started and silent_frames >= silence_frames
+     ):
+         return await self._transcribe(bytes(capture), detector.sample_rate)
      ```
 
      - If DC offset + ambient noise keeps `_pcm_rms(frame) >= 200`, `speech_started`
        is set to `True` immediately on frame 1 and `silent_frames` stays `0`
        forever, forcing every command to record for the full `max_command_seconds`
-       (`6.0s`) before Whisper even starts!
-     - Conversely, if the user's voice is quieter than the threshold or if wake
-       word false-triggers, `speech_started` remains `False` and `silent_frames`
-       never increments, again hanging for the full `6.0s`.
+       (`15.0s` in `config.toml`) before Whisper even starts!
+     - Conversely, if wake word triggers and the user does not speak (or speaks
+       below threshold), `speech_started` remains `False` and `silent_frames`
+       never increments, again hanging for the full `15.0s`.
 
-5. **Event-loop blocking in `_PCMFrameAssembler.feed()` and PulseAudio `hw:0,0` contention (`voice_input.py:447, 554-577`):**
-   - `_PCMFrameAssembler.feed(pcm)` converts 48,000 Hz samples to 16,000 Hz using
-     a pure-Python `while` loop (`int(value).to_bytes(2, "little", signed=True)`)
-     synchronously on the main `asyncio` event loop thread (`voice_input.py:447`),
-     creating ~64,000 Python objects per second of audio and starving both WebSocket
-     responsiveness and `source.read()`. (By contrast, `pi5mic` uses C-level
-     `audioop.ratecv` in a dedicated thread.)
+6. **Event-loop blocking in `_PCMFrameAssembler.feed()` and PulseAudio `hw:0,0` contention (`voice_input.py:448, 553-576`, `microphone.py:514-547`):**
+   - `_PCMFrameAssembler.feed(pcm)` (`voice_input.py:553-576`) converts 48,000 Hz
+     samples to 16,000 Hz using a pure-Python `while` loop
+     (`int(value).to_bytes(2, "little", signed=True)`) synchronously on the main
+     `asyncio` event loop thread, creating ~64,000 Python objects per second of
+     audio and starving both WebSocket responsiveness and `source.read()`.
    - Finally, `/usr/bin/pulseaudio` (`PID 875`) is running on the host. Live
      testing confirmed that whenever any process queries ALSA `default` (`pcm.hat`),
      PulseAudio opens `/dev/snd/pcmC0D0c` (`hw:0,0` capture) and holds it for 5
@@ -567,38 +649,41 @@ integrated agent voice pipeline:
 ## Potential vulnerabilities and architectural risks
 
 During the line-by-line audit across `ninjarobot_pi5_agent` and
-`ninjarobot_pi5_ide`, five additional reliability and architectural risks were
+`ninjarobot_pi5_ide`, six additional reliability and architectural risks were
 identified:
 
-1. **Repeated `pyngrok` paid traffic-policy warning on every service startup (`agent-service.log` lines 15, 74, 99, ..., 692):**
+1. **Sticky `_start_attempted` in `MicrophoneDevice.start()` blocks Level 2 recovery (`microphone.py:704-740`, `robot.py:929-931`):**
+   - If `MicrophoneDevice.start()` fails once at startup (e.g., due to PulseAudio
+     holding `hw:0,0`), `_start_attempted` stays `True` and `_backend` stays
+     `None` for the lifetime of the service process, causing every subsequent
+     `system.resume` health check (`_microphone_health()`) to fail without
+     re-probing hardware.
+2. **Repeated `pyngrok` paid traffic-policy warning on every service startup (`agent-service.log` lines 15, 74, 99, ..., 692):**
    - Every time `ninjarobot-agent` starts with `remote_access.enabled = true`,
      `pyngrok` logs:
      `failed to start tunnel: This policy includes paid traffic policy features that are not allowed on your current plan. ... ERR_NGROK_2263`
      before falling back to a basic tunnel. This adds 1–2 seconds of startup latency
      and clutters `agent-service.log` with false-positive error warnings.
-2. **Continuous HTTP 405 reconnect loop from remote Tavily MCP (`agent-service.log` lines 10–11, 69–70, ..., 687–688):**
+3. **Continuous HTTP 405 reconnect loop from remote Tavily MCP (`agent-service.log` lines 10–11, 69–70, ..., 687–688):**
    - `mcp.client.streamable_http` attempts a `GET https://mcp.tavily.com/mcp` SSE
      stream which returns `HTTP/1.1 405 Method Not Allowed`, logging a reconnect
      message during every startup and tool session.
-3. **Web Controller Resume disarms AI chat motion without clear UI feedback (`web_control.py:394-403`):**
-   - When the user clicks **Resume** (`#resumeMovementButton`) in the Agent Web UI,
-     `WebRobotController.resume()` calls `self._runtime.disarm_motion(self.chat_session(lease_id))`
-     and then `self.activate(lease_id)` (which only arms `control_session(lease_id)`,
-     not `chat_session(lease_id)`). If the user had armed **Arm AI motion** (`A`),
-     clicking **Resume** (`Y`) silently disarms AI chat motion while leaving the user
-     wondering why their next chat motion prompt asks to arm motion again.
-4. **Conversation database bloat and prompt poisoning from persisted runtime notices (`runtime.py:711-728`):**
-   - `_append_memory_notice()` writes transient runtime failure notices (such as
-     `"Spoken output unavailable or stopped; the text reply is retained."`) as
-     permanent `ASSISTANT` rows in `conversations.sqlite3`. Over time, these rows
-     dominate the 24-message rolling window and degrade LLM tool-calling accuracy.
-5. **Dual checkout paths in historical service logs (`agent-service.log` lines 86, 115):**
+4. **Web Controller Resume disarms AI chat motion without updating the UI button (`web_control.py:416-426`, `app-agent.js:187-205`):**
+   - When the user clicks **Resume** (`#resumeMovementButton`, `Y`) in the Agent
+     Web UI, `WebRobotController.resume()` calls
+     `self._runtime.disarm_motion(self.chat_session(lease_id))` on the backend,
+     but `app-agent.js:195-200` does **not** call `updateAiMotion(false)`. Thus
+     the **Arm AI motion** (`A`) button in the web UI remains visually highlighted
+     as armed (`aria-pressed="true"`) even though the backend just disarmed AI
+     chat motion!
+5. **Conversation database bloat and prompt poisoning from persisted runtime notices (`runtime.py:1485-1501`, `agent_loop.py:299-305`):**
+   - `_append_memory_notice()` writes runtime notices (`metadata={"workflow": "memory-notice"}`)
+     as permanent `ASSISTANT` rows in `conversations.sqlite3`, and `AgentLoop`
+     includes them in `history` on every subsequent model turn.
+6. **Dual checkout paths in historical service logs (`agent-service.log` lines 86, 115):**
    - On 2 November (`14:31Z` and `14:33Z`), the service was started from a second
      checkout `/home/rogerchang/Ninja/NinjaRobotPi5` while sharing the same
      `~/.config/ninjarobot_pi5/` and `~/.local/state/ninjarobot_pi5/` directories.
-     Although later runs used `/home/rogerchang/NinjaRobotPi5`, `service status`
-     and `agent-service.log` should surface a clear warning if the active checkout
-     differs from the configured or deployed workspace path.
 
 ## Phased implementation plan
 
@@ -609,202 +694,283 @@ identified:
 > `pi5disp`, `pi5camera`, `pi5vl53l0x`) do **not** require modification for these
 > fixes, preserving `docs/validation/immutable_driver_baseline.json`.
 
-### Phase 1: Servo safety latch recovery, status visibility, and Fusion role mapping (Issue 1)
+### Phase 1: Servo safety latch recovery, status visibility, and prompt/role alignment (Issue 1)
 
 - **Objective:** Ensure Level 1 (`motion_latched`) stops can be cleanly diagnosed
-  and resumed without being blocked by unrelated Level 2 device probes, distinguish
-  historical latches from active electrical faults, surface latch status in
-  `servo.status` and LLM `runtime_state`, and support Fusion HAT+ servo movement
-  in both single-servo and behavior/gamepad paths.
+  and resumed via `/resume` and Web UI **Resume** without being blocked by
+  unrelated Level 2 device probes; fix sticky microphone health probes during
+  Level 2 `system.resume`; distinguish historical latches from active electrical
+  faults; surface latch status in `servo.status`, `runtime_state`, and UI; and
+  align `IDENTITY_PROMPT` and optional wheel role setup with Fusion HAT+ servo
+  rules.
 - **Target files:**
   - `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/safety.py`
   - `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/robot.py`
   - `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/servo.py`
-  - `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/config_import.py`
+  - `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/microphone.py`
   - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/runtime.py`
   - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/service_main.py`
   - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/prompts.py`
   - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/setup_wizard.py`
+  - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/app-agent.js`
+- **Compatibility contract:**
+  - Preserve `RobotAssembly.resume_system()` and `RobotAssembly.resume_motion()`
+    signatures and existing unit test contracts (`test_ipc.py`,
+    `test_distance_game.py`, `test_disabled_devices.py`).
+  - Preserve `config_import.py`'s safety rule (`InstallationGuide.md:190-191`)
+    that positional servos on `fusion_hat_plus` are never *silently* mapped to
+    `left_motor` / `right_motor`.
 - **Implementation steps:**
-  1. **Smart Level 1 vs Level 2 resume (`robot.py`, `runtime.py`):** In
-     `RobotAssembly.resume_system()` (or `AgentRuntime.resume_system()`), check
-     `safety_state.read()`. When `system_latched` is `False` and `motion_latched`
-     is `True`, execute `resume_motion(confirmed=True)` (which checks live power
-     via `ensure_power_ready()` and clears the motion latch) instead of failing on
-     unrelated sensor health checks; when `system_latched` is `True`, continue
-     requiring all enabled device health probes.
-  2. **Historical vs active fault messaging (`safety.py`):** In
-     `MotionController._check_stop_state()`, include `snapshot.updated_at` in the
-     `MOTION_STOPPED` message and state clearly that motion is blocked by a
-     **latched safety stop recorded at `<updated_at>`** that requires `/resume`
-     (or clicking **Resume** in the web controller), rather than implying an
-     undervoltage fault just occurred during the blocked call.
-  3. **Expose safety latch in `servo.status` and `runtime_state` (`servo.py`, `robot.py`, `service_main.py`):**
-     Include `motion_latched` and `stop_reason` in `servo.status` and include the
-     non-sensitive `safety` snapshot (`motion_latched`, `system_latched`, `reason`,
-     `updated_at`) in `runtime_state` (`service_main.py:216-247`) and
-     `AgentRuntime._recovery_status()`.
-  4. **Onboarding safety latch check (`setup_wizard.py`):** During `ninjarobot onboard`
-     (before starting the agent service), check if `safety.json` has a stale
-     `motion_latched` or `system_latched` state; if current power is healthy,
-     prompt the operator to confirm clearing the historical latch.
-  5. **Single-servo vs movement-behavior prompt & Fusion servo roles (`prompts.py`, `config_import.py`):**
-     - Update `IDENTITY_PROMPT` (`prompts.py:88-89`) so that explicit single-servo
-       angle requests (e.g., `"rotate PWM0 to 90 degrees"`) use `robot.servo.move`,
-       while multi-stage expressions with movement or directional locomotion use
-       `robot.behavior.execute_movement` (only when `servo_roles` are configured).
-     - In `config_import.py:194-205`, when `is_fusion` is true and at least two
-       `hat_pwm*` endpoints are calibrated (`hat_pwm0`, `hat_pwm1`) while no custom
-       roles are set, map `left_motor = endpoints[0]` and `right_motor = endpoints[1]`
-       (or allow optional role mapping in onboarding) so Gamepad D-pad and
-       `move_forward` / `move_backward` presets work out of the box on 2-servo
-       Fusion HAT+ builds.
+  1. **Smart Level 1 vs Level 2 routing in `AgentRuntime.resume_system()` (`runtime.py:1935-1960`):**
+     - Inspect `self._read_robot_status()` before dispatching the resume tool.
+     - When `safety.get("motion_latched") is True` and
+       `safety.get("system_latched") is False`, dispatch
+       `tool_name="robot.motion.resume"` (which verifies live power via
+       `ensure_power_ready()` and clears the Level 1 motion latch).
+     - When `system_latched` is `True` (or when `_robot_status` is `None` /
+       unlatched, preserving `test_ipc.py:443-466`), dispatch
+       `tool_name="robot.system.resume"`.
+  2. **Resilient `_microphone_health()` and `_camera_health()` during Level 2 `system.resume` (`robot.py:925-931`, `microphone.py:704-740`):**
+     - In `RobotAssembly._microphone_health()`, if
+       `await self.microphone.health() is not ResourceHealth.READY`, acquire
+       `async with self.microphone.manual_access():` (pausing `VoiceInputController`
+       if open) and call `await self.microphone.suspend()` before
+       `await self.microphone.start()`. Do the same `suspend()` + `start()`
+       retry in `_camera_health()` when not `READY`.
+  3. **Historical vs active fault messaging (`safety.py:66-92, 404-419`):**
+     - Pass `updated_at=snapshot.updated_at` into `stop_guidance()` (or format it
+       in `_check_stop_state()`) so a persisted latch clearly states:
+       `"Motion is blocked by a persistent safety stop recorded at <updated_at>: <cause>"`
+       and instructs the operator to run `/resume` or click **Resume Robot
+       Movement**.
+  4. **Expose safety latch in `servo.status`, `_recovery_status`, `runtime_state`, and Web UI (`servo.py:240-252`, `runtime.py:881-897`, `service_main.py:250-281`, `app-agent.js:187-205`):**
+     - Include `motion_latched` and `stop_reason` in `ServoDevice.status()` (via
+       an optional `safety_reader` callback passed from `RobotAssembly`) and
+       include `safety` (`motion_latched`, `system_latched`, `reason`,
+       `updated_at`), `servo_endpoints`, and `servo_roles` in `runtime_state`
+       (`service_main.py:250-281`).
+     - Update `AgentRuntime._recovery_status()` (`runtime.py:881-897`) so
+       `motion_latched` also populates `reason`, `detail`, and `instructions`.
+     - In `app-agent.js:165, 198`, call `updateAiMotion(false)` when `resumeRobot`
+       completes so the **Arm AI motion** button accurately reflects that
+       `/resume` disarmed AI motion.
+  5. **Single-servo vs locomotion prompt & opt-in wheel role mapping (`prompts.py:88-96`, `setup_wizard.py:562-583`):**
+     - Update `IDENTITY_PROMPT` (`prompts.py:88-96`) to distinguish:
+       - Direct single-servo angle requests (e.g., `"rotate PWM0 / hat_pwm0 to 90 degrees"`):
+         call `robot.servo.move` with the requested `endpoint` and `target_angle`.
+       - Multi-stage expressive movements or directional wheel locomotion (when
+         `runtime_state.servo_roles` has `left_motor` and `right_motor`
+         configured): call `robot.behavior.execute_movement`.
+     - In `_import_hardware_configuration()` (`setup_wizard.py:562-583`), when
+       the profile is `fusion_hat_plus`, `len(updated.hardware.servos.endpoints) >= 2`,
+       and `not updated.behaviors.servo_roles` (only during interactive
+       tty/real hardware import when `servo.json` is present), offer an explicit
+       opt-in choice to map `left_motor` and `right_motor` to the first two
+       calibrated `hat_pwm*` endpoints if they are wheel servos (defaulting to
+       keeping positional servos unmapped).
+- **Validation gate:** Unit tests in `ninjarobot_pi5_ide/tests/test_safety.py`,
+  `test_behavior_runtime.py`, `test_ipc.py`, and full gate suite.
 - **Hardware risk level:** Medium (actuator policy and safety latch recovery; no
   automatic motion is triggered by clearing a latch).
 
-### Phase 2: Embedded speaker LLM awareness, Piper TTS onboarding, and notice fix (Issue 2)
+### Phase 2: Embedded speaker LLM awareness, Piper TTS provisioning, and memory hygiene (Issue 2)
 
 - **Objective:** Make the LLM aware of the automatic spoken-output pipeline,
-  ensure Piper TTS and voice models are installed/configured when enabling speech
-  output during onboarding, surface actionable TTS diagnostics, and fix the
-  duplicate/unspaced failure notice in `AgentRuntime`.
+  prevent onboarding from enabling `speech_output.enabled = true` when Piper TTS
+  or voice models are missing, provide a streamlined Piper TTS + English voice
+  provisioning workflow, surface exact TTS diagnostic codes, and stop polluting
+  LLM conversation context with `memory-notice` rows.
 - **Target files:**
   - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/prompts.py`
   - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/service_main.py`
   - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/speech.py`
   - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/runtime.py`
+  - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/agent_loop.py`
   - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/setup_wizard.py`
-  - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/bluetooth_setup.py`
+  - `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/hardware_setup.py`
   - `scripts/prepare_speech_voice.py`
+- **Compatibility contract:**
+  - Preserve `_optional_hardware()` prompt sequence in `setup_wizard.py` so
+    existing `test_setup_wizard.py` console tests pass unchanged.
+  - Keep Piper in its isolated `~/.local/share/ninjarobot_pi5/speech` virtual
+    environment (`requirements/local-speech.txt`), never installing Piper into
+    the root robot environment (`InstallationGuide.md:830-843`).
 - **Implementation steps:**
-  1. **Add `speech_output` state to `runtime_state` and `IDENTITY_PROMPT` (`service_main.py`, `prompts.py`):**
-     - Include `"speech_output": {"enabled": runtime.speech.enabled, "output_node": config.speech_output.output_node}`
-       in `runtime_state` (`service_main.py:216-247`).
-     - Add an explicit rule in `IDENTITY_PROMPT` (`prompts.py`):
-       `"When runtime_state.speech_output.enabled is true, the runtime automatically synthesizes and speaks your text reply (or spoken_summary) through the configured speaker (such as the Fusion HAT+ embedded speaker or Bluetooth speaker) after you reply. Do not claim that you only have a buzzer when asked to speak out loud; simply write the spoken response in your reply."`
-  2. **Integrate Piper TTS & voice model setup/check into speaker onboarding (`setup_wizard.py`, `bluetooth_setup.py`, `scripts/prepare_speech_voice.py`):**
-     - During `_bluetooth_setup()` in `setup_wizard.py` (both for Fusion HAT+
-       Embedded Speaker and Bluetooth Speaker), check whether `piper_python` and
-       at least one voice model (`english_model` / `chinese_model`) exist on disk.
-     - If missing, offer to run the pinned voice preparation helper
-       (`scripts/prepare_speech_voice.py`) and automatically populate
-       `speech_output.piper_python`, `speech_output.english_model`, and
-       `speech_output.chinese_model` in `config.toml` when models are present in
-       `~/.local/share/ninjarobot_pi5/voices/`.
-     - If Piper or voice models are still not installed after onboarding, keep
-       `speech_output.output_node = "alsa:sndrpigooglevoi"` saved, set
-       `speech_output.enabled = false`, and print the exact command to install
-       the voice model so the agent does not fail TTS on every single chat turn.
-  3. **Actionable synthesis failure reason & fix duplicate notice (`speech.py`, `runtime.py`):**
-     - In `SpeechService.speak()` (`speech.py:216-222`), preserve safe diagnostic
-       codes (`speech_model_not_configured`, `piper_python_missing`) in the
-       returned `reason` field.
-     - In `AgentRuntime._append_memory_notice()` (`runtime.py:711-728`), stream
-       `f"\n\n{notice}"` to `on_text_delta` (with proper spacing) and **do not**
-       append a separate `MessageRole.ASSISTANT` row to `self.store` for transient
-       speech-output notices (preventing conversation database duplication and
-       LLM context poisoning).
-- **Hardware risk level:** Low (audio output configuration and prompt/runtime
-  state).
+  1. **Add `speech_output` state to `runtime_state` and `IDENTITY_PROMPT` (`service_main.py:250-281`, `prompts.py:32-118`):**
+     - Include `"speech_output": {"enabled": bool(runtime.speech and runtime.speech.enabled), "output_node": config.speech_output.output_node, "fusion_speaker": config.speech_output.fusion_speaker}`
+       in `runtime_state` (`service_main.py:250-281`).
+     - Add an explicit instruction in `IDENTITY_PROMPT` (`prompts.py`):
+       `"When runtime_state.speech_output.enabled is true, the runtime automatically synthesizes and speaks your text reply (or spoken_summary) through the configured speaker (such as the Fusion HAT+ embedded speaker or Bluetooth speaker) after you reply. Do not claim that you only have a buzzer when asked to speak out loud; write the spoken response normally in your reply."`
+  2. **Auto-bind existing English voice model and guard `speech_output.enabled` in `configure_sunfounder_i2s_speaker()` (`hardware_setup.py:435-462`, `scripts/prepare_speech_voice.py`):**
+     - In `configure_sunfounder_i2s_speaker(config_path)`
+       (`ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/hardware_setup.py:435-462`),
+       check if the default English voice model
+       (`~/.local/share/ninjarobot_pi5/voices/en/en_US-ljspeech-high.onnx`)
+       exists on disk when `payload["speech_output"]["english_model"]` is empty;
+       if so, set `payload["speech_output"]["english_model"] = "~/.local/share/ninjarobot_pi5/voices/en/en_US-ljspeech-high.onnx"`.
+     - Check whether `piper_python` (`~/.local/share/ninjarobot_pi5/speech/bin/python`)
+       and the configured language model exist on disk: set
+       `payload["speech_output"]["enabled"] = True` when ready, or `False` when
+       Piper/voice files are not yet installed (while still saving
+       `output_node = node` and `fusion_speaker = True`), and report the exact
+       setup command in `setup_wizard.py` without adding an extra blocking
+       `ui.ask()` call inside `_optional_hardware()`.
+     - Enhance `scripts/prepare_speech_voice.py` with optional `--install-piper`
+       and `--configure-config` flags (or provide a single documented command)
+       that creates `~/.local/share/ninjarobot_pi5/speech`, installs
+       `requirements/local-speech.txt`, downloads and verifies
+       `en_US-ljspeech-high.onnx`, and updates `speech_output.english_model` and
+       `speech_output.enabled = true` in `~/.config/ninjarobot_pi5/config.toml`.
+  3. **Surface specific synthesis failure reasons (`speech.py:54-70, 223-229`):**
+     - In `LocalSynthesizer.status()` (`speech.py:54-70`) and
+       `SpeechService.speak()` (`speech.py:223-229`), preserve known safe
+       `ValueError` diagnostic codes (`speech_model_not_configured`,
+       `piper_not_installed`, `speech_model_missing`,
+       `speech_model_language_mismatch`, `speech_language_unavailable`) in the
+       returned `detail` / `reason` field so `/speech status` and logs identify
+       the exact missing prerequisite.
+  4. **Filter `memory-notice` rows out of LLM prompt history and avoid persisting transient TTS errors (`agent_loop.py:299-305`, `runtime.py:547-555`):**
+     - In `AgentRuntime.chat()` (`runtime.py:547-555`), when `spoken` fails,
+       stream `\n\n` + notice to `on_text_delta` and append it to the returned
+       `reply.text`, but **do not** persist transient TTS failure notices as
+       `MessageRole.ASSISTANT` messages in `conversations.sqlite3`.
+     - In `AgentLoop.chat()` (`agent_loop.py:299-305`), exclude stored messages
+       with `stored.metadata.get("workflow") == "memory-notice"` when building
+       `history` for the model turn so historical notices in
+       `conversations.sqlite3` no longer poison the LLM context.
+- **Validation gate:** Unit tests in `ninjarobot_pi5_agent/tests/test_speech.py`,
+  `test_setup_wizard.py`, `test_fusion_setup.py`, and full gate suite.
+- **Hardware risk level:** Low (audio output configuration, prompt/runtime state,
+  and conversation context filtering).
 
 ### Phase 3: Web power-off helper installation and authorization decoupling (Issue 3)
 
 - **Objective:** Allow operators to install the privileged poweroff helper and
-  enable the Web UI **Power off NinjaRobot** button during onboarding (or via CLI)
-  without forcing systemd boot auto-start, and ensure active local controllers are
-  properly authorized.
+  enable the Web UI **Power off NinjaRobot** button via CLI or onboarding without
+  forcing systemd boot auto-start, and ensure local controllers are properly
+  authorized or guided to pair.
 - **Target files:**
   - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/deployment.py`
-  - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/setup_wizard.py`
   - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/agent_cli.py`
+  - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/setup_wizard.py`
   - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_app.py`
-  - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/app-shared.js`
+- **Compatibility contract:**
+  - Keep `/usr/libexec/ninjarobot-poweroff` and
+    `/etc/sudoers.d/ninjarobot-agent-poweroff` byte-identical to the audited
+    deployment assets and validated via `visudo -cf` and
+    `validate_poweroff_helper()`.
+  - Never run a live power-off command in automated tests.
 - **Implementation steps:**
-  1. **Decouple web power-off helper installation from systemd boot auto-start (`deployment.py`, `agent_cli.py`):**
-     - Add `DeploymentManager.install_poweroff(confirmed: bool)` (or allow
-       `deployment enable --web-poweroff-only --confirm`) that installs only
-       `/usr/libexec/ninjarobot-poweroff` (`0755 root:root`) and
-       `/etc/sudoers.d/ninjarobot-agent-poweroff` (`0440 root:root`, validated via
-       `visudo -cf`), and sets `deployment.web_poweroff_enabled = true` in
-       `config.toml` without enabling `ninjarobot-agent.service` at boot.
-  2. **Add optional Web Power-Off setup step to `ninjarobot onboard` (`setup_wizard.py`):**
-     - After `_remote_setup()` in `setup_wizard.py`, add an explicit, previewable
-       step asking whether the operator wants to enable the Web UI **Power off
-       NinjaRobot** button (explaining that it installs `/usr/libexec/ninjarobot-poweroff`
-       and `/etc/sudoers.d/ninjarobot-agent-poweroff` via `sudo`).
-  3. **Align local controller pairing/authorization with `require_local_pairing` (`web_app.py`, `app-shared.js`):**
-     - In `web_app.py:456-462, 866-872`, when `require_local_pairing` is `False`
-       and the request is from a direct local client (not remote proxy), allow an
-       authenticated active local lease holder to satisfy `poweroff_authorized`,
-       or surface a clear `"Pair this browser via /pair to authorize power-off"`
-       status string in `app-shared.js:436-447`.
+  1. **Add standalone `install-poweroff` / `enable_poweroff` to `DeploymentManager` (`deployment.py`, `agent_cli.py`):**
+     - Add `DeploymentManager.install_poweroff(*, confirmed: bool) -> dict[str, Any]`
+       that stages and installs `/usr/libexec/ninjarobot-poweroff` (`0755 root:root`)
+       and `/etc/sudoers.d/ninjarobot-agent-poweroff` (`0440 root:root`, checked
+       with `visudo -cf`), verifies `self._poweroff_authorized()`, runs
+       `_ensure_full_poweroff_configuration()` (which is a safe no-op on
+       `fusion_hat_plus`), and persists `deployment.web_poweroff_enabled = True`
+       in `config.toml` **without** enabling `ninjarobot-agent.service` at boot
+       (`auto_start_enabled` remains unchanged).
+     - Expose this in `ninjarobot-agent deployment install-poweroff --confirm`
+       and in the interactive `ninjarobot-agent deployment` menu (`agent_cli.py`).
+  2. **Offer optional Web Power-Off setup during onboarding (`setup_wizard.py`):**
+     - Support `ninjarobot onboard --step poweroff` (and offer opt-in helper
+       installation inside `_remote_setup()` when running interactively) so
+       operators can enable the Web Power-Off button during onboarding while
+       preserving existing `_Console` test fixtures.
+  3. **Authorize active local controller when `require_local_pairing` is `False` (`web_app.py:446-475`):**
+     - In `websocket_controller()` (`web_app.py:446-475`), when
+       `scope == "local"` (direct LAN connection, not `remote_connection`) and
+       `not require_local_pairing`, treat the authenticated local controller as
+       `paired_connection = True` (or require local pairing whenever
+       `web_poweroff_enabled` is `True` by including `config.deployment.web_poweroff_enabled`
+       in `_effective_onboarding_enabled()` in `service_main.py:66-73` so local
+       browsers always pair via `/pair` and receive the session cookie). Including
+       `web_poweroff_enabled` in `_effective_onboarding_enabled()` is even safer
+       because it preserves the strict `/pair` session-cookie requirement for
+       power-off!
+- **Validation gate:** Unit tests in `ninjarobot_pi5_agent/tests/test_deployment.py`
+  and `test_web.py`.
 - **Hardware risk level:** High / Power-risk (touches `/usr/libexec/ninjarobot-poweroff`
   and `/etc/sudoers.d/ninjarobot-agent-poweroff`; automated tests must stop at
   command construction, sudoers validation, and dry-run checks).
 
 ### Phase 4: Web microphone and robot Always-On Voice Input stabilization (Issue 4)
 
-- **Objective:** Fix browser `#webMicButton` transcript truncation and state
-  races, provide robot-side push-to-talk fallback when browser `SpeechRecognition`
-  is unavailable, and make robot-side Always-On Voice Input (`#usbMicButton` /
-  `VoiceInputController`) as resilient on the Fusion HAT+ I2S microphone as
-  standalone `pi5mic`.
+- **Objective:** Make `#webMicButton` work reliably across all browsers (with
+  automatic fallback to the robot's local `whisper.cpp` push-to-talk endpoint
+  when browser `SpeechRecognition` is unavailable or fails), and make robot-side
+  Always-On Voice Input (`#usbMicButton` / `VoiceInputController`) as resilient
+  on the Fusion HAT+ 48 kHz I2S microphone as standalone `pi5mic`.
 - **Target files:**
   - `ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/app-agent.js`
   - `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/config_import.py`
-  - `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/fusion.py`
   - `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/microphone.py`
   - `ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/voice_input.py`
+- **Compatibility contract:**
+  - Preserve `VoiceInputController` state machine (`DISABLED`, `STARTING`,
+    `LISTENING`, `DETECTED`, `RECORDING`, `TRANSCRIBING`, `DISPATCHING`,
+    `COOLDOWN`, `PAUSED`, `DEGRADED`, `FAILED`) and existing unit tests in
+    `ninjarobot_pi5_ide/tests/test_voice_input.py`.
 - **Implementation steps:**
-  1. **Fix `#webMicButton` transcript accumulation, state machine, and robot push-to-talk fallback (`app-agent.js`):**
-     - In `recognition.onresult` (`app-agent.js:262-269`), iterate from
-       `let index = 0` to `event.results.length` so finalized segments are
-       preserved across multi-phrase utterances.
-     - Guard `recognition.start()` with a `starting` flag cleared on `onstart` /
-       `onerror` / `onend` to prevent `InvalidStateError` on rapid taps.
-     - When browser `SpeechRecognition` is unavailable (or fails with `network` /
-       `not-allowed` / `service-not-allowed`), automatically fall back to the
-       existing robot-side push-to-talk WebSocket command (`send("usb_microphone", { duration_seconds: 4, language: state.language })` / `send("usb_microphone_stop")`)
-       so `#webMicButton` always works via the robot's microphone and local
-       `whisper.cpp`!
-  2. **Import `voiceinput` settings from `mic.json` and preserve existing keys in `configure_fusion_microphone` (`config_import.py`, `fusion.py`):**
-     - Update `import_pi5_configs()` (`config_import.py:216-256`) to import
-       `voiceinput.enabled`, `voiceinput.vad_rms_threshold` /
-       `silence_rms_threshold`, `voiceinput.silence_timeout_seconds`,
-       `voiceinput.max_capture_seconds`, `voiceinput.cooldown_seconds`, and
-       `wakeword.threshold` / `vad_threshold` from `~/.config/pi5mic/mic.json` into
-       `payload["voice_input"]`.
-     - Ensure `configure_fusion_microphone()` (`fusion.py:82-125`) preserves all
-       existing sections in `mic.json`.
-  3. **Make `VoiceInputController` resilient to single overflows and empty transcripts (`voice_input.py`, `microphone.py`):**
-     - Match `pi5mic`'s overflow resilience: in `VoiceInputController._listen_once()`,
-       do not raise `VoiceInputError("audio_overflow")` on a single `overflowed`
-       flag; tolerate transient overflows (`overflow_streak < 3`) by resetting the
-       assembler when not capturing, or continuing capture without tearing down
-       the PortAudio stream.
-     - Scale `ManagedVoiceAudioSource` `block_frames` proportionally to sample rate
-       (e.g., `max(1280, int(actual_rate * 0.08))` = `3840` frames at `48000 Hz`,
-       or `80 ms` per read) to eliminate 26.67 ms read starvation.
-     - In `WhisperCppTranscriber.transcribe()` and `VoiceInputController._transcribe()`,
-       classify empty transcripts and Whisper non-speech markers (`[BLANK_AUDIO]`,
-       `(blank audio)`) as `VoiceInputError("no_speech_detected")`, and in
-       `VoiceInputController._run()`, re-arm immediately on `no_speech_detected`
-       without incrementing fatal `failures` or entering `DEGRADED`/`FAILED`.
-  4. **Remove DC offset in `_pcm_rms()`, add post-wake initial-speech timeout, and optimize resampling (`voice_input.py`):**
-     - Update `_pcm_rms(pcm)` (`voice_input.py:590-594`) to subtract the frame's
-       mean sample value (`mean = sum(samples) / len(samples)`) before computing
-       RMS, eliminating I2S MEMS DC bias from triggering false speech detection.
-     - If `speech_started` remains `False` for `silence_frames` after wake-word
-       detection, stop capture early and re-arm instead of waiting the full
-       `max_command_seconds`.
-     - Offload `_PCMFrameAssembler.feed(pcm)` (or use `array("h")` / C-level buffer
-       operations) so 48 kHz -> 16 kHz resampling does not block the `asyncio`
-       event loop.
-     - In `ManagedVoiceAudioSource.start()`, retry `RawInputStream` open briefly
-       (e.g., up to 3 attempts over 1.5s) if PortAudio reports transient
-       `Device unavailable [PaErrorCode -9985]` due to PulseAudio idle-suspend
-       handoff, or prefer the shared ALSA capture PCM (`mic` / `hat`) when `hw:0,0`
-       is busy.
+  1. **Upgrade `#webMicButton` with robot push-to-talk fallback and fix `#usbMicButton` error/failed-state handling (`app-agent.js:209-309`):**
+     - In `configureSpeechRecognition()` (`app-agent.js:240-309`), do **not**
+       disable `#webMicButton` when `window.SpeechRecognition || window.webkitSpeechRecognition`
+       is missing, and if browser `SpeechRecognition` fails with `network`,
+       `service-not-allowed`, `not-allowed`, or `audio-capture`, automatically
+       fall back to robot-side push-to-talk (`send("usb_microphone", { duration_seconds: 5, language: state.locale || "auto" })` /
+       `send("usb_microphone_stop")`) and place the returned `data.transcript`
+       into `elements.chatInput.value`.
+     - Preserve any existing text in `elements.chatInput.value` when starting a
+       new dictation segment (`prefix + " " + transcript.trim()`), and guard
+       `recognition.start()` with a synchronous ` recognitionStarting` flag to
+       prevent `InvalidStateError` on rapid clicks.
+     - In `updateVoiceInput()` (`app-agent.js:209-227`), treat
+       `status.state === "failed"` or `"stopped"` as `enabled = false` so the
+       user can click `#usbMicButton` to re-enable voice input after a failure,
+       and replace `.catch(() => {})` (`line 234`) with error toast/log feedback.
+  2. **Import `voiceinput.enabled` from `mic.json` (`config_import.py:283-297`):**
+     - In `import_pi5_configs()` (`config_import.py:283-297`), include
+       `"enabled": "enabled"` in `voice_mapping` when `isinstance(voiceinput.get("enabled"), bool)`
+       so enabling Always-On Voice Input in `mic-tool` persists into
+       `config.toml` during onboarding config import.
+  3. **Tolerate transient PortAudio overflows and scale 48 kHz read block size (`voice_input.py:444-447`, `microphone.py:497-550`):**
+     - In `ManagedVoiceAudioSource.start()` (`microphone.py:514-547`), scale the
+       effective read block size for high sample rates when `self._block_frames == 1280`
+       (e.g., `max(self._block_frames, int(actual_rate * 0.08))` = `3840` frames
+       at `48000 Hz`, matching the 80 ms `openWakeWord` frame period) and retry
+       `RawInputStream` open up to 3 times with a `0.4s` backoff if PortAudio
+       reports transient `Device unavailable [PaErrorCode -9985]` from
+       PulseAudio idle-suspend handoff.
+     - In `VoiceInputController._listen_once()` (`voice_input.py:444-447`), track
+       consecutive overflows (`overflow_streak`): only raise
+       `VoiceInputError("audio_overflow")` if **3 consecutive reads** overflow
+       (matching `pi5mic/src/pi5mic/core/voiceinput.py:644-676`), resetting
+       `overflow_streak = 0` on normal reads.
+  4. **Treat `no_speech_detected` and empty/blank Whisper transcripts as non-fatal re-arm events (`microphone.py:200-202`, `voice_input.py:345-360, 505-517`):**
+     - In `VoiceInputController._transcribe()` (`voice_input.py:505-517`),
+       classify empty transcripts, `RuntimeError("whisper.cpp returned an empty transcript")`,
+       and Whisper blank-audio tokens (`[BLANK_AUDIO]`, `(blank audio)`) as
+       `VoiceInputError("no_speech_detected")`.
+     - In `VoiceInputController._run()` (`voice_input.py:345-360`), when
+       `exc.code == "no_speech_detected"`, reset to `LISTENING` and `continue`
+       immediately **without** incrementing `failures` or entering
+       `DEGRADED` / `FAILED` (matching `pi5mic`).
+  5. **Remove DC offset in `_pcm_rms()`, bound post-wake initial silence, and optimize `_PCMFrameAssembler.feed()` (`voice_input.py:450-465, 553-593`):**
+     - In `_pcm_rms(pcm)` (`voice_input.py:589-593`), subtract the frame's mean
+       sample value (`mean = sum(samples) / len(samples)`) before computing RMS
+       so I2S MEMS DC bias cannot masquerade as continuous speech.
+     - In `_listen_once()` (`voice_input.py:450-465`), also count initial
+       post-wake silent frames (`initial_silent_frames`): if `not speech_started`
+       after `max(silence_frames * 2, 25)` frames (~2.0s–2.5s of silence after
+       wake word), abort capture with `no_speech_detected` instead of recording
+       dead air for `max_command_seconds` (`15.0s`).
+     - In `_PCMFrameAssembler.feed(pcm)` (`voice_input.py:553-576`), replace the
+       per-sample `int(value).to_bytes(2, "little", signed=True)` loop with
+       `array("h")` bulk packing (or integer decimation when `source_rate == 48000`
+       and `target_rate == 16000`, which is an exact 3:1 ratio!) to eliminate
+       64,000 object allocations/sec on the `asyncio` event loop.
+- **Validation gate:** Unit tests in `ninjarobot_pi5_ide/tests/test_voice_input.py`,
+  `test_microphone.py`, `test_config_import.py`, and full gate suite.
 - **Hardware risk level:** Low (microphone capture remains opt-in and bounded;
   no audio is retained on disk).
 
@@ -819,21 +985,30 @@ Per `AGENTS.md` and `.agents/skills/ninjarobot-knowledge/SKILL.md`:
   all wiki pages and raw sources were inspected directly from
   `ninjarobot_pi5_wiki/project-knowledge.json`, `ninjarobot_pi5_wiki/wiki/`, and
   `ninjarobot_pi5_wiki/raw/`.
+- **Current registered wiki sources in `ninjarobot_pi5_wiki/project-knowledge.json`:**
+  - `raw/articles/ninjarobotpi5/2026-11-03-04/InstallationGuide.md`
+  - `raw/articles/ninjarobotpi5/2026-11-03-04/DevelopmentGuide.md`
+  - `raw/notes/ninjarobotpi5/2026-11-03-04/DevelopmentLog.md`
 - **Documentation updates required when implementing Phases 1–4:**
-  1. `README.md` — document the Web Power-Off onboarding option, Piper TTS voice
-     preparation during speaker onboarding, and Fusion HAT+ servo role defaults.
-  2. New version of `InstallationGuide` in `ninjarobot_pi5_wiki/raw/` (superseding
-     `InstallationGuide_261103.md`) — document Piper TTS setup during Fusion HAT+
-     speaker onboarding, Web Power-Off helper installation, and clearing historical
-     safety latches with `/resume`.
-  3. New version of `DevelopmentGuide` in `ninjarobot_pi5_wiki/raw/` (superseding
-     `DevelopmentGuide_261103.md`) — document the Level 1 (`motion.resume`) vs
-     Level 2 (`system.resume`) recovery routing, `runtime_state.speech_output` and
-     `runtime_state.safety` contracts, and Fusion HAT+ 48 kHz voice input buffering
-     and DC-offset-free VAD.
-  4. New version of `DevelopmentLog` in `ninjarobot_pi5_wiki/raw/` (superseding
-     `DevelopmentLog_261103.md`) — record the 4 November 2026 post-integration
-     audit and phase validation results.
+  1. `README.md` — document the standalone Web Power-Off helper installation
+     command (`ninjarobot-agent deployment install-poweroff --confirm`), Piper
+     TTS voice preparation (`scripts/prepare_speech_voice.py`), and Fusion HAT+
+     servo role behavior.
+  2. New version of `InstallationGuide.md` under
+     `ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-04/InstallationGuide.md`
+     (never editing the registered `2026-11-03-04` original) — document Piper TTS
+     provisioning for the Fusion HAT+ embedded speaker, standalone Web Power-Off
+     helper installation, and Level 1 vs Level 2 `/resume` behavior.
+  3. New version of `DevelopmentGuide.md` under
+     `ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-04/DevelopmentGuide.md` —
+     document automatic `motion.resume` vs `system.resume` routing in
+     `AgentRuntime.resume_system()`, `runtime_state.speech_output` and
+     `runtime_state.safety` contracts, `memory-notice` history filtering, and
+     48 kHz Fusion HAT+ voice-input buffering and DC-offset-free VAD.
+  4. New version of `DevelopmentLog.md` under
+     `ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-04/DevelopmentLog.md` —
+     record the 4 November 2026 post-integration audit rationale and validation
+     results.
 
 ## Validation gates and Raspberry Pi test checklists
 
@@ -858,28 +1033,35 @@ git diff --check
 1. **Safe smoke and latch recovery check (no actuator motion):**
    - Inspect `~/.local/state/ninjarobot_pi5/safety.json` and run `/resume` in
      `ninjarobot-agent chat` (or click **Resume** in the Web UI).
-   - **Expected result:** `motion_latched` transitions to `false` without being
-     blocked by unrelated sensors; `servo.status` reports `motion_latched: false`.
+   - **Expected result:** `AgentRuntime.resume_system()` dispatches
+     `robot.motion.resume`, `motion_latched` transitions to `false`, and
+     `servo.status` reports `motion_latched: false`.
+   - **Rollback:** Run `ninjarobot-agent service stop` or trigger Emergency Stop (`X`).
 2. **Device communication check (embedded speaker & voice input, consent required):**
-   - Run `uv run --frozen python scripts/prepare_speech_voice.py` (or the
-     onboarding speaker step) to configure Piper TTS and a voice model.
-   - Start the agent, enable `/speech on`, and ask: `"Please introduce yourself out loud."`
+   - Provision the isolated Piper environment and English voice model using
+     `scripts/prepare_speech_voice.py`, then start the agent, enable `/speech on`,
+     and ask: `"Please introduce yourself out loud."`
    - **Expected result:** The agent replies normally without claiming it only has
      a buzzer, and the reply is spoken clearly through the Fusion HAT+ embedded
-     speaker.
-   - Enable **VOICE INPUT** (`#usbMicButton`) in the Web UI, say `"Hey Ninja, what time is it?"`,
-     and also test **WEB MICROPHONE** (`#webMicButton`).
+     speaker (`alsa:sndrpigooglevoi`).
+   - Enable **VOICE INPUT** (`#usbMicButton`) in the Web UI, say
+     `"Hey Ninja, what time is it?"`, and test **WEB MICROPHONE** (`#webMicButton`).
    - **Expected result:** Wake word triggers `recording` -> `transcribing` ->
      `dispatching` without `audio_overflow` or premature `FAILED` state;
-     multi-phrase browser speech is retained in `#chatInput`.
+     `#webMicButton` captures speech via browser STT or robot push-to-talk
+     fallback.
+   - **Rollback:** Toggle `/speech off` and click **VOICE INPUT** to disable
+     listening.
 3. **Actuator-moving check (opt-in; raise wheels and keep power switch accessible):**
    - Arm AI motion (`A` / `/arm`), then ask: `"Rotate hat_pwm0 servo to 90 degrees."`
-   - Test Gamepad D-pad forward/backward buttons.
-   - **Expected result:** `hat_pwm0` rotates smoothly to 90 degrees and de-energizes
-     cleanly; Gamepad D-pad moves `left_motor` (`hat_pwm0`) and `right_motor`
-     (`hat_pwm1`) without unmapped-role errors.
+   - **Expected result:** The LLM calls `robot.servo.move(endpoint="hat_pwm0", target_angle=90)`,
+     and `hat_pwm0` rotates smoothly to 90 degrees and de-energizes cleanly.
+   - **Rollback:** Click **Emergency Stop** (`X`) or remove servo power.
 4. **Power-risk check (manual operator test only):**
-   - After installing the poweroff helper (`ninjarobot-agent deployment install-poweroff --confirm`
-     or via onboarding), open the Web UI Robot Menu.
+   - Run `uv run --frozen ninjarobot-agent deployment install-poweroff --confirm`,
+     restart the service, pair the browser via `/pair`, and open the Web UI
+     Robot Menu.
    - **Expected result:** **Power off NinjaRobot** (`#powerOffButton`) is enabled
-     for the active paired controller and displays `"Power-off is ready for the active controller."`
+     for the active paired controller and displays `"Available to this active controller."`
+   - **Rollback:** Cancel the confirmation dialog, or set
+     `web_poweroff_enabled = false` in `~/.config/ninjarobot_pi5/config.toml`.
