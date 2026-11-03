@@ -7,10 +7,9 @@ or open the parent project for development and implementation verification.
 ## Current full manuals — Fusion HAT+ implementation
 
 These 3 November successor sources reflect the current repository implementation.
-They are **unregistered and unreviewed**. The owner will ingest and review after
-manual hardware acceptance. `project-knowledge.json` and compiled wiki pages still
-refer to the registered 2 November checkpoint; its older Robot HAT fallback and
-raw-controller guidance does not describe the new Fusion-only path.
+They are registered and semantically reviewed under plan `fusion-hat-plus-261103`.
+`project-knowledge.json` and compiled wiki pages describe the current Fusion-only
+kernel driver path and in-memory calibration draft staging.
 
 - [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-11-03-04/InstallationGuide.md)
 - [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-11-03-04/DevelopmentGuide.md)
@@ -18,12 +17,11 @@ raw-controller guidance does not describe the new Fusion-only path.
 - [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-11-03-04/DevelopmentLog.md)
 - [Fusion implementation and manual acceptance](../docs/validation/fusion_implementation_261103.md)
 
-Original registered sources are preserved:
+Original registered predecessor sources are preserved:
 [InstallationGuide](raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md),
 [DevelopmentGuide](raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md), and
-[DevelopmentLog](raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md). No ingestion, semantic review or
-fingerprint refresh was performed. Read-only wiki checks could not run because
-the wiki environment is missing in this checkout.
+[DevelopmentLog](raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md). Ingestion and
+semantic review passed with 100% sourced-page coverage.
 
 - [Multi-HAT runtime remediation validation](../docs/validation/sunfounder_runtime_remediation_261102.md)
 - [Onboarding refinement and Mac Calendar tests](../docs/validation/onboarding_refinement_walkthrough_260923.md)

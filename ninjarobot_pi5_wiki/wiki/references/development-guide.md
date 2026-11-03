@@ -9,10 +9,10 @@ generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20261102-developmentguide
-  resource: urn:llmwiki:source:src-20261102-developmentguide
+- id: src-20261103-developmentguide
+  resource: urn:llmwiki:source:src-20261103-developmentguide
   title: DevelopmentGuide.md
-  content_hash: sha256:d106f1e107b08da8a11f85ef97a4195e2483dcda7753aaa167f762457ee3eeb4
+  content_hash: sha256:b6f8ff4f81477bbd155436abf135e93acfb0dab78568e498a11986ca8efd43a4
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -20,7 +20,7 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-11-02T00:00:00Z'
+  performed_at: '2026-11-03T00:00:00Z'
   result: passed
   checks:
     source_support: passed
@@ -29,17 +29,17 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered 2 November runtime remediation and Multi-HAT
-    hardware refinement evidence; no human verification is claimed.
+  - Reviewed this page against registered 3 November SunFounder Fusion HAT+ kernel
+    driver integration and calibration draft staging evidence; no human verification is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
     and note pending physical acceptance, live third-party accounts, and monetary
     spending caps.
-  target_hash: sha256:76b1487450a91571f3b4f597a5cbdc3c272136544893a417cf456e7471f40f43
+  target_hash: sha256:4de6c740827a08a9536b6f39bde146c0ec7cabcdaffc98af65fb65948382cd14
 ---
 
 # Development guide
 
-The full guide describes architecture, managed drivers, configuration, safety, the behavior system, external tools, memory, web access, and development checks.[^src-20261102-developmentguide]
+The full guide describes architecture, managed drivers, configuration, safety, the behavior system, external tools, memory, web access, and development checks.[^src-20261103-developmentguide]
 
 Use the source identifier below to resolve the complete manual through the raw
 source catalog. The outer wiki README also links directly to the current full
@@ -48,10 +48,10 @@ Read the relevant full section before acting on an abbreviated explanation.[^src
 
 [Return to project overview](/overview.md).
 
-## Current checkpoint: Runtime remediation and Multi-HAT hardware refinement
+## Current checkpoint: SunFounder Fusion HAT+ kernel driver integration and calibration draft staging
 
-The 2 November 2026 revision (`2026-11-02`) documents web startup `proxy_headers=False` for loopback proxy pairing inspection; distinct `battery_undervoltage` cutoff with persisted measured voltage and cutoff details; non-finite telemetry safeguards; SunFounder sysfs-informed `0x17` preset avoiding probing and legacy charging GPIO23; completed transient full stop clears local presentation gate; embedded audio uses Fusion kernel speaker node, removing raw I2C `0x31` write; ALSA/PipeWire readiness aligned; Fusion PWM/timer registers advance by two bytes at `0x17`; config import preserves explicit servo roles; Ollama catalog discovery queries local models without credentials and cloud models when an API key is stored, carrying route as provider `base_url`, alongside 25 October 2026 `SunFounderRobotHatBackend` (`0x14`/`0x17` dual MCU with automatic fallback, 3-byte Big-Endian transactions, class-level `RLock`), `PCA9685ServoBackend` with built-in `smbus2` controller, `ServoEndpoint` (0..15), IDE `SUPPORTED_SERVO_ENDPOINTS`, `PowerConfig`, `SpeechOutputConfig.speaker_enable_gpio`, `audio_output.py` I2S sink discovery and GPIO12 amp enable, single-component pin collision fix in `hardware_setup.py`, flexible PWM channels, auxiliary-only servo roles in `safety.py`, and onboarding wizard profile selection, alongside 23 September onboarding wizard refinements, Mac Calendar SSH forwarding, 22 September guided onboarding, 18 September web controller dual views, 17 September calendar setup and unified `CONFIRM` / `CANCEL` flow, 15–16 September distance game and servo repairs, Phase 4 information services, Phase 4 foundations, and system clock access.[^src-20261102-developmentguide]
+The 3 November 2026 revision (`2026-11-03-04`) documents `FusionHatPlusBackend` sysfs PWM ownership (`1.1.0-ninja1`, fixed 50 Hz across 3 shared timer groups, class-level lock); `fusion.py` sysfs interface validation and telemetry parsing; `calib.py` in-memory draft staging (stage Min/Max/Center in any order with Enter/Space, atomic commit with F requiring `500 <= Min < Center < Max <= 2500` microseconds, discard with Q, clean exit without centering); `hardware_setup.py` non-moving prerequisite readiness; `scripts/fusion_hat_setup.py` prepare/preview/install tool; alongside 2 November runtime remediation (`proxy_headers=False`, distinct `battery_undervoltage` cutoff with persisted measured voltage and cutoff details, non-finite telemetry safeguards, completed transient full stop presentation clearance, embedded audio Fusion kernel speaker node, ALSA/PipeWire readiness aligned, config import explicit servo role preservation, and route-persisting local/cloud Ollama selection), 25 October Multi-HAT expansion backends, 23 September onboarding wizard refinements, Mac Calendar SSH forwarding, 22 September guided onboarding, 18 September web controller dual views, 17 September calendar setup and unified CONFIRM authorization, 15–16 September distance game and servo repairs, Phase 4 information services, Phase 4 foundations, and system clock access.[^src-20261103-developmentguide]
 
 
-[^src-20261102-developmentguide]: DevelopmentGuide.md, source version `runtime-remediation-261102`; registered source `src-20261102-developmentguide`.
+[^src-20261103-developmentguide]: DevelopmentGuide.md, source version `fusion-hat-plus-261103`; registered source `src-20261103-developmentguide`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

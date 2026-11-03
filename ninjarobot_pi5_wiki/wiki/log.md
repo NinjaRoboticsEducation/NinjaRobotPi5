@@ -1,5 +1,9 @@
 # Wiki Update Log
 
+## 2026-11-03
+
+* **Update**: Applied plan `fusion-hat-plus-261103` — Ingest 2026-11-03 SunFounder Fusion HAT+ kernel driver integration and calibration draft staging manuals (2026-11-03-04); update ten knowledge pages with reviewed 1.1.0-ninja1 kernel driver sysfs ownership, fusion_hat_setup.py preparation and install tool, non-moving onboarding prerequisite validation, in-memory servo calibration draft staging (V/X/C -> F/Q), kernel voltage_now battery telemetry division by 1,000,000 with distinct battery_undervoltage cutoff (6.90 V), and orderly web OS shutdown.. Sources: `src-20260907-knowledgeintegration`, `src-20261103-developmentguide`, `src-20261103-installationguide`, `src-20261103-developmentlog`, `src-20261027-ninjarobot-mcp-skill`.
+
 ## 2026-11-02
 
 * **Update**: Applied plan `runtime-remediation-261102` — Ingest 2026-11-02 runtime remediation and Multi-HAT hardware refinement manuals; update ten knowledge pages with proxy-header disabling, battery undervoltage reason and telemetry safeguards, sysfs-informed 0x17 SunFounder preset, transient full stop local gate clearance, Fusion kernel speaker node audio control, 2-byte register stride at 0x17, explicit servo role preservation, and route-persisting local/cloud Ollama selection.. Sources: `src-20260907-knowledgeintegration`, `src-20261102-developmentguide`, `src-20261102-installationguide`, `src-20261102-developmentlog`, `src-20261027-ninjarobot-mcp-skill`.

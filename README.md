@@ -30,9 +30,9 @@ Fusion uses the reviewed kernel driver for all twelve servo channels and embedde
 audio; older Robot HAT variants are no longer offered. Follow the
 [installation and manual validation steps](docs/validation/fusion_implementation_261103.md)
 before real-device testing. Repository validation passes; physical acceptance is
-still pending. The 3 November full manuals linked below are new raw sources,
-not yet ingested or semantically reviewed. The registered wiki map remains at
-2 November until the owner's workflow completes. Registered predecessor sources:
+still pending. The 3 November full manuals linked below are registered and
+semantically reviewed in the local wiki knowledge base under plan `fusion-hat-plus-261103`.
+Registered predecessor sources:
 [InstallationGuide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md),
 [DevelopmentGuide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md),
 and [DevelopmentLog](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md).

@@ -9,10 +9,10 @@ generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20261102-developmentlog
-  resource: urn:llmwiki:source:src-20261102-developmentlog
+- id: src-20261103-developmentlog
+  resource: urn:llmwiki:source:src-20261103-developmentlog
   title: DevelopmentLog.md
-  content_hash: sha256:e3011cf344fdf8a68e01a93896fc75d1940498fede239203e877384895aa355e
+  content_hash: sha256:72165a9673ce7cb920920d014845c07f88cf7e5956c6249167e65a50feceb1a9
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -20,7 +20,7 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-11-02T00:00:00Z'
+  performed_at: '2026-11-03T00:00:00Z'
   result: passed
   checks:
     source_support: passed
@@ -29,17 +29,17 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered 2 November runtime remediation and Multi-HAT
-    hardware refinement evidence; no human verification is claimed.
+  - Reviewed this page against registered 3 November SunFounder Fusion HAT+ kernel
+    driver integration and calibration draft staging evidence; no human verification is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
     and note pending physical acceptance, live third-party accounts, and monetary
     spending caps.
-  target_hash: sha256:16c0a5445130caadebb079ab71bd6bd5697319d8486134aa5fb601961c089aaa
+  target_hash: sha256:b6a2a9b06040d1ed8ae01c5b927d3e27986a6c0a69d7498995d056bdf77054a0
 ---
 
 # Development log
 
-The complete log preserves dated implementation decisions and validation reports. Historical test results describe their recorded checkout and date; they are not fresh verification.[^src-20261102-developmentlog]
+The complete log preserves dated implementation decisions and validation reports. Historical test results describe their recorded checkout and date; they are not fresh verification.[^src-20261103-developmentlog]
 
 Use the source identifier below to resolve the complete manual through the raw
 source catalog. The outer wiki README also links directly to the current full
@@ -48,10 +48,10 @@ Read the relevant full section before acting on an abbreviated explanation.[^src
 
 [Return to project overview](/overview.md).
 
-## Current checkpoint: Runtime remediation and Multi-HAT hardware refinement
+## Current checkpoint: SunFounder Fusion HAT+ kernel driver integration and calibration draft staging
 
-The 2 November 2026 entries record runtime remediation following `NinjaSunFounderIntegrationImplementation_261102.md`: Phase 1 web startup `proxy_headers=False` for loopback proxy pairing inspection without accepting forged LAN requests; Phase 2 distinct `battery_undervoltage` cutoff with persisted measured voltage and cutoff details and non-finite telemetry safeguards, plus sysfs-informed `0x17` preset avoiding probing and legacy charging GPIO23; Phase 3 embedded audio using Fusion kernel speaker node when present, removing raw I2C `0x31` write, ALSA/PipeWire audio health alignment, and transient full stop local presentation gate cleanup; Phase 4 Fusion PWM/timer 2-byte register stride at `0x17`, pi5servo isolated tests (141 passed), IDE config/import regression (70 passed), and 2 authorized driver repairs recorded in `authorized_driver_changes.json`; Phase 5 combined Ollama catalogs, route-persisting local/cloud selection (`base_url`), and keyless local onboarding. All 1,104 repository unit tests and 464 driver unit tests passed without live actuator movement. Detailed validation evidence is recorded in `docs/validation/sunfounder_runtime_remediation_261102.md`, alongside earlier 25 October Multi-HAT expansion upgrade, 23 September onboarding refinements, 22 September guided onboarding, 18 September web controller dual views, 17 September calendar setup and unified CONFIRM authorization, 15–16 September distance game and servo repairs, Phase 4 information services, Phase 4 foundations, and system clock access.[^src-20261102-developmentlog]
+The 3 November 2026 entries record SunFounder Fusion HAT+ integration and follow-up repairs: Phase 0/1 reviewed kernel driver `1.1.0-ninja1` sysfs PWM ownership (`hat_pwm0`..`hat_pwm11` in 3 groups of 4 at fixed 50 Hz) and patch `0001-safe-pwm-and-battery.patch`; Phase 2 `scripts/fusion_hat_setup.py` installer tool and source preparation recovery in persistent cache (`$HOME/.cache/ninjarobot/fusion-source-recovered`); Phase 3 non-moving onboarding prerequisite validation (`hardware_setup.py`) halting gracefully on missing driver/sysfs nodes without tracebacks; Phase 4 in-memory servo calibration draft staging (<kbd>V</kbd>/<kbd>X</kbd>/<kbd>C</kbd> &rarr; <kbd>F</kbd>/<kbd>Q</kbd>) in `calib.py`; Phase 5 battery telemetry dividing kernel `voltage_now` by 1,000,000 once with distinct `battery_undervoltage` cutoff (6.90 V); and orderly web OS shutdown. All 1,132 repository unit tests, 159 `pi5servo` tests (including all draft entry orders), and separate driver suites passed without live actuator movement. Validation recorded in `docs/validation/fusion_implementation_261103.md`, `fusion_prerequisite_repair_261103.md`, `fusion_source_preparation_repair_261103.md`, and `fusion_calibration_draft_repair_261103.md`, alongside earlier 2 November runtime remediation, 25 October Multi-HAT expansion upgrade, 23 September onboarding refinements, 22 September guided onboarding, 18 September web controller dual views, 17 September calendar setup and unified CONFIRM authorization, 15–16 September distance game and servo repairs, Phase 4 information services, Phase 4 foundations, and system clock access.[^src-20261103-developmentlog]
 
 
-[^src-20261102-developmentlog]: DevelopmentLog.md, source version `runtime-remediation-261102`; registered source `src-20261102-developmentlog`.
+[^src-20261103-developmentlog]: DevelopmentLog.md, source version `fusion-hat-plus-261103`; registered source `src-20261103-developmentlog`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

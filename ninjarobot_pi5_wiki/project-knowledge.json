@@ -1,27 +1,27 @@
 {
   "version": 1,
-  "reviewed_checkout": "f46a1fd326ae9d4b1b26ce1e1b2988a3629b81fa",
+  "reviewed_checkout": "5ded13e3bda5c3b19271a94502e9ed4d048140a7",
   "reviewed_by": "agent:antigravity",
-  "reviewed_at": "2026-11-02T00:00:00.000000+00:00",
+  "reviewed_at": "2026-11-03T00:00:00.000000+00:00",
   "documents": [
     {
       "name": "InstallationGuide.md",
-      "path": "raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md",
-      "original_content_hash": "sha256:802998dc63e28cf49612c003f69965ab6f0f9b408ea185415292a58a1a428e06",
-      "content_hash": "sha256:802998dc63e28cf49612c003f69965ab6f0f9b408ea185415292a58a1a428e06",
-      "previous_path": "raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md",
+      "path": "raw/articles/ninjarobotpi5/2026-11-03-04/InstallationGuide.md",
+      "original_content_hash": "sha256:82026b1b823dcf781f718cfe49d69b5c89262a95412ea634c3fa931969c9ae84",
+      "content_hash": "sha256:82026b1b823dcf781f718cfe49d69b5c89262a95412ea634c3fa931969c9ae84",
+      "previous_path": "raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md",
       "pages": [
         "wiki/references/installation-guide.md",
         "wiki/concepts/installation.md"
       ],
-      "source_id": "src-20261102-installationguide"
+      "source_id": "src-20261103-installationguide"
     },
     {
       "name": "DevelopmentGuide.md",
-      "path": "raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md",
-      "original_content_hash": "sha256:d106f1e107b08da8a11f85ef97a4195e2483dcda7753aaa167f762457ee3eeb4",
-      "content_hash": "sha256:d106f1e107b08da8a11f85ef97a4195e2483dcda7753aaa167f762457ee3eeb4",
-      "previous_path": "raw/articles/ninjarobotpi5/2026-10-25/DevelopmentGuide.md",
+      "path": "raw/articles/ninjarobotpi5/2026-11-03-04/DevelopmentGuide.md",
+      "original_content_hash": "sha256:b6f8ff4f81477bbd155436abf135e93acfb0dab78568e498a11986ca8efd43a4",
+      "content_hash": "sha256:b6f8ff4f81477bbd155436abf135e93acfb0dab78568e498a11986ca8efd43a4",
+      "previous_path": "raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md",
       "pages": [
         "wiki/overview.md",
         "wiki/references/development-guide.md",
@@ -30,7 +30,7 @@
         "wiki/concepts/features-and-tools.md",
         "wiki/analyses/knowledge-limitations.md"
       ],
-      "source_id": "src-20261102-developmentguide"
+      "source_id": "src-20261103-developmentguide"
     },
     {
       "name": "NinjaRobot_MCP_Skill.md",
@@ -46,15 +46,15 @@
     },
     {
       "name": "DevelopmentLog.md",
-      "path": "raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md",
-      "original_content_hash": "sha256:e3011cf344fdf8a68e01a93896fc75d1940498fede239203e877384895aa355e",
-      "content_hash": "sha256:e3011cf344fdf8a68e01a93896fc75d1940498fede239203e877384895aa355e",
-      "previous_path": "raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md",
+      "path": "raw/notes/ninjarobotpi5/2026-11-03-04/DevelopmentLog.md",
+      "original_content_hash": "sha256:72165a9673ce7cb920920d014845c07f88cf7e5956c6249167e65a50feceb1a9",
+      "content_hash": "sha256:72165a9673ce7cb920920d014845c07f88cf7e5956c6249167e65a50feceb1a9",
+      "previous_path": "raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md",
       "pages": [
         "wiki/references/development-log.md",
         "wiki/concepts/development-history.md"
       ],
-      "source_id": "src-20261102-developmentlog"
+      "source_id": "src-20261103-developmentlog"
     }
   ],
   "implementation_roots": [
@@ -361,12 +361,12 @@
       "review_note": "Reviewed Phase 4 and Phase 5 delta against consolidated 2026-09-13 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/deployment.py": {
-      "content_hash": "sha256:77d710f7da7596fda3d1773d0a12ca99ebf7b7ffae033ba0c1ddae5f43ad5234",
+      "content_hash": "sha256:3a8006c42cb0fc72fe749d5fa0eced81a8f200876289136de85c4dcd4e8dd7fd",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
+      "review_note": "Reviewed 3 November SunFounder Fusion HAT+ kernel driver integration and calibration draft staging against 2026-11-03 manual checkpoint and commit 5ded13e3bda5c3b19271a94502e9ed4d048140a7."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/deployment/ninjarobot-agent.service.in": {
       "content_hash": "sha256:96536a4639dbce2060296e02f43321c06de7a98f80847c683b02bc593b326a1e",
@@ -719,20 +719,20 @@
       "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/service_main.py": {
-      "content_hash": "sha256:09eb63eb4c08b12c85f5d4529d75564bf261fc30ebc007d184deb65a21bb22ab",
+      "content_hash": "sha256:3192d30ac651077b9dac1070f3c3bc8a7d06a6c17df1a000821d5de2497ccac0",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed 2 November runtime remediation checkpoint and Multi-HAT refinement against 2026-11-02 manual checkpoint and commit f46a1fd326ae9d4b1b26ce1e1b2988a3629b81fa."
+      "review_note": "Reviewed 3 November SunFounder Fusion HAT+ kernel driver integration and calibration draft staging against 2026-11-03 manual checkpoint and commit 5ded13e3bda5c3b19271a94502e9ed4d048140a7."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/shutdown.py": {
-      "content_hash": "sha256:4bb58718dd959a5a2fdd0aa0aa2a6ff8c849415e3a6c266b74511bd6ce82a456",
+      "content_hash": "sha256:5bc321aa2d179ec60de2160f76efc1ff6c70f987678d504c3de037f7ece125ba",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
+      "review_note": "Reviewed 3 November SunFounder Fusion HAT+ kernel driver integration and calibration draft staging against 2026-11-03 manual checkpoint and commit 5ded13e3bda5c3b19271a94502e9ed4d048140a7."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/skills.py": {
       "content_hash": "sha256:8bef58e8dd8c6c8965955ce505f3da408edd3fe5ccf89addc29ed9bf8cabeec7",
@@ -870,12 +870,12 @@
       "review_note": "Reviewed 18 September game pad view controller module (touch D-pad dispatch, user behavior selector) against 2026-09-18 manual checkpoint."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/app-shared.js": {
-      "content_hash": "sha256:2bc8a84069ec42a98009aaccbd571bf2c71c1d702a248f88837bc9d516011231",
+      "content_hash": "sha256:5e5ba04c4de373ddea2c16cbc6230b2f9c4a629b42861d215fa3459cd95a32d2",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed 18 September shared frontend controller module (websocket, modals, i18n, lease negotiation) against 2026-09-18 manual checkpoint."
+      "review_note": "Reviewed 3 November SunFounder Fusion HAT+ kernel driver integration and calibration draft staging against 2026-11-03 manual checkpoint and commit 5ded13e3bda5c3b19271a94502e9ed4d048140a7."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/gamepad.html": {
       "content_hash": "sha256:4450010815c59e678b94b0e582b98c03d405e7ef5e8645a79070bda9672723ba",
@@ -886,32 +886,32 @@
       "review_note": "Reviewed 18 September Game Pad dedicated structure, touch D-pad, and user behavior selector against 2026-09-18 manual checkpoint."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/i18n/en.json": {
-      "content_hash": "sha256:96d22aba17d6414be4dc3a250e4e1dffd1e97614d899997fd4c1a61d8a25cf4c",
+      "content_hash": "sha256:1c8000b47a9c6735949f2d91dabd5654346a727b67423bade5738bdd1625b646",
       "pages": [
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed 18 September English localization updates (146 keys) for dual interface, user behaviors, and chat controls against 2026-09-18 manual checkpoint."
+      "review_note": "Reviewed 3 November SunFounder Fusion HAT+ kernel driver integration and calibration draft staging against 2026-11-03 manual checkpoint and commit 5ded13e3bda5c3b19271a94502e9ed4d048140a7."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/i18n/ja.json": {
-      "content_hash": "sha256:6a6397579d1c85488e7f05d09c73dfd8e518061c837e0fb6dc4cb11fd236f633",
+      "content_hash": "sha256:2ba19ebf2b1f55d440f964b69795408751a03a671a431eddb0413ab702262eef",
       "pages": [
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed 18 September Japanese localization updates (146 keys) for dual interface, user behaviors, and chat controls against 2026-09-18 manual checkpoint."
+      "review_note": "Reviewed 3 November SunFounder Fusion HAT+ kernel driver integration and calibration draft staging against 2026-11-03 manual checkpoint and commit 5ded13e3bda5c3b19271a94502e9ed4d048140a7."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/i18n/zh-CN.json": {
-      "content_hash": "sha256:b621b18ef3da11c2da9c6699964859075ed78cb52ba0991122c8de874288992c",
+      "content_hash": "sha256:ebb1ff6977acba0ffbc17f1f012409cd144964070b8c86d0cdf0d5c089bb8d6e",
       "pages": [
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed 18 September Simplified Chinese localization updates (146 keys) for dual interface, user behaviors, and chat controls against 2026-09-18 manual checkpoint."
+      "review_note": "Reviewed 3 November SunFounder Fusion HAT+ kernel driver integration and calibration draft staging against 2026-11-03 manual checkpoint and commit 5ded13e3bda5c3b19271a94502e9ed4d048140a7."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/i18n/zh-TW.json": {
-      "content_hash": "sha256:9eff573560eb00020a4e05b7e2ed616684b93045548ede58afb05dbf7d8a2b5a",
+      "content_hash": "sha256:02b1382ae6837d07109576a7c37444c9801c1f61f92959eba695d3e559456c8d",
       "pages": [
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed 18 September Traditional Chinese localization updates (146 keys) for dual interface, user behaviors, and chat controls against 2026-09-18 manual checkpoint."
+      "review_note": "Reviewed 3 November SunFounder Fusion HAT+ kernel driver integration and calibration draft staging against 2026-11-03 manual checkpoint and commit 5ded13e3bda5c3b19271a94502e9ed4d048140a7."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/web_static/manifest.webmanifest": {
       "content_hash": "sha256:4887afdbcd1b947b651c99609c7470dd5a1d800237d2bc06c45b3ccad2eea8bc",
@@ -1002,12 +1002,12 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/audio_output.py": {
-      "content_hash": "sha256:3990c2a3430cdd1772f820b91e51a3e6bec56490b800a6ca183bc28d3df3e064",
+      "content_hash": "sha256:1eb62410571f57af5b8c21ddcc2c4973fafe1e8d743c98967e0fc412f9a182a8",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed 2 November runtime remediation checkpoint and Multi-HAT refinement against 2026-11-02 manual checkpoint and commit f46a1fd326ae9d4b1b26ce1e1b2988a3629b81fa."
+      "review_note": "Reviewed 3 November SunFounder Fusion HAT+ kernel driver integration and calibration draft staging against 2026-11-03 manual checkpoint and commit 5ded13e3bda5c3b19271a94502e9ed4d048140a7."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/audio_process.py": {
       "content_hash": "sha256:36bcdfd944d50e83a2d325a11a9ea8bbc30ae36c4783b6b5db2d29b5cb696e02",
@@ -1258,12 +1258,12 @@
       "review_note": "Reviewed stop cause preservation and cleanup lifecycle against 2026-09-16 manual checkpoint."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/bluetooth_setup.py": {
-      "content_hash": "sha256:c46f9580319672de2b0cacd0414aabe5c441a37ac394fc73cda193a65d2a7d65",
+      "content_hash": "sha256:a789ebd7e10e1a124efa342f8d73576c048f3415ffc56f383dc5001853ff0174",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed Phase 4 and Phase 5 delta against consolidated 2026-09-13 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
+      "review_note": "Reviewed 3 November SunFounder Fusion HAT+ kernel driver integration and calibration draft staging against 2026-11-03 manual checkpoint and commit 5ded13e3bda5c3b19271a94502e9ed4d048140a7."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/bluetooth_speaker.py": {
       "content_hash": "sha256:dfb69da190605df615f258e78dabbb0a65c33e3803cddac8a34c041187c8248c",
@@ -1298,20 +1298,20 @@
       "review_note": "Reviewed Phase 4 and Phase 5 delta against consolidated 2026-09-13 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/config.py": {
-      "content_hash": "sha256:d72b9c7c3f9f196368f176e8b72627423fa626c70557fff39b8a9212026fca6d",
+      "content_hash": "sha256:9186bfcfb1dc34ee3b11aa8612eec48e18722c9aa0d6cfb745da517de38ad4b1",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed 2 November runtime remediation checkpoint and Multi-HAT refinement against 2026-11-02 manual checkpoint and commit f46a1fd326ae9d4b1b26ce1e1b2988a3629b81fa."
+      "review_note": "Reviewed 3 November SunFounder Fusion HAT+ kernel driver integration and calibration draft staging against 2026-11-03 manual checkpoint and commit 5ded13e3bda5c3b19271a94502e9ed4d048140a7."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/config_import.py": {
-      "content_hash": "sha256:4bc630cc1d0718712b33a6c198d5f276fee016f855ef09ed239eda7ef72f3a58",
+      "content_hash": "sha256:a7da527551f3bf63df6eb4f4093ac27dc0a763ced9e700e14c89b27bd97fd827",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/installation.md"
       ],
-      "review_note": "Reviewed 2 November runtime remediation checkpoint and Multi-HAT refinement against 2026-11-02 manual checkpoint and commit f46a1fd326ae9d4b1b26ce1e1b2988a3629b81fa."
+      "review_note": "Reviewed 3 November SunFounder Fusion HAT+ kernel driver integration and calibration draft staging against 2026-11-03 manual checkpoint and commit 5ded13e3bda5c3b19271a94502e9ed4d048140a7."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/diagnostics.py": {
       "content_hash": "sha256:c234aac7c559657671ea72dba257c44ece639ff30941da65c8a63186a8df540a",
@@ -1452,12 +1452,12 @@
       "review_note": "Reviewed Phase 0–2 delta against consolidated 2026-09-09 manual checkpoint and tests; physical acceptance and monetary cap remain explicitly unverified."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/robot.py": {
-      "content_hash": "sha256:6647f74a0d9b813f80b2760a32da2d3327fdd36d313488602a1a23e118b42996",
+      "content_hash": "sha256:390754246fd7fadfe9dc28ce592351b46db5d586e5171f2714cd10fbaed0b73b",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed 2 November runtime remediation checkpoint and Multi-HAT refinement against 2026-11-02 manual checkpoint and commit f46a1fd326ae9d4b1b26ce1e1b2988a3629b81fa."
+      "review_note": "Reviewed 3 November SunFounder Fusion HAT+ kernel driver integration and calibration draft staging against 2026-11-03 manual checkpoint and commit 5ded13e3bda5c3b19271a94502e9ed4d048140a7."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/runtime_control.py": {
       "content_hash": "sha256:4d5a129f28cd93249e8e0280e584a1636edec74ceaef48cfeb8918f7e68140a9",
@@ -1468,12 +1468,12 @@
       "review_note": "Initial navigation coverage; consult code and detailed manuals for individual behavior. No claim of exhaustive symbol-level documentation."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/safety.py": {
-      "content_hash": "sha256:157073582fb58bbf3ffc333fd3b330c47dc4b0dc4d4541ab0ef828de37e001fb",
+      "content_hash": "sha256:d9badeac5d582b7b89480e1dd49f1a1f56080870e47596d94cf1db44be2f91ed",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md"
       ],
-      "review_note": "Reviewed 2 November runtime remediation checkpoint and Multi-HAT refinement against 2026-11-02 manual checkpoint and commit f46a1fd326ae9d4b1b26ce1e1b2988a3629b81fa."
+      "review_note": "Reviewed 3 November SunFounder Fusion HAT+ kernel driver integration and calibration draft staging against 2026-11-03 manual checkpoint and commit 5ded13e3bda5c3b19271a94502e9ed4d048140a7."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/scheduler.py": {
       "content_hash": "sha256:5d780174bf99d903edb128ecd9940a1ee51592eac3b554f5b35336b1294260d1",
@@ -1532,13 +1532,13 @@
       "review_note": "Reviewed 22 September Notion OAuth loopback and private credential storage against consolidated 2026-09-22 manual checkpoint."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/setup_wizard.py": {
-      "content_hash": "sha256:0b2c48803894a260a4b7910607d48ffb5fa857592af27e62f4dcf3089605f70f",
+      "content_hash": "sha256:bac2375b98d5cd49ac45ff268dc8be16c4d7e1e9653be72c1c624f890d63d2ee",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/features-and-tools.md",
         "wiki/concepts/installation.md"
       ],
-      "review_note": "Reviewed 2 November runtime remediation checkpoint and Multi-HAT refinement against 2026-11-02 manual checkpoint and commit f46a1fd326ae9d4b1b26ce1e1b2988a3629b81fa."
+      "review_note": "Reviewed 3 November SunFounder Fusion HAT+ kernel driver integration and calibration draft staging against 2026-11-03 manual checkpoint and commit 5ded13e3bda5c3b19271a94502e9ed4d048140a7."
     },
     "ninjarobot_pi5_agent/src/ninjarobot_pi5_agent/external_mcp/__init__.py": {
       "content_hash": "sha256:138e064704c8dbbc73e7dd5f820b58ad672d0cb7b97ee096da1e6f9b0cd14187",
@@ -1556,12 +1556,12 @@
       "review_note": "Reviewed 22 September external stdio Google Calendar MCP server against consolidated 2026-09-22 manual checkpoint."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/hardware_setup.py": {
-      "content_hash": "sha256:2c022da200d6819ab6862e1bfa468fa2ccd75b4a3813e567ea36459323f691c1",
+      "content_hash": "sha256:17b7817e88b896922ffcde51f471d3bdabcce37fbb109850b4f8f96f5edb8891",
       "pages": [
         "wiki/concepts/architecture.md",
         "wiki/concepts/installation.md"
       ],
-      "review_note": "Reviewed 2 November runtime remediation checkpoint and Multi-HAT refinement against 2026-11-02 manual checkpoint and commit f46a1fd326ae9d4b1b26ce1e1b2988a3629b81fa."
+      "review_note": "Reviewed 3 November SunFounder Fusion HAT+ kernel driver integration and calibration draft staging against 2026-11-03 manual checkpoint and commit 5ded13e3bda5c3b19271a94502e9ed4d048140a7."
     },
     "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/hardware_config_probe.py": {
       "content_hash": "sha256:06baf484a8a040f18e397498d8f0252af3b8229c4904b124d9ee0ce13364c134",
@@ -1569,6 +1569,14 @@
         "wiki/concepts/architecture.md"
       ],
       "review_note": "Reviewed 23 September isolated hardware config probe subprocess for microphone asset check containment against consolidated 2026-09-23-02 manual checkpoint."
+    },
+    "ninjarobot_pi5_ide/src/ninjarobot_pi5_ide/fusion.py": {
+      "content_hash": "sha256:b8bf605706e192c6bf880fc18dcd1932ac8d054dc03bfa73ef830bbbd35bdcd8",
+      "pages": [
+        "wiki/concepts/architecture.md",
+        "wiki/concepts/installation.md"
+      ],
+      "review_note": "Reviewed 3 November SunFounder Fusion HAT+ kernel driver integration and sysfs telemetry against 2026-11-03 manual checkpoint and commit 5ded13e3bda5c3b19271a94502e9ed4d048140a7."
     }
   },
   "adapters": [

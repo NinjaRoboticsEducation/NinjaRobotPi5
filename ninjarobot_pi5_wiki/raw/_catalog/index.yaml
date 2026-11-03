@@ -1,5 +1,5 @@
 version: 2
-generated_at: '2026-11-02T13:28:25Z'
+generated_at: '2026-11-03T15:33:35Z'
 sources:
 - id: src-20260906-developmentguide
   title: DevelopmentGuide.md
@@ -459,5 +459,20 @@ sources:
 - id: src-20261102-installationguide
   title: InstallationGuide.md
   path: raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md
+  kind: text
+  state: ingested
+- id: src-20261103-developmentguide
+  title: DevelopmentGuide.md
+  path: raw/articles/ninjarobotpi5/2026-11-03-04/DevelopmentGuide.md
+  kind: text
+  state: ingested
+- id: src-20261103-developmentlog
+  title: DevelopmentLog.md
+  path: raw/notes/ninjarobotpi5/2026-11-03-04/DevelopmentLog.md
+  kind: text
+  state: ingested
+- id: src-20261103-installationguide
+  title: InstallationGuide.md
+  path: raw/articles/ninjarobotpi5/2026-11-03-04/InstallationGuide.md
   kind: text
   state: ingested
