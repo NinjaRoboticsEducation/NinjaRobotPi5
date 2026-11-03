@@ -604,3 +604,29 @@ def test_poweroff_helper_and_sudoers_are_exact_and_argument_free() -> None:
     sudoers = (assets / "ninjarobot-poweroff.sudoers.in").read_text(encoding="utf-8")
     assert helper == "#!/bin/sh\nset -eu\nexec /usr/bin/systemctl poweroff --no-wall\n"
     assert sudoers == "@USER@ ALL=(root) NOPASSWD: /usr/libexec/ninjarobot-poweroff\n"
+
+
+def test_fusion_service_has_narrow_sysfs_access_and_os_only_shutdown(tmp_path, monkeypatch):
+    from ninjarobot_pi5_ide.config_import import save_robot_config
+
+    spec = _spec(tmp_path)
+    config = load_robot_config(spec.config)
+    config = config.model_copy(
+        update={"hardware": config.hardware.model_copy(update={"profile": "fusion_hat_plus"})}
+    )
+    save_robot_config(config, spec.config, overwrite=True)
+    rendered = render_unit(spec)
+    assert "ProtectKernelTunables=true" in rendered
+    assert "-/sys/devices/virtual/fusion_hat/fusion_hat/pwm" in rendered
+    assert "-/run/lock/ninjarobot-fusion.lock" in rendered
+    manager = DeploymentManager(spec)
+    monkeypatch.setattr(
+        manager,
+        "_full_poweroff_status",
+        lambda: pytest.fail("must not configure EEPROM for Fusion OS shutdown"),
+    )
+    assert manager._ensure_full_poweroff_configuration() == {
+        "changed": False,
+        "pending": False,
+        "status": {"required": False, "mode": "orderly_os_shutdown"},
+    }

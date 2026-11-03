@@ -285,6 +285,9 @@ async def run_setup_wizard(
                 _select_hardware_profile(ui, progress, store)
 
             active_profile = _resolve_active_hardware_profile(progress)
+            if active_profile == "sunfounder_robot_hat":
+                ui.write("Saved SunFounder settings require explicit Fusion HAT+ migration.")
+                active_profile = _select_hardware_profile(ui, progress, store)
             if "hardware_profile" not in progress.selections:
                 progress.selections["hardware_profile"] = active_profile
 
@@ -385,7 +388,7 @@ async def run_setup_wizard(
 def _resolve_active_hardware_profile(progress: SetupProgress) -> str:
     """Resolve the active Expansion HAT profile from progress or saved servo.json."""
     selected = progress.selections.get("hardware_profile")
-    if selected in {"dfr0566", "sunfounder_robot_hat", "pca9685"}:
+    if selected in {"dfr0566", "fusion_hat_plus", "pca9685"}:
         return selected
     try:
         servo_item = next(
@@ -400,6 +403,8 @@ def _resolve_active_hardware_profile(progress: SetupProgress) -> str:
                     name = str(backend.get("name", "") or "").lower()
                     kwargs = backend.get("kwargs")
                     addr = kwargs.get("address") if isinstance(kwargs, dict) else None
+                    if name == "fusion_hat_plus":
+                        return "fusion_hat_plus"
                     if name in {"sunfounder_robot_hat", "sunfounder", "robot_hat"} or addr in {
                         0x14,
                         0x17,
@@ -424,14 +429,14 @@ def _select_hardware_profile(
     ui.write("======================================================================")
     ui.write("Select the Expansion HAT installed on your Raspberry Pi 5:")
     ui.write("  1. DFRobot DFR0566 IO Expansion HAT")
-    ui.write("  2. SunFounder Robot HAT")
+    ui.write("  2. SunFounder Fusion HAT+")
     ui.write("  3. General PCA9685 PWM Expansion HAT")
     choice = _choice(ui, "Choose hardware profile [1]: ", {"1", "2", "3", "q"}, "1")
     if choice == "q":
         raise EOFError
     profile = {
         "1": "dfr0566",
-        "2": "sunfounder_robot_hat",
+        "2": "fusion_hat_plus",
         "3": "pca9685",
     }[choice]
     progress.selections["hardware_profile"] = profile
@@ -475,10 +480,10 @@ def _hardware_step(
             "With both wheels raised, choose Calibrate for GPIO12 and GPIO13. Verify each "
             "wheel stops at neutral before leaving the tool."
         ),
-        "sunfounder_robot_hat": (
-            "With both wheels raised, choose 3. Calibrate for pwm0 (P0 Left) and pwm1 "
-            "(P1 Right), or any connected pwm0-pwm11 (P0-P11) servo channels. Verify each "
-            "servo stops at neutral before leaving the tool."
+        "fusion_hat_plus": (
+            "Raise wheels and unload mechanisms. Calibrate each connected endpoint, "
+            "hat_pwm0 through hat_pwm11. Use the safe limits for your servo type; "
+            "wheel roles are optional and must be assigned explicitly."
         ),
         "pca9685": (
             "With both wheels raised, choose 3. Calibrate for pwm0 (PWM0 Left) and pwm1 "
@@ -578,32 +583,46 @@ async def _optional_hardware(
     reuse_microphone: bool = False,
 ) -> None:
     ui.write("\nOptional hardware")
+    active_profile = _resolve_active_hardware_profile(progress)
     if selected in {None, "bluetooth"}:
         active_profile = _resolve_active_hardware_profile(progress)
-        if active_profile == "sunfounder_robot_hat":
-            ui.write("\nSunFounder Robot HAT — Embedded Speaker Initialization")
-            ui.write(
-                "What is this? The SunFounder Robot HAT includes an embedded I2S speaker "
-                "and onboard amplifier (GPIO12)."
+        if active_profile == "fusion_hat_plus":
+            ui.write("\nSunFounder Fusion HAT+ — Embedded Speaker Initialization")
+            ui.write("Embedded audio requires the reviewed Fusion driver and a reboot.")
+            current = load_effective_config(config_path if config_path.exists() else None)
+            default_output = "b" if current.speech_output.output_node.startswith("bluez_") else "e"
+            choice = _choice(
+                ui,
+                "Speech output: E) Embedded B) Bluetooth S) Skip ["
+                + default_output.upper()
+                + "]: ",
+                {"e", "b", "s", "y", "n"},
+                default_output,
             )
-            prompt = (
-                "Initialize and test the SunFounder Robot HAT onboard I2S speaker (GPIO12)? [Y/n]: "
-            )
-            if _yes(ui.ask(prompt) or "y"):
+            if choice == "b":
+                try:
+                    await connect_wizard(config_path)
+                    _record(progress, "bluetooth", "complete", "configured", "speaker_selected")
+                except Exception as exc:
+                    ui.write(f"Bluetooth setup failed: {type(exc).__name__}")
+                    _record(progress, "bluetooth", "failed", "unverified", "setup_failed")
+            elif choice in {"e", "y"}:
                 try:
                     node = await configure_sunfounder_i2s_speaker(config_path)
                     played = await play_sunfounder_speaker_test_tone(node)
+                    if not played:
+                        raise RuntimeError("speaker verification did not complete")
                 except Exception as exc:
                     ui.write(
                         f"Onboard I2S speaker setup failed: {type(exc).__name__}. "
-                        "Check dtoverlay=googlevoicehat-soundcard or dtoverlay=hifiberry-dac "
-                        "in /boot/firmware/config.txt."
+                        "Run scripts/fusion_hat_setup.py check and follow the reviewed "
+                        "installation/reboot instructions; no default device was substituted."
                     )
                     _record(progress, "bluetooth", "failed", "unverified", type(exc).__name__)
                 else:
                     ui.write(
                         "Configured SunFounder onboard I2S speaker "
-                        f"(GPIO12 amplifier enabled, sink: {node})."
+                        f"(kernel-controlled amplifier, selected output: {node})."
                     )
                     if played:
                         ui.write("Played embedded speaker verification chime.")
@@ -639,7 +658,37 @@ async def _optional_hardware(
 
     if reuse_microphone or selected not in {None, "microphone"}:
         return
-    if _yes(ui.ask("Configure the optional USB microphone and Hey Ninja wake word? [y/N]: ")):
+    configure_input = False
+    if active_profile == "fusion_hat_plus":
+        input_default = "u" if progress.selections.get("fusion_voice_input") == "u" else "e"
+        choice = _choice(
+            ui,
+            f"Voice input: E) Embedded U) USB S) Skip [{input_default.upper()}]: ",
+            {"e", "u", "s", "y", "n"},
+            input_default,
+        )
+        configure_input = choice in {"e", "u", "y"}
+        if configure_input:
+            progress.selections["fusion_voice_input"] = "u" if choice == "u" else "e"
+        if choice in {"e", "y"}:
+            from ninjarobot_pi5_ide.fusion import configure_fusion_microphone
+
+            try:
+                selector = await asyncio.to_thread(configure_fusion_microphone, config_path)
+                ui.write(f"Selected embedded microphone: {selector}. No recording was made.")
+            except (OSError, RuntimeError, ValueError) as exc:
+                ui.write(
+                    f"Embedded microphone prerequisite failed: {type(exc).__name__}. "
+                    "Check the Fusion driver and sound card after reboot."
+                )
+                _record(progress, "microphone", "failed", "unverified", "prerequisite_missing")
+                store.save(progress)
+                return
+    else:
+        configure_input = _yes(
+            ui.ask("Configure the optional USB microphone and Hey Ninja wake word? [y/N]: ")
+        )
+    if configure_input:
         ui.write("The default speech-to-text engine is local whisper.cpp.")
         ui.write("The setup tool uses the bundled hey_Ninja.onnx wake model.")
         ui.write(

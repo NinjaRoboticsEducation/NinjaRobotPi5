@@ -10,6 +10,7 @@ from .backend_errors import (
     BackendUnavailableError,
 )
 from .backends.dfr0566 import DFR0566ServoBackend
+from .backends.fusion_hat_plus import FusionHatPlusBackend
 from .backends.hardware_pwm import HardwarePWMServoBackend
 from .backends.pca9685 import PCA9685ServoBackend
 from .backends.pwm_pio import PwmPioServoBackend
@@ -287,6 +288,13 @@ def create_servo_backend(
         return PwmPioServoBackend(
             pins=pins,
             **_filter_backend_kwargs(kwargs, PWM_PIO_BACKEND_KWARGS),
+        )
+
+    if backend_name == "fusion_hat_plus":
+        return FusionHatPlusBackend(
+            **_filter_backend_kwargs(
+                kwargs, {"frequency_hz", "sysfs_root", "battery_path", "lock_path"}
+            )
         )
 
     if backend_name == "pca9685":

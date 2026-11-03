@@ -123,7 +123,7 @@ def test_unknown_component_cannot_inject_a_command() -> None:
                 "__backend__": {"name": "pca9685", "kwargs": {"address": 64}},
                 "hat_pwm0": {"pulse_center": 1500},
             },
-            False,
+            True,
         ),
         ("microphone", "mic", {"audio": {"channels": 1}}, False),
     ],
@@ -179,3 +179,53 @@ def test_microphone_asset_probe_preserves_runtime_import_containment(tmp_path):
         }
     )
     assert {name for name in sys.modules if name.startswith("pi5mic")} == before
+
+
+def test_fusion_profile_preserves_calibration_and_backups(monkeypatch, tmp_path):
+    import json
+
+    from ninjarobot_pi5_ide.config_import import DiscoveredConfig
+
+    path = tmp_path / "servo.json"
+    original = {
+        "__backend__": {"name": "sunfounder_robot_hat"},
+        "hat_pwm11": {"pulse_min": 800, "pulse_center": 1500, "pulse_max": 2200},
+    }
+    path.write_text(json.dumps(original))
+    original_bytes = path.read_bytes()
+    monkeypatch.setattr(
+        hardware_setup, "discover_pi5_configs", lambda: [DiscoveredConfig("pi5servo", path, True)]
+    )
+    hardware_setup.apply_hardware_profile_preset("fusion_hat_plus")
+    updated = path.read_bytes()
+    assert json.loads(updated)["hat_pwm11"] == original["hat_pwm11"]
+    assert json.loads(updated)["__backend__"]["name"] == "fusion_hat_plus"
+    assert path.with_suffix(".json.before-profile-change").read_bytes() == original_bytes
+    hardware_setup.apply_hardware_profile_preset("fusion_hat_plus")
+    assert path.read_bytes() == updated
+    assert hardware_setup.hardware_setup_status("servo")["configuration_valid"]
+
+
+def test_fusion_invalid_channel_reports_exact_calibration(monkeypatch, tmp_path):
+    import json
+
+    from ninjarobot_pi5_ide.config_import import DiscoveredConfig
+
+    path = tmp_path / "servo.json"
+    path.write_text(
+        json.dumps(
+            {
+                "__backend__": {"name": "fusion_hat_plus"},
+                "hat_pwm1": {"pulse_min": 1500, "pulse_center": 1500, "pulse_max": 2200},
+            }
+        )
+    )
+    before = path.read_bytes()
+    monkeypatch.setattr(
+        hardware_setup, "discover_pi5_configs", lambda: [DiscoveredConfig("pi5servo", path, True)]
+    )
+    status = hardware_setup.hardware_setup_status("servo")
+    assert not status["configuration_valid"]
+    assert "hat_pwm1" in status["message"]
+    assert "minimum < center" in status["message"]
+    assert path.read_bytes() == before

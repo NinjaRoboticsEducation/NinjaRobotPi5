@@ -103,7 +103,7 @@
   "power.confirmDetail": "Movement, voice input, remote access, and the agent service will stop before the Raspberry Pi powers off.",
   "power.confirmTitle": "Power off NinjaRobot?",
   "power.detail": "Stop robot hardware and services, then shut down this Raspberry Pi.",
-  "power.disabled": "Power-off is disabled in deployment settings.",
+  "power.disabled": "Power-off is disabled. Run Startup Agent deployment setup/repair to enable it.",
   "power.enabled": "Available to this active controller.",
   "power.preparing": "Preparing secure confirmation…",
   "power.shuttingDown": "NinjaRobot is shutting down safely.",
@@ -145,5 +145,7 @@
   "voice.status": "Always-on Ninja: {state}",
   "voice.title": "VOICE INPUT",
   "voice.titleOn": "VOICE INPUT ON",
-  "voice.transcript": "[Voice] {text}"
+  "voice.transcript": "[Voice] {text}",
+  "power.helperUnavailable": "The shutdown helper is unavailable. Repair Startup Agent deployment.",
+  "power.pairingRequired": "Pair this browser and acquire the controller lease to shut down."
 }

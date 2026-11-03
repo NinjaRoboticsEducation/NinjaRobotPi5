@@ -353,3 +353,21 @@ def test_all_web_locales_have_identical_keys_and_cover_markup_and_script() -> No
     markup_keys = set(re.findall(r'data-i18n(?:-placeholder|-aria|-alt)?="([A-Za-z0-9.]+)"', html))
     script_keys = set(re.findall(r'\bt\("([A-Za-z0-9.]+)"', javascript))
     assert markup_keys | script_keys <= english_keys
+
+
+def test_fusion_os_shutdown_does_not_require_eeprom_but_still_checks_helper(monkeypatch):
+    from ninjarobot_pi5_agent import shutdown
+
+    helper = Path("/usr/libexec/ninjarobot-poweroff")
+    monkeypatch.setattr(shutdown, "validate_poweroff_helper", lambda path: True)
+    monkeypatch.setattr(
+        shutdown.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, "", "")
+    )
+    monkeypatch.setattr(
+        shutdown,
+        "read_full_poweroff_status",
+        lambda: pytest.fail("Fusion OS halt must not inspect EEPROM"),
+    )
+    assert shutdown._probe_poweroff_helper(helper, require_full_poweroff=False) == (True, None)
+    monkeypatch.setattr(shutdown, "validate_poweroff_helper", lambda path: False)
+    assert not shutdown._probe_poweroff_helper(helper, require_full_poweroff=False)[0]

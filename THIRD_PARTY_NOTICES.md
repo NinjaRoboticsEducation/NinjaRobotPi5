@@ -184,3 +184,17 @@ consent can still grant access to private workspace or calendar data selected by
 the user. See the [Tavily MCP documentation](https://docs.tavily.com/documentation/mcp),
 [Notion MCP documentation](https://developers.notion.com/guides/mcp/get-started-with-mcp),
 and [Google Calendar API documentation](https://developers.google.com/workspace/calendar/api/guides/overview).
+
+## Reviewed Fusion HAT+ kernel driver
+
+The optional Fusion installer retrieves SunFounder's GPL-3.0 driver at commit
+`4bd1018ad5a70ee113160536f969cdadd9f22918` from
+[the upstream repository](https://github.com/sunfounder/fusion-hat/tree/4bd1018ad5a70ee113160536f969cdadd9f22918).
+The archive and every compiled source input are pinned in
+[vendor/fusion-hat/manifest.json](vendor/fusion-hat/manifest.json).
+The project-maintained patch fixes PWM stop/error semantics, stale battery data,
+and device permissions; its derivative kernel work remains GPL-3.0, not MIT.
+The upstream license is preserved in [COPYING](vendor/fusion-hat/COPYING).
+No upstream mutable installer or nested audio download is executed. The script
+builds with the operator's matching Linux headers, compiler, make and device-tree
+compiler; it does not automatically install those dependencies.

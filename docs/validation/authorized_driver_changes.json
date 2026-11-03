@@ -498,16 +498,16 @@
     },
     "pi5servo/src/pi5servo/cli/_common.py": {
       "approved": {
-        "sha256": "e651ebb9a165817162657b12ed00e31cdc1e8a7f956968fd5bc2542ae190ae4d",
-        "size": 9565
+        "sha256": "ed591b1694018ced7db9e6ba4090514708a0128e1976cdfe3b91a180dc8629fc",
+        "size": 9588
       },
       "authorized_by": "Project owner",
-      "authorized_on": "2026-10-25",
+      "authorized_on": "2026-11-03",
       "baseline": {
         "sha256": "0b3414c083ce444e1c3f0b0dc2127a6518bef727347b01f44962b8430f6f83d5",
         "size": 9502
       },
-      "reason": "Add SunFounder Robot HAT (0x14 Big-Endian 3-byte protocol, P0..P11, ADC A4 battery) and General PCA9685 smbus2/hat_pwm0..15 multi-HAT support while preserving DFR0566 baseline."
+      "reason": "Owner-approved Fusion-only kernel transport, exclusive servo ownership, explicit CLI backend and atomic Fusion calibration validation; 145 standalone tests passed"
     },
     "pi5servo/src/pi5servo/cli/calib.py": {
       "approved": {
@@ -563,16 +563,16 @@
     },
     "pi5servo/src/pi5servo/cli/servo_tool.py": {
       "approved": {
-        "sha256": "f71aa6009a149e86cc9dad2c8e87d33f745e60f10ef89b5b68e1cc3f96678431",
-        "size": 18934
+        "sha256": "8c5eeb0e580c7798262dfa25fcf51930effab682720c2762950ae6f619b67f97",
+        "size": 19287
       },
-      "authorized_by": "project owner",
-      "authorized_on": "2026-08-14",
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-11-03",
       "baseline": {
         "sha256": "4b27b6529af9893dc4320e394a73617acf9edc333dba0cc8ba6cd572637fbf9f",
         "size": 18891
       },
-      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+      "reason": "Owner-approved Fusion standalone session ownership and no automatic startup movement"
     },
     "pi5servo/src/pi5servo/cli/status.py": {
       "approved": {
@@ -589,29 +589,29 @@
     },
     "pi5servo/src/pi5servo/config/config_manager.py": {
       "approved": {
-        "sha256": "c8f3acd5442512afe2a31cac3c4f1c375b0357621ebd7b507703149fe9808b97",
-        "size": 8688
+        "sha256": "3ebe29bbbd949b456e83168c0f6c6209b40782a71d1668e4303b08d267906e46",
+        "size": 10199
       },
-      "authorized_by": "project owner",
-      "authorized_on": "2026-08-14",
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-11-03",
       "baseline": {
         "sha256": "8e44a2dea4bd4c1d75ef6e8bfd47f3aa2c2b35e094ac5d6109bcee49e94c61b8",
         "size": 8664
       },
-      "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+      "reason": "Owner-approved Fusion profile endpoint filtering and atomic validated calibration persistence"
     },
     "pi5servo/src/pi5servo/core/backend.py": {
       "approved": {
-        "sha256": "a71bedc64641f0af15f3fd57df0fbc3ed639ce40d43ad4cb19a58b10e63df1f5",
-        "size": 11142
+        "sha256": "fe5f77a9b6f9f82dc187a499a5d7ca2ec34fe3aa04defbc54f3a76ac121601c2",
+        "size": 11427
       },
       "authorized_by": "Project owner",
-      "authorized_on": "2026-10-25",
+      "authorized_on": "2026-11-03",
       "baseline": {
         "sha256": "7d1c7bc15beb2cb82af294f2650a299b90b404cd61a5fd7b76f576e791ce5c5d",
         "size": 9850
       },
-      "reason": "Support SunFounder Robot HAT v4 (0x14) and Fusion HAT / Robot HAT v5 (0x17) I2C MCU register maps and automatic fallback"
+      "reason": "Owner-approved Fusion-only kernel transport, exclusive servo ownership, explicit CLI backend and atomic Fusion calibration validation; 145 standalone tests passed"
     },
     "pi5servo/src/pi5servo/core/backends/__init__.py": {
       "approved": {
@@ -625,6 +625,16 @@
         "size": 339
       },
       "reason": "Add SunFounder Robot HAT (0x14 Big-Endian 3-byte protocol, P0..P11, ADC A4 battery) and General PCA9685 smbus2/hat_pwm0..15 multi-HAT support while preserving DFR0566 baseline."
+    },
+    "pi5servo/src/pi5servo/core/backends/fusion_hat_plus.py": {
+      "approved": {
+        "sha256": "5a1d988b3a1a68c7baa811b714e3d7455e24bd78a882d13fe9c3ef14fefc2b87",
+        "size": 6344
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-11-03",
+      "baseline": null,
+      "reason": "Owner-approved Fusion-only kernel transport, exclusive servo ownership, explicit CLI backend and atomic Fusion calibration validation; 145 standalone tests passed"
     },
     "pi5servo/src/pi5servo/core/backends/hardware_pwm.py": {
       "approved": {
@@ -700,6 +710,16 @@
         "size": 7517
       },
       "reason": "Fresh-install repair: use canonical per-user XDG configuration paths for standalone Pi5 tools, bridge apt-managed Raspberry Pi OS Picamera2 into the project uv environment, update CLI guidance, and add regression coverage."
+    },
+    "pi5servo/tests/test_fusion_kernel.py": {
+      "approved": {
+        "sha256": "2d8619308e14969ed1d0094f761f6445545bb2c307a6785326d066cb2ac98aa1",
+        "size": 3357
+      },
+      "authorized_by": "Project owner",
+      "authorized_on": "2026-11-03",
+      "baseline": null,
+      "reason": "Owner-approved Fusion-only kernel transport, exclusive servo ownership, explicit CLI backend and atomic Fusion calibration validation; 145 standalone tests passed"
     },
     "pi5servo/tests/test_parser.py": {
       "approved": {

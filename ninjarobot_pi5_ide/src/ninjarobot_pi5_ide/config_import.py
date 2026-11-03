@@ -160,6 +160,7 @@ def import_pi5_configs(
                     backend_addr = kwargs_meta.get("address")
 
             is_sunfounder = backend_name in {
+                "fusion_hat_plus",
                 "sunfounder_robot_hat",
                 "sunfounder",
                 "robot_hat",
@@ -178,6 +179,39 @@ def import_pi5_configs(
                 ):
                     hat_endpoints.append(norm)
 
+            is_fusion = backend_name == "fusion_hat_plus"
+            previous_profile = payload["hardware"].get("profile", "dfr0566")
+            if is_fusion:
+                payload["hardware"]["profile"] = "fusion_hat_plus"
+            elif is_pca9685:
+                payload["hardware"]["profile"] = "pca9685"
+            elif not is_sunfounder:
+                payload["hardware"]["profile"] = "dfr0566"
+            if previous_profile == "fusion_hat_plus" and not is_fusion:
+                payload["hardware"]["power"] = {"enabled": False}
+                payload["speech_output"]["speaker_enable_gpio"] = None
+                if payload["speech_output"].get("fusion_speaker"):
+                    payload["speech_output"]["fusion_speaker"] = False
+                    payload["speech_output"]["output_node"] = ""
+            if previous_profile != "dfr0566" and not (is_sunfounder or is_pca9685):
+                native_endpoints = sorted(
+                    {
+                        str(_normalize_servo_endpoint(key))
+                        for key, value in data.items()
+                        if isinstance(value, dict)
+                        and str(_normalize_servo_endpoint(key)).startswith("gpio")
+                    }
+                )
+                payload["hardware"]["servos"]["endpoints"] = tuple(
+                    native_endpoints or default_robot_config().hardware.servos.endpoints
+                )
+                if not native_endpoints:
+                    payload["hardware"]["servos"]["enabled"] = False
+                payload["behaviors"]["servo_roles"] = {
+                    role: ep
+                    for role, ep in payload["behaviors"]["servo_roles"].items()
+                    if ep in native_endpoints
+                }
             if is_sunfounder or is_pca9685:
                 hat_endpoints.sort(key=lambda ep: int(ep.removeprefix("hat_pwm")))
                 if hat_endpoints:
@@ -185,18 +219,20 @@ def import_pi5_configs(
                     old_roles = dict(payload["behaviors"].get("servo_roles") or {})
                     roles = {role: ep for role, ep in old_roles.items() if ep in hat_endpoints}
                     if (
-                        not roles
+                        not is_fusion
+                        and not roles
                         and len(hat_endpoints) >= 2
                         and old_roles == {"left_motor": "gpio12", "right_motor": "gpio13"}
                     ):
                         roles = dict(zip(("left_motor", "right_motor"), hat_endpoints[:2]))
                     payload["behaviors"]["servo_roles"] = roles
                 if is_sunfounder:
-                    fuel_gauge_addr = 0x17 if backend_addr in {0x17, "0x17"} else 0x14
-                    payload["speech_output"]["speaker_enable_gpio"] = 12
+                    fuel_gauge_addr = 0x17 if is_fusion or backend_addr in {0x17, "0x17"} else 0x14
+                    payload["speech_output"]["speaker_enable_gpio"] = None if is_fusion else 12
                     payload["hardware"]["power"] = {
                         "enabled": True,
                         "fuel_gauge_address": fuel_gauge_addr,
+                        "telemetry_required": is_fusion,
                         "warning_voltage": 7.15,
                         "cutoff_voltage": 6.90,
                         "charging_gpio": None if fuel_gauge_addr == 0x17 else 23,
@@ -341,6 +377,9 @@ def robot_config_to_toml(config: RobotConfig) -> str:
     lines = [
         f"schema_version = {config.schema_version}",
         "",
+        "[hardware]",
+        f"profile = {_toml(hardware.profile)}",
+        "",
         "[hardware.buzzer]",
         f"enabled = {_toml(config.hardware.buzzer.enabled)}",
         f"gpio = {hardware.buzzer.gpio}",
@@ -393,6 +432,7 @@ def robot_config_to_toml(config: RobotConfig) -> str:
                 "",
                 "[hardware.power]",
                 f"enabled = {_toml(hardware.power.enabled)}",
+                f"telemetry_required = {_toml(hardware.power.telemetry_required)}",
                 f"fuel_gauge_address = {hardware.power.fuel_gauge_address}",
                 f"warning_voltage = {hardware.power.warning_voltage}",
                 f"cutoff_voltage = {hardware.power.cutoff_voltage}",

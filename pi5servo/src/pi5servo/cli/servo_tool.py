@@ -113,7 +113,7 @@ def servo_tool(
             )
         )
 
-        if center_on_load:
+        if center_on_load and resolved_backend != "fusion_hat_plus":
             persistent_group.center_all()
             time.sleep(0.1)
             labels = ", ".join(format_endpoint_label(pin) for pin in known_pins)
@@ -161,6 +161,8 @@ def servo_tool(
     def build_temp_group(pins: list[int | str]) -> tuple[ServoGroup, object | None]:
         if persistent_group is not None and set(pins).issubset(set(persistent_group.pins)):
             return persistent_group, None
+        if resolved_backend == "fusion_hat_plus":
+            release_persistent_group()
         return _build_backend_group(pins)
 
     def build_temp_servo(pin: int | str) -> tuple[Servo, object | None]:
@@ -291,12 +293,15 @@ def servo_tool(
                     # Quick-move commands are direct operator actions. Force the
                     # final PWM write so center/offline recovery commands are not
                     # skipped when a prior transient servo object left stale state.
-                    success = group.execute_command(cmd_str, force=True)
-                    click.echo(term.green("✓ Done") if success else term.red("✗ Aborted"))
-
-                    if owns_group:
-                        group.close()
-                        close_runtime_handle(temp_runtime)
+                    try:
+                        success = group.execute_command(cmd_str, force=True)
+                        click.echo(term.green("✓ Done") if success else term.red("✗ Aborted"))
+                    finally:
+                        if owns_group:
+                            group.close()
+                            close_runtime_handle(temp_runtime)
+                            if resolved_backend == "fusion_hat_plus":
+                                refresh_persistent_group(center_on_load=False)
                 except Exception as exc:
                     click.echo(term.red(f"✗ Error: {exc}"))
 

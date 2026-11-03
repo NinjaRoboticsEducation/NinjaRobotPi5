@@ -270,3 +270,46 @@ def test_import_single_hat_servo_does_not_invent_a_wheel(tmp_path):
     assert config.hardware.servos.endpoints == ("hat_pwm3",)
     assert config.behaviors.servo_roles == {}
     assert config.hardware.power.charging_gpio is None
+
+
+def test_switch_from_fusion_restores_only_saved_native_endpoints(tmp_path):
+    payload = default_robot_config().model_dump()
+    payload["hardware"]["profile"] = "fusion_hat_plus"
+    payload["hardware"]["servos"]["endpoints"] = ("hat_pwm3",)
+    payload["hardware"]["power"]["telemetry_required"] = True
+    payload["behaviors"]["servo_roles"] = {}
+    payload["speech_output"]["fusion_speaker"] = True
+    payload["speech_output"]["output_node"] = "alsa:sndrpigooglevoi"
+    base = RobotConfig.model_validate(payload)
+    path = tmp_path / "servo.json"
+    write_json(
+        path,
+        {
+            "__backend__": {"name": "lgpio"},
+            "12": {"pulse_center": 1500},
+            "hat_pwm3": {"pulse_center": 1500},
+        },
+    )
+    result, _ = import_pi5_configs(base, [DiscoveredConfig("pi5servo", path, True)])
+    assert result.hardware.profile == "dfr0566"
+    assert result.hardware.servos.endpoints == ("gpio12",)
+    assert not result.hardware.power.telemetry_required
+    assert not result.speech_output.fusion_speaker
+    assert result.speech_output.output_node == ""
+
+
+def test_fusion_identity_and_required_telemetry_survive_save(tmp_path):
+    payload = default_robot_config().model_dump()
+    payload["hardware"]["profile"] = "fusion_hat_plus"
+    payload["hardware"]["servos"]["endpoints"] = ("hat_pwm0",)
+    payload["behaviors"]["servo_roles"] = {}
+    payload["hardware"]["power"].update(
+        enabled=True, telemetry_required=True, fuel_gauge_address=23, charging_gpio=None
+    )
+    payload["speech_output"].update(fusion_speaker=True, output_node="alsa:sndrpigooglevoi")
+    config = RobotConfig.model_validate(payload)
+    path = tmp_path / "config.toml"
+    save_robot_config(config, path, overwrite=False)
+    restored = load_robot_config(path)
+    assert restored.hardware == config.hardware
+    assert restored.speech_output == config.speech_output

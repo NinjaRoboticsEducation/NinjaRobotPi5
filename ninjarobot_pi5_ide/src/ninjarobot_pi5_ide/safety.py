@@ -68,6 +68,7 @@ def stop_guidance(reason: str | None, *, fault_detail: str | None = None) -> Sto
     causes = {
         "operator_stop": "The Emergency Stop was requested by an operator.",
         "undervoltage": "The Raspberry Pi reported undervoltage while the robot was moving.",
+        "power_telemetry_unavailable": "Required Fusion power telemetry is unavailable or stale.",
         "battery_undervoltage": (
             "The expansion HAT battery voltage dropped below the safe cutoff. "
             "Recharge the battery before resuming."
@@ -446,6 +447,7 @@ class MotionController:
             self._check_stop_state()
             generation = self._stop_generation
             await asyncio.gather(self._servo.start(), self._distance.prepare())
+            await self.ensure_power_ready()
             self._check_stop_state()
             if generation != self._stop_generation:
                 raise MotionSafetyError("Movement was stopped during device preparation.")
@@ -606,8 +608,49 @@ class MotionController:
             await self._warn("distance reading stale; movement continues")
         return None
 
+    async def ensure_power_ready(self) -> None:
+        """Fusion must have a current safe sample before movement or recovery."""
+        if not self._power_config.telemetry_required:
+            return
+        reason = "power_telemetry_unavailable"
+        detail = "No current verified power sample"
+        try:
+            active = await asyncio.to_thread(self._undervoltage_provider)
+            if active:
+                reason = "undervoltage"
+                detail = "Raspberry Pi current undervoltage bit is active"
+            else:
+                # Recovery can precede the first motion after a service restart.
+                # Fusion start claims the session at zero output, never centers it.
+                await self._servo.start()
+                reader = getattr(self._servo, "read_battery_voltage_sync", None)
+                voltage = await asyncio.to_thread(reader) if callable(reader) else None
+                if (
+                    isinstance(voltage, (int, float))
+                    and not isinstance(voltage, bool)
+                    and math.isfinite(voltage)
+                    and 0.5 < voltage <= 15
+                ):
+                    if voltage >= self._power_config.cutoff_voltage:
+                        return
+                    reason = "battery_undervoltage"
+                    detail = (
+                        f"measured={voltage:.2f}V cutoff={self._power_config.cutoff_voltage:.2f}V"
+                    )
+        except Exception:
+            pass
+        await self.stop_motion(reason, latch=True, fault_detail=detail)
+        raise MotionSafetyError(detail + "; check power and explicitly resume")
+
     async def _undervoltage_monitor(self) -> None:
         while not self._stop_event.is_set():
+            if self._power_config.telemetry_required:
+                try:
+                    await self.ensure_power_ready()
+                except MotionSafetyError:
+                    return
+                await asyncio.sleep(min(self._config.watchdog_timeout_seconds / 2, 1.0))
+                continue
             try:
                 active = await asyncio.to_thread(self._undervoltage_provider)
             except Exception:

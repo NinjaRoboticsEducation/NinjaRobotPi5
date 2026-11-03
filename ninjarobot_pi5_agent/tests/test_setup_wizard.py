@@ -11,6 +11,12 @@ import pytest
 from ninjarobot_pi5_agent import setup_wizard
 
 
+@pytest.fixture(autouse=True)
+def isolated_discovery(monkeypatch):
+    # Setup unit tests must never consult the operator's saved servo configuration.
+    monkeypatch.setattr(setup_wizard, "discover_pi5_configs", lambda: [])
+
+
 class _Console:
     def __init__(self, answers: tuple[str, ...] = ()) -> None:
         self.answers = deque(answers)
@@ -459,7 +465,7 @@ def test_candidate_secrets_preserve_secret_store_name_validation(tmp_path):
     ("choice", "expected_profile", "expected_backend_name", "expected_prompt_fragment"),
     [
         ("1", "dfr0566", "auto", "GPIO12 and GPIO13"),
-        ("2", "sunfounder_robot_hat", "sunfounder_robot_hat", "pwm0 (P0 Left) and pwm1 (P1 Right)"),
+        ("2", "fusion_hat_plus", "fusion_hat_plus", "hat_pwm0 through hat_pwm11"),
         ("3", "pca9685", "pca9685", "pwm0 (PWM0 Left) and pwm1 (PWM1 Right)"),
     ],
 )
@@ -486,7 +492,7 @@ def test_hardware_profile_selection_and_servo_step(
     assert loaded.selections["hardware_profile"] == expected_profile
     banner = "\n".join(ui_select.messages)
     assert "1. DFRobot DFR0566 IO Expansion HAT" in banner
-    assert "2. SunFounder Robot HAT" in banner
+    assert "2. SunFounder Fusion HAT+" in banner
     assert "3. General PCA9685 PWM Expansion HAT" in banner
 
     servo_json = tmp_path / "xdg" / "pi5servo" / "servo.json"
@@ -518,8 +524,13 @@ def test_sunfounder_optional_hardware_configures_onboard_i2s_speaker(monkeypatch
         return "alsa_output.platform-soc_sound.stereo-fallback"
 
     monkeypatch.setattr(setup_wizard, "configure_sunfounder_i2s_speaker", fake_configure_i2s)
+
+    async def fake_tone(_node):
+        return True
+
+    monkeypatch.setattr(setup_wizard, "play_sunfounder_speaker_test_tone", fake_tone)
     path = tmp_path / "state" / "progress.json"
-    progress = setup_wizard.SetupProgress(selections={"hardware_profile": "sunfounder_robot_hat"})
+    progress = setup_wizard.SetupProgress(selections={"hardware_profile": "fusion_hat_plus"})
     ui = _Console(("y", "n"))
     config_path = tmp_path / "config.toml"
 
@@ -540,7 +551,7 @@ def test_sunfounder_skip_embedded_speaker_does_not_prompt_bluetooth(monkeypatch,
         lambda *_a, **_kw: pytest.fail("Bluetooth setup must not run on SunFounder Robot HAT"),
     )
     path = tmp_path / "state" / "progress.json"
-    progress = setup_wizard.SetupProgress(selections={"hardware_profile": "sunfounder_robot_hat"})
+    progress = setup_wizard.SetupProgress(selections={"hardware_profile": "fusion_hat_plus"})
     ui = _Console(("n", "n"))
     config_path = tmp_path / "config.toml"
 

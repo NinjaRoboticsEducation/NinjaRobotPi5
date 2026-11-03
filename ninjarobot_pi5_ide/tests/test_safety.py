@@ -744,3 +744,39 @@ def test_battery_latch_retains_voltage_detail_and_distinct_guidance(tmp_path: Pa
     assert snapshot.fault_detail == "measured=6.50V cutoff=6.90V"
     assert "battery" in stop_guidance(snapshot.reason).cause
     assert "Raspberry Pi" in stop_guidance("undervoltage").cause
+
+
+def test_fusion_preflight_rejects_missing_or_low_power_before_movement(tmp_path):
+    from ninjarobot_pi5_ide.config import PowerConfig
+    from ninjarobot_pi5_ide.safety import MotionSafetyError
+
+    async def exercise():
+        for value, reason in [
+            (None, "power_telemetry_unavailable"),
+            (6.0, "battery_undervoltage"),
+            (float("nan"), "power_telemetry_unavailable"),
+        ]:
+            servo = FakeServo()
+            servo.read_battery_voltage_sync = lambda: value
+            config = behavior_config(tmp_path)
+            state = SafetyStateStore(config.safety_state_file)
+            state.clear_motion()
+            motion = MotionController(
+                servo=cast(ServoDevice, servo),
+                distance=FakeDistance([200]),
+                config=config,
+                state=state,
+                power_config=PowerConfig(
+                    enabled=True, telemetry_required=True, fuel_gauge_address=0x17
+                ),
+                undervoltage_provider=lambda: False,
+            )
+            with pytest.raises(MotionSafetyError):
+                await motion.ensure_power_ready()
+            assert not servo.move_calls
+            assert state.read().reason == reason
+            servo.read_battery_voltage_sync = lambda: 7.5
+            await motion.ensure_power_ready()
+            assert state.read().motion_latched  # A healthy sample does not erase history.
+
+    asyncio.run(exercise())

@@ -53,6 +53,7 @@ export const state = {
   messages: {},
   englishMessages: {},
   poweroffEnabled: false,
+  poweroffReady: false,
   poweroffAuthorized: false,
   poweroffNonce: null,
   remoteConnection: false,
@@ -312,6 +313,7 @@ function handleMessage(message) {
     const toolCount = Array.isArray(message.data?.tools) ? message.data.tools.length : 0;
     log(t("status.ready", { provider: providerText, tools: toolCount }));
     state.poweroffEnabled = message.data?.release?.shutdown?.enabled === true;
+    state.poweroffReady = message.data?.release?.shutdown?.state === "ready";
     updatePoweroffAvailability();
     messageHandlers.onSystemStatus?.(message);
     return;
@@ -425,11 +427,11 @@ export function clearPreview() {
 export function updatePoweroffAvailability() {
   if (!elements.powerOff || !elements.powerAvailability) return;
   elements.powerOff.disabled =
-    !state.poweroffEnabled || !state.poweroffAuthorized || !state.leaseId;
+    !state.poweroffEnabled || !state.poweroffReady || !state.poweroffAuthorized || !state.leaseId;
   elements.powerAvailability.textContent =
-    state.poweroffEnabled && state.poweroffAuthorized
-      ? t("power.enabled")
-      : t("power.disabled");
+    !state.poweroffEnabled ? t("power.disabled") :
+    !state.poweroffReady ? t("power.helperUnavailable") :
+    (!state.poweroffAuthorized || !state.leaseId) ? t("power.pairingRequired") : t("power.enabled");
 }
 
 export function focusableElements(container) {

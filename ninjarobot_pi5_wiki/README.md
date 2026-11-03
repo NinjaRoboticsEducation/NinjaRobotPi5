@@ -4,29 +4,26 @@ Start here for project documentation, architecture, development history, and
 AI-assisted development. Open this folder in your coding tool for wiki questions,
 or open the parent project for development and implementation verification.
 
-## Current full manuals — Runtime remediation and Multi-HAT hardware refinement
+## Current full manuals — Fusion HAT+ implementation
 
-These 2 November successor manuals are ingested and semantically reviewed in the wiki.
-They document web startup proxy-header disabling (`proxy_headers=False`), distinct battery
-undervoltage cutoff (`battery_undervoltage`) with persisted fault details and non-finite safeguards,
-sysfs-informed `0x17` SunFounder preset avoiding probing and legacy charging GPIO23, transient full
-stop presentation gate clearance, embedded audio using Fusion kernel speaker control without raw I2C
-`0x31` writes, PipeWire/ALSA audio health alignment, 2-byte register stride for Fusion PWM/timers
-at `0x17`, config import preserving explicit servo roles without companion fabrication, and
-route-persisting local/cloud Ollama selection, alongside Multi-HAT hardware support (DFRobot DFR0566,
-SunFounder Robot HAT v4 `0x14` and Fusion HAT `0x17` with auto-fallback, and PCA9685 `0x40`).
-The registered document map is updated to the 2 November checkpoint.
-Use [the document map](project-knowledge.json) for registered source provenance;
-use the links below for the full manuals:
+These 3 November successor sources reflect the current repository implementation.
+They are **unregistered and unreviewed**. The owner will ingest and review after
+manual hardware acceptance. `project-knowledge.json` and compiled wiki pages still
+refer to the registered 2 November checkpoint; its older Robot HAT fallback and
+raw-controller guidance does not describe the new Fusion-only path.
 
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md)
-- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md)
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-11-03/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-11-03/DevelopmentGuide.md)
+- [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md) (unchanged public tools)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-11-03/DevelopmentLog.md)
+- [Fusion implementation and manual acceptance](../docs/validation/fusion_implementation_261103.md)
 
-These source revisions document runtime remediation, Multi-HAT hardware refinement,
-and dual MCU auto-detection. They are ingested and semantically reviewed;
-`project-knowledge.json` describes this registered checkpoint.
+Original registered sources are preserved:
+[InstallationGuide](raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md),
+[DevelopmentGuide](raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md), and
+[DevelopmentLog](raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md). No ingestion, semantic review or
+fingerprint refresh was performed. Read-only wiki checks could not run because
+the wiki environment is missing in this checkout.
 
 - [Multi-HAT runtime remediation validation](../docs/validation/sunfounder_runtime_remediation_261102.md)
 - [Onboarding refinement and Mac Calendar tests](../docs/validation/onboarding_refinement_walkthrough_260923.md)

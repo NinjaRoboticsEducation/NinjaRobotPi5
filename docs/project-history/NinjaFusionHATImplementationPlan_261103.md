@@ -4,7 +4,9 @@ Finalize the seven-issue remediation with Fusion HAT+ as the only supported
 SunFounder board, embedded audio by default, and independent control of all
 twelve PWM servo channels.
 
-Date: 3 November 2026. Status: finalized plan; implementation has not started.
+Date: 3 November 2026. Original status: finalized plan before implementation.
+For the subsequently approved implementation, software gates and pending physical
+acceptance, see the [implementation record](../validation/fusion_implementation_261103.md).
 The owner approved the recommendations and narrowed SunFounder support to
 Fusion HAT+. This document supersedes the provisional phases and open product
 choices in the [regression investigation](NinjaSunFounderRegressionInvestigation_261103.md)

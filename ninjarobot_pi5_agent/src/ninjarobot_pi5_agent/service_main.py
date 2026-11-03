@@ -405,7 +405,9 @@ async def run_service(arguments: argparse.Namespace) -> None:
         events=events,
         release_status=release_status,
         request_service_stop=request_service_stop,
+        require_full_poweroff=config.hardware.profile != "fusion_hat_plus",
     )
+    await poweroff.refresh_status()
     web_access = WebAccessState()
     if onboarding_enabled:
         web_access.enable_local_fallback()

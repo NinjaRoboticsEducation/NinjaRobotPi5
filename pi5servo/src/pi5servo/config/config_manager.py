@@ -2,6 +2,7 @@
 
 import json
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -105,13 +106,41 @@ class ConfigManager:
             True if saved successfully, False on error
         """
         try:
+            # Reject unsafe ranges before replacing any existing calibration file.
+            for endpoint in (
+                self._data if self._backend_config.get("name") == "fusion_hat_plus" else {}
+            ):
+                if not endpoint.startswith("hat_pwm"):
+                    continue  # Retain inactive native calibration for switching profiles.
+                calibration = self.get_calibration(endpoint)
+                if not (
+                    500
+                    <= calibration.pulse_min
+                    < calibration.pulse_center
+                    < calibration.pulse_max
+                    <= 2500
+                ):
+                    raise ValueError(f"{endpoint}: minimum must be below center and maximum")
             # Ensure parent directory exists
             self._config_path.parent.mkdir(parents=True, exist_ok=True)
 
             json_data = self._to_dict()
 
-            with open(self._config_path, "w", encoding="utf-8") as f:
-                json.dump(json_data, f, indent=2)
+            if self._config_path.is_symlink():
+                raise ValueError("servo configuration must not be a symlink")
+            temporary = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="w", encoding="utf-8", dir=self._config_path.parent, delete=False
+                ) as f:
+                    temporary = Path(f.name)
+                    json.dump(json_data, f, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(temporary, self._config_path)
+            finally:
+                if temporary is not None:
+                    temporary.unlink(missing_ok=True)
 
             return True
         except OSError:
@@ -181,7 +210,10 @@ class ConfigManager:
 
     def get_known_endpoints(self) -> list[ServoEndpoint]:
         """Return all configured endpoints in normalized form."""
-        return [parse_servo_endpoint(endpoint_id) for endpoint_id in sorted(self._data)]
+        endpoints = [parse_servo_endpoint(endpoint_id) for endpoint_id in sorted(self._data)]
+        if self._backend_config.get("name") == "fusion_hat_plus":
+            return [endpoint for endpoint in endpoints if endpoint.kind == "hat_pwm"]
+        return endpoints
 
     def remove_calibration(self, pin: int | str | ServoEndpoint) -> bool:
         """Remove calibration for a specific endpoint.

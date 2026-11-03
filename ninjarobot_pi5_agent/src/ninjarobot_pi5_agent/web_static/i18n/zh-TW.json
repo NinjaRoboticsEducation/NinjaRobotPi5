@@ -103,7 +103,7 @@
   "power.confirmDetail": "Raspberry Pi 關機前將停止移動、語音輸入、遠端存取與代理服務。",
   "power.confirmTitle": "要關閉 NinjaRobot 電源嗎？",
   "power.detail": "停止機器人硬體與服務，然後關閉 Raspberry Pi。",
-  "power.disabled": "部署設定未啟用關機功能。",
+  "power.disabled": "關機未啟用。請執行 Startup Agent 部署設定或修復。",
   "power.enabled": "目前的控制器可使用此功能。",
   "power.preparing": "正在準備安全確認…",
   "power.shuttingDown": "NinjaRobot 正在安全關機。",
@@ -145,5 +145,7 @@
   "voice.status": "Ninja 常時待命：{state}",
   "voice.title": "語音輸入",
   "voice.titleOn": "語音輸入已開啟",
-  "voice.transcript": "［語音］{text}"
+  "voice.transcript": "［語音］{text}",
+  "power.helperUnavailable": "關機助手無法使用。請修復 Startup Agent 部署。",
+  "power.pairingRequired": "請配對瀏覽器並取得控制權後再關機。"
 }

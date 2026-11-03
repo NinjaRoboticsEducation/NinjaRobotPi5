@@ -3,16 +3,22 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import stat
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Sequence
 
 from .config_import import default_robot_config, discover_pi5_configs, import_pi5_configs
 from .hardware_ownership import DEFAULT_HARDWARE_LOCK, HardwareOwnership
+
+
+class ServoSetupError(ValueError):
+    """Safe, actionable calibration diagnostic without private configuration."""
 
 
 @dataclass(frozen=True)
@@ -152,6 +158,7 @@ def hardware_setup_status(component: str) -> dict[str, object]:
                 backend_name = str(backend_cfg.get("name", "auto") or "auto").lower()
                 backend_addr = backend_cfg.get("kwargs", {}).get("address")
                 is_sunfounder = backend_name in {
+                    "fusion_hat_plus",
                     "sunfounder_robot_hat",
                     "sunfounder",
                     "robot_hat",
@@ -168,11 +175,11 @@ def hardware_setup_status(component: str) -> dict[str, object]:
                             continue
                         ch_num = ep.removeprefix("hat_pwm")
                         if not ch_num.isdigit() or not (0 <= int(ch_num) <= max_channel):
-                            continue
+                            raise ServoSetupError(f"{ep}: unsupported channel for selected HAT")
                         entry = data.get(ep) or data.get(f"pwm{ch_num}") or data.get(f"p{ch_num}")
                         if isinstance(entry, dict) and "pulse_center" in entry:
                             valid_hat_calibrations[ep] = cal
-                    min_required = 1 if (is_sunfounder and not is_pca9685) else 2
+                    min_required = 1
                     if len(valid_hat_calibrations) < min_required:
                         raise ValueError("missing saved wheel or servo calibration")
                     selected_calibrations = valid_hat_calibrations
@@ -188,7 +195,7 @@ def hardware_setup_status(component: str) -> dict[str, object]:
                         str(pin): cal for pin, cal in calibrated.items() if pin in {12, 13}
                     }
 
-                for calibration in selected_calibrations.values():
+                for endpoint, calibration in selected_calibrations.items():
                     if (
                         not 500
                         <= calibration.pulse_min
@@ -196,7 +203,11 @@ def hardware_setup_status(component: str) -> dict[str, object]:
                         < calibration.pulse_max
                         <= 2500
                     ):
-                        raise ValueError("invalid servo pulse calibration")
+                        raise ServoSetupError(
+                            f"{endpoint}: pulse calibration must satisfy "
+                            "500 <= minimum < center < maximum <= 2500 microseconds. "
+                            "Repair this channel in the calibration tool."
+                        )
             if component == "microphone":
                 _check_microphone_assets(data)
             # Only reviewed hardware fields are shown, never arbitrary JSON/credentials.
@@ -217,6 +228,8 @@ def hardware_setup_status(component: str) -> dict[str, object]:
                 }
             valid = True
             problem = "Settings checked; physical operation has not been tested."
+        except ServoSetupError as exc:
+            problem = str(exc)
         except (OSError, ValueError, TypeError, KeyError, ImportError):
             problem = (
                 "Saved settings are invalid or incomplete. Open the setup tool to repair them."
@@ -313,9 +326,9 @@ HARDWARE_PROFILE_BACKENDS: dict[str, dict[str, object]] = {
         "name": "auto",
         "kwargs": {"bus_id": 1, "address": 16, "frequency_hz": 50},
     },
-    "sunfounder_robot_hat": {
-        "name": "sunfounder_robot_hat",
-        "kwargs": {"bus_id": 1, "address": 20, "frequency_hz": 50},
+    "fusion_hat_plus": {
+        "name": "fusion_hat_plus",
+        "kwargs": {"frequency_hz": 50},
     },
     "pca9685": {
         "name": "pca9685",
@@ -326,88 +339,69 @@ HARDWARE_PROFILE_BACKENDS: dict[str, dict[str, object]] = {
 
 def apply_hardware_profile_preset(profile: str) -> Path:
     """Write the selected Expansion HAT backend preset into ``servo.json``."""
+    # Calling this function is an explicit profile selection, not auto-detection.
+    if profile == "sunfounder_robot_hat":
+        profile = "fusion_hat_plus"
     if profile not in HARDWARE_PROFILE_BACKENDS:
         raise ValueError(f"unsupported hardware profile: {profile}")
     discovered = next(item for item in discover_pi5_configs() if item.library == "pi5servo")
-    servo_path = discovered.path.expanduser().resolve()
+    servo_path = discovered.path.expanduser().absolute()
     servo_path.parent.mkdir(parents=True, exist_ok=True)
+    if servo_path.is_symlink() or servo_path.parent.resolve() != servo_path.parent:
+        raise ValueError("servo settings must not use symlinks")
+    original = servo_path.read_bytes() if servo_path.exists() else None
     data: dict[str, object] = {}
-    if servo_path.is_file() and not servo_path.is_symlink():
-        try:
-            loaded = json.loads(servo_path.read_text(encoding="utf-8"))
-            if isinstance(loaded, dict):
-                data = loaded
-        except (OSError, ValueError):
-            data = {}
-    backend = dict(HARDWARE_PROFILE_BACKENDS[profile])
-    if profile == "sunfounder_robot_hat" and Path("/sys/class/fusion_hat").exists():
-        backend["kwargs"] = {"bus_id": 1, "address": 0x17, "frequency_hz": 50}
+    if original is not None:
+        loaded = json.loads(original)
+        if not isinstance(loaded, dict):
+            raise ValueError("servo settings must contain an object; original was preserved")
+        data = loaded
+    backend = HARDWARE_PROFILE_BACKENDS[profile]
+    if data.get("__backend__") == backend:
+        return servo_path
+    if original is not None:
+        backup = servo_path.with_suffix(".json.before-profile-change")
+        if not backup.exists():
+            with backup.open("xb") as handle:
+                handle.write(original)
+            backup.chmod(0o600)
     data["__backend__"] = backend
-    servo_path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    temporary: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", dir=servo_path.parent, delete=False) as handle:
+            temporary = handle.name
+            json.dump(data, handle, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, servo_path)
+    finally:
+        if temporary is not None:
+            Path(temporary).unlink(missing_ok=True)
     return servo_path
 
 
-def _ensure_sunfounder_i2s_overlay() -> None:
-    """Load the runtime I2S soundcard overlay on Raspberry Pi if no I2S ALSA card is active yet."""
-    from .audio_output import _detect_alsa_i2s_device
-
-    if _detect_alsa_i2s_device() is not None:
-        return
-    if not shutil.which("dtoverlay") or not Path("/proc/device-tree").exists():
-        return
-    try:
-        subprocess.run(
-            ["sudo", "-n", "dtoverlay", "googlevoicehat-soundcard"],
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=5,
-        )
-    except Exception:
-        pass
-
-
-async def play_sunfounder_speaker_test_tone(
-    output_node: str = "alsa_output.platform-soc_sound.stereo-fallback",
-) -> bool:
-    """Play a short verification chime through the SunFounder embedded I2S speaker."""
+async def play_sunfounder_speaker_test_tone(output_node: str) -> bool:
+    """Explicit operator tone using the detected embedded route; no boot changes."""
     import asyncio
-    import os
 
-    if "PYTEST_CURRENT_TEST" in os.environ:
-        return False
-
-    from .audio_output import (
-        _detect_alsa_i2s_device,
-        _set_speaker_amplifier,
-        synthesize_test_chime_wav,
-    )
+    from .audio_output import synthesize_test_chime_wav
     from .audio_process import run_audio_process
+    from .fusion import set_fusion_speaker
 
-    await asyncio.to_thread(_ensure_sunfounder_i2s_overlay)
-    await asyncio.to_thread(_set_speaker_amplifier, 12, True)
-    wav_bytes = synthesize_test_chime_wav()
+    await asyncio.to_thread(set_fusion_speaker, True)
     try:
-        if shutil.which("pw-play"):
-            await run_audio_process(
-                ["pw-play", f"--target={output_node}", "--volume=0.35", "-"],
-                input_data=wav_bytes,
-                timeout=5.0,
-                output_limit=65536,
-            )
-            return True
-        alsa_dev = await asyncio.to_thread(_detect_alsa_i2s_device)
-        if alsa_dev and shutil.which("aplay"):
-            await run_audio_process(
-                ["aplay", "-q", "-D", alsa_dev, "-"],
-                input_data=wav_bytes,
-                timeout=5.0,
-                output_limit=65536,
-            )
-            return True
-    except Exception:
-        return False
-    return False
+        arguments = (
+            ["aplay", "-q", "-D", f"plughw:CARD={output_node[5:]},DEV=0", "-"]
+            if output_node.startswith("alsa:")
+            else ["pw-play", f"--target={output_node}", "--volume=0.35", "-"]
+        )
+        await run_audio_process(
+            arguments, input_data=synthesize_test_chime_wav(), timeout=5, output_limit=65536
+        )
+        return True
+    finally:
+        await asyncio.to_thread(set_fusion_speaker, False)
 
 
 async def configure_sunfounder_i2s_speaker(
@@ -415,35 +409,26 @@ async def configure_sunfounder_i2s_speaker(
     *,
     play_test_tone: bool = False,
 ) -> str:
-    """Enable GPIO12 amplifier, discover I2S sink, and persist in ``config.toml``."""
-    import asyncio
-
-    from .audio_output import _set_speaker_amplifier, discover_i2s_output_node
+    """Select actual Fusion embedded audio without installing or enabling hardware."""
+    from .audio_output import discover_i2s_output_node
+    from .config import RobotConfig
     from .config_import import load_effective_config, save_robot_config
+    from .fusion import require_fusion_driver
 
-    if play_test_tone:
-        await asyncio.to_thread(_ensure_sunfounder_i2s_overlay)
-    node = await discover_i2s_output_node() or "alsa_output.platform-soc_sound.stereo-fallback"
-    resolved_path = config_path.expanduser()
-    current = load_effective_config(resolved_path if resolved_path.exists() else None)
+    require_fusion_driver()
+    node = await discover_i2s_output_node()
+    if not node or not any(
+        token in node.lower() for token in ("googlevoicehat", "sndrpigooglevoi")
+    ):
+        raise RuntimeError("Fusion embedded sound card missing; verify prerequisites after reboot")
+    current = load_effective_config(config_path if config_path.exists() else None)
     payload = current.model_dump()
-    servos_endpoints = tuple(payload["hardware"]["servos"].get("endpoints") or ())
-    if "gpio12" in servos_endpoints or "12" in servos_endpoints:
-        hat_eps = [ep for ep in servos_endpoints if str(ep).startswith("hat_pwm")]
-        if not hat_eps:
-            raise ValueError("Import calibrated HAT endpoints before enabling embedded audio")
-        payload["hardware"]["servos"]["endpoints"] = tuple(hat_eps)
-        payload["behaviors"]["servo_roles"] = {
-            role: ep for role, ep in payload["behaviors"]["servo_roles"].items() if ep in hat_eps
-        }
     payload["speech_output"]["enabled"] = True
     payload["speech_output"]["output_node"] = node
-    payload["speech_output"]["speaker_enable_gpio"] = 12
-    from .config import RobotConfig
-
+    payload["speech_output"]["speaker_enable_gpio"] = None
+    payload["speech_output"]["fusion_speaker"] = True
     updated = RobotConfig.model_validate(payload)
-    _set_speaker_amplifier(12, True)
-    save_robot_config(updated, resolved_path, overwrite=resolved_path.exists())
+    save_robot_config(updated, config_path, overwrite=config_path.exists())
     if play_test_tone:
         await play_sunfounder_speaker_test_tone(node)
     return node

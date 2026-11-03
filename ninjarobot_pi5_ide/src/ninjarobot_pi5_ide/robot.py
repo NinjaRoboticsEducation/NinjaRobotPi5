@@ -239,10 +239,16 @@ class RobotAssembly:
         shown = False
         if self.display.enabled:
             shown = await self.show_agent_face("speaking")
+        request = self._expression_request
         try:
             yield
         finally:
-            if shown and self._ambient_face == "speaking" and not self.system_safety.stopped:
+            if (
+                shown
+                and self._ambient_face == "speaking"
+                and request == self._expression_request
+                and not self.system_safety.stopped
+            ):
                 await self.restore_idle_face()
 
     async def start(self) -> None:
@@ -614,6 +620,8 @@ class RobotAssembly:
 
     async def resume_motion(self, *, confirmed: bool) -> SafetySnapshot:
         """Clear an explicitly confirmed Level 1 latch."""
+        if confirmed:
+            await self.motion.ensure_power_ready()
         snapshot = self.motion.resume(confirmed=confirmed)
         self._idle_suppressed = False
         await self._start_idle_if_safe()
@@ -623,6 +631,8 @@ class RobotAssembly:
         """Clear Level 2 only after every configured device reports ready."""
         if self.distance_game._task is not None:
             await self.distance_game.stop("system_resume")
+        if confirmed:
+            await self.motion.ensure_power_ready()
         snapshot = await self.system_safety.resume_system(
             confirmed=confirmed,
             health_checks={
@@ -711,7 +721,7 @@ class RobotAssembly:
         ):
             return
         snapshot = self.safety_state.read()
-        if snapshot.motion_latched or snapshot.system_latched:
+        if snapshot.system_latched:
             return
         async with self._idle_lock:
             if self._foreground_behaviors:

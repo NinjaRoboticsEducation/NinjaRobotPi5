@@ -1,0 +1,375 @@
+--- a/driver/main.h
++++ b/driver/main.h
+@@ -24,7 +24,7 @@
+ #include <linux/workqueue.h>
+ 
+ // Driver version
+-#define VERSION "1.1.0"
++#define VERSION "1.1.0-ninja1"
+ 
+ // Device name and I2C address
+ #define FUSION_HAT_NAME "fusion_hat"
+@@ -124,12 +124,15 @@
+ 
+   // PWM related
+   bool pwm_enabled[FUSION_HAT_PWM_CHANNELS];
++  int pwm_errors[FUSION_HAT_PWM_CHANNELS];
+   uint32_t pwm_duty_cycles[FUSION_HAT_PWM_CHANNELS];
+   uint32_t pwm_periods[FUSION_HAT_PWM_CHANNELS];
+ 
+   // Battery related
+   struct power_supply *battery;
+   struct power_supply_desc battery_desc;
++  bool battery_valid;
++  unsigned long battery_sample_jiffies;
+   bool charging;       // Charging status
+   int battery_level;   // Battery level percentage
+   int battery_voltage; // Battery voltage (mV)
+--- a/driver/battery.c
++++ b/driver/battery.c
+@@ -13,6 +13,10 @@
+ #include <linux/mutex.h>
+ 
+ #include "main.h"
++#include <linux/jiffies.h>
++
++/* Worker runs every second. Never expose a sample older than three periods. */
++#define BATTERY_MAX_AGE_MS (3 * MAIN_INTERVAL)
+ 
+ /**
+  * @brief List of supported power supply properties
+@@ -50,6 +54,7 @@
+     int ret;
+     
+     mutex_lock(&dev->lock);
++    dev->battery_valid = false;
+     
+     ret = fusion_hat_i2c_read_word(dev->client, CMD_READ_BATTERY_H, &battery_adc_value, true);
+     if (ret != 0) {
+@@ -69,6 +74,8 @@
+     battery_voltage_mv *= BATTERY_DIVIDER;
+ 
+     dev->battery_voltage = battery_voltage_mv;
++    dev->battery_sample_jiffies = jiffies;
++    dev->battery_valid = true;
+ 
+     dev->charging = charging_status ? true : false;
+         
+@@ -102,6 +109,13 @@
+     // Assumed full capacity for charge-related properties (mAh)
+     const int BATTERY_FULL_CHARGE_MAH = 2000;
+     
++    mutex_lock(&dev->lock);
++    if (!dev->battery_valid ||
++        time_after(jiffies, dev->battery_sample_jiffies +
++                   msecs_to_jiffies(BATTERY_MAX_AGE_MS))) {
++        mutex_unlock(&dev->lock);
++        return -ENODATA;
++    }
+     switch (psp) {
+     case POWER_SUPPLY_PROP_PRESENT:
+         val->intval = 1;
+@@ -169,8 +183,10 @@
+             val->intval = POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL;
+         break;
+     default:
++        mutex_unlock(&dev->lock);
+         return -EINVAL;
+     }
++    mutex_unlock(&dev->lock);
+     return 0;
+ }
+ 
+@@ -199,6 +215,7 @@
+     }
+     
+     // Initialize battery state variables
++    dev->battery_valid = false;
+     dev->charging = false;
+     dev->battery_level = 0;
+     dev->battery_voltage = 0;
+--- a/driver/pwm.c
++++ b/driver/pwm.c
+@@ -192,13 +192,16 @@
+  */
+ static ssize_t period_show(struct kobject *kobj, struct kobj_attribute *attr,
+                            char *buf) {
+-  struct fusion_hat_pwm_channel *pwm_chan =
++  struct fusion_hat_pwm_channel *channel =
+       container_of(kobj, struct fusion_hat_pwm_channel, kobj);
+-  int channel = pwm_chan->channel;
+-  struct fusion_hat_dev *fusion_dev = pwm_chan->dev;
+-  uint32_t period = fusion_dev->pwm_periods[channel];
+-
+-  return sprintf(buf, "%u\n", period);
++  struct fusion_hat_dev *dev = channel->dev;
++  int error;
++  uint32_t value;
++  mutex_lock(&dev->lock);
++  error = dev->pwm_errors[channel->channel];
++  value = dev->pwm_periods[channel->channel];
++  mutex_unlock(&dev->lock);
++  return error ? error : sprintf(buf, "%u\n", value);
+ }
+ 
+ /**
+@@ -265,9 +268,11 @@
+       }
+     }
+   }
++  for (i = channel & ~3; i <= (channel | 3); i++)
++    fusion_dev->pwm_errors[i] = ret < 0 ? ret : 0;
+   mutex_unlock(&fusion_dev->lock);
+ 
+-  return ret < 0 ? ret : count;
++  return ret < 0 ? ret : (ssize_t)count;
+ }
+ 
+ /**
+@@ -277,15 +282,18 @@
+  * @param buf The buffer to write the duty cycle value to
+  * @return Number of bytes written to buffer
+  */
+-static ssize_t duty_cycle_show(struct kobject *kobj,
+-                               struct kobj_attribute *attr, char *buf) {
+-  struct fusion_hat_pwm_channel *pwm_chan =
++static ssize_t duty_cycle_show(struct kobject *kobj, struct kobj_attribute *attr,
++                           char *buf) {
++  struct fusion_hat_pwm_channel *channel =
+       container_of(kobj, struct fusion_hat_pwm_channel, kobj);
+-  int channel = pwm_chan->channel;
+-  struct fusion_hat_dev *fusion_dev = pwm_chan->dev;
+-  uint32_t value = fusion_dev->pwm_duty_cycles[channel];
+-
+-  return sprintf(buf, "%u\n", value);
++  struct fusion_hat_dev *dev = channel->dev;
++  int error;
++  uint32_t value;
++  mutex_lock(&dev->lock);
++  error = dev->pwm_errors[channel->channel];
++  value = dev->pwm_duty_cycles[channel->channel];
++  mutex_unlock(&dev->lock);
++  return error ? error : sprintf(buf, "%u\n", value);
+ }
+ 
+ /**
+@@ -302,44 +310,31 @@
+   struct fusion_hat_pwm_channel *pwm_chan =
+       container_of(kobj, struct fusion_hat_pwm_channel, kobj);
+   int channel = pwm_chan->channel;
+-  struct fusion_hat_dev *fusion_dev = pwm_chan->dev;
+-  uint32_t input_value, period, psc, arr, full_scale;
+-  uint16_t pwm_value;
++  struct fusion_hat_dev *dev = pwm_chan->dev;
++  uint32_t value, period, psc, arr;
+   int ret;
+-
+-  // Check if enabled
+-  if (!fusion_dev->pwm_enabled[channel]) {
+-    printk(KERN_INFO "PWM channel %d is not enabled\n", channel);
++  if (kstrtou32(buf, 10, &value) < 0)
+     return -EINVAL;
+-  }
+-
+-  // Parse input value
+-  if (kstrtou32(buf, 10, &input_value) < 0) {
+-    printk(KERN_INFO "Failed to parse duty cycle value for channel %d\n",
+-           channel);
+-    return -EINVAL;
+-  }
+-
+-  // The compare value is relative to the current full scale (ARR + 1); a
+-  // hard-coded PWM_PERIOD_VALUE would distort the duty cycle for smaller ARR
+-  period = fusion_dev->pwm_periods[channel];
+-  if (period == 0 || period > 1000000)
+-    period = PWM_DEFAULT_PERIOD;
++  mutex_lock(&dev->lock);
++  if (!dev->pwm_enabled[channel] || dev->pwm_errors[channel]) {
++    ret = dev->pwm_errors[channel] ?: -EINVAL;
++    goto out;
++  }
++  period = dev->pwm_periods[channel];
++  if (!period || value > period) {
++    ret = -EINVAL;
++    goto out;
++  }
+   fusion_hat_pwm_calc_div(period, &psc, &arr);
+-  full_scale = arr + 1;
+-  pwm_value = fusion_hat_pwm_calc_compare(input_value, period, full_scale);
+-
+-  mutex_lock(&fusion_dev->lock);
+-  ret = fusion_hat_write_pwm_value(fusion_dev->client, channel, pwm_value);
+-  mutex_unlock(&fusion_dev->lock);
+-  if (ret >= 0) {
+-    fusion_dev->pwm_duty_cycles[channel] = input_value;
+-  } else {
+-    printk(KERN_INFO "Failed to write duty cycle value for channel %d\n",
+-           channel);
+-  }
+-
+-  return ret < 0 ? ret : count;
++  ret = fusion_hat_write_pwm_value(dev->client, channel,
++          fusion_hat_pwm_calc_compare(value, period, arr + 1));
++  if (ret >= 0)
++    dev->pwm_duty_cycles[channel] = value;
++  else
++    dev->pwm_errors[channel] = ret;
++out:
++  mutex_unlock(&dev->lock);
++  return ret < 0 ? ret : (ssize_t)count;
+ }
+ 
+ /**
+@@ -351,12 +346,16 @@
+  */
+ static ssize_t enable_show(struct kobject *kobj, struct kobj_attribute *attr,
+                            char *buf) {
+-  struct fusion_hat_pwm_channel *pwm_chan =
++  struct fusion_hat_pwm_channel *channel =
+       container_of(kobj, struct fusion_hat_pwm_channel, kobj);
+-  int channel = pwm_chan->channel;
+-  struct fusion_hat_dev *fusion_dev = pwm_chan->dev;
+-
+-  return sprintf(buf, "%u\n", fusion_dev->pwm_enabled[channel] ? 1 : 0);
++  struct fusion_hat_dev *dev = channel->dev;
++  int error;
++  bool value;
++  mutex_lock(&dev->lock);
++  error = dev->pwm_errors[channel->channel];
++  value = dev->pwm_enabled[channel->channel];
++  mutex_unlock(&dev->lock);
++  return error ? error : sprintf(buf, "%u\n", value);
+ }
+ 
+ /**
+@@ -372,65 +371,23 @@
+   struct fusion_hat_pwm_channel *pwm_chan =
+       container_of(kobj, struct fusion_hat_pwm_channel, kobj);
+   int channel = pwm_chan->channel;
+-  struct fusion_hat_dev *fusion_dev = pwm_chan->dev;
++  struct fusion_hat_dev *dev = pwm_chan->dev;
+   uint8_t enable;
+-  uint32_t period, psc, arr, full_scale;
+-  int i, ret, duty_ret;
+-
+-  if (kstrtou8(buf, 10, &enable) < 0)
++  int ret;
++
++  if (kstrtou8(buf, 10, &enable) < 0 || enable > 1)
+     return -EINVAL;
+-
+-  mutex_lock(&fusion_dev->lock);
+-  fusion_dev->pwm_enabled[channel] = enable ? true : false;
+-
+-  if (enable) {
+-    // Re-apply the period last written through the period attribute; the
+-    // previous hard-coded ARR/PSC silently overrode the user's frequency
+-    period = fusion_dev->pwm_periods[channel];
+-    if (period == 0 || period > 1000000)
+-      period = PWM_DEFAULT_PERIOD;
+-    fusion_hat_pwm_calc_div(period, &psc, &arr);
+-    full_scale = arr + 1;
+-
+-    ret = fusion_hat_write_period_value(fusion_dev->client, channel,
+-                                        (uint16_t)arr);
+-    if (ret >= 0)
+-      ret = fusion_hat_write_prescaler_value(fusion_dev->client, channel,
+-                                             (uint16_t)(psc - 1));
+-    if (ret < 0) {
+-      dev_err(&fusion_dev->client->dev, "Failed to initialize channel %d: %d\n",
+-              channel, ret);
+-    } else {
+-      // PSC and ARR are shared by the 4 channels of one timer group, so every
+-      // enabled member keeps its pulse width on the new full scale (ARR + 1)
+-      for (i = channel & ~3; i <= (channel | 3); i++) {
+-        if (!fusion_dev->pwm_enabled[i])
+-          continue;
+-        duty_ret = fusion_hat_write_pwm_value(
+-            fusion_dev->client, i,
+-            fusion_hat_pwm_calc_compare(fusion_dev->pwm_duty_cycles[i], period,
+-                                        full_scale));
+-        if (duty_ret < 0) {
+-          // Keep refreshing the other channels, but report the first failure
+-          dev_err(&fusion_dev->client->dev,
+-                  "Failed to set duty cycle value for channel %d: %d\n", i,
+-                  duty_ret);
+-          if (ret >= 0)
+-            ret = duty_ret;
+-        }
+-      }
+-    }
+-    if (ret < 0) {
+-      mutex_unlock(&fusion_dev->lock);
+-      return ret;
+-    }
+-  } else {
+-    // If disabling PWM, set value to 0
+-    fusion_hat_write_pwm_value(fusion_dev->client, channel, 0);
+-  }
+-  mutex_unlock(&fusion_dev->lock);
+-
+-  return count;
++  mutex_lock(&dev->lock);
++  /* Both transitions first prove that this channel is at zero. Timer setup
++   * belongs to period_store; enabling must never restore an old command. */
++  ret = fusion_hat_write_pwm_value(dev->client, channel, 0);
++  if (ret >= 0) {
++    dev->pwm_enabled[channel] = enable != 0;
++    dev->pwm_duty_cycles[channel] = 0;
++  }
++  dev->pwm_errors[channel] = ret < 0 ? ret : 0;
++  mutex_unlock(&dev->lock);
++  return ret < 0 ? ret : (ssize_t)count;
+ }
+ 
+ /**
+@@ -465,6 +422,7 @@
+   // Initialize PWM states
+   for (i = 0; i < FUSION_HAT_PWM_CHANNELS; i++) {
+     dev->pwm_enabled[i] = false;
++    dev->pwm_errors[i] = 0;
+     dev->pwm_duty_cycles[i] = 0;
+     dev->pwm_periods[i] = PWM_DEFAULT_PERIOD;
+   }
+@@ -486,17 +444,17 @@
+     // Initialize sysfs attributes with 0666 permissions (rw-rw-rw-)
+     // to allow access for all users without requiring sudo
+     pwm_channels[i].period_attr.attr.name = "period";
+-    pwm_channels[i].period_attr.attr.mode = 0666;
++    pwm_channels[i].period_attr.attr.mode = 0660;
+     pwm_channels[i].period_attr.show = period_show;
+     pwm_channels[i].period_attr.store = period_store;
+ 
+     pwm_channels[i].duty_cycle_attr.attr.name = "duty_cycle";
+-    pwm_channels[i].duty_cycle_attr.attr.mode = 0666;
++    pwm_channels[i].duty_cycle_attr.attr.mode = 0660;
+     pwm_channels[i].duty_cycle_attr.show = duty_cycle_show;
+     pwm_channels[i].duty_cycle_attr.store = duty_cycle_store;
+ 
+     pwm_channels[i].enable_attr.attr.name = "enable";
+-    pwm_channels[i].enable_attr.attr.mode = 0666;
++    pwm_channels[i].enable_attr.attr.mode = 0660;
+     pwm_channels[i].enable_attr.show = enable_show;
+     pwm_channels[i].enable_attr.store = enable_store;
+ 
+--- a/driver/speaker.c
++++ b/driver/speaker.c
+@@ -76,7 +76,7 @@
+  * The speaker status is represented as a single byte (0 or 1).
+  */
+ static struct device_attribute dev_attr_speaker = {
+-    .attr = {.name = "speaker", .mode = 0666},
++    .attr = {.name = "speaker", .mode = 0660},
+     .show = speaker_show,
+     .store = speaker_store,
+ };
+--- a/driver/main.c
++++ b/driver/main.c
+@@ -241,6 +241,7 @@
+     // Initialize and schedule periodic battery check work
+     schedule_delayed_work(&main_work, msecs_to_jiffies(MAIN_INTERVAL));
+     
++    kobject_uevent(&fusion_dev->device->kobj, KOBJ_CHANGE);
+     dev_info(&client->dev, "Fusion Hat driver probed successfully\n");
+     return 0;
+     

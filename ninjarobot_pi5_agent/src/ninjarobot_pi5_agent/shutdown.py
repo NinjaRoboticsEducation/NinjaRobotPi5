@@ -44,6 +44,7 @@ class PoweroffCoordinator:
         request_service_stop: Callable[[], None],
         clock: Callable[[], float] = time.monotonic,
         helper_probe: HelperProbe | None = None,
+        require_full_poweroff: bool = True,
     ) -> None:
         self._enabled = enabled
         self._helper_path = Path(helper_path)
@@ -53,10 +54,26 @@ class PoweroffCoordinator:
         self._release_status = release_status
         self._request_service_stop = request_service_stop
         self._clock = clock
-        self._helper_probe = helper_probe or _probe_poweroff_helper
+        self._helper_probe = helper_probe or (
+            lambda path: _probe_poweroff_helper(path, require_full_poweroff=require_full_poweroff)
+        )
         self._nonces: dict[str, tuple[str, float]] = {}
         self._requested = False
         self._lock = asyncio.Lock()
+
+    async def refresh_status(self) -> None:
+        """Expose readiness without issuing a nonce or invoking the shutdown helper."""
+        if not self._enabled:
+            self._release_status.update(
+                "shutdown", ReleaseFeatureState.DISABLED, detail="deployment_disabled"
+            )
+            return
+        ready, _detail = await asyncio.to_thread(self._helper_probe, self._helper_path)
+        self._release_status.update(
+            "shutdown",
+            ReleaseFeatureState.READY if ready else ReleaseFeatureState.UNAVAILABLE,
+            detail=None if ready else "deployment_helper_unavailable",
+        )
 
     @property
     def requested(self) -> bool:
@@ -107,12 +124,14 @@ class PoweroffCoordinator:
         )
         cleanup_failures: list[str] = []
         try:
-            await self._controller.emergency_stop(lease_id)
+            async with asyncio.timeout(10):
+                await self._controller.emergency_stop(lease_id)
         except Exception:
             LOGGER.exception("Robot emergency stop failed during orderly power-off.")
             cleanup_failures.append("hardware_stop_failed")
         try:
-            await self._runtime.disable_voice_input()
+            async with asyncio.timeout(10):
+                await self._runtime.disable_voice_input()
         except Exception:
             LOGGER.exception("Voice input cleanup failed during orderly power-off.")
             cleanup_failures.append("voice_stop_failed")
@@ -180,7 +199,9 @@ class PoweroffCoordinator:
         raise PermissionError(message)
 
 
-def _probe_poweroff_helper(helper: Path) -> tuple[bool, str | None]:
+def _probe_poweroff_helper(
+    helper: Path, *, require_full_poweroff: bool = True
+) -> tuple[bool, str | None]:
     """Verify the fixed helper and passwordless narrow sudo rule without mutating state."""
     approved = Path("/usr/libexec/ninjarobot-poweroff")
     if not helper.is_absolute() or helper != approved:
@@ -212,6 +233,8 @@ def _probe_poweroff_helper(helper: Path) -> tuple[bool, str | None]:
             False,
             "passwordless power-off sudo authorization is missing; repair Startup Agent deployment",
         )
+    if not require_full_poweroff:
+        return True, None
     poweroff = read_full_poweroff_status()
     if not poweroff.available:
         return (

@@ -103,7 +103,7 @@
   "power.confirmDetail": "Raspberry Piの電源を切る前に、動作、音声入力、リモートアクセス、エージェントサービスを停止します。",
   "power.confirmTitle": "NinjaRobotの電源を切りますか？",
   "power.detail": "ロボットハードウェアとサービスを停止してからRaspberry Piをシャットダウンします。",
-  "power.disabled": "配備設定で電源オフが無効です。",
+  "power.disabled": "電源オフは無効です。Startup Agent の配備設定・修復を実行してください。",
   "power.enabled": "現在の操作端末から実行できます。",
   "power.preparing": "安全な確認を準備中…",
   "power.shuttingDown": "NinjaRobotを安全にシャットダウンしています。",
@@ -145,5 +145,7 @@
   "voice.status": "常時待受 Ninja：{state}",
   "voice.title": "音声入力",
   "voice.titleOn": "音声入力オン",
-  "voice.transcript": "［音声］{text}"
+  "voice.transcript": "［音声］{text}",
+  "power.helperUnavailable": "シャットダウンヘルパーを利用できません。配備設定を修復してください。",
+  "power.pairingRequired": "ブラウザーをペアリングし、操作権を取得してください。"
 }

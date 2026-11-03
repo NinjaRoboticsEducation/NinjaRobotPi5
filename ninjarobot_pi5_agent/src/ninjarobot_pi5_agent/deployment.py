@@ -188,6 +188,18 @@ def render_unit(spec: DeploymentSpec) -> str:
         }
         | {str(spec.skill_dir), str(spec.benchmark_dir)}
     )
+    try:
+        fusion = load_robot_config(spec.config).hardware.profile == "fusion_hat_plus"
+    except (OSError, ValueError):
+        fusion = False
+    if fusion:
+        writable.extend(
+            [
+                "-/sys/devices/virtual/fusion_hat/fusion_hat/pwm",
+                "-/sys/devices/virtual/fusion_hat/fusion_hat/speaker",
+                "-/run/lock/ninjarobot-fusion.lock",
+            ]
+        )
     return (
         _asset("ninjarobot-agent.service.in")
         .replace("@USER@", spec.user)
@@ -309,7 +321,7 @@ class DeploymentManager:
                 f"deployment is incomplete ({missing}); install or repair it before enabling"
             )
         poweroff = self._full_poweroff_status()
-        if not poweroff.scheduled:
+        if self._requires_full_poweroff() and not poweroff.scheduled:
             raise RuntimeError(
                 "full Raspberry Pi power-off is not configured; run deployment setup/repair"
             )
@@ -352,7 +364,9 @@ class DeploymentManager:
             "running": active,
             "ready": ipc_ready,
             "full_poweroff": poweroff.as_dict(),
-            "next_step": _full_poweroff_next_step(poweroff),
+            "next_step": _full_poweroff_next_step(poweroff)
+            if self._requires_full_poweroff()
+            else None,
             "systemd": systemd,
             "spec": _public_spec(self.spec),
         }
@@ -362,10 +376,13 @@ class DeploymentManager:
         artifacts = self.artifact_status()
         poweroff = self._full_poweroff_status()
         return {
-            "valid": all(artifacts.values()) and poweroff.ready,
+            "valid": all(artifacts.values())
+            and (not self._requires_full_poweroff() or poweroff.ready),
             "artifacts": artifacts,
             "full_poweroff": poweroff.as_dict(),
-            "next_step": _full_poweroff_next_step(poweroff),
+            "next_step": _full_poweroff_next_step(poweroff)
+            if self._requires_full_poweroff()
+            else None,
             "spec": _public_spec(self.spec),
         }
 
@@ -475,10 +492,22 @@ class DeploymentManager:
         result = self._runner([str(SUDO), "-n", "-l", str(HELPER_PATH)])
         return result.returncode == 0
 
+    def _requires_full_poweroff(self) -> bool:
+        try:
+            return load_robot_config(self.spec.config).hardware.profile != "fusion_hat_plus"
+        except (OSError, ValueError):
+            return True
+
     def _full_poweroff_status(self) -> FullPoweroffStatus:
         return read_full_poweroff_status(runner=self._runner)
 
     def _ensure_full_poweroff_configuration(self) -> dict[str, object]:
+        if not self._requires_full_poweroff():
+            return {
+                "changed": False,
+                "pending": False,
+                "status": {"required": False, "mode": "orderly_os_shutdown"},
+            }
         status = self._full_poweroff_status()
         if not status.available:
             raise RuntimeError(

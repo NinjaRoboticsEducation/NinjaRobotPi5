@@ -61,7 +61,13 @@ def save_selection(
             )
         updated = config.model_copy(
             update={
-                "speech_output": config.speech_output.model_copy(update={"output_node": output}),
+                "speech_output": config.speech_output.model_copy(
+                    update={
+                        "output_node": output,
+                        "fusion_speaker": False,
+                        "speaker_enable_gpio": None,
+                    }
+                ),
                 "bluetooth_speaker": BluetoothSpeakerConfig(
                     address=address,
                     adapter=adapter,

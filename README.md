@@ -23,6 +23,21 @@
 
 # English
 
+
+## Fusion HAT+ implementation checkpoint
+
+Fusion uses the reviewed kernel driver for all twelve servo channels and embedded
+audio; older Robot HAT variants are no longer offered. Follow the
+[installation and manual validation steps](docs/validation/fusion_implementation_261103.md)
+before real-device testing. Repository validation passes; physical acceptance is
+still pending. The 3 November full manuals linked below are new raw sources,
+not yet ingested or semantically reviewed. The registered wiki map remains at
+2 November until the owner's workflow completes. Registered predecessor sources:
+[InstallationGuide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md),
+[DevelopmentGuide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md),
+and [DevelopmentLog](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md).
+
+
 ## 1. What Is NinjaRobotPi5?
 
 **NinjaRobotPi5** is an open-source AI robot platform built on the **Raspberry Pi 5** (a small, affordable computer about the size of a credit card). It brings together a display (the robot's face), a buzzer (for sounds and melodies), wheel servos (for movement), a distance sensor, a camera, and a microphone — all controlled through one clean software interface.
@@ -55,17 +70,17 @@ Follow these steps to build and run your own NinjaRobotPi5 from scratch.
 | **Operating System** | Raspberry Pi OS Lite 64-bit | No desktop needed — headless (no monitor) is fine |
 | **Storage** | microSD card (32 GB+) or NVMe SSD | SSD gives faster AI model loading |
 | **Cooling** | Active cooler (fan + heatsink) | Required — AI inference runs hot |
-| **Expansion Board** | **1.** DFRobot DFR0566 IO Expansion HAT *(baseline)*<br>**2.** SunFounder Robot HAT (`0x14` / `0x17`)<br>**3.** General PCA9685 PWM Expansion HAT (`0x40`) | Choose your installed HAT during `ninjarobot onboard` |
+| **Expansion Board** | **1.** DFRobot DFR0566 IO Expansion HAT *(baseline)*<br>**2.** SunFounder Fusion HAT+ (`0x17`, reviewed kernel driver)<br>**3.** General PCA9685 PWM Expansion HAT (`0x40`) | Choose your installed HAT during `ninjarobot onboard` |
 | **Left Wheel Servo** | TowerPro MG90D 360° continuous rotation | `GPIO12` (DFR0566) or any `pwm0`..`pwm11` / `hat_pwm0`..`hat_pwm11` (SunFounder `P0`–`P11`) or `pwm0`..`pwm15` (PCA9685 `PWM0`–`PWM15`) |
 | **Right Wheel Servo** | TowerPro MG90D 360° continuous rotation | `GPIO13` (DFR0566) or any `pwm0`..`pwm11` / `hat_pwm0`..`hat_pwm11` (SunFounder `P0`–`P11`) or `pwm0`..`pwm15` (PCA9685 `PWM0`–`PWM15`) |
 | **Auxiliary Servos** *(optional)* | Up to 12 (`P0`–`P11` on SunFounder) or 16 (`PWM0`–`PWM15` on PCA9685) | Head pan/tilt, arm, gripper (`hat_pwm0`..`hat_pwm15`) |
-| **Buzzer** | Passive buzzer | Connected to `GPIO27` (or any Digital pin `17, 4, 27, 22` on SunFounder Robot HAT) |
+| **Buzzer** | Passive buzzer | Connected to `GPIO27` (or any Digital pin `17, 4, 27, 22` on SunFounder Fusion HAT+) |
 | **Distance Sensor** | VL53L0X Time-of-Flight (laser distance) | I2C bus 1 at address 0x29 |
 | **Display** | ST7789V 240×320 IPS LCD | SPI0; DC=GPIO4, RST=GPIO5, BL=GPIO6 *(SunFounder: DC/RST on any Digital pin `17, 4, 27, 22`, e.g. `DC=27, RST=22, BL=6`)* |
 | **Camera** | Raspberry Pi Camera Module (OV5647) | CSI ribbon cable, 1280×720 |
 | **Microphone** | USB audio input device | Use a Linux/ALSA-compatible mic; verify device and sample-rate support |
-| **Audio Output** | Bluetooth speaker *(DFR0566 / PCA9685)* or **Embedded I2S Speaker** *(SunFounder Robot HAT)* | SunFounder uses onboard I2S DAC (`googlevoicehat-soundcard` / `hifiberry-dac`) + `GPIO12` / `0x17` amplifier enable |
-| **Power Supply** | Official Pi 27 W USB-C + Geekworm X1208 UPS (`0x36`) **or** SunFounder Robot HAT 2S battery (`0x14` / `0x17`) | Undervoltage monitoring & safe 6.90 V cutoff supported |
+| **Audio Output** | Bluetooth (DFR0566/PCA9685); embedded speaker by default (Fusion) | Fusion uses the reviewed kernel amplifier interface and detected sound card; Bluetooth remains optional |
+| **Power Supply** | Existing DFR0566/X1208 supplies, or Fusion HAT+ battery | Pi rail warning and battery cutoff remain separate; verify voltage under load before movement |
 
 > **📎 Full hardware details:** See [hardware-profile.md](docs/hardware/hardware-profile.md)
 
@@ -76,7 +91,7 @@ NinjaRobotPi5 supports **three Expansion HAT profiles** out of the box:
 | Profile | Expansion HAT | I2C Address | Wheel / Servo Channels | Extra Servo Channels | Power & Audio Highlights |
 |---|---|---|---|---|---|
 | **Profile 1** *(Default)* | **DFRobot DFR0566 IO Expansion HAT** (+ Geekworm X1208 UPS) | `0x10` (HAT) / `0x36` (X1208) | `gpio12` (Left), `gpio13` (Right) | `hat_pwm0`..`hat_pwm3` | Pi 5 native hardware PWM on D12/D13; Bluetooth speaker |
-| **Profile 2** | **SunFounder Robot HAT** (v4 `0x14` & Fusion HAT / v5 `0x17`) | `0x14` or `0x17` (auto-detected) | Any `pwm0`..`pwm11` (`P0`..`P11`), e.g. `pwm0`/`pwm1` or `pwm10`/`pwm11` | Up to 12 channels (`P0`..`P11`) | Onboard 2S battery ADC (`0x13` on `0x14` / `0x18` on `0x17`), Digital pins (`17, 4, 27, 22`), embedded I2S speaker initialization (`GPIO12` / `0x31` enable) |
+| **Profile 2** | **SunFounder Fusion HAT+ only** | Kernel-owned `0x17`; no address fallback | `hat_pwm0`–`hat_pwm11` | 12 channels at shared 50 Hz | Embedded microphone/speaker by default, optional USB/Bluetooth; required fresh kernel battery telemetry |
 | **Profile 3** | **General PCA9685 PWM Expansion HAT** | `0x40` (PCA9685) | `pwm0` / `PWM0` (Left), `pwm1` / `PWM1` (Right) | `pwm2`..`pwm15` (`PWM2`..`PWM15`) | 16-channel 12-bit hardware I2C PWM; Bluetooth speaker |
 
 Below is how each component connects to the Raspberry Pi 5 through the DFR0566 expansion board (Profile 1) or SunFounder / PCA9685 HATs (Profiles 2 & 3):
@@ -130,9 +145,9 @@ Use the tables below as the recommended default electronic module pin wiring ref
 | **Servo** | Left wheel servo | `GPIO 12` (on DFR0566) |
 | | Right wheel servo | `GPIO 13` (on DFR0566) |
 
-##### b. SunFounder Robot HAT
+##### b. SunFounder Fusion HAT+
 
-| Electronic Module | Module Pin / Role | Connection on SunFounder Robot HAT |
+| Electronic Module | Module Pin / Role | Connection on SunFounder Fusion HAT+ |
 |---|---|---|
 | **Buzzer** | `+` | `GPIO 17` (Digital on SunFounder) |
 | | `-` | `GND` (Digital on SunFounder) |
@@ -174,7 +189,7 @@ Use the tables below as the recommended default electronic module pin wiring ref
 | | `GND` | `Pin06/GND` (RaspberryPi) |
 | | Servo 1~12 | `pwm 0~11` (on PCA9685) |
 
-> ⚠️ **Safety reminder:** Never change wiring while the robot is powered on. In Profile 1, D12/D13 use native Pi PWM. In Profile 2 (SunFounder Robot HAT v5), `GPIO5` is reserved for onboard MCU reset, `GPIO23` is the USB-C charge indicator, and `GPIO12` enables the onboard I2S speaker amplifier (`dtoverlay=hifiberry-dac` in `/boot/firmware/config.txt`). Verify servo voltage and grounding against the [confirmed hardware profile](docs/hardware/hardware-profile.md). Follow the [X1208 manufacturer instructions](https://wiki.geekworm.com/X1208) or SunFounder 2S battery instructions for battery type, polarity, and power input.
+> **Safety:** Power off before changing wiring. Fusion reserves GPIO16/18/19/20/21; use the reviewed kernel installer, not legacy GPIO12 amplifier or GPIO5 reset instructions. Verify servo supply and grounding against the board documentation. See the [Fusion manual](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03/InstallationGuide.md#fusion-installation-and-onboarding).
 
 ### 2.3 Raspberry Pi OS Installation
 
@@ -312,11 +327,11 @@ The wizard shows a NINJAROBOT welcome screen and walks you through:
 
 | Step | What happens |
 |---|---|
-| **0. Expansion HAT profile selection** | Choose **`1. DFRobot DFR0566 IO Expansion HAT`**, **`2. SunFounder Robot HAT`**, or **`3. General PCA9685 PWM Expansion HAT`**. The wizard automatically writes the matching servo backend preset (`auto` at `0x10`, `sunfounder_robot_hat` at `0x14`/`0x17`, or `pca9685` at `0x40`) to `~/.config/pi5servo/servo.json`. |
+| **0. Expansion HAT profile selection** | Choose DFR0566, **Fusion HAT+**, or PCA9685. Fusion writes the explicit `fusion_hat_plus` kernel backend and preserves a calibration backup; older Robot HAT selections require explicit migration. |
 | **1. Hardware setup** | Opens existing setup tools one by one for buzzer, display, distance sensor, servos (`GPIO12`/`GPIO13` for Option 1, any `pwm0`..`pwm11` for Option 2, or `pwm0`..`pwm15` for Option 3), and camera; checks saved configuration afterward and automatically imports HAT endpoints, `servo_roles`, and power monitoring into `config.toml`. Existing valid settings can be applied together. Configuration checks do not certify physical operation. |
-| **2. Speaker setup** *(optional)* | When **Option 2 (SunFounder Robot HAT)** is selected, runs the **Embedded Speaker Initialization** process (enables the onboard I2S speaker amplifier, configures the I2S DAC sink, and plays a verification chime — without prompting for Bluetooth). When **Option 1 (DFR0566)** or **Option 3 (PCA9685)** is selected, runs the **Bluetooth speaker** onboarding flow. |
-| **3. Microphone setup** *(optional)* | Configures your USB mic, local `whisper.cpp` speech-to-text, and the bundled `hey_Ninja.onnx` wake model. |
-| **4. AI provider** | Choose **`1. Ollama`**, **`2. Google (Gemini)`**, **`3. OpenAI`**, or **`4. Anthropic`**, input your provider API key (`OLLAMA_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY`), review the numbered list of available cloud AI models, and input the model number to run the Ninja agent with the selected model. |
+| **2. Speaker setup** *(optional)* | Fusion offers embedded speaker (default), Bluetooth, or skip. Embedded setup requires the reviewed driver and detected card, then an explicit tone test. Other profiles retain Bluetooth setup. |
+| **3. Microphone setup** *(optional)* | Fusion offers embedded microphone (default) or USB; other profiles retain USB. Configure local speech recognition and wake assets. Enumeration does not record; recording tests require consent. |
+| **4. AI provider** | Select Ollama, Gemini, OpenAI or Anthropic. Ollama lists downloaded local models without a key and cloud models with credentials, preserving the selected route. |
 | **5. External MCP tools** *(optional)* | Set up Tavily web search, Google Calendar, or Notion. |
 | **6. Ngrok remote access** *(optional)* | Configure remote access from outside your home network. See [Appendix D](#appendix-d-ngrok-account-setup). |
 | **7. Launch** | Start the robot in simulation mode (safe) or real-hardware mode. |
@@ -332,22 +347,22 @@ The wizard shows a NINJAROBOT welcome screen and walks you through:
    ```
    When prompted at **Hardware Expansion Profile Selection**, enter:
    - **`1`** for **DFRobot DFR0566 IO Expansion HAT** (+ Geekworm X1208 UPS)
-   - **`2`** for **SunFounder Robot HAT** (supports both Robot HAT v4 at `0x14` and Fusion HAT / Robot HAT v5 at `0x17` + embedded I2S speaker)
+   - **`2`** for **SunFounder Fusion HAT+ only** (`0x17`, reviewed kernel driver required)
    - **`3`** for **General PCA9685 PWM Expansion HAT** (16-channel I2C PWM at `0x40`)
 2. **Initialize Each Hardware Module One by One:**
-   - **Step 1 (Buzzer):** Open `buzzer-tool`, choose `Init` (on SunFounder Robot HAT you may connect the buzzer to any Digital pin `17, 4, 27, 22`, e.g. `GPIO 17`), verify the short beep and silence, then exit.
-   - **Step 2 (Display):** Open `display-tool`, choose `Init` (on SunFounder Robot HAT connect SPI pins `GND, 3V3, SCK, MO, CS, BL=GPIO6` and connect `DC` and `RST` to any free Digital pins from `17, 4, 27, 22`, e.g. `DC=27, RST=22, BL=6`), test `Show Text` and `Clear`, then exit.
+   - **Step 1 (Buzzer):** Open `buzzer-tool`, choose `Init` (on SunFounder Fusion HAT+ you may connect the buzzer to any Digital pin `17, 4, 27, 22`, e.g. `GPIO 17`), verify the short beep and silence, then exit.
+   - **Step 2 (Display):** Open `display-tool`, choose `Init` (on SunFounder Fusion HAT+ connect SPI pins `GND, 3V3, SCK, MO, CS, BL=GPIO6` and connect `DC` and `RST` to any free Digital pins from `17, 4, 27, 22`, e.g. `DC=27, RST=22, BL=6`), test `Show Text` and `Clear`, then exit.
    - **Step 3 (Distance Sensor):** Open `sensor-tool`, run `Health Check`, `Single Read`, and `Calibrate` against a target at a known distance (`0x29` on I2C-1).
    - **Step 4 (Servo Calibration — Raise Both Wheels First!):**
      Type `WHEELS RAISED` when prompted to open `pi5servo servo-tool`:
      1. Choose **`3. Calibrate`** from the menu.
      2. Enter your servo endpoint: `gpio12` / `gpio13` (Option 1), any `pwm0`..`pwm11` / `p0`..`p11` channel such as `pwm10` or `pwm11` (Option 2), or `pwm0`..`pwm15` (Option 3).
      3. Press **`c`** to select **Center (`0°`)**, adjust the pulse using **`w` / `s`** (`±1 µs`) or **`Up` / `Down`** arrow keys (`±20 µs`) until a continuous servo stops spinning (or a positional servo reaches center), and press **`Enter`** to save.
-     4. Optionally press **`v`** (Min `-90°`) and **`x`** (Max `+90°`), press **`Enter`** to save, then press **`q`** to return to the menu.
+     4. For Fusion, calibrate Min/Center/Max to satisfy `pulse_min < pulse_center < pulse_max`; neutral-only ranges are incomplete. Use safe mechanical limits, save, then exit.
      5. Repeat **`3. Calibrate`** for any additional connected servos, then press **`q`** to exit `servo-tool`.
    - **Step 5 (Camera):** Open `camera-tool`, run the setup wizard and `Doctor`, then exit.
    - **Step 6 (Speaker & Microphone):**
-     - If you selected **SunFounder Robot HAT (Option 2)**, confirm the **Embedded Speaker Initialization** prompt (`[Y/n]`) to enable the onboard I2S speaker and play a verification chime.
+     - For **Fusion HAT+**, choose embedded output or optional Bluetooth, then embedded input or optional USB independently. Complete the explicit speaker tone test and microphone asset setup.
      - If you selected **DFR0566 (Option 1)** or **PCA9685 (Option 3)**, optionally pair a Bluetooth speaker.
      - Optionally configure the USB microphone (`mic-tool`).
 3. **Configure AI Model Provider (e.g. Ollama Cloud):**
@@ -529,7 +544,7 @@ Each `pi5*` driver is a standalone library that works independently. You can use
 
 | Driver | Description | Documentation |
 |---|---|---|
-| **pi5servo** | Velocity-based servo control and calibration tools. Supports MG90D continuous-rotation and positional servos via Pi 5 hardware PWM, DFRobot DFR0566 (`0x10`), SunFounder Robot HAT v5 (`0x14`), and General PCA9685 PWM Expansion HAT (`0x40`). | [pi5servo/README.md](pi5servo/README.md) |
+| **pi5servo** | Servo control and calibration through existing native/DFR paths, reviewed Fusion kernel PWM0–11, and PCA9685 PWM0–15. | [pi5servo/README.md](pi5servo/README.md) |
 | **pi5disp** | ST7789V display driver for the robot's face screen. Supports images, text, scrolling, brightness, and rotation. | [pi5disp/README.md](pi5disp/README.md) |
 | **pi5buzzer** | Passive buzzer driver for beeps, notes, and melodies. Includes named emotion sounds like `happy` and `sad`. | [pi5buzzer/README.md](pi5buzzer/README.md) |
 | **pi5vl53l0x** | VL53L0X laser distance sensor driver. Supports calibration, health checks, and obstacle detection. | [pi5vl53l0x/README.md](pi5vl53l0x/README.md) |
@@ -881,10 +896,10 @@ The principal `/` commands are listed below; `/help` is the current in-app refer
 
 | Document | Description |
 |---|---|
-| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md)) | Complete step-by-step guide from blank Pi to running robot |
-| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/DevelopmentGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md)) | Architecture, API reference, and developer workflow |
+| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03/InstallationGuide.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md)) | Complete step-by-step guide from blank Pi to running robot |
+| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03/DevelopmentGuide.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/DevelopmentGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md)) | Architecture, API reference, and developer workflow |
 | [MCP and Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md) ([2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/NinjaRobot_MCP_Skill.md)) | Beginner guide to external tools and reusable Skills |
-| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md)) | Implementation history and decisions |
+| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-03/DevelopmentLog.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md)) | Implementation history and decisions |
 | [Hardware Profile](docs/hardware/hardware-profile.md) | Confirmed wiring and electrical records |
 | [Documentation Index](docs/README.md) | Index of all project documents |
 | [v1.0.0 Support Matrix](docs/architecture/v1.0.0-support-matrix.md) | Historical release baseline; see current manuals for later additions such as speech output |
@@ -1106,7 +1121,7 @@ Made with ❤️ for AI Robotics Education and Research
 | **OS** | Raspberry Pi OS Lite 64-bit | デスクトップ不要 |
 | **ストレージ** | microSD（32 GB+）または NVMe SSD | SSD推奨 |
 | **冷却** | アクティブクーラー（ファン＋ヒートシンク） | 必須 |
-| **拡張ボード** | **1.** DFRobot DFR0566 IO Expansion HAT<br>**2.** SunFounder Robot HAT v5 (`0x14`)<br>**3.** General PCA9685 PWM Expansion HAT (`0x40`) | `ninjarobot onboard` で 1 / 2 / 3 を選択 |
+| **拡張ボード** | **1.** DFRobot DFR0566 IO Expansion HAT<br>**2.** SunFounder Fusion HAT+ (`0x17`)<br>**3.** General PCA9685 PWM Expansion HAT (`0x40`) | `ninjarobot onboard` で 1 / 2 / 3 を選択 |
 | **左ホイールサーボ** | TowerPro MG90D 360° 連続回転 | GPIO12 (DFR0566) または `pwm0` (SunFounder `P0` / PCA9685 `PWM0`) |
 | **右ホイールサーボ** | TowerPro MG90D 360° 連続回転 | GPIO13 (DFR0566) または `pwm1` (SunFounder `P1` / PCA9685 `PWM1`) |
 | **ブザー** | パッシブブザー | GPIO27 |
@@ -1154,7 +1169,7 @@ Made with ❤️ for AI Robotics Education and Research
 
 | ドライバー | 説明 | ドキュメント |
 |---|---|---|
-| **pi5servo** | サーボ制御とキャリブレーション | [README](pi5servo/README.md) |
+| **pi5servo** | Servo control and calibration through existing native/DFR paths, reviewed Fusion kernel PWM0–11, and PCA9685 PWM0–15. | [pi5servo/README.md](pi5servo/README.md) |
 | **pi5disp** | ST7789V ディスプレイ | [README](pi5disp/README.md) |
 | **pi5buzzer** | パッシブブザー | [README](pi5buzzer/README.md) |
 | **pi5vl53l0x** | 距離センサー | [README](pi5vl53l0x/README.md) |
@@ -1233,7 +1248,7 @@ AI ロボティクス教育と研究のために ❤️ を込めて作られま
 | **作業系統** | Raspberry Pi OS Lite 64-bit | 不需桌面 |
 | **儲存** | microSD（32 GB+）或 NVMe SSD | SSD 更快 |
 | **散熱** | 主動式散熱器 | 必需 |
-| **擴充板** | **1.** DFRobot DFR0566<br>**2.** SunFounder Robot HAT v5 (`0x14`)<br>**3.** General PCA9685 PWM Expansion HAT (`0x40`) | 於 `ninjarobot onboard` 選擇 1 / 2 / 3 |
+| **擴充板** | **1.** DFRobot DFR0566<br>**2.** SunFounder Fusion HAT+ (`0x17`)<br>**3.** General PCA9685 PWM Expansion HAT (`0x40`) | 於 `ninjarobot onboard` 選擇 1 / 2 / 3 |
 | **左輪伺服** | MG90D 360° | GPIO12 (DFR0566) 或 `pwm0` (SunFounder `P0` / PCA9685 `PWM0`) |
 | **右輪伺服** | MG90D 360° | GPIO13 (DFR0566) 或 `pwm1` (SunFounder `P1` / PCA9685 `PWM1`) |
 | **蜂鳴器** | 被動式 | GPIO27 |
@@ -1279,7 +1294,7 @@ AI ロボティクス教育と研究のために ❤️ を込めて作られま
 
 | 驅動 | 說明 | 文件 |
 |---|---|---|
-| **pi5servo** | 伺服馬達控制 | [README](pi5servo/README.md) |
+| **pi5servo** | Servo control and calibration through existing native/DFR paths, reviewed Fusion kernel PWM0–11, and PCA9685 PWM0–15. | [pi5servo/README.md](pi5servo/README.md) |
 | **pi5disp** | 顯示驅動 | [README](pi5disp/README.md) |
 | **pi5buzzer** | 蜂鳴器驅動 | [README](pi5buzzer/README.md) |
 | **pi5vl53l0x** | 距離感測器 | [README](pi5vl53l0x/README.md) |
@@ -1356,7 +1371,7 @@ AI ロボティクス教育と研究のために ❤️ を込めて作られま
 | **操作系统** | Raspberry Pi OS Lite 64-bit | 不需桌面 |
 | **存储** | microSD（32 GB+）或 NVMe SSD | SSD 更快 |
 | **散热** | 主动散热器 | 必需 |
-| **扩展板** | **1.** DFRobot DFR0566<br>**2.** SunFounder Robot HAT v5 (`0x14`)<br>**3.** General PCA9685 PWM Expansion HAT (`0x40`) | 在 `ninjarobot onboard` 中选择 1 / 2 / 3 |
+| **扩展板** | **1.** DFRobot DFR0566<br>**2.** SunFounder Fusion HAT+ (`0x17`)<br>**3.** General PCA9685 PWM Expansion HAT (`0x40`) | 在 `ninjarobot onboard` 中选择 1 / 2 / 3 |
 | **左轮舵机** | MG90D 360° | GPIO12 (DFR0566) 或 `pwm0` (SunFounder `P0` / PCA9685 `PWM0`) |
 | **右轮舵机** | MG90D 360° | GPIO13 (DFR0566) 或 `pwm1` (SunFounder `P1` / PCA9685 `PWM1`) |
 | **蜂鸣器** | 无源 | GPIO27 |
@@ -1402,7 +1417,7 @@ AI ロボティクス教育と研究のために ❤️ を込めて作られま
 
 | 驱动 | 说明 | 文档 |
 |---|---|---|
-| **pi5servo** | 舵机控制 | [README](pi5servo/README.md) |
+| **pi5servo** | Servo control and calibration through existing native/DFR paths, reviewed Fusion kernel PWM0–11, and PCA9685 PWM0–15. | [pi5servo/README.md](pi5servo/README.md) |
 | **pi5disp** | 显示驱动 | [README](pi5disp/README.md) |
 | **pi5buzzer** | 蜂鸣器驱动 | [README](pi5buzzer/README.md) |
 | **pi5vl53l0x** | 距离传感器 | [README](pi5vl53l0x/README.md) |

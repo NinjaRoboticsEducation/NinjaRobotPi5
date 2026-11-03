@@ -218,6 +218,7 @@ class PowerConfig(ConfigModel):
     """Optional battery/UPS monitoring configuration across supported HATs."""
 
     enabled: bool = False
+    telemetry_required: bool = False
     fuel_gauge_address: Literal[0x36, 0x14, 0x17] = 0x36
     warning_voltage: Annotated[float, Field(ge=6.0, le=8.4)] = 7.15
     cutoff_voltage: Annotated[float, Field(ge=6.0, le=8.0)] = 6.90
@@ -233,6 +234,7 @@ class PowerConfig(ConfigModel):
 class HardwareConfig(ConfigModel):
     """Authoritative V4 hardware mapping."""
 
+    profile: Literal["dfr0566", "fusion_hat_plus", "pca9685"] = "dfr0566"
     buzzer: BuzzerConfig = Field(default_factory=BuzzerConfig)
     servos: ServoConfig = Field(default_factory=ServoConfig)
     display: DisplayConfig = Field(default_factory=DisplayConfig)
@@ -254,6 +256,8 @@ class HardwareConfig(ConfigModel):
         # I2C1 remains enabled for the configured distance sensor. HAT PWM
         # channels are not native GPIO pins and must not be interpreted as such.
         owners: dict[int, str] = {2: "I2C1 SDA", 3: "I2C1 SCL"}
+        if self.profile == "fusion_hat_plus":
+            owners.update({pin: "Fusion embedded audio" for pin in (16, 18, 19, 20, 21)})
 
         def claim(pin: int, owner: str) -> None:
             if pin in owners:
@@ -463,6 +467,7 @@ class SpeechOutputConfig(ConfigModel):
     synthesis_timeout_seconds: Annotated[float, Field(ge=1, le=60)] = 30.0
     playback_timeout_seconds: Annotated[float, Field(ge=1, le=120)] = 60.0
     bluetooth_lead_in_seconds: Annotated[float, Field(ge=0, le=2)] = 0.5
+    fusion_speaker: bool = False
     speaker_enable_gpio: Annotated[int, Field(ge=0, le=27)] | None = None
 
     @field_validator("output_node")

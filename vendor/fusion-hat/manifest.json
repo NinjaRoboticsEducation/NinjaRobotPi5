@@ -1,0 +1,48 @@
+{
+  "upstream": "https://github.com/sunfounder/fusion-hat",
+  "revision": "4bd1018ad5a70ee113160536f969cdadd9f22918",
+  "archive_sha256": "37ea53b9b72b6431a4a2ee8b752804ad74f0f10071c416f856991814347d9c2d",
+  "driver_version": "1.1.0-ninja1",
+  "patches": [
+    {
+      "path": "patches/0001-safe-pwm-and-battery.patch",
+      "sha256": "71a8186a09111d87526a75e3e56a3b1fb4c73d9a5d80434ff9b8d5a568d8ebfc"
+    }
+  ],
+  "files": {
+    "driver/main.h": {
+      "original": "62af2e8d409af074261e790747a8e3ac346f4014c8ddad94e57a3d72b760e308",
+      "patched": "ef49affcd06b97aec0518c73cba347bea0e76bfcc49108dcd3c8aa18e7211aa7"
+    },
+    "driver/battery.c": {
+      "original": "4c17947a5e1f376d790db5e96c90eab0f8f10d9d50b9aa9c41e5e20f1168c8df",
+      "patched": "dfdd93bcbc076bf60db05ead01daf700faee025be87800d6c14092266b11871c"
+    },
+    "driver/pwm.c": {
+      "original": "4ec8c3c67bdccee98abb80fdc10a80c6fee6af06506c60c6b8a68e2739d7891b",
+      "patched": "2143b3757a782f8423a649a915cc601821aafb3e6cb5f3f24892d8975259021a"
+    },
+    "driver/speaker.c": {
+      "original": "537b2d32120c41d4d1acb6de9a0f87b49d382b8143ced4c32958f690daabead7",
+      "patched": "8fea949e5121e4e021d5f8476c49bfa5472671bf263ddc513c18704fce1583c8"
+    },
+    "driver/main.c": {
+      "original": "5f064b33267c91c6022606918c6ff719ef17a4998694da7f4d9c27e6d5e6ad10",
+      "patched": "2c979fb28f13eaf84dfcd3c9296d2348f1f82c6732895697ffcb7ae1bfe4c23a"
+    }
+  },
+  "build_files": {
+    "driver/sunfounder-fusionhat-overlay.dts": "e98666d9e73fd5f951f6fe06dc08bd9094a29077371086a85120e60569d24355",
+    "driver/battery.c": "dfdd93bcbc076bf60db05ead01daf700faee025be87800d6c14092266b11871c",
+    "driver/speaker.c": "8fea949e5121e4e021d5f8476c49bfa5472671bf263ddc513c18704fce1583c8",
+    "driver/main.h": "ef49affcd06b97aec0518c73cba347bea0e76bfcc49108dcd3c8aa18e7211aa7",
+    "driver/led.c": "832d86ea84dc5f8f1bfb7872cb33d9e1035eb44d065a304bcc103a0a8b9f2625",
+    "driver/adc.c": "4b555ee530c7f2e3270e968daedd4f7ea474a211f1e0668d0b52a37e5c2b8aba",
+    "driver/button.c": "6db2b70012de31f81f7b38eb46cf2440fadbb9dca35683b1bb5f183459e589bc",
+    "driver/Makefile": "ddfc66af6aa28f9c4cde8da66863f9381d46984e6cbc52e0c4143059df48ef30",
+    "driver/i2c.c": "28c0fe5906ab0c168fbe4b993a296aab25f854040d3e60918a52f3f0dc08d5c9",
+    "driver/pwm.c": "2143b3757a782f8423a649a915cc601821aafb3e6cb5f3f24892d8975259021a",
+    "driver/main.c": "2c979fb28f13eaf84dfcd3c9296d2348f1f82c6732895697ffcb7ae1bfe4c23a",
+    "driver/shutdown.c": "11486bbf9f5fdbbb4fcf189b44f87a0781d8bede7bc73afd28d6a176bf05316e"
+  }
+}

@@ -18,6 +18,7 @@ from typing import Any
 
 from .audio_process import run_audio_process
 from .config import SpeechOutputConfig
+from .fusion import require_fusion_driver, set_fusion_speaker_async
 from .microphone import MicrophoneDevice
 from .voice_input import VoiceInputController
 
@@ -91,9 +92,9 @@ def _detect_alsa_i2s_device() -> str | None:
     for line in completed.stdout.splitlines():
         lowered = line.lower()
         if any(pattern in lowered for pattern in _I2S_SINK_PATTERNS):
-            match = re.match(r"^card\s+(\d+):", line.strip())
+            match = re.match(r"^card\s+\d+:\s+([A-Za-z0-9_]+)\s", line.strip())
             if match:
-                return f"plughw:{match.group(1)},0"
+                return f"plughw:CARD={match.group(1)},DEV=0"
     return None
 
 
@@ -149,10 +150,9 @@ async def discover_i2s_output_node(runner: ProcessRunner = run_audio_process) ->
                 haystack = f"{node_name.lower()} {description}"
                 if any(pattern in haystack for pattern in _I2S_SINK_PATTERNS):
                     return node_name
-        return ""
     alsa_dev = await asyncio.to_thread(_detect_alsa_i2s_device)
     if alsa_dev:
-        return "alsa_output.platform-soc_sound.stereo-fallback"
+        return "alsa:" + alsa_dev.split("CARD=", 1)[1].split(",", 1)[0]
     return ""
 
 
@@ -227,6 +227,16 @@ class AudioOutput:
     async def outputs(self) -> list[dict[str, str]]:
         if self._simulated:
             return [{"name": "simulation", "description": "Simulated speaker"}]
+        if self.config.output_node.startswith("alsa:"):
+            device = await asyncio.to_thread(_detect_alsa_i2s_device)
+            if device == f"plughw:CARD={self.config.output_node[5:]},DEV=0":
+                return [
+                    {
+                        "name": self.config.output_node,
+                        "description": "Selected embedded ALSA speaker",
+                    }
+                ]
+            return []
         data = await self._runner(["pw-dump"], timeout=3, output_limit=2_000_000)
         rows = json.loads(data)
         if not isinstance(rows, list):
@@ -262,6 +272,18 @@ class AudioOutput:
         if not self.config.output_node:
             return {"ready": False, "reason": "select_output_node"}
         self._alsa_device: str | None = None
+        if self.config.fusion_speaker:
+            try:
+                await asyncio.to_thread(require_fusion_driver)
+            except RuntimeError:
+                return {"ready": False, "reason": "fusion_driver_prerequisite_missing"}
+        if self.config.output_node.startswith("alsa:"):
+            ready = await self._alsa_i2s_fallback_ready()
+            return {
+                "ready": ready,
+                "reason": "available" if ready else "selected_output_unavailable",
+                "selected_output": self.config.output_node,
+            }
         if not shutil.which("pw-play") or not shutil.which("pw-dump"):
             if await self._alsa_i2s_fallback_ready():
                 return {"ready": True, "reason": "available", "selected_output": self._target_node}
@@ -303,6 +325,8 @@ class AudioOutput:
             return False
         device = await asyncio.to_thread(_detect_alsa_i2s_device)
         if not device:
+            return False
+        if node.startswith("alsa:") and device != f"plughw:CARD={node[5:]},DEV=0":
             return False
         self._alsa_device = device
         self._target_node = node
@@ -349,7 +373,9 @@ class AudioOutput:
     async def _play_stream(self, data: bytes, duration: float, generation: int) -> dict[str, Any]:
         playback: asyncio.Task[bytes] | None = None
         try:
-            if self.config.speaker_enable_gpio is not None:
+            if self.config.fusion_speaker:
+                await set_fusion_speaker_async(True)
+            elif self.config.speaker_enable_gpio is not None:
                 await asyncio.to_thread(
                     _set_speaker_amplifier, self.config.speaker_enable_gpio, True
                 )
@@ -370,11 +396,9 @@ class AudioOutput:
                     "-",
                 ]
             else:
-                alsa_dev = (
-                    self._alsa_device
-                    or await asyncio.to_thread(_detect_alsa_i2s_device)
-                    or "default"
-                )
+                alsa_dev = self._alsa_device
+                if not alsa_dev:
+                    raise RuntimeError("selected_output_unavailable")
                 arguments = ["aplay", "-q", "-D", alsa_dev, "-"]
             playback = asyncio.create_task(
                 self._runner(
@@ -405,6 +429,8 @@ class AudioOutput:
             if playback is not None:
                 playback.cancel()
                 await asyncio.gather(playback, return_exceptions=True)
+            if self.config.fusion_speaker:
+                await set_fusion_speaker_async(False)
 
     async def stop(self) -> None:
         self._generation += 1
