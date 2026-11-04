@@ -1,0 +1,16 @@
+id: src-20261104-installationguide
+path: raw/articles/ninjarobotpi5/2026-11-04-03/InstallationGuide.md
+media_type: text/markdown
+kind: text
+title: Installationguide
+added_at: '2026-11-04T08:58:18Z'
+content_hash: sha256:2851ccda47e03c5c0e703cb58c528a905b2de3eb0c8315e5328d19d1a2ac8175
+state: ingested
+original_uri: urn:llmwiki:source:src-20261104-installationguide
+source_version: null
+retrieved_at: null
+normalized_at: '2026-11-04T09:11:25Z'
+normalizer: llmwiki-text/0.2
+error: null
+ingested_at: '2026-11-04T10:17:40Z'
+last_plan: fusion-agent-remediation-261104

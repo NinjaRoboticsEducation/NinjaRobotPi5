@@ -9,10 +9,10 @@ generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20261103-developmentlog
-  resource: urn:llmwiki:source:src-20261103-developmentlog
+- id: src-20261104-developmentlog
+  resource: urn:llmwiki:source:src-20261104-developmentlog
   title: DevelopmentLog.md
-  content_hash: sha256:72165a9673ce7cb920920d014845c07f88cf7e5956c6249167e65a50feceb1a9
+  content_hash: sha256:4cf5e316ededeb861a25dd0aef7ceb39b39561d9a0784bbcec48595c11b8ae80
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -20,7 +20,7 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-11-03T00:00:00Z'
+  performed_at: '2026-11-04T00:00:00Z'
   result: passed
   checks:
     source_support: passed
@@ -29,17 +29,18 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered 3 November SunFounder Fusion HAT+ kernel
-    driver integration and calibration draft staging evidence; no human verification is claimed.
+  - Reviewed this page against registered 4 November SunFounder Fusion HAT+ agent
+    integration remediation, web microphone lifecycle repair, and documentation reconciliation
+    evidence; no human verification is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
     and note pending physical acceptance, live third-party accounts, and monetary
     spending caps.
-  target_hash: sha256:b6a2a9b06040d1ed8ae01c5b927d3e27986a6c0a69d7498995d056bdf77054a0
+  target_hash: sha256:89e32a2b1a7a1631c4890aea4d55c931ea8067cca8bcd4c955519a3bbf6a6fc5
 ---
 
 # Development log
 
-The complete log preserves dated implementation decisions and validation reports. Historical test results describe their recorded checkout and date; they are not fresh verification.[^src-20261103-developmentlog]
+The complete log preserves dated implementation decisions and validation reports. Historical test results describe their recorded checkout and date; they are not fresh verification.[^src-20261104-developmentlog]
 
 Use the source identifier below to resolve the complete manual through the raw
 source catalog. The outer wiki README also links directly to the current full
@@ -48,10 +49,10 @@ Read the relevant full section before acting on an abbreviated explanation.[^src
 
 [Return to project overview](/overview.md).
 
-## Current checkpoint: SunFounder Fusion HAT+ kernel driver integration and calibration draft staging
+## Current checkpoint: Fusion agent integration remediation and documentation reconciliation
 
-The 3 November 2026 entries record SunFounder Fusion HAT+ integration and follow-up repairs: Phase 0/1 reviewed kernel driver `1.1.0-ninja1` sysfs PWM ownership (`hat_pwm0`..`hat_pwm11` in 3 groups of 4 at fixed 50 Hz) and patch `0001-safe-pwm-and-battery.patch`; Phase 2 `scripts/fusion_hat_setup.py` installer tool and source preparation recovery in persistent cache (`$HOME/.cache/ninjarobot/fusion-source-recovered`); Phase 3 non-moving onboarding prerequisite validation (`hardware_setup.py`) halting gracefully on missing driver/sysfs nodes without tracebacks; Phase 4 in-memory servo calibration draft staging (<kbd>V</kbd>/<kbd>X</kbd>/<kbd>C</kbd> &rarr; <kbd>F</kbd>/<kbd>Q</kbd>) in `calib.py`; Phase 5 battery telemetry dividing kernel `voltage_now` by 1,000,000 once with distinct `battery_undervoltage` cutoff (6.90 V); and orderly web OS shutdown. All 1,132 repository unit tests, 159 `pi5servo` tests (including all draft entry orders), and separate driver suites passed without live actuator movement. Validation recorded in `docs/validation/fusion_implementation_261103.md`, `fusion_prerequisite_repair_261103.md`, `fusion_source_preparation_repair_261103.md`, and `fusion_calibration_draft_repair_261103.md`, alongside earlier 2 November runtime remediation, 25 October Multi-HAT expansion upgrade, 23 September onboarding refinements, 22 September guided onboarding, 18 September web controller dual views, 17 September calendar setup and unified CONFIRM authorization, 15–16 September distance game and servo repairs, Phase 4 information services, Phase 4 foundations, and system clock access.[^src-20261103-developmentlog]
+The 4 November 2026 entries record post-onboarding Fusion HAT+ agent integration remediation across four areas: (1) servo control safety latch timestamping, `ServoDevice.status` motion latch exposure, Level 1 `/resume` dispatch, `/arm` and `/disarm` chat commands, signed `-90`..`90` single-servo angle routing, and camera/mic health retry; (2) live `speech_output` runtime awareness, `--install-piper` voice provisioning, and `memory-notice` turn filtering; (3) standalone `install-poweroff` helper deployment and LAN session pairing; (4) browser microphone session retention until `onend`, HTTP push-to-talk fallback, 48 kHz chunk scaling, `PaErrorCode -9985` retry, ALSA overflow tolerance, Whisper `[BLANK_AUDIO]` re-arm, and audio child process stdin closure cleanup. All 1,141 main tests and driver suites passed across separate processes without live actuator movement. Validation recorded in `docs/project-history/NinjaSunFounderIntegrationAudit_261104.md`, `docs/validation/web_mic_lifecycle_261104.md`, and `docs/validation/documentation_reconciliation_261104.md`, alongside 3 November SunFounder Fusion HAT+ integration and follow-up repairs (`docs/validation/fusion_implementation_261103.md`, `fusion_prerequisite_repair_261103.md`, `fusion_source_preparation_repair_261103.md`, `fusion_calibration_draft_repair_261103.md`), 2 November runtime remediation, 25 October Multi-HAT expansion upgrade, 23 September onboarding refinements, 22 September guided onboarding, 18 September web controller dual views, 17 September calendar setup and unified CONFIRM authorization, 15–16 September distance game and servo repairs, Phase 4 information services, Phase 4 foundations, and system clock access.[^src-20261104-developmentlog]
 
 
-[^src-20261103-developmentlog]: DevelopmentLog.md, source version `fusion-hat-plus-261103`; registered source `src-20261103-developmentlog`.
+[^src-20261104-developmentlog]: DevelopmentLog.md, source version `fusion-agent-remediation-261104`; registered source `src-20261104-developmentlog`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

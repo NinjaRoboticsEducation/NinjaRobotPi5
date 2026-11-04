@@ -4,7 +4,7 @@ okf_version: "0.2"
 
 # Local LLM Wiki
 
-* [NinjaRobotPi5 project overview](overview.md) - Start here for architecture, setup, features, development history, and current evidence.
+* [NinjaRobotPi5 project overview](overview.md) - Architecture, primary manuals, hardware ownership boundaries, and AI workflow.
 * [Analyses](analyses/) - Browse analyses in this bundle.
 * [Concepts](concepts/) - Browse concepts in this bundle.
 * [Entities](entities/) - Browse entities in this bundle.

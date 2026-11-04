@@ -1,5 +1,9 @@
 # Wiki Update Log
 
+## 2026-11-04
+
+* **Update**: Applied plan `fusion-agent-remediation-261104` — Ingest 2026-11-04-03 SunFounder Fusion HAT+ agent integration remediation, web microphone lifecycle repair, and documentation reconciliation manuals; update ten knowledge pages with safety latch timestamp diagnostics, Level 1 /resume dispatch, /arm and /disarm commands, signed -90..90 single-servo routing, live speech_output prompt awareness and Piper TTS provisioning, standalone web power-off helper, browser microphone lifecycle retention until onend with HTTP push-to-talk fallback, and 48 kHz I2S voice input resilience.. Sources: `src-20261104-installationguide`, `src-20261104-developmentguide`, `src-20261104-developmentlog`, `src-20260907-knowledgeintegration`, `src-20261027-ninjarobot-mcp-skill`.
+
 ## 2026-11-03
 
 * **Update**: Applied plan `fusion-hat-plus-261103` — Ingest 2026-11-03 SunFounder Fusion HAT+ kernel driver integration and calibration draft staging manuals (2026-11-03-04); update ten knowledge pages with reviewed 1.1.0-ninja1 kernel driver sysfs ownership, fusion_hat_setup.py preparation and install tool, non-moving onboarding prerequisite validation, in-memory servo calibration draft staging (V/X/C -> F/Q), kernel voltage_now battery telemetry division by 1,000,000 with distinct battery_undervoltage cutoff (6.90 V), and orderly web OS shutdown.. Sources: `src-20260907-knowledgeintegration`, `src-20261103-developmentguide`, `src-20261103-installationguide`, `src-20261103-developmentlog`, `src-20261027-ninjarobot-mcp-skill`.

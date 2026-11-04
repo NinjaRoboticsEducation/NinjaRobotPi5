@@ -12,5 +12,5 @@ retrieved_at: null
 normalized_at: '2026-10-27T00:00:25Z'
 normalizer: llmwiki-text/0.2
 error: null
-ingested_at: '2026-11-03T15:33:18Z'
-last_plan: fusion-hat-plus-261103
+ingested_at: '2026-11-04T10:17:40Z'
+last_plan: fusion-agent-remediation-261104
