@@ -301,6 +301,7 @@ class AgentLoop:
                     session_id,
                     user_id=self._active_user(session_id),
                 )
+                if stored.metadata.get("workflow") != "memory-notice"
             )
             history = repair_tool_history(history)
             request_id = self._id_factory()

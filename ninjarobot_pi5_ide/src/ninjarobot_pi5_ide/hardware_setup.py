@@ -452,7 +452,30 @@ async def configure_sunfounder_i2s_speaker(
         raise RuntimeError("Fusion embedded sound card missing; verify prerequisites after reboot")
     current = load_effective_config(config_path if config_path.exists() else None)
     payload = current.model_dump()
-    payload["speech_output"]["enabled"] = True
+    default_en_voice = Path(
+        "~/.local/share/ninjarobot_pi5/voices/en/en_US-ljspeech-high.onnx"
+    ).expanduser()
+    if not payload["speech_output"].get("english_model") and default_en_voice.is_file():
+        payload["speech_output"]["english_model"] = (
+            "~/.local/share/ninjarobot_pi5/voices/en/en_US-ljspeech-high.onnx"
+        )
+    piper_python = Path(
+        str(
+            payload["speech_output"].get(
+                "piper_python", "~/.local/share/ninjarobot_pi5/speech/bin/python"
+            )
+        )
+    ).expanduser()
+    language = str(payload["speech_output"].get("language", "en"))
+    active_model_raw = (
+        payload["speech_output"].get("chinese_model")
+        if language == "zh"
+        else payload["speech_output"].get("english_model")
+    )
+    active_model_ready = bool(
+        active_model_raw and Path(str(active_model_raw)).expanduser().is_file()
+    )
+    payload["speech_output"]["enabled"] = bool(piper_python.is_file() and active_model_ready)
     payload["speech_output"]["output_node"] = node
     payload["speech_output"]["speaker_enable_gpio"] = None
     payload["speech_output"]["fusion_speaker"] = True

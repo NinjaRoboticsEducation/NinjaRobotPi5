@@ -311,6 +311,64 @@ class DeploymentManager:
             "spec": _public_spec(self.spec),
         }
 
+    def install_poweroff(self, *, confirmed: bool) -> dict[str, Any]:
+        """Install only the power-off helper and sudoers rule without enabling boot auto-start."""
+        if not confirmed:
+            raise ValueError("power-off helper installation requires --confirm")
+        self._prepare_optional_user_files()
+        self.spec.validate()
+        helper = _asset("ninjarobot-poweroff")
+        sudoers = _asset("ninjarobot-poweroff.sudoers.in").replace("@USER@", self.spec.user)
+        with tempfile.TemporaryDirectory(prefix="ninjarobot-poweroff-deploy-") as temporary:
+            root = Path(temporary)
+            helper_source = root / "poweroff-helper.install"
+            sudoers_source = root / "poweroff-sudoers.install"
+            helper_source.write_text(helper, encoding="utf-8")
+            sudoers_source.write_text(sudoers, encoding="utf-8")
+            if helper_source.read_text(encoding="utf-8") != helper:
+                raise RuntimeError("power-off helper staging verification failed")
+            if sudoers_source.read_text(encoding="utf-8") != sudoers:
+                raise RuntimeError("power-off sudoers staging verification failed")
+            self._checked([str(VISUDO), "-cf", str(sudoers_source)])
+            commands = (
+                [
+                    str(SUDO),
+                    str(INSTALL),
+                    "-o",
+                    "root",
+                    "-g",
+                    "root",
+                    "-m",
+                    "0755",
+                    str(helper_source),
+                    str(HELPER_PATH),
+                ],
+                [
+                    str(SUDO),
+                    str(INSTALL),
+                    "-o",
+                    "root",
+                    "-g",
+                    "root",
+                    "-m",
+                    "0440",
+                    str(sudoers_source),
+                    str(SUDOERS_PATH),
+                ],
+            )
+            for command in commands:
+                self._checked(command)
+        poweroff = self._ensure_full_poweroff_configuration()
+        self._persist_web_poweroff(True)
+        return {
+            "installed": True,
+            "enabled": self.is_enabled(),
+            "web_poweroff_enabled": True,
+            "full_poweroff": poweroff["status"],
+            "poweroff_reboot_required": poweroff["changed"] or poweroff["pending"],
+            "spec": _public_spec(self.spec),
+        }
+
     def enable(self, *, confirmed: bool) -> dict[str, Any]:
         if not confirmed:
             raise ValueError("auto-start enablement requires --confirm")
@@ -558,6 +616,12 @@ class DeploymentManager:
         if enabled:
             payload["deployment"]["web_poweroff_enabled"] = True
             payload["onboarding"]["enabled"] = True
+        save_robot_config(type(config).model_validate(payload), self.spec.config, overwrite=True)
+
+    def _persist_web_poweroff(self, enabled: bool) -> None:
+        config = load_robot_config(self.spec.config)
+        payload = config.model_dump(mode="python")
+        payload["deployment"]["web_poweroff_enabled"] = enabled
         save_robot_config(type(config).model_validate(payload), self.spec.config, overwrite=True)
 
     def _prepare_optional_user_files(self) -> None:

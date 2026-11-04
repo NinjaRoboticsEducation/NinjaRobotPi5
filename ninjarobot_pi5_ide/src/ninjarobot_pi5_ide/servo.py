@@ -186,11 +186,16 @@ class ServoDevice:
         self._state_lock = asyncio.Lock()
         self._closed = False
         self._motion_guard: Callable[[], None] | None = None
+        self._safety_reader: Callable[[], Any] | None = None
         self._stop_generation = 0
 
     def set_motion_guard(self, guard: Callable[[], None]) -> None:
         """Bind the owning IDE controller's checks before exposing movement."""
         self._motion_guard = guard
+
+    def set_safety_reader(self, reader: Callable[[], Any]) -> None:
+        """Bind a read-only safety snapshot provider for servo.status."""
+        self._safety_reader = reader
 
     def _check_motion(self, generation: int | None = None) -> None:
         if generation is not None and generation != self._stop_generation:
@@ -242,7 +247,7 @@ class ServoDevice:
         async with self._state_lock:
             runtime = self._runtime
             calibrated = runtime.calibrated_endpoints if runtime is not None else frozenset()
-            return {
+            payload: dict[str, Any] = {
                 "endpoints": list(self._endpoints),
                 "calibrated": {endpoint: endpoint in calibrated for endpoint in self._endpoints},
                 "motion_enabled": self._motion_enabled,
@@ -250,6 +255,12 @@ class ServoDevice:
                 "driver_available": runtime is not None,
                 "simulated": self._simulated,
             }
+            if self._safety_reader is not None:
+                snapshot = self._safety_reader()
+                latched = bool(getattr(snapshot, "motion_latched", False))
+                payload["motion_latched"] = latched
+                payload["stop_reason"] = getattr(snapshot, "reason", None) if latched else None
+            return payload
 
     async def move(
         self,
@@ -693,6 +704,8 @@ class ServoStatusAdapter:
                 "group_motion_enabled": {"type": "boolean"},
                 "driver_available": {"type": "boolean"},
                 "simulated": {"type": "boolean"},
+                "motion_latched": {"type": "boolean"},
+                "stop_reason": {"type": ["string", "null"]},
             },
             "required": [
                 "endpoints",

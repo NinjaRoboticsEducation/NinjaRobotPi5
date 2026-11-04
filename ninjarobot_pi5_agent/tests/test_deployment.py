@@ -630,3 +630,37 @@ def test_fusion_service_has_narrow_sysfs_access_and_os_only_shutdown(tmp_path, m
         "pending": False,
         "status": {"required": False, "mode": "orderly_os_shutdown"},
     }
+
+
+def test_install_poweroff_installs_helper_and_sudoers_without_enabling_systemd_unit(
+    tmp_path: Path,
+) -> None:
+    from ninjarobot_pi5_ide.config_import import save_robot_config
+
+    spec = _spec(tmp_path)
+    config = load_robot_config(spec.config)
+    config = config.model_copy(
+        update={"hardware": config.hardware.model_copy(update={"profile": "fusion_hat_plus"})}
+    )
+    save_robot_config(config, spec.config, overwrite=True)
+
+    calls: list[list[str]] = []
+
+    def runner(command: object) -> subprocess.CompletedProcess[str]:
+        rendered = list(command)  # type: ignore[arg-type]
+        calls.append(rendered)
+        if rendered[1:3] == ["is-enabled", UNIT_NAME]:
+            return subprocess.CompletedProcess(rendered, 1, "disabled\n", "")
+        return subprocess.CompletedProcess(rendered, 0, "", "")
+
+    result = DeploymentManager(spec, runner=runner).install_poweroff(confirmed=True)
+    assert result["installed"] is True
+    assert result["enabled"] is False
+    assert result["web_poweroff_enabled"] is True
+    assert load_robot_config(spec.config).deployment.web_poweroff_enabled is True
+    assert load_robot_config(spec.config).deployment.auto_start_enabled is False
+    destinations = {
+        command[-1] for command in calls if len(command) > 1 and "install" in command[1]
+    }
+    assert destinations == {str(HELPER_PATH), str(SUDOERS_PATH)}
+    assert str(UNIT_PATH) not in destinations

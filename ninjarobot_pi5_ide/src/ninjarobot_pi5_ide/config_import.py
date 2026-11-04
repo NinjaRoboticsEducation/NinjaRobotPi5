@@ -282,6 +282,8 @@ def import_pi5_configs(
                 )
             voiceinput = data.get("voiceinput")
             if isinstance(voiceinput, dict):
+                if isinstance(voiceinput.get("enabled"), bool):
+                    payload["voice_input"]["enabled"] = voiceinput["enabled"]
                 voice_mapping = {
                     "max_capture_seconds": "max_command_seconds",
                     "silence_timeout_seconds": "silence_stop_seconds",

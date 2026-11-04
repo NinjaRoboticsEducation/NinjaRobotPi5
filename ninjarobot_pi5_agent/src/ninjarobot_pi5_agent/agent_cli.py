@@ -307,7 +307,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     deployment = commands.add_parser("deployment", help="Manage opt-in systemd auto-start.")
     deployment_commands = deployment.add_subparsers(dest="deployment_command", required=True)
-    for deployment_command in ("setup", "install", "upgrade", "enable", "uninstall"):
+    for deployment_command in (
+        "setup",
+        "install",
+        "install-poweroff",
+        "upgrade",
+        "enable",
+        "uninstall",
+    ):
         item = deployment_commands.add_parser(deployment_command)
         item.add_argument("--confirm", action="store_true")
     for deployment_command in (
@@ -1238,6 +1245,8 @@ def _run_deployment_command(arguments: argparse.Namespace) -> int:
     command = arguments.deployment_command
     if command == "setup":
         _print_json(manager.install_and_enable(confirmed=arguments.confirm))
+    elif command == "install-poweroff":
+        _print_json(manager.install_poweroff(confirmed=arguments.confirm))
     elif command in {"install", "upgrade"}:
         _print_json(
             manager.install(
@@ -2118,6 +2127,7 @@ async def _interactive_deployment(arguments: argparse.Namespace) -> None:
             "2. Disable and stop automatic startup Agent\n"
             "3. Show startup Agent status\n"
             "4. Back to the Interactive Tool\n"
+            "5. Install web power-off helper only (no boot auto-start)\n"
         )
         choice = input("Select an option: ").strip()
         if choice == "4":
@@ -2126,11 +2136,12 @@ async def _interactive_deployment(arguments: argparse.Namespace) -> None:
             "1": "setup",
             "2": "disable",
             "3": "status",
+            "5": "install-poweroff",
         }.get(choice)
         if command is None:
-            print("Please choose a number from 1 through 4.")
+            print("Please choose a number from 1 through 5.")
             continue
-        confirmed = command == "setup"
+        confirmed = command in {"setup", "install-poweroff"}
         if command == "setup":
             answer = input(
                 "Type ENABLE to install, start, and enable the real-hardware Agent: "
@@ -2139,6 +2150,13 @@ async def _interactive_deployment(arguments: argparse.Namespace) -> None:
                 print("Deployment action cancelled.")
                 continue
             await _stop_agent_before_deployment(arguments)
+        elif command == "install-poweroff":
+            answer = input(
+                "Type POWEROFF to install the web power-off helper without boot auto-start: "
+            ).strip()
+            if answer != "POWEROFF":
+                print("Deployment action cancelled.")
+                continue
         namespace = argparse.Namespace(**vars(arguments))
         namespace.deployment_command = command
         namespace.confirm = confirmed

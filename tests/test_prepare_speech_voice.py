@@ -49,3 +49,28 @@ def test_download_hash_cleanup_and_repeatability(tmp_path, monkeypatch, corrupt)
         with pytest.raises(ValueError, match="Preserving"):
             setup.prepare(tmp_path, apply=True)
         assert (tmp_path / "test.onnx").read_bytes() == b"my existing model"
+
+
+def test_configure_speech_model_persists_english_model_and_piper_python(tmp_path):
+    from ninjarobot_pi5_ide.config_import import load_effective_config
+
+    voice_dir = tmp_path / "voices" / "en"
+    voice_dir.mkdir(parents=True)
+    model_file = voice_dir / "en_US-ljspeech-high.onnx"
+    model_file.write_bytes(b"fake")
+    venv_dir = tmp_path / "speech"
+    python_bin = venv_dir / "bin" / "python"
+    python_bin.parent.mkdir(parents=True)
+    python_bin.write_bytes(b"fake")
+    config_path = tmp_path / "config.toml"
+
+    setup.configure_speech_model(
+        config_path,
+        destination=voice_dir,
+        venv_dir=venv_dir,
+        apply=True,
+    )
+    loaded = load_effective_config(config_path)
+    assert loaded.speech_output.english_model == str(model_file)
+    assert loaded.speech_output.piper_python == str(python_bin)
+    assert loaded.speech_output.enabled is True

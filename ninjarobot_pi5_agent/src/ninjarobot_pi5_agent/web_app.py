@@ -473,6 +473,8 @@ def create_web_app(
                     paired_connection = False
                 if (remote_connection or require_local_pairing) and not paired_connection:
                     raise PairingError("browser pairing required")
+                if not remote_connection and not require_local_pairing:
+                    paired_connection = True
             except PairingError:
                 denial = PlainTextResponse("Remote browser pairing required.", status_code=401)
                 send_denial = getattr(websocket, "send_denial_response", None)

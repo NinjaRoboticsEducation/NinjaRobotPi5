@@ -247,12 +247,24 @@ async def run_service(arguments: argparse.Namespace) -> None:
     )
     policy = PolicyEngine(arms, camera_grants)
 
+    from ninjarobot_pi5_ide.diagnostics import diagnose_environment
+
+    from .speech import SimulatedSynthesizer, SpeechService
+
+    speech = SpeechService(
+        config.speech_output,
+        ide,
+        synthesizer=SimulatedSynthesizer(config.speech_output) if not arguments.real else None,
+    )
+
     def runtime_state(
         session_id: str,
         lease_id: str | None,
     ) -> dict[str, object]:
         camera_status = camera_grants.status(session_id, lease_id=lease_id)
         camera_authorized = bool(camera_status["authorized_for_next_preview"])
+        robot_status = ide.status()
+        safety = robot_status.get("safety") if isinstance(robot_status, dict) else None
         return {
             "session_id": session_id,
             "controller_lease": lease_id,
@@ -267,6 +279,14 @@ async def run_service(arguments: argparse.Namespace) -> None:
                 ),
             },
             "motion_armed": arms.is_armed(session_id, lease_id=lease_id),
+            "safety": safety,
+            "servo_endpoints": list(config.hardware.servos.endpoints),
+            "servo_roles": dict(config.behaviors.servo_roles),
+            "speech_output": {
+                "enabled": bool(speech.enabled),
+                "output_node": config.speech_output.output_node,
+                "fusion_speaker": config.speech_output.fusion_speaker,
+            },
             "ai_camera": {
                 **camera_status,
                 "meaning": (
@@ -298,9 +318,6 @@ async def run_service(arguments: argparse.Namespace) -> None:
         runtime_state=runtime_state,
         presentation=RobotPresentationController(ide),
     )
-    from ninjarobot_pi5_ide.diagnostics import diagnose_environment
-
-    from .speech import SimulatedSynthesizer, SpeechService
 
     runtime = AgentRuntime(
         information=information,
@@ -316,11 +333,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
         model_manager=model,
         robot_status=ide.status,
         tasks=tasks,
-        speech=SpeechService(
-            config.speech_output,
-            ide,
-            synthesizer=SimulatedSynthesizer(config.speech_output) if not arguments.real else None,
-        ),
+        speech=speech,
         memory=memory,
         enroll_identity=ide.enroll_face_identity if memory is not None else None,
         recognize_identity=ide.identify_face if memory is not None else None,

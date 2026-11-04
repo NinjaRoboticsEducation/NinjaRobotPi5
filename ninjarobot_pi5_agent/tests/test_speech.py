@@ -154,3 +154,11 @@ def test_simulation_does_not_require_models_or_processes(monkeypatch):
         runner.assert_not_awaited()
 
     asyncio.run(scenario())
+
+
+def test_local_synthesizer_reports_specific_value_error_code():
+    synth = LocalSynthesizer(SpeechOutputConfig(english_model=""))
+    status = synth.status("en")
+    assert status["ready"] is False
+    assert status["reason"] == "check_piper_and_language_model"
+    assert status["detail"] == "speech_model_not_configured"

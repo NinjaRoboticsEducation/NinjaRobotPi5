@@ -472,3 +472,51 @@ def test_cancelled_pause_rolls_back_reservation() -> None:
         await controller.stop()
 
     asyncio.run(scenario())
+
+
+def test_blank_audio_transcript_rearms_listener_without_incrementing_failures() -> None:
+    async def scenario() -> None:
+        detector = FakeDetector([True, True])
+        frames = [
+            pcm_frame(0),
+            pcm_frame(1200),
+            pcm_frame(0),
+            pcm_frame(0),
+            pcm_frame(0),
+            pcm_frame(0),
+        ]
+        sources = [FakeSource(frames), FakeSource(frames)]
+
+        class SequenceTranscriber(FakeTranscriber):
+            def __init__(self) -> None:
+                super().__init__()
+                self._items = iter(["[BLANK_AUDIO]", "move forward"])
+
+            async def transcribe(self, wav_path: Path, *, language: str) -> str:
+                assert wav_path.is_file()
+                self.paths.append(wav_path)
+                self.languages.append(language)
+                return next(self._items)
+
+        transcripts: list[tuple[str, str]] = []
+        statuses: list[VoiceInputStatus] = []
+        completed = asyncio.Event()
+        controller = build_controller(
+            detector,
+            sources,
+            SequenceTranscriber(),
+            transcripts,
+            completed,
+            statuses,
+            retry_limit=0,
+        )
+
+        await controller.start()
+        await asyncio.wait_for(completed.wait(), timeout=2.0)
+        await controller.stop()
+
+        assert transcripts == [("move forward", "en")]
+        assert any(status.last_error_code == "no_speech_detected" for status in statuses)
+        assert all(status.state is not VoiceInputState.FAILED for status in statuses)
+
+    asyncio.run(scenario())

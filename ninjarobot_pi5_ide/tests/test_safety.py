@@ -780,3 +780,19 @@ def test_fusion_preflight_rejects_missing_or_low_power_before_movement(tmp_path)
             assert state.read().motion_latched  # A healthy sample does not erase history.
 
     asyncio.run(exercise())
+
+
+def test_persisted_latch_message_includes_recorded_timestamp(tmp_path: Path) -> None:
+    async def exercise() -> None:
+        motion, _servo, _distance, state = controller(
+            tmp_path / "persisted-timestamp",
+            readings=[200],
+        )
+        snapshot = state.latch_motion("undervoltage")
+        assert snapshot.updated_at is not None
+        with pytest.raises(IDEError) as exc_info:
+            await motion.move_endpoint(endpoint="gpio12", target_angle=15.0, speed_mode="M")
+        assert exc_info.value.details.code == "MOTION_STOPPED"
+        assert snapshot.updated_at in exc_info.value.details.message
+
+    asyncio.run(exercise())

@@ -497,6 +497,61 @@ def test_runtime_resume_failure_stays_disarmed_and_reports_health_error(tmp_path
     asyncio.run(exercise())
 
 
+def test_runtime_resume_uses_motion_resume_for_level_one_latch(tmp_path) -> None:
+    from unittest.mock import AsyncMock
+
+    async def exercise() -> None:
+        safety = {
+            "schema_version": 1,
+            "motion_latched": True,
+            "system_latched": False,
+            "reason": "undervoltage",
+            "fault_detail": None,
+            "updated_at": "2026-11-02T03:09:04Z",
+        }
+        runtime = build_runtime(
+            tmp_path,
+            robot_status=lambda: {
+                "safety": safety,
+                "recovery_required": False,
+                "motion_recovery_required": True,
+            },
+        )
+        await runtime.start()
+        status = runtime.startup_status()
+        assert status["operational_state"] == "motion_latched"
+        assert status["recovery"]["required"] is False
+        assert status["recovery"]["reason"] == "undervoltage"
+        assert status["recovery"]["instructions"] is not None
+
+        succeeded = ToolExecutionResult(
+            call_id="resume-motion-1",
+            tool_name="robot.motion.resume",
+            status=ToolExecutionStatus.SUCCEEDED,
+            data={"system_latched": False, "motion_latched": False},
+        )
+        execute_tool = AsyncMock(return_value=succeeded)
+        runtime.execute_tool = execute_tool
+
+        result = await runtime.resume_system(
+            "local-cli",
+            confirmed=True,
+            requested_by="test-motion-resume",
+        )
+        assert result is succeeded
+        execute_tool.assert_awaited_once_with(
+            tool_name="robot.motion.resume",
+            arguments={"confirmed": True},
+            session_id="local-cli",
+            lease_id=None,
+            confirmed=True,
+            requested_by="test-motion-resume",
+        )
+        await runtime.close()
+
+    asyncio.run(exercise())
+
+
 def test_ipc_allows_reconnect_stream_history_clear_arm_and_stop(tmp_path) -> None:
     async def exercise() -> None:
         socket_path = tmp_path / "agent.sock"

@@ -6,22 +6,28 @@ or open the parent project for development and implementation verification.
 
 ## Current full manuals — Fusion HAT+ implementation
 
-These 3 November successor sources reflect the current repository implementation.
-They are registered and semantically reviewed under plan `fusion-hat-plus-261103`.
-`project-knowledge.json` and compiled wiki pages describe the current Fusion-only
-kernel driver path and in-memory calibration draft staging.
+These 4 November successor sources reflect the current repository implementation
+including the Fusion agent integration remediation. They are unpublished source
+successors awaiting manual validation, wiki ingestion, and semantic review;
+`project-knowledge.json` and compiled wiki pages remain at the registered
+3 November (`2026-11-03-04`) checkpoint under plan `fusion-hat-plus-261103`.
 
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-11-03-04/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-11-03-04/DevelopmentGuide.md)
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-11-04/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-11-04/DevelopmentGuide.md)
 - [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md) (unchanged public tools)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-11-03-04/DevelopmentLog.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-11-04/DevelopmentLog.md)
+- [Fusion agent integration audit and implementation plan](../docs/project-history/NinjaSunFounderIntegrationAudit_261104.md)
 - [Fusion implementation and manual acceptance](../docs/validation/fusion_implementation_261103.md)
 
 Original registered predecessor sources are preserved:
-[InstallationGuide](raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md),
-[DevelopmentGuide](raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md), and
-[DevelopmentLog](raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md). Ingestion and
-semantic review passed with 100% sourced-page coverage.
+[InstallationGuide (2026-11-03-04)](raw/articles/ninjarobotpi5/2026-11-03-04/InstallationGuide.md),
+[DevelopmentGuide (2026-11-03-04)](raw/articles/ninjarobotpi5/2026-11-03-04/DevelopmentGuide.md),
+[DevelopmentLog (2026-11-03-04)](raw/notes/ninjarobotpi5/2026-11-03-04/DevelopmentLog.md),
+[InstallationGuide (2026-11-02)](raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md),
+[DevelopmentGuide (2026-11-02)](raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md), and
+[DevelopmentLog (2026-11-02)](raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md). Ingestion and
+semantic review of `2026-11-03-04` passed with 100% sourced-page coverage; ingestion
+and review of `2026-11-04` are deferred to the owner after manual validation.
 
 - [Multi-HAT runtime remediation validation](../docs/validation/sunfounder_runtime_remediation_261102.md)
 - [Onboarding refinement and Mac Calendar tests](../docs/validation/onboarding_refinement_walkthrough_260923.md)

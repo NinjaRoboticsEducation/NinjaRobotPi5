@@ -865,7 +865,11 @@ class AgentRuntime:
             "startup": dict(self._startup),
             "robot": robot,
             "robot_status_error": robot_status_error,
-            "recovery": self._recovery_status(safety, system_latched=system_latched),
+            "recovery": self._recovery_status(
+                safety,
+                system_latched=system_latched,
+                motion_latched=motion_latched,
+            ),
         }
 
     def _read_robot_status(self) -> tuple[dict[str, Any] | None, str | None]:
@@ -882,16 +886,18 @@ class AgentRuntime:
         safety: object,
         *,
         system_latched: bool,
+        motion_latched: bool = False,
     ) -> dict[str, Any]:
         snapshot = safety if isinstance(safety, Mapping) else {}
+        latched = system_latched or motion_latched
         return {
             "required": system_latched,
-            "reason": snapshot.get("reason") if system_latched else None,
-            "detail": snapshot.get("fault_detail") if system_latched else None,
+            "reason": snapshot.get("reason") if latched else None,
+            "detail": snapshot.get("fault_detail") if latched else None,
             "instructions": (
                 "Open `ninjarobot-agent chat`, enter `/resume`, and explicitly confirm "
                 "the non-moving health checks. Do not delete the safety state file."
-                if system_latched
+                if latched
                 else None
             ),
         }
@@ -1940,13 +1946,21 @@ class AgentRuntime:
         lease_id: str | None = None,
         requested_by: str = "local-controller",
     ) -> ToolExecutionResult:
-        """Health-check and clear the system latch without re-arming AI motion."""
+        """Health-check and clear the system or motion latch without re-arming AI motion."""
         self._ensure_started()
         if not confirmed:
             raise PermissionError("system resume requires explicit confirmation")
         self.disarm_motion(session_id)
+        robot, _ = self._read_robot_status()
+        safety = robot.get("safety") if isinstance(robot, Mapping) else None
+        motion_only = bool(
+            isinstance(safety, Mapping)
+            and safety.get("motion_latched") is True
+            and safety.get("system_latched") is False
+        )
+        tool_name = "robot.motion.resume" if motion_only else "robot.system.resume"
         result = await self.execute_tool(
-            tool_name="robot.system.resume",
+            tool_name=tool_name,
             arguments={"confirmed": True},
             session_id=session_id,
             lease_id=lease_id,

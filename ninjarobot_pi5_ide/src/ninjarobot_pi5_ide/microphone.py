@@ -508,6 +508,7 @@ class ManagedVoiceAudioSource:
         self._requested_sample_rate = requested_sample_rate
         self._channels = channels
         self._block_frames = block_frames
+        self._read_frames = block_frames
         self._sample_rate = requested_sample_rate
         self._stream: Any | None = None
 
@@ -530,19 +531,33 @@ class ManagedVoiceAudioSource:
             purpose="NinjaRobot always-on voice input",
             error_factory=RuntimeError,
         )
+        read_frames = (
+            max(self._block_frames, int(actual_rate * 0.08))
+            if self._block_frames == 1280
+            else self._block_frames
+        )
         try:
-            stream = await asyncio.to_thread(
-                sounddevice.RawInputStream,
-                samplerate=actual_rate,
-                blocksize=self._block_frames,
-                device=device,
-                channels=self._channels,
-                dtype="int16",
-                latency="high",
-            )
+            for attempt in range(3):
+                try:
+                    stream = await asyncio.to_thread(
+                        sounddevice.RawInputStream,
+                        samplerate=actual_rate,
+                        blocksize=read_frames,
+                        device=device,
+                        channels=self._channels,
+                        dtype="int16",
+                        latency="high",
+                    )
+                    break
+                except Exception as exc:
+                    if attempt < 2 and _voice_microphone_error_code(exc) == "microphone_busy":
+                        await asyncio.sleep(0.15 * (attempt + 1))
+                        continue
+                    raise
             # Publish the partially opened stream before start so cancellation
             # can close it instead of leaving PortAudio ownership behind.
             self._stream = stream
+            self._read_frames = read_frames
             await asyncio.to_thread(stream.start)
         except asyncio.CancelledError:
             await self.close()
@@ -556,7 +571,7 @@ class ManagedVoiceAudioSource:
         stream = self._stream
         if stream is None:
             raise RuntimeError("voice audio source is not started")
-        data, overflowed = await asyncio.to_thread(stream.read, self._block_frames)
+        data, overflowed = await asyncio.to_thread(stream.read, self._read_frames)
         return bytes(data), bool(overflowed)
 
     async def close(self) -> None:
@@ -581,7 +596,7 @@ def _voice_microphone_error_code(error: Exception) -> str:
     message = str(error).casefold()
     if isinstance(error, PermissionError) or "permission denied" in message:
         return "microphone_permission_denied"
-    if "busy" in message or "in use" in message:
+    if any(marker in message for marker in ("busy", "in use", "device unavailable", "-9985")):
         return "microphone_busy"
     if any(
         marker in message

@@ -408,10 +408,17 @@ class MotionController:
             guidance = stop_guidance(
                 snapshot.reason or "operator_stop", fault_detail=snapshot.fault_detail
             )
+            recorded_at = (
+                f" (persisted safety latch recorded at {snapshot.updated_at})"
+                if snapshot.updated_at
+                else ""
+            )
             raise IDEError(
                 ErrorDetails(
                     code="SYSTEM_STOPPED" if system_stopped else "MOTION_STOPPED",
-                    message=f"{guidance.cause} Recovery: {guidance.recovery_instruction}",
+                    message=(
+                        f"{guidance.cause}{recorded_at} Recovery: {guidance.recovery_instruction}"
+                    ),
                     technical_detail=None,
                     definitely_not_executed=True,
                     retry_safety=RetrySafety.SAFE,

@@ -60,7 +60,28 @@ class LocalSynthesizer:
                 "language": language,
                 "detail": "Local files present; synthesis requires an actual test.",
             }
-        except (OSError, ValueError, TypeError, AttributeError):
+        except ValueError as exc:
+            detail = (
+                str(exc)
+                if str(exc)
+                in {
+                    "speech_model_not_configured",
+                    "piper_not_installed",
+                    "speech_model_missing",
+                    "speech_model_config_too_large",
+                    "speech_model_language_mismatch",
+                    "speech_language_unavailable",
+                }
+                else "check_piper_and_language_model"
+            )
+            return {
+                "ready": False,
+                "engine": "piper",
+                "language": language,
+                "reason": "check_piper_and_language_model",
+                "detail": detail,
+            }
+        except (OSError, TypeError, AttributeError):
             return {
                 "ready": False,
                 "engine": "piper",
@@ -220,12 +241,28 @@ class SpeechService:
             if current is not None and current.cancelling():
                 raise
             result = {"status": "cancelled", "played": False}
-        except Exception:
+        except Exception as exc:
+            detail = (
+                str(exc)
+                if isinstance(exc, ValueError)
+                and str(exc)
+                in {
+                    "speech_model_not_configured",
+                    "piper_not_installed",
+                    "speech_model_missing",
+                    "speech_model_config_too_large",
+                    "speech_model_language_mismatch",
+                    "speech_language_unavailable",
+                    "speech_audio_missing_or_large",
+                }
+                else None
+            )
             result = {
                 "status": "failed",
                 "played": False,
                 "reason": "speech_unavailable_or_interrupted; text retained",
                 "stage": stage,
+                **({"detail": detail} if detail is not None else {}),
             }
         finally:
             self._jobs.discard(job)

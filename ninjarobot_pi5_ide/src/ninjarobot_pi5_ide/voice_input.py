@@ -360,6 +360,13 @@ class VoiceInputController:
                     )
                     await self._wait_or_stop(self._cooldown_seconds)
                 except VoiceInputError as exc:
+                    if exc.code == "no_speech_detected":
+                        await self._set_status(
+                            state=VoiceInputState.LISTENING,
+                            listening_indicator=True,
+                            last_error_code="no_speech_detected",
+                        )
+                        continue
                     failures += 1
                     await self._set_status(
                         state=(
@@ -416,6 +423,8 @@ class VoiceInputController:
         capture_started = False
         speech_started = False
         silent_frames = 0
+        initial_silent_frames = 0
+        consecutive_overflows = 0
         try:
             self._source_open = True
             await source.start()
@@ -431,6 +440,7 @@ class VoiceInputController:
                     self._silence_stop_seconds * detector.sample_rate / detector.frame_length
                 ),
             )
+            max_initial_silence_frames = max(silence_frames * 2, 12)
             self._paused_event.clear()
             await self._set_status(
                 state=VoiceInputState.LISTENING,
@@ -443,7 +453,11 @@ class VoiceInputController:
                 if not self._resume_event.is_set() or self._stop_event.is_set():
                     break
                 if overflowed:
-                    raise VoiceInputError("audio_overflow")
+                    consecutive_overflows += 1
+                    if source.sample_rate <= detector.sample_rate or consecutive_overflows >= 3:
+                        raise VoiceInputError("audio_overflow")
+                else:
+                    consecutive_overflows = 0
                 for frame in assembler.feed(pcm):
                     if capture_started:
                         capture.extend(frame)
@@ -452,9 +466,14 @@ class VoiceInputController:
                             if silent:
                                 if speech_started:
                                     silent_frames += 1
+                                else:
+                                    initial_silent_frames += 1
+                                    if initial_silent_frames >= max_initial_silence_frames:
+                                        raise VoiceInputError("no_speech_detected")
                             else:
                                 speech_started = True
                                 silent_frames = 0
+                                initial_silent_frames = 0
                         if len(capture) >= max_capture_bytes or (
                             self._vad_enabled and speech_started and silent_frames >= silence_frames
                         ):
@@ -508,12 +527,19 @@ class VoiceInputController:
                     language=_whisper_language(self._language),
                 )
             ).strip()
-            if not transcript:
+            if not transcript or transcript.upper() in {
+                "[BLANK_AUDIO]",
+                "(BLANK AUDIO)",
+                "[SILENCE]",
+                "(SILENCE)",
+            }:
                 raise VoiceInputError("no_speech_detected")
             return transcript
         except VoiceInputError:
             raise
         except Exception as exc:
+            if "empty transcript" in str(exc).casefold():
+                raise VoiceInputError("no_speech_detected") from exc
             raise VoiceInputError("transcription_failed") from exc
         finally:
             temporary.unlink(missing_ok=True)
@@ -552,20 +578,41 @@ class _PCMFrameAssembler:
         self._output = bytearray()
 
     def feed(self, pcm: bytes) -> tuple[bytes, ...]:
-        incoming = _pcm_samples(pcm)
         if self._source_rate == self._target_rate:
+            if len(pcm) % 2:
+                raise VoiceInputError("invalid_pcm_frame")
             self._output.extend(pcm)
+        elif self._source_rate % self._target_rate == 0:
+            incoming = _pcm_samples(pcm)
+            self._samples.extend(incoming)
+            ratio = self._source_rate // self._target_rate
+            available = (len(self._samples) - int(self._position)) // ratio
+            if available > 0:
+                start = int(self._position)
+                out_samples = array("h", self._samples[start : start + available * ratio : ratio])
+                if sys.byteorder != "little":
+                    out_samples.byteswap()
+                self._output.extend(out_samples.tobytes())
+                consumed = start + available * ratio
+                del self._samples[:consumed]
+                self._position = 0.0
         else:
+            incoming = _pcm_samples(pcm)
             self._samples.extend(incoming)
             step = self._source_rate / self._target_rate
+            out_samples = array("h")
             while self._position + 1 < len(self._samples):
                 left = int(self._position)
                 fraction = self._position - left
                 value = round(
                     self._samples[left] * (1.0 - fraction) + self._samples[left + 1] * fraction
                 )
-                self._output.extend(int(value).to_bytes(2, "little", signed=True))
+                out_samples.append(max(-32768, min(32767, int(value))))
                 self._position += step
+            if out_samples:
+                if sys.byteorder != "little":
+                    out_samples.byteswap()
+                self._output.extend(out_samples.tobytes())
             consumed = int(self._position)
             if consumed:
                 del self._samples[:consumed]
@@ -591,6 +638,10 @@ def _pcm_rms(pcm: bytes) -> float:
     samples = _pcm_samples(pcm)
     if not samples:
         return 0.0
+    mean = sum(samples) / len(samples)
+    ac_rms = math.sqrt(sum((sample - mean) ** 2 for sample in samples) / len(samples))
+    if ac_rms > 0.0:
+        return ac_rms
     return math.sqrt(sum(sample * sample for sample in samples) / len(samples))
 
 

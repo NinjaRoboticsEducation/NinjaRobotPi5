@@ -202,6 +202,7 @@ class RobotAssembly:
             display_hold_seconds=config.behaviors.system_stopped_display_seconds,
         )
         self.servo.set_motion_guard(self.motion.require_motion_context)
+        self.servo.set_safety_reader(self.safety_state.read)
         self.behaviors.set_drive_handler(self.motion.drive)
         self.behaviors.set_failure_handler(self._driver_failure)
         self.distance_game = DistanceGame(self, volume=config.distance_game.volume)
@@ -924,8 +925,15 @@ class RobotAssembly:
 
     async def _camera_health(self) -> bool:
         await self.camera.start()
+        if await self.camera.health() is not ResourceHealth.READY:
+            await self.camera.suspend()
+            await self.camera.start()
         return await self.camera.health() is ResourceHealth.READY
 
     async def _microphone_health(self) -> bool:
         await self.microphone.start()
+        if await self.microphone.health() is not ResourceHealth.READY:
+            async with self.microphone.manual_access():
+                await self.microphone.suspend()
+                await self.microphone.start()
         return await self.microphone.health() is ResourceHealth.READY

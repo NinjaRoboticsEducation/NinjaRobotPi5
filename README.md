@@ -29,13 +29,18 @@
 Fusion uses the reviewed kernel driver for all twelve servo channels and embedded
 audio; older Robot HAT variants are no longer offered. Follow the
 [installation and manual validation steps](docs/validation/fusion_implementation_261103.md)
+and the [4 November agent integration audit and remediation plan](docs/project-history/NinjaSunFounderIntegrationAudit_261104.md)
 before real-device testing. Repository validation passes; physical acceptance is
-still pending. The 3 November full manuals linked below are registered and
-semantically reviewed in the local wiki knowledge base under plan `fusion-hat-plus-261103`.
+still pending. The 4 November full manuals linked below are unpublished source
+successors awaiting manual validation, wiki ingestion, and semantic review; the
+registered wiki knowledge base currently points to the 3 November checkpoint (`2026-11-03-04`).
 Registered predecessor sources:
-[InstallationGuide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md),
-[DevelopmentGuide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md),
-and [DevelopmentLog](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md).
+[InstallationGuide (2026-11-03-04)](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/InstallationGuide.md),
+[DevelopmentGuide (2026-11-03-04)](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/DevelopmentGuide.md),
+[DevelopmentLog (2026-11-03-04)](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-03-04/DevelopmentLog.md),
+[InstallationGuide (2026-11-02)](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/InstallationGuide.md),
+[DevelopmentGuide (2026-11-02)](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md),
+and [DevelopmentLog (2026-11-02)](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md).
 
 
 ## 1. What Is NinjaRobotPi5?
@@ -189,7 +194,7 @@ Use the tables below as the recommended default electronic module pin wiring ref
 | | `GND` | `Pin06/GND` (RaspberryPi) |
 | | Servo 1~12 | `pwm 0~11` (on PCA9685) |
 
-> **Safety:** Power off before changing wiring. Fusion reserves GPIO16/18/19/20/21; use the reviewed kernel installer, not legacy GPIO12 amplifier or GPIO5 reset instructions. Verify servo supply and grounding against the board documentation. See the [Fusion manual](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/InstallationGuide.md#fusion-installation-and-onboarding).
+> **Safety:** Power off before changing wiring. Fusion reserves GPIO16/18/19/20/21; use the reviewed kernel installer, not legacy GPIO12 amplifier or GPIO5 reset instructions. Verify servo supply and grounding against the board documentation. See the [Fusion manual](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-04/InstallationGuide.md#fusion-installation-and-onboarding).
 
 ### 2.3 Raspberry Pi OS Installation
 
@@ -896,10 +901,10 @@ The principal `/` commands are listed below; `/help` is the current in-app refer
 
 | Document | Description |
 |---|---|
-| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/InstallationGuide.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md)) | Complete step-by-step guide from blank Pi to running robot |
-| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/DevelopmentGuide.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/DevelopmentGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md)) | Architecture, API reference, and developer workflow |
+| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-04/InstallationGuide.md) ([2026-11-03-04](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/InstallationGuide.md), [2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md)) | Complete step-by-step guide from blank Pi to running robot |
+| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-04/DevelopmentGuide.md) ([2026-11-03-04](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/DevelopmentGuide.md), [2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/DevelopmentGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md)) | Architecture, API reference, and developer workflow |
 | [MCP and Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md) ([2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/NinjaRobot_MCP_Skill.md)) | Beginner guide to external tools and reusable Skills |
-| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-03-04/DevelopmentLog.md) ([2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md)) | Implementation history and decisions |
+| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-04/DevelopmentLog.md) ([2026-11-03-04](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-03-04/DevelopmentLog.md), [2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md)) | Implementation history and decisions |
 | [Hardware Profile](docs/hardware/hardware-profile.md) | Confirmed wiring and electrical records |
 | [Documentation Index](docs/README.md) | Index of all project documents |
 | [v1.0.0 Support Matrix](docs/architecture/v1.0.0-support-matrix.md) | Historical release baseline; see current manuals for later additions such as speech output |

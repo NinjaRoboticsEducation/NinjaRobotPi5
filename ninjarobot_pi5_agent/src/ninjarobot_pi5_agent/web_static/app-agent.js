@@ -165,6 +165,7 @@ if (emergencyBtn) {
         if (resumed) {
           updateEmergencyStop(false);
           updateResumeMovement(true);
+          updateAiMotion(false);
         }
       } catch {
         // cancelled or failed
@@ -197,6 +198,7 @@ if (resumeBtn) {
       if (resumed) {
         updateResumeMovement(true);
         updateEmergencyStop(false);
+        updateAiMotion(false);
       }
     } catch {
       // cancelled or failed
@@ -208,7 +210,11 @@ if (resumeBtn) {
 
 export function updateVoiceInput(status = {}) {
   if (!elements.voiceInput) return;
-  const enabled = status.enabled === true && status.state !== "disabled";
+  const enabled =
+    status.enabled === true &&
+    status.state !== "disabled" &&
+    status.state !== "failed" &&
+    status.state !== "stopped";
   state.voiceEnabled = enabled;
   elements.voiceInput.dataset.state =
     typeof status.state === "string" ? status.state : "disabled";
@@ -231,7 +237,11 @@ if (elements.voiceInput) {
     const request = state.voiceEnabled ? "voice_disable" : "voice_enable";
     send(request)
       .then((data) => updateVoiceInput(data))
-      .catch(() => {});
+      .catch((error) => {
+        const message = String(error?.message || error);
+        log(message, "error");
+        toast(message);
+      });
   });
 }
 
@@ -240,16 +250,58 @@ if (elements.voiceInput) {
 export function configureSpeechRecognition() {
   if (!elements.webMic) return;
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let fallbackPushToTalk = !SpeechRecognition;
+  let pttRecording = false;
+
+  async function toggleRobotPushToTalk() {
+    if (pttRecording) {
+      pttRecording = false;
+      send("usb_microphone_stop").catch(() => {});
+      return;
+    }
+    pttRecording = true;
+    elements.webMic.setAttribute("aria-pressed", "true");
+    elements.webMic.classList.add("recording");
+    const strong = elements.webMic.querySelector("strong");
+    if (strong) strong.textContent = t("speech.stop");
+    try {
+      const result = await send("usb_microphone", {
+        duration_seconds: 5,
+        language: state.locale || "auto",
+      });
+      const text = String(result?.transcript || result?.data?.transcript || "").trim();
+      if (text) {
+        const prefix = elements.chatInput.value.trim();
+        elements.chatInput.value = prefix ? `${prefix} ${text}` : text;
+        elements.chatInput.focus();
+        toast(t("speech.added"));
+      }
+    } catch (error) {
+      const message = String(error?.message || error);
+      log(message, "error");
+      toast(message);
+    } finally {
+      pttRecording = false;
+      elements.webMic.setAttribute("aria-pressed", "false");
+      elements.webMic.classList.remove("recording");
+      const strongReset = elements.webMic.querySelector("strong");
+      if (strongReset) strongReset.textContent = t("browserMic.title");
+    }
+  }
+
   if (!SpeechRecognition) {
-    elements.webMic.disabled = true;
-    const small = elements.webMic.querySelector("small");
-    if (small) small.textContent = t("speech.notSupported");
+    elements.webMic.addEventListener("click", () => {
+      toggleRobotPushToTalk();
+    });
     return;
   }
   const recognition = new SpeechRecognition();
+  let recognitionStarting = false;
+  let initialPrefix = "";
   recognition.interimResults = true;
   recognition.continuous = false;
   recognition.onstart = () => {
+    recognitionStarting = false;
     state.recognitionActive = true;
     if (elements.webMic) {
       elements.webMic.setAttribute("aria-pressed", "true");
@@ -263,13 +315,18 @@ export function configureSpeechRecognition() {
     for (let index = 0; index < event.results.length; index += 1) {
       transcript += event.results[index][0].transcript;
     }
-    elements.chatInput.value = transcript.trim();
-    if (event.results[event.results.length - 1].isFinal && transcript.trim()) {
+    const clean = transcript.trim();
+    elements.chatInput.value = initialPrefix && clean ? `${initialPrefix} ${clean}` : clean || initialPrefix;
+    if (event.results[event.results.length - 1].isFinal && clean) {
       elements.chatInput.focus();
       toast(t("speech.added"));
     }
   };
   recognition.onerror = (event) => {
+    recognitionStarting = false;
+    if (event.error === "network" || event.error === "service-not-allowed") {
+      fallbackPushToTalk = true;
+    }
     const messages = {
       "not-allowed": t("error.permissionDenied"),
       "service-not-allowed": t("error.speechUnavailable"),
@@ -283,6 +340,7 @@ export function configureSpeechRecognition() {
     toast(message);
   };
   recognition.onend = () => {
+    recognitionStarting = false;
     state.recognitionActive = false;
     if (elements.webMic) {
       elements.webMic.setAttribute("aria-pressed", "false");
@@ -293,14 +351,21 @@ export function configureSpeechRecognition() {
   };
   state.recognition = recognition;
   elements.webMic.addEventListener("click", () => {
-    if (state.recognitionActive) {
+    if (fallbackPushToTalk) {
+      toggleRobotPushToTalk();
+      return;
+    }
+    if (state.recognitionActive || recognitionStarting) {
       recognition.stop();
       return;
     }
+    initialPrefix = elements.chatInput.value.trim();
     recognition.lang = SPEECH_LOCALES[state.locale];
     try {
+      recognitionStarting = true;
       recognition.start();
     } catch (error) {
+      recognitionStarting = false;
       const message = t("error.browserMicStart", { error: error.message });
       log(message, "error");
       toast(message);

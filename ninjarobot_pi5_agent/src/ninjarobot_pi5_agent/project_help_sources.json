@@ -3,23 +3,23 @@
   "documents": [
     {
       "name": "InstallationGuide.md",
-      "path": "raw/articles/ninjarobotpi5/2026-09-17-03/InstallationGuide.md",
-      "content_hash": "sha256:7e50d29d87acf54bcc5dce24f26b8c667acf2b026edfec45e2cc8c286e190029"
+      "path": "raw/articles/ninjarobotpi5/2026-11-04/InstallationGuide.md",
+      "content_hash": "sha256:4d3e2c588754317d666fa1d35e4ae0bf8725eb91e3a525973de2b7301fc34d53"
     },
     {
       "name": "NinjaRobot_MCP_Skill.md",
-      "path": "raw/articles/ninjarobotpi5/2026-09-17-03/NinjaRobot_MCP_Skill.md",
-      "content_hash": "sha256:1f99135350ca5fcd714428806c4eb34248af59b888369be8fe3d398a3655ed7c"
+      "path": "raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md",
+      "content_hash": "sha256:6a1b6e3538d38533ad9b9a254877f7d966df732225a0d3d432b168ffc7fdf2df"
     },
     {
       "name": "DevelopmentGuide.md",
-      "path": "raw/articles/ninjarobotpi5/2026-09-17-03/DevelopmentGuide.md",
-      "content_hash": "sha256:55b061c1a72d4b5f81693f83f2ae39200ff8ed7ea992645e83e661ac5efcd0f0"
+      "path": "raw/articles/ninjarobotpi5/2026-11-04/DevelopmentGuide.md",
+      "content_hash": "sha256:3e5474a95196e37da73898a117c32bd104de178d827feb9b97e04108a0c974f8"
     },
     {
       "name": "DevelopmentLog.md",
-      "path": "raw/notes/ninjarobotpi5/2026-09-17-03/DevelopmentLog.md",
-      "content_hash": "sha256:2c9e4a8d9702facf8d609b368da4c898d00c8f912dbfe3a9026c78f9849f4fa3"
+      "path": "raw/notes/ninjarobotpi5/2026-11-04/DevelopmentLog.md",
+      "content_hash": "sha256:aa2a507bccd23127dfbe33bfd0840815cbf71d7c7abe2409c9800a63bef84d11"
     }
   ]
 }
