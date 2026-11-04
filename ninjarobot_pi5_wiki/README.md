@@ -12,10 +12,10 @@ successors awaiting manual validation, wiki ingestion, and semantic review;
 `project-knowledge.json` and compiled wiki pages remain at the registered
 3 November (`2026-11-03-04`) checkpoint under plan `fusion-hat-plus-261103`.
 
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-11-04/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-11-04/DevelopmentGuide.md)
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-11-04-02/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-11-04-02/DevelopmentGuide.md)
 - [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md) (unchanged public tools)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-11-04/DevelopmentLog.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-11-04-02/DevelopmentLog.md)
 - [Fusion agent integration audit and implementation plan](../docs/project-history/NinjaSunFounderIntegrationAudit_261104.md)
 - [Fusion implementation and manual acceptance](../docs/validation/fusion_implementation_261103.md)
 

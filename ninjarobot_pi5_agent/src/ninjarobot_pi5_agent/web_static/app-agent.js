@@ -326,20 +326,19 @@ export function configureSpeechRecognition() {
     return;
   }
 
-  let recognitionStarting = false;
+  let phase = "IDLE";
+  let pendingStart = false;
+  let cancelled = false;
   let initialPrefix = "";
 
   function stopActiveRecognition({ abort = false } = {}) {
-    recognitionStarting = false;
-    state.recognitionActive = false;
-    resetWebMicButton();
+    pendingStart = false;
+    cancelled = abort;
     const active = state.recognition;
     if (!active) return;
-    state.recognition = null;
-    active.onstart = null;
-    active.onresult = null;
-    active.onerror = null;
-    active.onend = null;
+    phase = "STOPPING";
+    state.recognitionActive = false;
+    resetWebMicButton();
     try {
       if (abort && typeof active.abort === "function") {
         active.abort();
@@ -360,7 +359,8 @@ export function configureSpeechRecognition() {
     recognition.lang = SPEECH_LOCALES[state.locale] || "en-US";
     recognition.onstart = () => {
       if (state.recognition !== recognition) return;
-      recognitionStarting = false;
+      if (phase === "STOPPING") return;
+      phase = "RECORDING";
       state.recognitionActive = true;
       if (elements.webMic) {
         elements.webMic.setAttribute("aria-pressed", "true");
@@ -370,7 +370,7 @@ export function configureSpeechRecognition() {
       }
     };
     recognition.onresult = (event) => {
-      if (state.recognition !== recognition) return;
+      if (state.recognition !== recognition || cancelled) return;
       let transcript = "";
       for (let index = 0; index < event.results.length; index += 1) {
         transcript += event.results[index][0].transcript;
@@ -381,19 +381,20 @@ export function configureSpeechRecognition() {
       if (event.results[event.results.length - 1].isFinal && clean) {
         elements.chatInput.focus();
         toast(t("speech.added"));
-        try {
-          recognition.stop();
-        } catch {
-          // Handled by stopActiveRecognition below.
-        }
-        stopActiveRecognition({ abort: false });
+        phase = "STOPPING";
+        state.recognitionActive = false;
+        resetWebMicButton();
       }
     };
     recognition.onerror = (event) => {
       if (state.recognition !== recognition) return;
       const errorCode = event?.error;
-      stopActiveRecognition({ abort: true });
-      if (errorCode === "aborted") return;
+      const expectedAbort = cancelled && errorCode === "aborted";
+      phase = "STOPPING";
+      state.recognitionActive = false;
+      resetWebMicButton();
+      if (expectedAbort) return;
+      pendingStart = false;
       const messages = {
         "not-allowed": t("error.permissionDenied"),
         "service-not-allowed": t("error.speechUnavailable"),
@@ -409,31 +410,50 @@ export function configureSpeechRecognition() {
     recognition.onend = () => {
       if (state.recognition !== recognition) return;
       state.recognition = null;
-      recognitionStarting = false;
+      phase = "IDLE";
       state.recognitionActive = false;
       resetWebMicButton();
+      if (pendingStart && !document.hidden) {
+        pendingStart = false;
+        startRecognition();
+      }
     };
     return recognition;
   }
 
-  elements.webMic.addEventListener("click", () => {
-    if (state.recognitionActive || recognitionStarting || state.recognition) {
-      stopActiveRecognition({ abort: false });
-      return;
-    }
+  function startRecognition() {
     initialPrefix = elements.chatInput.value.trim();
+    cancelled = false;
     const recognition = createRecognitionSession();
     state.recognition = recognition;
     try {
-      recognitionStarting = true;
+      phase = "STARTING";
       recognition.start();
     } catch (error) {
-      stopActiveRecognition({ abort: true });
+      state.recognition = null;
+      phase = "IDLE";
+      resetWebMicButton();
       const message = t("error.browserMicStart", { error: error.message });
       log(message, "error");
       toast(message);
     }
+  }
+
+  elements.webMic.addEventListener("click", () => {
+    if (phase === "STOPPING") {
+      pendingStart = !pendingStart;
+      elements.webMic.setAttribute("aria-pressed", String(pendingStart));
+    } else if (phase !== "IDLE") {
+      stopActiveRecognition();
+    } else {
+      startRecognition();
+    }
   });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stopActiveRecognition({ abort: true });
+  });
+  window.addEventListener("pagehide", () => stopActiveRecognition({ abort: true }));
+
 }
 
 /* ── Speech On/Off Toggle ────────────────────────────── */

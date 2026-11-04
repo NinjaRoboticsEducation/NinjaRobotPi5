@@ -788,7 +788,8 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert "state.recognitionActive" in javascript
     assert 'localStorage.getItem("ninjarobotBrowserChatId")' in javascript
     assert "browser_chat_id: state.browserChatId" in javascript
-    assert "recognition.stop()" in javascript
+    assert "active.stop()" in javascript
+    assert "recognition.stop()" not in recognition_handler
     assert "createRecognitionSession()" in agent_js
     assert "stopWebMicSession({ abort: true })" in agent_js
     assert 'text === "/arm"' in agent_js

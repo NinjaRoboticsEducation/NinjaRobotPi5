@@ -1,5 +1,7 @@
 # NinjaRobotPi5 Web Microphone Continuous Recognition Investigation
 
+Implementation follow-up: see [the source fact check and validation](../validation/web_mic_lifecycle_261104.md). Browser teardown timing and the specific logged pipe failure remain hypotheses; the source-level lifecycle defects are confirmed.
+
 This document details the root cause investigation, runtime log evidence, and
 architectural recommendations for resolving the continuous usage instability of
 the Web Microphone feature (`#webMicButton`) in NinjaRobotPi5.

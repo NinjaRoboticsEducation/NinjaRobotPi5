@@ -37,12 +37,16 @@ async def run_audio_process(
 
     async def exchange() -> bytes:
         assert process.stdin is not None and process.stdout is not None
-        process.stdin.write(input_data)
         try:
+            process.stdin.write(input_data)
             await process.stdin.drain()
         except (BrokenPipeError, ConnectionResetError):
             pass
         process.stdin.close()
+        try:
+            await process.stdin.wait_closed()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
         output = bytearray()
         while chunk := await process.stdout.read(65536):
             output.extend(chunk)
@@ -74,6 +78,12 @@ async def run_audio_process(
         except ProcessLookupError:
             pass
         await process.wait()
+        if process.stdin is not None:
+            process.stdin.close()
+            try:
+                await process.stdin.wait_closed()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
 
     work = asyncio.create_task(exchange())
     watcher = asyncio.create_task(monitor())
