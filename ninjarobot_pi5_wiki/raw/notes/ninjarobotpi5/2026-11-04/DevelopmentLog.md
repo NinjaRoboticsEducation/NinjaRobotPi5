@@ -12,9 +12,17 @@ NinjaRobot agent on SunFounder Fusion HAT+ (`docs/project-history/NinjaSunFounde
    - Updated `AgentRuntime.resume_system()` (`runtime.py`) to dispatch `robot.motion.resume`
      when `motion_latched` is active without `system_latched`, and updated `app-agent.js`
      to clear the web motion-stopped indicator after `/resume`.
-   - Exposed `safety`, `servo_endpoints`, and `servo_roles` in `service_main.py`
-     `runtime_state()` and updated `IDENTITY_PROMPT` (`prompts.py`) so single-servo
-     endpoint requests (`hat_pwm0`–`hat_pwm11`) use `robot.servo.move` directly.
+   - Exposed `safety`, `servo_endpoints`, `calibrated_servo_endpoints`, and `servo_roles`
+     in `service_main.py` `runtime_state()` and updated `IDENTITY_PROMPT` (`prompts.py`)
+     and `ServoMoveAdapter.descriptor` (`servo.py`) so single-servo endpoint requests
+     (`hat_pwm0`–`hat_pwm11`) use `robot.servo.move` directly with the signed `-90` to
+     `90` degree convention (`0` is center/neutral).
+   - Fixed `ServoDevice.move()` (`servo.py`) to call `servo.move_to_center()` only when
+     `previous_angle is None`, preventing `move_to_center()` from clobbering `_last_angle`
+     to `0.0` before `move_all_async([0.0])`.
+   - Added `/arm` and `/disarm` support to web chat (`app-agent.js`), updated
+     `IMMUTABLE_SAFETY_PROMPT` (`prompts.py`) to specify `/arm` and `/disarm`, and added
+     a deterministic `/motion` help response in `AgentRuntime.chat()` (`runtime.py`).
 2. **Embedded speaker `/speech on` refusal & Piper TTS provisioning:**
    - Moved `SpeechService` construction before `runtime_state()` in `service_main.py`
      and exposed `runtime_state.speech_output` (`enabled`, `output_node`, `fusion_speaker`).
@@ -35,10 +43,12 @@ NinjaRobot agent on SunFounder Fusion HAT+ (`docs/project-history/NinjaSunFounde
    - Authorized direct LAN/localhost controller lease holders (`not remote_connection` and
      `not require_local_pairing`) in `web_app.py` when `pairing` is configured.
 4. **Web microphone & 48 kHz I2S always-on voice input instability:**
-   - Updated `app-agent.js` to treat `failed`/`stopped` voice states as disabled, surface
-     push-to-talk errors, guard `recognitionStarting`, preserve input prefixes, and fall
-     back to onboard microphone capture (`usb_microphone`) when browser `SpeechRecognition`
-     is unavailable over plain HTTP.
+   - Updated `app-agent.js` to create a fresh `SpeechRecognition` instance per Web Mic
+     session, terminate active recognition on `isFinal` and `submitChat()` so consecutive
+     voice prompts work without stale session state, treat `failed`/`stopped` voice states
+     as disabled, surface push-to-talk errors, guard `recognitionStarting`, preserve input
+     prefixes, and fall back to onboard microphone capture (`usb_microphone`) when browser
+     `SpeechRecognition` is unavailable over plain HTTP.
    - Imported `voiceinput.enabled` in `config_import.py`.
    - Scaled 48 kHz PortAudio read chunks and added 3-attempt retry on `PaErrorCode -9985`
      in `microphone.py`.

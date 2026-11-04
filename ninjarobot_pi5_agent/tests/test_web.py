@@ -789,6 +789,10 @@ def test_mobile_interface_has_safari_chrome_safety_and_input_only_speech() -> No
     assert 'localStorage.getItem("ninjarobotBrowserChatId")' in javascript
     assert "browser_chat_id: state.browserChatId" in javascript
     assert "recognition.stop()" in javascript
+    assert "createRecognitionSession()" in agent_js
+    assert "stopWebMicSession({ abort: true })" in agent_js
+    assert 'text === "/arm"' in agent_js
+    assert 'text === "/disarm"' in agent_js
     assert "requestFullscreen" in javascript
     assert "webkitRequestFullscreen" in javascript
     assert 'window.matchMedia("(display-mode: standalone)")' in javascript

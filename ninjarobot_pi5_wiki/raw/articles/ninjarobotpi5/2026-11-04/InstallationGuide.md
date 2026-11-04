@@ -5,7 +5,7 @@
 This 4 November successor documents the agent runtime, speech, web power-off, and
 voice-input fixes after SunFounder Fusion HAT+ hardware integration:
 
-1. **Persisted safety latch clarity, Level 1 `/resume`, and single-servo routing:**
+1. **Persisted safety latch clarity, Level 1 `/resume`, `/arm`, and single-servo routing:**
    - Persisted `MOTION_STOPPED` / `SYSTEM_STOPPED` errors in `safety_state.json` now
      include `(persisted safety latch recorded at <timestamp>)` so historical
      undervoltage or emergency-stop latches are never mistaken for live hardware
@@ -13,9 +13,13 @@ voice-input fixes after SunFounder Fusion HAT+ hardware integration:
    - `/resume` and the web **Resume** button now dispatch `robot.motion.resume`
      when `motion_latched` is active without a Level 2 `system_latched` latch, and
      automatically refresh the web motion arm state.
+   - Use `/arm` (and `/disarm`) in both CLI chat and the web chat interface to arm
+     or disarm AI motion (`IMMUTABLE_SAFETY_PROMPT` and `/motion` help now state
+     `/arm` explicitly).
    - Single-servo angle commands (`hat_pwm0`–`hat_pwm11`, e.g. "rotate PWM0 to 90
-     degrees") route directly to `robot.servo.move` even when differential-drive
-     wheel roles (`left_drive` / `right_drive`) are not assigned.
+     degrees" or "rotate to center") route directly to `robot.servo.move` using the
+     signed `-90` to `90` degree range where `0` is center (neutral), and preserve
+     the servo's previous angle when interpolating back to `0` degrees.
 2. **Embedded speaker Piper TTS provisioning and LLM speech awareness:**
    - Prepare the isolated Piper TTS virtual environment and download/configure the
      default English voice model (`en_US-lessac-medium.onnx`) in one step:
@@ -35,7 +39,11 @@ voice-input fixes after SunFounder Fusion HAT+ hardware integration:
    - Direct LAN/localhost web controller sessions (`local` lease holders when
      `require_local_pairing` is `false`) can use the **Power Off** button once the
      helper, sudoers rule, and power-source telemetry checks pass.
-4. **Web microphone push-to-talk fallback and 48 kHz I2S voice-input stability:**
+4. **Web microphone continuous session lifecycle, push-to-talk fallback, and 48 kHz I2S voice-input stability:**
+   - Each Web Mic activation creates a fresh `SpeechRecognition` session and cleanly
+     terminates the active session as soon as a final transcript (`isFinal`) arrives
+     or a chat message is submitted (`submitChat`), enabling continuous back-to-back
+     voice prompts without toggling a stale session off.
    - When browser Web Speech API (`webkitSpeechRecognition`) is unavailable (such
      as over plain HTTP on a LAN IP), the web microphone button automatically falls
      back to recording via the robot's onboard microphone (`usb_microphone`).

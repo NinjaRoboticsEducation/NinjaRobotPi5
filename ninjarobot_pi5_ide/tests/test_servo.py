@@ -503,6 +503,12 @@ def test_servo_descriptors_encode_motion_and_priority_stop_policy() -> None:
     assert ServoMoveAdapter.descriptor.risk.value == "motion"
     assert ServoMoveAdapter.descriptor.confirmation_required is True
     assert ServoMoveAdapter.descriptor.idempotent is False
+    assert "-90" in ServoMoveAdapter.descriptor.description
+    assert "0 degrees is center/neutral" in ServoMoveAdapter.descriptor.description
+    assert (
+        "0 is the center (neutral) position"
+        in ServoMoveAdapter.descriptor.input_schema["properties"]["target_angle"]["description"]
+    )
     assert ServoMoveAdapter.descriptor.resources == (
         "servo_bus",
         "pwm0",
@@ -513,6 +519,56 @@ def test_servo_descriptors_encode_motion_and_priority_stop_policy() -> None:
     assert ServoStopAdapter.descriptor.risk.value == "low"
     assert ServoStopAdapter.descriptor.resources == ServoMoveAdapter.descriptor.resources
     assert ServoStopAdapter.descriptor.confirmation_required is False
+
+
+def test_moving_back_to_center_preserves_last_angle_for_interpolation() -> None:
+    async def exercise() -> None:
+        group = FakeServoGroup()
+
+        class AngleTrackingServo(FakeServo):
+            def __init__(self) -> None:
+                super().__init__()
+                self.last_angle: float | None = None
+
+            def move_to_center(self) -> None:
+                super().move_to_center()
+                self.last_angle = 0.0
+
+        tracked = AngleTrackingServo()
+        group.servos["hat_pwm1"] = tracked
+        observed_start_angles: list[float | None] = []
+        original_move_all = group.move_all_async
+
+        async def recording_move_all(
+            targets: list[float | None],
+            speed_mode: str = "M",
+        ) -> bool:
+            observed_start_angles.append(tracked.last_angle)
+            target = targets[ENDPOINTS.index("hat_pwm1")]
+            if target is not None:
+                tracked.last_angle = float(target)
+            return await original_move_all(targets, speed_mode)
+
+        group.move_all_async = recording_move_all  # type: ignore[method-assign]
+        device = ServoDevice(
+            calibration_file="/tmp/test-servo.json",
+            motion_enabled=True,
+            runtime_factory=runtime_factory(group, calibrated=frozenset({"hat_pwm1"})),
+            simulated=True,
+        )
+        await device.start()
+        assert device.calibrated_endpoints == ("hat_pwm1",)
+        await device.move(endpoint="hat_pwm1", target_angle=90.0, speed_mode="M")
+        assert tracked.center_calls == 1
+        assert tracked.last_angle == 90.0
+
+        await device.move(endpoint="hat_pwm1", target_angle=0.0, speed_mode="M")
+        assert tracked.center_calls == 1
+        assert observed_start_angles == [0.0, 90.0]
+        assert tracked.last_angle == 0.0
+        await device.close()
+
+    asyncio.run(exercise())
 
 
 @pytest.mark.parametrize("cancel", [False, True])

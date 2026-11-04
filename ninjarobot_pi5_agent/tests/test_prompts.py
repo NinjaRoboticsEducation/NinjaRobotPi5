@@ -60,5 +60,7 @@ def test_prompt_order_keeps_safety_before_skill_and_conversation(tmp_path) -> No
     assert "only the trusted deterministic camera" in messages[2].content
     assert '"current_grant_sequence": 2' in messages[2].content
     assert "Retained camera captures" in messages[1].content
+    assert "/arm in chat" in messages[0].content
+    assert "0 is center (neutral)" in messages[1].content
     assert "subordinate workflow" in messages[3].content
     assert messages[-1] == conversation[0]

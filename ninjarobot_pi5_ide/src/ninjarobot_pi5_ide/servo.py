@@ -232,6 +232,14 @@ class ServoDevice:
         """Return whether this device is explicitly hardware-free."""
         return self._simulated
 
+    @property
+    def calibrated_endpoints(self) -> tuple[str, ...]:
+        """Return currently loaded calibrated endpoints in configured order."""
+        runtime = self._runtime
+        if runtime is None:
+            return ()
+        return tuple(ep for ep in self._endpoints if ep in runtime.calibrated_endpoints)
+
     async def start(self) -> None:
         """Claim both backends once at zero pulse while retaining diagnostics."""
         async with self._state_lock:
@@ -331,8 +339,10 @@ class ServoDevice:
                     capability="servo.move",
                 )
 
+            previous_angle = getattr(servo, "last_angle", None)
             try:
-                await _complete_thread(servo.move_to_center)
+                if previous_angle is None:
+                    await _complete_thread(servo.move_to_center)
                 self._check_motion(generation)
             except asyncio.CancelledError:
                 await _complete_thread(runtime.group.off)
@@ -353,9 +363,23 @@ class ServoDevice:
             targets: list[float | None] = [
                 target_angle if item == endpoint else None for item in self._endpoints
             ]
+            start_angle = (
+                float(previous_angle)
+                if isinstance(previous_angle, (int, float))
+                else float(calibration.angle_center)
+            )
+            needs_hold = abs(target_angle - start_angle) < 0.1
 
             async def move_prepared() -> bool:
                 self._check_motion(generation)
+                if needs_hold:
+                    set_angle = getattr(servo, "set_angle", None)
+                    if callable(set_angle):
+                        await _complete_thread(lambda: set_angle(target_angle))
+                    if not self._simulated:
+                        await asyncio.sleep(0.35)
+                        self._check_motion(generation)
+                    return True
                 return await runtime.group.move_all_async(targets, speed_mode=speed_mode)
 
             movement_task = asyncio.create_task(move_prepared())
@@ -752,7 +776,10 @@ class ServoMoveAdapter:
     descriptor = CapabilityDescriptor(
         name="servo.move",
         version="1.0.0",
-        description="Move one explicitly calibrated servo endpoint within its limits.",
+        description=(
+            "Move one explicitly calibrated servo endpoint within its limits "
+            "(-90 to 90 degrees, where 0 degrees is center/neutral)."
+        ),
         input_schema={
             "type": "object",
             "properties": {
@@ -764,6 +791,10 @@ class ServoMoveAdapter:
                     "type": "number",
                     "minimum": MIN_TARGET_ANGLE,
                     "maximum": MAX_TARGET_ANGLE,
+                    "description": (
+                        "Target angle in degrees from -90 (minimum) to 90 (maximum), "
+                        "where 0 is the center (neutral) position."
+                    ),
                 },
                 "speed_mode": {
                     "type": "string",

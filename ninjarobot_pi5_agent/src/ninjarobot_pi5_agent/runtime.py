@@ -435,6 +435,14 @@ class AgentRuntime:
                     for item in self.skills.list()
                 ):
                     skill_id = "distance-game"
+            if command and command[0] == "/motion":
+                return await self._identity_reply(
+                    session_id,
+                    "Use /arm to confirm and arm physical AI motion for this chat session, "
+                    "or /disarm to disarm it.",
+                    on_text_delta=on_text_delta,
+                    persist=False,
+                )
             if text.startswith("/speech"):
                 parts = text.split()
                 operation = parts[1] if len(parts) == 2 and parts[0] == "/speech" else "status"

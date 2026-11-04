@@ -265,6 +265,8 @@ async def run_service(arguments: argparse.Namespace) -> None:
         camera_authorized = bool(camera_status["authorized_for_next_preview"])
         robot_status = ide.status()
         safety = robot_status.get("safety") if isinstance(robot_status, dict) else None
+        servo_device = getattr(getattr(ide, "assembly", None), "servo", None)
+        calibrated_endpoints = list(getattr(servo_device, "calibrated_endpoints", ()) or ())
         return {
             "session_id": session_id,
             "controller_lease": lease_id,
@@ -281,6 +283,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
             "motion_armed": arms.is_armed(session_id, lease_id=lease_id),
             "safety": safety,
             "servo_endpoints": list(config.hardware.servos.endpoints),
+            "calibrated_servo_endpoints": calibrated_endpoints,
             "servo_roles": dict(config.behaviors.servo_roles),
             "speech_output": {
                 "enabled": bool(speech.enabled),

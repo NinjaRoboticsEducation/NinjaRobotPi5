@@ -13,9 +13,15 @@ Fusion HAT+ agent integration issues:
     `SafetyStateStore.read` callback so `robot.servo.status` reflects persisted safety latches.
   - `AgentRuntime.resume_system()` inspects `safety` snapshot state and calls
     `robot.motion.resume` when `motion_latched` is set and `system_latched` is clear.
-  - `service_main.py` includes `safety`, `servo_endpoints`, `servo_roles`, and
-    `speech_output` in `runtime_state`, and `IDENTITY_PROMPT` instructs the model to
-    call `robot.servo.move` for named servo endpoints (`hat_pwm0`–`hat_pwm11`).
+  - `app-agent.js` handles `/arm` and `/disarm` in web chat, `IMMUTABLE_SAFETY_PROMPT`
+    specifies `/arm` and `/disarm`, and `AgentRuntime.chat()` returns a deterministic
+    instruction to use `/arm` or `/disarm` if `/motion` is entered.
+  - `service_main.py` includes `safety`, `servo_endpoints`, `calibrated_servo_endpoints`,
+    `servo_roles`, and `speech_output` in `runtime_state`. `ServoMoveAdapter.descriptor`
+    and `IDENTITY_PROMPT` specify that `target_angle` uses `-90` (minimum) to `90`
+    (maximum) degrees where `0` is center (neutral). `ServoDevice.move()` only calls
+    `servo.move_to_center()` when `last_angle is None` so moving back to `0` degrees
+    interpolates smoothly from the previous angle instead of overwriting `_last_angle`.
   - `RobotAssembly._camera_health()` and `_microphone_health()` re-attempt `suspend()` +
     `start()` when a resource transitions out of `ResourceHealth.READY`.
 - **Speech output awareness, Piper provisioning & memory hygiene (`speech.py`, `hardware_setup.py`, `prepare_speech_voice.py`, `agent_loop.py`):**
@@ -38,9 +44,11 @@ Fusion HAT+ agent integration issues:
     and `not require_local_pairing`) as paired for local power-off eligibility while keeping
     pairing mandatory for remote/tunneled sessions.
 - **Web & onboard 48 kHz I2S voice input resilience (`app-agent.js`, `config_import.py`, `microphone.py`, `voice_input.py`):**
-  - `app-agent.js` treats `status: "failed" | "stopped"` as `enabled = false`, guards
-    `recognitionStarting`, preserves text input prefixes, and falls back to robot
-    push-to-talk (`usb_microphone`) when browser `SpeechRecognition` is unavailable.
+  - `app-agent.js` creates a fresh `SpeechRecognition` instance per Web Mic click,
+    stops active recognition on `isFinal` and `submitChat()`, treats `status: "failed" | "stopped"`
+    as `enabled = false`, guards `recognitionStarting`, preserves text input prefixes,
+    and falls back to robot push-to-talk (`usb_microphone`) when browser `SpeechRecognition`
+    is unavailable.
   - `ManagedVoiceAudioSource` scales `read_frames` (`max(block_frames, int(actual_rate * 0.08))`)
     and retries transient `PaErrorCode -9985` (`Device unavailable`) up to 3 times.
   - `VoiceInputManager` tolerates up to 2 consecutive ALSA overflows when `source.sample_rate > detector.sample_rate`,

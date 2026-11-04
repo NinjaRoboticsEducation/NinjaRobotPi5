@@ -1065,3 +1065,18 @@ git diff --check
      for the active paired controller and displays `"Available to this active controller."`
    - **Rollback:** Cancel the confirmation dialog, or set
      `web_poweroff_enabled = false` in `~/.config/ninjarobot_pi5/config.toml`.
+
+## Post-testing follow-up fixes (4 November 2026)
+
+Following repeated live testing on the Raspberry Pi 5 + SunFounder Fusion HAT+, three additional issues were traced in `~/.local/state/ninjarobot_pi5/agent-service.log`, `agent-actions.sqlite3`, and `conversations.sqlite3` and resolved:
+
+1. **Chat motion arming command (`/arm`):**
+   - **Root cause:** `IMMUTABLE_SAFETY_PROMPT` did not name `/arm`, leading the LLM and user to try `/motion` / `/motion on` in chat (`2026-11-04T01:50:34Z`), and Web UI `submitChat()` (`app-agent.js`) only intercepted `/resume` and `/camera`.
+   - **Fix:** Updated `IMMUTABLE_SAFETY_PROMPT` (`prompts.py`) to specify `/arm` and `/disarm`, added deterministic `/motion` guidance in `AgentRuntime.chat()` (`runtime.py`), and added `/arm` and `/disarm` interception in `submitChat()` (`app-agent.js`).
+2. **Servo `-90`~`0`~`90` degree range and `0` degree center interpolation:**
+   - **Root cause A (LLM convention):** Neither `ServoMoveAdapter.descriptor` nor `IDENTITY_PROMPT` specified that `target_angle` uses `-90` to `90` degrees with `0` as center, so the LLM assumed `0..180` hobby servo convention (`center = 90`) when asked to rotate to center (`2026-11-04T01:56:15Z`).
+   - **Root cause B (`ServoDevice.move()` interpolation bug):** When `target_angle=0` was called (`01:58:05Z`, `01:59:55Z`, `02:33:25Z`), `ServoDevice.move()` unconditionally called `servo.move_to_center()` *before* `runtime.group.move_all_async()`. `move_to_center()` overwrote `servo._last_angle = 0.0`, causing `move_all_async([0.0])` to see `distance = abs(0.0 - 0.0) < 0.1` and return immediately in `1ms`, where `finally: runtime.group.off()` cut PWM before the physical servo could move back from `-90°`/`90°` to `0°`.
+   - **Fix:** Updated `ServoMoveAdapter.descriptor` (`servo.py`), `IDENTITY_PROMPT` (`prompts.py`), and `runtime_state.calibrated_servo_endpoints` (`service_main.py`) to explicitly define `-90` (min), `0` (center), and `90` (max). Updated `ServoDevice.move()` (`servo.py`) to call `servo.move_to_center()` only when `previous_angle is None`, preserving `last_angle` for smooth interpolation back to `0°`.
+3. **Web Mic continuous back-to-back voice input failure:**
+   - **Root cause:** In `app-agent.js`, neither `recognition.onresult` (on `isFinal`) nor `submitChat()` stopped the active `SpeechRecognition` session. When the user submitted the first voice prompt and clicked `#webMicButton` a second time (`02:31:05Z`), `state.recognitionActive` was still `true`, so clicking `#webMicButton` merely stopped the lingering session instead of starting a new one. Reusing a single `SpeechRecognition` instance across turns also left stale browser state.
+   - **Fix & Further Investigation:** Refactored `configureSpeechRecognition()` (`app-agent.js`) to instantiate a fresh session per click. When immediate re-arming instability persisted due to asynchronous browser engine teardown and handler stripping, a comprehensive root cause investigation and lifecycle state machine proposal was produced in `docs/project-history/NinjaWebMicContinuousInvestigation_261104.md`.

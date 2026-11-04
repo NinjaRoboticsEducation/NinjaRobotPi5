@@ -4,7 +4,7 @@
     {
       "name": "InstallationGuide.md",
       "path": "raw/articles/ninjarobotpi5/2026-11-04/InstallationGuide.md",
-      "content_hash": "sha256:4d3e2c588754317d666fa1d35e4ae0bf8725eb91e3a525973de2b7301fc34d53"
+      "content_hash": "sha256:8e6acb39f0bc531a2fd9cde94d855ee3e5b138673675bbae04d0b7db1346ffcc"
     },
     {
       "name": "NinjaRobot_MCP_Skill.md",
@@ -14,12 +14,12 @@
     {
       "name": "DevelopmentGuide.md",
       "path": "raw/articles/ninjarobotpi5/2026-11-04/DevelopmentGuide.md",
-      "content_hash": "sha256:3e5474a95196e37da73898a117c32bd104de178d827feb9b97e04108a0c974f8"
+      "content_hash": "sha256:ea77e32e39a43217db89c51cc242c0f8a1c486c4155a936c7b74a5d9bbf9f35b"
     },
     {
       "name": "DevelopmentLog.md",
       "path": "raw/notes/ninjarobotpi5/2026-11-04/DevelopmentLog.md",
-      "content_hash": "sha256:aa2a507bccd23127dfbe33bfd0840815cbf71d7c7abe2409c9800a63bef84d11"
+      "content_hash": "sha256:d8188b443bd33cdd8e17df3d89c4a152c6f0ced8f7a3b9edce6ccf104369062d"
     }
   ]
 }

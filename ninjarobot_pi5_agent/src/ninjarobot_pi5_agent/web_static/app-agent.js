@@ -31,13 +31,39 @@ export function addMessage(role, text = "") {
 
 /* ── Chat Submission ─────────────────────────────────── */
 
+let stopWebMicSession = null;
+
 export function submitChat(rawText) {
   const text = rawText.trim();
   if (!text) return;
+  if (typeof stopWebMicSession === "function") {
+    stopWebMicSession({ abort: true });
+  }
   if (elements.chatInput) elements.chatInput.value = "";
   addMessage("user", text);
   if (text === "/resume") {
     resumeRobot(true).catch(() => {});
+    return;
+  }
+  if (text === "/arm") {
+    if (!window.confirm(t("motion.armConfirm"))) {
+      return;
+    }
+    send("arm_chat_motion", { confirmed: true })
+      .then(() => {
+        updateAiMotion(true);
+        addMessage("assistant", t("motion.disarm"));
+      })
+      .catch(() => {});
+    return;
+  }
+  if (text === "/disarm") {
+    send("disarm_chat_motion")
+      .then(() => {
+        updateAiMotion(false);
+        addMessage("assistant", t("motion.arm"));
+      })
+      .catch(() => {});
     return;
   }
   if (text === "/camera") {
@@ -250,8 +276,15 @@ if (elements.voiceInput) {
 export function configureSpeechRecognition() {
   if (!elements.webMic) return;
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let fallbackPushToTalk = !SpeechRecognition;
   let pttRecording = false;
+
+  function resetWebMicButton() {
+    if (!elements.webMic) return;
+    elements.webMic.setAttribute("aria-pressed", "false");
+    elements.webMic.classList.remove("recording");
+    const strong = elements.webMic.querySelector("strong");
+    if (strong) strong.textContent = t("browserMic.title");
+  }
 
   async function toggleRobotPushToTalk() {
     if (pttRecording) {
@@ -282,10 +315,7 @@ export function configureSpeechRecognition() {
       toast(message);
     } finally {
       pttRecording = false;
-      elements.webMic.setAttribute("aria-pressed", "false");
-      elements.webMic.classList.remove("recording");
-      const strongReset = elements.webMic.querySelector("strong");
-      if (strongReset) strongReset.textContent = t("browserMic.title");
+      resetWebMicButton();
     }
   }
 
@@ -295,77 +325,110 @@ export function configureSpeechRecognition() {
     });
     return;
   }
-  const recognition = new SpeechRecognition();
+
   let recognitionStarting = false;
   let initialPrefix = "";
-  recognition.interimResults = true;
-  recognition.continuous = false;
-  recognition.onstart = () => {
-    recognitionStarting = false;
-    state.recognitionActive = true;
-    if (elements.webMic) {
-      elements.webMic.setAttribute("aria-pressed", "true");
-      elements.webMic.classList.add("recording");
-      const strong = elements.webMic.querySelector("strong");
-      if (strong) strong.textContent = t("speech.stop");
-    }
-  };
-  recognition.onresult = (event) => {
-    let transcript = "";
-    for (let index = 0; index < event.results.length; index += 1) {
-      transcript += event.results[index][0].transcript;
-    }
-    const clean = transcript.trim();
-    elements.chatInput.value = initialPrefix && clean ? `${initialPrefix} ${clean}` : clean || initialPrefix;
-    if (event.results[event.results.length - 1].isFinal && clean) {
-      elements.chatInput.focus();
-      toast(t("speech.added"));
-    }
-  };
-  recognition.onerror = (event) => {
-    recognitionStarting = false;
-    if (event.error === "network" || event.error === "service-not-allowed") {
-      fallbackPushToTalk = true;
-    }
-    const messages = {
-      "not-allowed": t("error.permissionDenied"),
-      "service-not-allowed": t("error.speechUnavailable"),
-      "audio-capture": t("error.noBrowserMic"),
-      "no-speech": t("error.noSpeech"),
-      network: t("error.speechNetwork"),
-    };
-    const message =
-      messages[event.error] || t("error.browserMic", { error: event.error });
-    log(message, "error");
-    toast(message);
-  };
-  recognition.onend = () => {
+
+  function stopActiveRecognition({ abort = false } = {}) {
     recognitionStarting = false;
     state.recognitionActive = false;
-    if (elements.webMic) {
-      elements.webMic.setAttribute("aria-pressed", "false");
-      elements.webMic.classList.remove("recording");
-      const strong = elements.webMic.querySelector("strong");
-      if (strong) strong.textContent = t("browserMic.title");
+    resetWebMicButton();
+    const active = state.recognition;
+    if (!active) return;
+    state.recognition = null;
+    active.onstart = null;
+    active.onresult = null;
+    active.onerror = null;
+    active.onend = null;
+    try {
+      if (abort && typeof active.abort === "function") {
+        active.abort();
+      } else {
+        active.stop();
+      }
+    } catch {
+      // Ignore errors when stopping an already closed session.
     }
-  };
-  state.recognition = recognition;
+  }
+
+  stopWebMicSession = stopActiveRecognition;
+
+  function createRecognitionSession() {
+    const recognition = new SpeechRecognition();
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.lang = SPEECH_LOCALES[state.locale] || "en-US";
+    recognition.onstart = () => {
+      if (state.recognition !== recognition) return;
+      recognitionStarting = false;
+      state.recognitionActive = true;
+      if (elements.webMic) {
+        elements.webMic.setAttribute("aria-pressed", "true");
+        elements.webMic.classList.add("recording");
+        const strong = elements.webMic.querySelector("strong");
+        if (strong) strong.textContent = t("speech.stop");
+      }
+    };
+    recognition.onresult = (event) => {
+      if (state.recognition !== recognition) return;
+      let transcript = "";
+      for (let index = 0; index < event.results.length; index += 1) {
+        transcript += event.results[index][0].transcript;
+      }
+      const clean = transcript.trim();
+      elements.chatInput.value =
+        initialPrefix && clean ? `${initialPrefix} ${clean}` : clean || initialPrefix;
+      if (event.results[event.results.length - 1].isFinal && clean) {
+        elements.chatInput.focus();
+        toast(t("speech.added"));
+        try {
+          recognition.stop();
+        } catch {
+          // Handled by stopActiveRecognition below.
+        }
+        stopActiveRecognition({ abort: false });
+      }
+    };
+    recognition.onerror = (event) => {
+      if (state.recognition !== recognition) return;
+      const errorCode = event?.error;
+      stopActiveRecognition({ abort: true });
+      if (errorCode === "aborted") return;
+      const messages = {
+        "not-allowed": t("error.permissionDenied"),
+        "service-not-allowed": t("error.speechUnavailable"),
+        "audio-capture": t("error.noBrowserMic"),
+        "no-speech": t("error.noSpeech"),
+        network: t("error.speechNetwork"),
+      };
+      const message =
+        messages[errorCode] || t("error.browserMic", { error: errorCode });
+      log(message, "error");
+      toast(message);
+    };
+    recognition.onend = () => {
+      if (state.recognition !== recognition) return;
+      state.recognition = null;
+      recognitionStarting = false;
+      state.recognitionActive = false;
+      resetWebMicButton();
+    };
+    return recognition;
+  }
+
   elements.webMic.addEventListener("click", () => {
-    if (fallbackPushToTalk) {
-      toggleRobotPushToTalk();
-      return;
-    }
-    if (state.recognitionActive || recognitionStarting) {
-      recognition.stop();
+    if (state.recognitionActive || recognitionStarting || state.recognition) {
+      stopActiveRecognition({ abort: false });
       return;
     }
     initialPrefix = elements.chatInput.value.trim();
-    recognition.lang = SPEECH_LOCALES[state.locale];
+    const recognition = createRecognitionSession();
+    state.recognition = recognition;
     try {
       recognitionStarting = true;
       recognition.start();
     } catch (error) {
-      recognitionStarting = false;
+      stopActiveRecognition({ abort: true });
       const message = t("error.browserMicStart", { error: error.message });
       log(message, "error");
       toast(message);

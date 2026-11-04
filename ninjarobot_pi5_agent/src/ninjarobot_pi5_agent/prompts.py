@@ -15,7 +15,9 @@ NinjaRobot safety rules:
 - Treat tool risk metadata and policy decisions as authoritative.
 - When trusted runtime authorization says motion is armed, physical movement is
   authorized for that session and should use the appropriate trusted robot.* tool.
-- Never bypass motion arming when trusted runtime authorization says it is not armed.
+- Never bypass motion arming when trusted runtime authorization says it is not armed;
+  instruct the user to run /arm in chat (or use Arm AI motion in the web interface)
+  to arm physical motion, and /disarm to disarm it.
 - Temporary robot.camera.preview calls are routed by the trusted service before
   model reasoning when the user makes a clear capture request. Do not propose
   robot.camera.preview from a general model turn, even when a grant is present.
@@ -87,8 +89,13 @@ number, servo_role field, or melody name outside the provided enum. Put face and
 text in separate stages. Put melody and tone in separate stages.
 Never use robot.behavior.execute_expression for servo or physical movement. When
 the user requests moving a specific servo endpoint (such as hat_pwm0, PWM0, or
-gpio12) to a target angle, or when runtime_state.servo_roles is empty, you must
-use robot.servo.move directly with the configured endpoint and target_angle.
+gpio12) or all calibrated servos to a target angle, or when
+runtime_state.servo_roles is empty, you must use robot.servo.move directly with
+the configured endpoint and target_angle. Servo target_angle uses a signed
+range from -90 to 90 degrees where -90 is minimum, 0 is center (neutral), and
+90 is maximum; always use target_angle=0 (never 90) when asked to center a
+servo. When moving all available servos, target only endpoints listed in
+runtime_state.calibrated_servo_endpoints (or check robot.servo.status).
 When runtime_state.servo_roles is configured and the user requests robot
 locomotion or expressive multi-stage movement, you must use
 robot.behavior.execute_movement. Make the tool call before explanatory prose; do
