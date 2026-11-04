@@ -79,11 +79,11 @@ Follow these steps to build and run your own NinjaRobotPi5 from scratch.
 | **Left Wheel Servo** | TowerPro MG90D 360° continuous rotation | `GPIO12` (DFR0566) or any `pwm0`..`pwm11` / `hat_pwm0`..`hat_pwm11` (SunFounder `P0`–`P11`) or `pwm0`..`pwm15` (PCA9685 `PWM0`–`PWM15`) |
 | **Right Wheel Servo** | TowerPro MG90D 360° continuous rotation | `GPIO13` (DFR0566) or any `pwm0`..`pwm11` / `hat_pwm0`..`hat_pwm11` (SunFounder `P0`–`P11`) or `pwm0`..`pwm15` (PCA9685 `PWM0`–`PWM15`) |
 | **Auxiliary Servos** *(optional)* | Up to 12 (`P0`–`P11` on SunFounder) or 16 (`PWM0`–`PWM15` on PCA9685) | Head pan/tilt, arm, gripper (`hat_pwm0`..`hat_pwm15`) |
-| **Buzzer** | Passive buzzer | Connected to `GPIO27` (or any Digital pin `17, 4, 27, 22` on SunFounder Fusion HAT+) |
+| **Buzzer** | Passive buzzer | Example: GPIO17; use a free pin matching saved setup, without sharing display pins |
 | **Distance Sensor** | VL53L0X Time-of-Flight (laser distance) | I2C bus 1 at address 0x29 |
-| **Display** | ST7789V 240×320 IPS LCD | SPI0; DC=GPIO4, RST=GPIO5, BL=GPIO6 *(SunFounder: DC/RST on any Digital pin `17, 4, 27, 22`, e.g. `DC=27, RST=22, BL=6`)* |
+| **Display** | ST7789V 240×320 IPS LCD | SPI0; use the profile wiring table below and matching saved settings; Fusion example: DC=27, RST=22, BL=6 |
 | **Camera** | Raspberry Pi Camera Module (OV5647) | CSI ribbon cable, 1280×720 |
-| **Microphone** | USB audio input device | Use a Linux/ALSA-compatible mic; verify device and sample-rate support |
+| **Microphone** | Embedded input (Fusion); USB input (DFR0566/PCA9685) | USB remains optional on Fusion; verify the selected device and supported sample rate |
 | **Audio Output** | Bluetooth (DFR0566/PCA9685); embedded speaker by default (Fusion) | Fusion uses the reviewed kernel amplifier interface and detected sound card; Bluetooth remains optional |
 | **Power Supply** | Existing DFR0566/X1208 supplies, or Fusion HAT+ battery | Pi rail warning and battery cutoff remain separate; verify voltage under load before movement |
 
@@ -190,11 +190,11 @@ Use the tables below as the recommended default electronic module pin wiring ref
 | | `SCL` | `Pin05/GPIO03` (RaspberryPi) |
 | **Servo (PCA9685 Board & Channels)** | `SCL` | `Pin05/GPIO3` (RaspberryPi) |
 | | `SDA` | `Pin03/GPIO2` (RaspberryPi) |
-| | `VCC` | `Pin02/5V` (RaspberryPi) |
+| | `VCC` (logic) | Verify board requirements; keep Pi I2C pull-ups at 3.3 V. Servo V+ is a separate supply |
 | | `GND` | `Pin06/GND` (RaspberryPi) |
-| | Servo 1~12 | `pwm 0~11` (on PCA9685) |
+| | Servo 1–16 | `pwm0`–`pwm15` (on PCA9685) |
 
-> **Safety:** Power off before changing wiring. Fusion reserves GPIO16/18/19/20/21; use the reviewed kernel installer, not legacy GPIO12 amplifier or GPIO5 reset instructions. Verify servo supply and grounding against the board documentation. See the [Fusion manual](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-04-02/InstallationGuide.md#fusion-installation-and-onboarding).
+> **Safety:** Power off before changing wiring. Fusion reserves GPIO16/18/19/20/21; use the reviewed kernel installer, not legacy GPIO12 amplifier or GPIO5 reset instructions. Verify servo supply and grounding against the board documentation. See the [Fusion manual](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-04-03/InstallationGuide.md#fusion-installation-and-onboarding).
 
 ### 2.3 Raspberry Pi OS Installation
 
@@ -256,7 +256,7 @@ Verify the installation:
 git --version
 ```
 
-**Install uv** (Optional)
+**Install uv** (required for the commands below)
 The recommended way to install uv on Linux/ARM is via standalone script, which automatically downloads the correct binary for your Raspberry Pi architecture: 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -311,6 +311,72 @@ cd NinjaRobotPi5
 
 The installed global command is `ninjarobot`. The equivalent `ninjarobot-agent` entry point exists inside the project environment and can be run as `uv run --frozen --no-sync ninjarobot-agent` from the checkout. Use the same published revision in the curl URL and `--ref`; changing directories does not change the default installation destination.
 
+### Fusion HAT+ driver installation — complete before servo onboarding
+
+Skip this section for DFR0566 or PCA9685. Selecting Fusion in onboarding saves a
+profile; it **does not install the kernel driver**. Only Fusion HAT+ is supported.
+Use these commands from your installed checkout as the normal robot user.
+
+1. Stop the Agent (`ninjarobot service stop`) and close standalone hardware tools.
+   Disconnect actuator power, back up the system and arrange console access before
+   changing boot settings. Do not run onboarding as root.
+2. Check prerequisites:
+
+   ```bash
+   cd ~/NinjaRobotPi5
+   uname -r
+   id -nG
+   uv run --frozen python scripts/fusion_hat_setup.py check
+   ```
+
+   The robot user needs existing `gpio` group membership. Install matching headers
+   for the **running kernel** using your Raspberry Pi OS package manager, plus
+   `build-essential`, `device-tree-compiler` and `patch`. Verify
+   `/lib/modules/$(uname -r)/build/Makefile` exists. Reboot first if an OS upgrade
+   changed the installed kernel; then recheck its headers. The helper does not
+   install these packages or add group membership.
+3. Prepare pinned, patched source in a persistent directory, then preview:
+
+   ```bash
+   uv run --frozen python scripts/fusion_hat_setup.py prepare --source "$HOME/.cache/ninjarobot/fusion-source"
+   uv run --frozen python scripts/fusion_hat_setup.py install --source "$HOME/.cache/ninjarobot/fusion-source"
+   ```
+
+   Expected: checksum-verified source, `source_verified: true`, and proposed files.
+   **This is only a preview.** If the directory is incomplete or changed, preserve
+   it and prepare into a new empty directory; use that same path for installation.
+   Do not use an unpatched vendor checkout or bypass checksum failures.
+4. Review the preview. It installs a kernel module, audio overlay, boot entry,
+   access rules and a shared lock rule. It does not change global audio defaults.
+   Existing installation transactions, loaded Fusion drivers or conflicting sound
+   overlays require maintenance review; do not delete records or force replacement.
+   Once ready, apply explicitly:
+
+   ```bash
+   sudo .venv/bin/python scripts/fusion_hat_setup.py install --source "$HOME/.cache/ninjarobot/fusion-source" --apply
+   ```
+
+5. Reboot manually when safe, reconnect, return to the checkout, and check as the
+   normal service user:
+
+   ```bash
+   uv run --frozen python scripts/fusion_hat_setup.py check
+   ```
+
+   Expect `installed_version: "1.1.0-ninja1"` and `ready: true`: twelve PWM
+   interfaces, permissions, lock, speaker, detected sound card and readable battery
+   telemetry. If unready, inspect `journalctl -k -b --no-pager --grep='fusion|sunfounder' -n 50`.
+   A missing sysfs version is a driver/binding prerequisite failure; recalibration
+   cannot repair it. Readiness does not certify safe voltage under servo load.
+6. Continue onboarding below. Embedded microphone and speaker are Fusion defaults;
+   USB input and Bluetooth output remain independent optional choices. Complete
+   audio asset setup and consented tests before enabling continuous voice input.
+
+The module was build-tested for `6.12.109+rpt-rpi-2712`; other kernels require
+qualification. Installation is per kernel, with no automatic rebuild after an OS
+upgrade. For replacement and rollback, follow the
+[full Fusion installation guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-04-03/InstallationGuide.md#explicit-operating-system-installation).
+
 ### 2.5 Onboarding — Set Up Your Robot
 
 After installation and reboot, enter your installation directory and either activate the project virtual environment or run the onboarding tool via `uv run`:
@@ -362,7 +428,7 @@ The wizard shows a NINJAROBOT welcome screen and walks you through:
      Type `WHEELS RAISED` when prompted to open `pi5servo servo-tool`:
      1. Choose **`3. Calibrate`** from the menu.
      2. Enter your servo endpoint: `gpio12` / `gpio13` (Option 1), any `pwm0`..`pwm11` / `p0`..`p11` channel such as `pwm10` or `pwm11` (Option 2), or `pwm0`..`pwm15` (Option 3).
-     3. Press **`c`** to select **Center (`0°`)**, adjust the pulse using **`w` / `s`** (`±1 µs`) or **`Up` / `Down`** arrow keys (`±20 µs`) until a continuous servo stops spinning (or a positional servo reaches center), and press **`Enter`** to save.
+     3. Press **`c`** to select **Center (`0°`)**, adjust the pulse using **`w` / `s`** (`±1 µs`) or **`Up` / `Down`** arrow keys (`±20 µs`) until a continuous servo stops spinning (or a positional servo reaches center), and press **`Enter`** to confirm the point (Fusion stages it in memory).
      4. For Fusion, Enter/Space stages each point in memory. Press **F** to validate and save all points once, or **Q** to discard. Calibrate Min/Center/Max to satisfy `pulse_min < pulse_center < pulse_max`; neutral-only ranges are incomplete. Use safe mechanical limits, save, then exit.
      5. Repeat **`3. Calibrate`** for any additional connected servos, then press **`q`** to exit `servo-tool`.
    - **Step 5 (Camera):** Open `camera-tool`, run the setup wizard and `Doctor`, then exit.
@@ -370,11 +436,14 @@ The wizard shows a NINJAROBOT welcome screen and walks you through:
      - For **Fusion HAT+**, choose embedded output or optional Bluetooth, then embedded input or optional USB independently. Complete the explicit speaker tone test and microphone asset setup.
      - If you selected **DFR0566 (Option 1)** or **PCA9685 (Option 3)**, optionally pair a Bluetooth speaker.
      - Optionally configure the USB microphone (`mic-tool`).
-3. **Configure AI Model Provider (e.g. Ollama Cloud):**
-   - Select **`1. Ollama`** as the AI model provider (or `2. Google`, `3. OpenAI`, `4. Anthropic`).
-   - Input your Ollama API key (`OLLAMA_API_KEY`, created at [ollama.com/settings/keys](https://ollama.com/settings/keys)) to link to Ollama's service.
-   - Review the numbered list of available cloud models retrieved from Ollama.
-   - Input the model number to validate and run the Ninja agent with the selected model.
+3. **Configure an AI provider and model:**
+   - Select Ollama or another offered provider.
+   - For downloaded local Ollama models, use your running local Ollama service;
+     no cloud API key is required. The list reflects downloaded models, not every
+     model in the public catalog. Download a compatible model separately if empty.
+   - To include Ollama cloud models, configure your Ollama API key. Select the
+     intended local or cloud entry; the saved route follows that selection.
+   - Validate a harmless text response before enabling robot actions.
 4. **Save Integrated Configuration & Start the Agent:**
    Press **Enter** at the integrated configuration preview to save `~/.config/ninjarobot_pi5/config.toml`, complete provider setup, and start the Agent service (`ninjarobot service start --real`).
 
@@ -486,6 +555,69 @@ Open the pairing URL in your phone's browser. The URL is single-use — once you
 **Agent Interface** — Full AI conversation, voice controls (WEB MIC, VOICE INPUT, SPEECH ON), and hardware control buttons:
 
 ![Agent Interface](DevelopmentPlanDoc/webinterface/AgentInterface.jpg)
+
+---
+
+## First-use acceptance tests
+
+Run these in order from the installed checkout. Repository tests are software
+checks; mark device acceptance complete only after observing your own robot.
+Stop the Agent before opening any standalone setup tool.
+
+| Step | Action | Expected result |
+| --- | --- | --- |
+| 1 — Safe smoke | Run `ninjarobot onboard --status`; Fusion users also run the read-only driver `check` above | Saved setup progress is visible; Fusion prerequisites show ready |
+| 2 — Simulation | Run `ninjarobot service start`, then `ninjarobot chat`; ask “What can you do?” | Text response without physical hardware actions; exit with `/exit` |
+| 3 — Device setup | Stop the service; run `ninjarobot onboard` and select the installed profile | Saved module settings validate; missing prerequisites name the corrective step |
+| 4 — Servo movement | With wheels raised, unloaded linkages and an operator ready to remove power, explicitly calibrate each populated port | Fusion accepts PWM0–11 independently. Enter/Space stages points, F saves a valid complete range, Q discards; unused ports need no calibration |
+| 5 — Real service | Close setup tools, then run `ninjarobot service start --real`; connect through the displayed local pairing link | Startup greeting finishes and the display returns to idle; expression requests update the face |
+| 6 — Audio, with consent | Complete speaker/microphone setup; use `/speech status`, `/speech outputs`, then `/speech on` and ask a short question | Selected output speaks; a successful tone alone does not verify speech synthesis |
+| 7 — Browser mic, with consent | Dictate a harmless question, Send, immediately click Web Mic again; repeat ten times | New capture waits for the old session to end; late text does not refill submitted input. Hiding the page cancels capture |
+| 8 — Robot voice, with consent | Enable VOICE INPUT only after microphone recognition/wake assets are configured; speak a harmless request | The selected robot microphone provides input; this is separate from browser dictation |
+| 9 — Model routes | Select a downloaded local Ollama model, test text; separately select a cloud entry with credentials | Both configured routes respond; local selection does not require a cloud key |
+| 10 — Remote access | Configure/activate ngrok and open a new pairing URL | Authenticated web access succeeds without “Unknown request host”; keep pairing links private |
+
+For missing speech assets, preview provisioning before applying it:
+
+```bash
+uv run --frozen python scripts/prepare_speech_voice.py --install-piper --configure
+uv run --frozen python scripts/prepare_speech_voice.py --install-piper --configure --apply
+```
+
+The second command installs an isolated Piper text-to-speech environment,
+downloads the selected English voice (about 114 MB) and updates speech settings.
+Restart the Agent after configuration changes. It does not establish microphone
+recognition or wake-word assets; configure those separately in microphone setup.
+
+For an old undervoltage stop, inspect current power status and the persisted-latch
+timestamp first. Repair genuine power faults. `/resume` performs health checks and
+clears the appropriate motion/system latch; it does **not** arm AI movement.
+Only after recovery, use `/arm` and its confirmation for this session. A positional
+servo uses signed angles from -90 to 90 degrees, with **0 as center**; 90 is an
+endpoint. Assign wheel roles only to actual continuous-rotation wheel servos.
+Fusion battery telemetry and the Pi's current power warning remain separate
+safety inputs; never bypass either to make a test pass.
+
+Power-risk acceptance is a separate, supervised test. To provision the orderly
+shutdown helper without installing boot autostart, run:
+
+```bash
+uv run --frozen ninjarobot-agent deployment install-poweroff --confirm
+```
+
+This is a privileged deployment operation through the existing installer. Save
+work first. The web Power Off control also requires its configured authorization,
+controller lease and power qualification; installing the helper alone does not
+remove those checks. Test actual shutdown only when ready for the computer to
+stop. Fusion provides an orderly OS shutdown; physical battery disconnection is
+not promised. Do not include shutdown in repeated voice tests.
+
+If Web Mic stalls waiting for a browser completion event, reload the page. Denied
+browser permission must show feedback rather than silently recording on another
+device. If a new release regresses behavior, stop capture/services, restore the
+previous application revision and saved configuration, restart and hard-refresh
+the page. Driver rollback uses its recorded transaction in a maintenance window;
+never delete the installation record to force a replacement.
 
 ---
 
@@ -901,10 +1033,10 @@ The principal `/` commands are listed below; `/help` is the current in-app refer
 
 | Document | Description |
 |---|---|
-| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-04-02/InstallationGuide.md) ([2026-11-03-04](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/InstallationGuide.md), [2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md)) | Complete step-by-step guide from blank Pi to running robot |
-| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-04-02/DevelopmentGuide.md) ([2026-11-03-04](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/DevelopmentGuide.md), [2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/DevelopmentGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md)) | Architecture, API reference, and developer workflow |
+| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-04-03/InstallationGuide.md) ([2026-11-03-04](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/InstallationGuide.md), [2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-04-03/InstallationGuide.md)) | Complete step-by-step guide from blank Pi to running robot |
+| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-04-03/DevelopmentGuide.md) ([2026-11-03-04](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/DevelopmentGuide.md), [2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/DevelopmentGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md)) | Architecture, API reference, and developer workflow |
 | [MCP and Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md) ([2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/NinjaRobot_MCP_Skill.md)) | Beginner guide to external tools and reusable Skills |
-| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-04-02/DevelopmentLog.md) ([2026-11-03-04](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-03-04/DevelopmentLog.md), [2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md)) | Implementation history and decisions |
+| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-04-03/DevelopmentLog.md) ([2026-11-03-04](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-03-04/DevelopmentLog.md), [2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md)) | Implementation history and decisions |
 | [Hardware Profile](docs/hardware/hardware-profile.md) | Confirmed wiring and electrical records |
 | [Documentation Index](docs/README.md) | Index of all project documents |
 | [v1.0.0 Support Matrix](docs/architecture/v1.0.0-support-matrix.md) | Historical release baseline; see current manuals for later additions such as speech output |
@@ -1064,7 +1196,7 @@ ask “What is on my calendar today?” in chat. The native `/info calendar.conn
 command lists native connections, not this MCP server.
 
 For reviewed event creation or modification, follow the separate native Calendar
-section of the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md).
+section of the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-04-03/InstallationGuide.md).
 For Mac forwarding, retry steps, and expected feedback, see the
 [Calendar walkthrough](docs/validation/onboarding_refinement_walkthrough_260923.md#google-calendar-mcp-mac-browser-over-ssh).
 Google’s [official Calendar quickstart](https://developers.google.com/workspace/calendar/api/quickstart/python)
@@ -1129,12 +1261,12 @@ Made with ❤️ for AI Robotics Education and Research
 | **拡張ボード** | **1.** DFRobot DFR0566 IO Expansion HAT<br>**2.** SunFounder Fusion HAT+ (`0x17`)<br>**3.** General PCA9685 PWM Expansion HAT (`0x40`) | `ninjarobot onboard` で 1 / 2 / 3 を選択 |
 | **左ホイールサーボ** | TowerPro MG90D 360° 連続回転 | GPIO12 (DFR0566) または `pwm0` (SunFounder `P0` / PCA9685 `PWM0`) |
 | **右ホイールサーボ** | TowerPro MG90D 360° 連続回転 | GPIO13 (DFR0566) または `pwm1` (SunFounder `P1` / PCA9685 `PWM1`) |
-| **ブザー** | パッシブブザー | GPIO27 |
+| **ブザー** | パッシブブザー | Profile wiring: see English §2.2 |
 | **距離センサー** | VL53L0X Time-of-Flight | I2C バス 1、アドレス 0x29 |
-| **ディスプレイ** | ST7789V 240×320 IPS LCD | SPI0; DC=GPIO4, RST=GPIO5, BL=GPIO6 |
+| **ディスプレイ** | ST7789V 240×320 IPS LCD | SPI0; see profile wiring in English §2.2 |
 | **カメラ** | Raspberry Pi カメラモジュール（OV5647） | CSI、1280×720 |
-| **マイク** | USB オーディオ入力 | Linux/ALSA 対応 USB マイク |
-| **電源** | 公式 Raspberry Pi 27 W USB-C 電源；電池はメーカー指定品 | Geekworm X1208 経由 |
+| **マイク** | USB オーディオ入力 | Fusion: embedded; USB optional |
+| **電源** | 公式 Raspberry Pi 27 W USB-C 電源；電池はメーカー指定品 | DFR: X1208; Fusion: HAT battery |
 
 > **📎 詳細：** [hardware-profile.md](docs/hardware/hardware-profile.md)
 
@@ -1256,12 +1388,12 @@ AI ロボティクス教育と研究のために ❤️ を込めて作られま
 | **擴充板** | **1.** DFRobot DFR0566<br>**2.** SunFounder Fusion HAT+ (`0x17`)<br>**3.** General PCA9685 PWM Expansion HAT (`0x40`) | 於 `ninjarobot onboard` 選擇 1 / 2 / 3 |
 | **左輪伺服** | MG90D 360° | GPIO12 (DFR0566) 或 `pwm0` (SunFounder `P0` / PCA9685 `PWM0`) |
 | **右輪伺服** | MG90D 360° | GPIO13 (DFR0566) 或 `pwm1` (SunFounder `P1` / PCA9685 `PWM1`) |
-| **蜂鳴器** | 被動式 | GPIO27 |
+| **蜂鳴器** | 被動式 | Profile wiring: see English §2.2 |
 | **距離感測器** | VL53L0X | I2C 0x29 |
 | **顯示螢幕** | ST7789V 240×320 | SPI0 |
 | **攝影機** | OV5647 | CSI |
-| **麥克風** | USB 音訊輸入 | Linux/ALSA 相容 USB |
-| **電源** | 官方 Raspberry Pi 27 W USB-C 電源；電池須符合製造商規格 | Geekworm X1208 UPS |
+| **麥克風** | USB 音訊輸入 | Fusion: embedded; USB optional |
+| **電源** | 官方 Raspberry Pi 27 W USB-C 電源；電池須符合製造商規格 | DFR: X1208; Fusion: HAT battery |
 
 ### 2.2〜2.7 步驟與英文版相同
 
@@ -1379,12 +1511,12 @@ AI ロボティクス教育と研究のために ❤️ を込めて作られま
 | **扩展板** | **1.** DFRobot DFR0566<br>**2.** SunFounder Fusion HAT+ (`0x17`)<br>**3.** General PCA9685 PWM Expansion HAT (`0x40`) | 在 `ninjarobot onboard` 中选择 1 / 2 / 3 |
 | **左轮舵机** | MG90D 360° | GPIO12 (DFR0566) 或 `pwm0` (SunFounder `P0` / PCA9685 `PWM0`) |
 | **右轮舵机** | MG90D 360° | GPIO13 (DFR0566) 或 `pwm1` (SunFounder `P1` / PCA9685 `PWM1`) |
-| **蜂鸣器** | 无源 | GPIO27 |
+| **蜂鸣器** | 无源 | Profile wiring: see English §2.2 |
 | **距离传感器** | VL53L0X | I2C 0x29 |
 | **显示屏** | ST7789V 240×320 | SPI0 |
 | **摄像头** | OV5647 | CSI |
-| **麦克风** | USB 音频输入 | Linux/ALSA 兼容 USB |
-| **电源** | 官方 Raspberry Pi 27 W USB-C 电源；电池须符合制造商规格 | Geekworm X1208 UPS |
+| **麦克风** | USB 音频输入 | Fusion: embedded; USB optional |
+| **电源** | 官方 Raspberry Pi 27 W USB-C 电源；电池须符合制造商规格 | DFR: X1208; Fusion: HAT battery |
 
 ### 2.2〜2.7 步骤与英文版相同
 
