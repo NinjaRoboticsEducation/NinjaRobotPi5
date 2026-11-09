@@ -509,6 +509,8 @@ registerMessageHandlers({
     refreshSpeechState();
   },
   onClose: () => {
+    stopWebMicSession?.({ abort: true });
+    updateAiMotion(false);
     updateAiCamera(false);
   },
   onEmergencyStop: () => {

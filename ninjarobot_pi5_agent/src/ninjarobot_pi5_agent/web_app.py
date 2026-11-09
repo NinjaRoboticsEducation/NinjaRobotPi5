@@ -503,19 +503,14 @@ def create_web_app(
                 await websocket.close(code=4423, reason="423 Locked")
             return
 
-        await websocket.accept()
-        try:
-            controller.activate(lease.lease_id, browser_chat_id=browser_chat_id)
-        except (ValueError, PermissionError, RuntimeError) as error:
-            await leases.release(lease.lease_id)
-            await websocket.close(code=4403, reason=str(error)[:120])
-            return
-        if on_authenticated_controller is not None:
-            await on_authenticated_controller(remote_connection, paired_connection)
         send_lock = asyncio.Lock()
         operation_lock = asyncio.Lock()
         client_tasks: set[asyncio.Task[None]] = set()
-        event_queue = await runtime.events.subscribe()
+        event_queue = None
+        event_task = None
+        connection_task = asyncio.current_task()
+        leaving = False
+        close_code = 4400
 
         async def send(payload: dict[str, Any]) -> None:
             async with send_lock:
@@ -531,12 +526,19 @@ def create_web_app(
 
         async def forward_events() -> None:
             while True:
+                assert event_queue is not None
                 await send_event(await event_queue.get())
+
+        def request_done(task: asyncio.Task[None]) -> None:
+            client_tasks.discard(task)
+            if not task.cancelled():
+                task.exception()  # Retrieve transport errors after peer loss.
 
         async def run_request(message: dict[str, Any]) -> None:
             request_id = _request_id(message)
             try:
                 kind = _required_string(message, "type")
+                await leases.validate(lease.lease_id, lease.generation)
                 if kind in {"emergency_stop", "move_stop", "usb_microphone_stop", "speech", "game"}:
                     data = await _dispatch_web_message(
                         controller,
@@ -548,6 +550,7 @@ def create_web_app(
                     )
                 else:
                     async with operation_lock:
+                        await leases.validate(lease.lease_id, lease.generation)
                         data = await _dispatch_web_message(
                             controller,
                             lease.lease_id,
@@ -566,8 +569,36 @@ def create_web_app(
                     }
                 )
 
-        event_task = asyncio.create_task(forward_events(), name="web-event-forwarder")
+        async def detach() -> None:
+            if not leaving and connection_task is not None:
+                connection_task.cancel()
+            tasks = tuple(client_tasks)
+            for task in tasks:
+                task.cancel()
+            if event_task is not None:
+                event_task.cancel()
+            try:
+                await websocket.close(code=close_code, reason="Controller connection ended")
+            except (WebSocketDisconnect, RuntimeError, OSError):
+                pass  # The peer may already have completed its close handshake.
+            await asyncio.gather(*tasks, return_exceptions=True)
+
         try:
+            await leases.attach(lease, detach)
+            await websocket.accept()
+            try:
+                controller.activate(lease.lease_id, browser_chat_id=browser_chat_id)
+            except (ValueError, PermissionError, RuntimeError):
+                close_code = 4403
+                leaving = True
+                await leases.release(lease.lease_id, generation=lease.generation)
+                # Detach has closed the failed attachment; keep setup exception-safe.
+                return
+            if on_authenticated_controller is not None:
+                await on_authenticated_controller(remote_connection, paired_connection)
+            await leases.validate(lease.lease_id, lease.generation)
+            event_queue = await runtime.events.subscribe()
+            event_task = asyncio.create_task(forward_events(), name="web-event-forwarder")
             await send(
                 {
                     "type": "lease",
@@ -603,9 +634,9 @@ def create_web_app(
                 message_lease = _required_string(message, "lease_id")
                 if message_lease != lease.lease_id:
                     raise InvalidControllerLeaseError("controller lease does not match")
-                await leases.validate(message_lease)
+                await leases.validate(message_lease, lease.generation)
                 if message.get("type") == "heartbeat":
-                    await leases.heartbeat(message_lease)
+                    await leases.heartbeat(message_lease, lease.generation)
                     await send(
                         {
                             "type": "heartbeat",
@@ -622,24 +653,29 @@ def create_web_app(
                             "data": {"released": True},
                         }
                     )
-                    await leases.release(message_lease)
+                    leaving = True
+                    await leases.release(message_lease, generation=lease.generation)
                     return
                 task = asyncio.create_task(
                     run_request(message),
                     name=f"web-request-{_request_id(message)}",
                 )
                 client_tasks.add(task)
-                task.add_done_callback(client_tasks.discard)
+                task.add_done_callback(request_done)
         except (WebSocketDisconnect, InvalidControllerLeaseError):
             pass
         finally:
-            for task in client_tasks:
+            leaving = True
+            await leases.disconnect(lease.lease_id, lease.generation)
+            tasks = tuple(client_tasks)
+            for task in tasks:
                 task.cancel()
-            await asyncio.gather(*client_tasks, return_exceptions=True)
-            event_task.cancel()
-            await asyncio.gather(event_task, return_exceptions=True)
-            await runtime.events.unsubscribe(event_queue)
-            await leases.disconnect(lease.lease_id)
+            await asyncio.gather(*tasks, return_exceptions=True)
+            if event_task is not None:
+                event_task.cancel()
+                await asyncio.gather(event_task, return_exceptions=True)
+            if event_queue is not None:
+                await runtime.events.unsubscribe(event_queue)
 
     return app
 
@@ -719,7 +755,7 @@ async def _dispatch_web_message(
     if kind == "usb_microphone_stop":
         return await controller.stop_transcription(lease_id)
     if kind == "voice_enable":
-        return await controller.enable_voice_input()
+        return await controller.enable_voice_input(lease_id)
     if kind == "voice_disable":
         return await controller.disable_voice_input()
     if kind == "game":

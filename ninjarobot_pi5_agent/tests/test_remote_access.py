@@ -418,3 +418,20 @@ def test_pyngrok_backend_falls_back_without_traffic_policy_on_free_tier_err_2263
     assert len(connect_calls) == 2
     assert "traffic_policy" in connect_calls[0]
     assert "traffic_policy" not in connect_calls[1]
+
+
+def test_browser_loss_does_not_replace_or_close_healthy_tunnel() -> None:
+    async def exercise() -> None:
+        backend = FakeBackend(["https://robot.example"])
+        service, _events, release, _persisted, _web_starts, _transitions = build_service(backend)
+        await service.activate()
+        for _ in range(100):
+            await service.controller_authenticated(True)
+            await service.controller_disconnected()
+        assert backend.connect_calls == 1
+        assert backend.closed == []
+        assert service.status()["public_url"] == "https://robot.example"
+        assert release.status()["remote_access"]["state"] == "waiting_for_connection"
+        await service.close()
+
+    asyncio.run(exercise())

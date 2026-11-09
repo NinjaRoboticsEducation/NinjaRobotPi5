@@ -273,7 +273,7 @@ def test_controller_lease_is_exclusive_and_reconnectable() -> None:
 
         assert reclaimed.lease_id == first.lease_id
         await manager.release(first.lease_id)
-        assert revoked == [(first.lease_id, "controller_release")]
+        assert revoked == [(first.lease_id, "disconnect"), (first.lease_id, "controller_release")]
         await manager.close()
 
     asyncio.run(exercise())

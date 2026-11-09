@@ -539,6 +539,10 @@ class RobotIDEClient:
             raise RuntimeError("robot IDE client is not started")
         return await self.robot.start_liveliness()
 
+    async def set_waiting_presentation(self, generation: int, active: bool) -> bool:
+        """Generation-checked presentation reservation, without changing safety."""
+        return await self.robot.set_waiting_presentation(generation, active)
+
     async def show_onboarding_qr(self, url: str) -> dict[str, Any]:
         """Display a validated pairing QR through the IDE-owned presentation path."""
         if not self._started:

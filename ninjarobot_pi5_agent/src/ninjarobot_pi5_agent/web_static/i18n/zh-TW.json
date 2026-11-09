@@ -49,6 +49,7 @@
   "controls.movement": "移動控制",
   "controls.special": "特殊機器人控制",
   "document.title": "NinjaRobotAgent",
+  "error.pairingRequired": "需要配對。請掃描機器人目前的 QR 碼重新連線。",
   "error.anotherController": "另一個裝置正在控制 NinjaRobot。",
   "error.badData": "服務傳回格式錯誤的資料。",
   "error.browserMic": "瀏覽器麥克風錯誤：{error}",

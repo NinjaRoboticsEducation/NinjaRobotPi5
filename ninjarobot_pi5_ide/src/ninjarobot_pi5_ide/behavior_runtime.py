@@ -311,7 +311,11 @@ class BehaviorRunner:
             )
             result = await self._display.show_image(
                 image,
-                source=f"face:{operation.expression}",
+                source=(
+                    f"privacy:{operation.expression}"
+                    if operation.expression in {"camera", "listening"}
+                    else f"face:{operation.expression}"
+                ),
             )
             frame_count += 1
             if deadline is None:

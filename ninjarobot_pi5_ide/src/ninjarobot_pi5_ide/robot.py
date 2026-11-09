@@ -207,6 +207,7 @@ class RobotAssembly:
         self.behaviors.set_failure_handler(self._driver_failure)
         self.distance_game = DistanceGame(self, volume=config.distance_game.volume)
         self._liveliness_enabled = False
+        self._waiting_presentation = False
         self._idle_suppressed = False
         self._ambient_face = "idle"
         self._foreground_behaviors = 0
@@ -262,10 +263,18 @@ class RobotAssembly:
         self._idle_suppressed = False
         return await self.run_behavior("greeting")
 
+    async def set_waiting_presentation(self, generation: int, active: bool) -> bool:
+        accepted = await self.display.set_waiting_presentation(generation, active)
+        if accepted:
+            self._waiting_presentation = active
+            if active and self._ambient_face not in {"camera", "listening"}:
+                await self._stop_idle()
+        return accepted
+
     async def show_onboarding_qr(self, url: str) -> dict[str, Any]:
         """Render one trusted pairing QR without exposing arbitrary images."""
-        if self.system_safety.stopped:
-            raise RuntimeError("system is stopped; onboarding QR cannot replace safety state")
+        if self.system_safety.stopped or self.safety_state.read().motion_latched:
+            return {"suppressed": "safety_state"}
         await self._stop_idle()
         width, height = await self.display.dimensions()
         image = render_pairing_qr(url, width=width, height=height)
@@ -278,11 +287,12 @@ class RobotAssembly:
         """Show one bounded boot state while Greeting remains disabled."""
         if state not in {"connecting", "error"}:
             raise ValueError("onboarding state must be connecting or error")
-        if self.system_safety.stopped:
+        if self.system_safety.stopped or self.safety_state.read().motion_latched:
             raise RuntimeError("system is stopped; onboarding cannot replace safety state")
         await self._stop_idle()
         text = "Connecting…" if state == "connecting" else "Error"
         return await self.display.show_text(
+            source="phase-8-onboarding-status",
             text=text,
             font_size=32 if state == "connecting" else 48,
             foreground="#FFFFFF",
@@ -474,6 +484,7 @@ class RobotAssembly:
         if self.audio is not None and expression not in {"speaking", "idle"}:
             await self.audio.stop()
         face = normalize_face_name(expression)
+        await self.display.set_privacy_presentation(face in {"camera", "listening"})
         if face != self._ambient_face:
             self._expression_request += 1
         self._ambient_face = face
@@ -497,11 +508,13 @@ class RobotAssembly:
             return False
         await self.distance_game.stop("privacy_capture")
         self._ambient_face = "camera"
+        await self.display.set_privacy_presentation(True)
         await self._stop_idle()
         for count in ("3", "2", "1"):
             if self.system_safety.stopped:
                 return False
             await self.display.show_text(
+                source="privacy:capture",
                 text=count,
                 font_size=128,
                 foreground="#FFFFFF",
@@ -625,6 +638,7 @@ class RobotAssembly:
             await self.motion.ensure_power_ready()
         snapshot = self.motion.resume(confirmed=confirmed)
         self._idle_suppressed = False
+        await self.display.set_safety_presentation(False)
         await self._start_idle_if_safe()
         return snapshot
 
@@ -651,6 +665,7 @@ class RobotAssembly:
         )
         self.distance_game._state = {"state": "idle", "reason": "system_recovered"}
         self._idle_suppressed = False
+        await self.display.set_safety_presentation(False)
         await self._start_idle_if_safe()
         return snapshot
 
@@ -714,6 +729,7 @@ class RobotAssembly:
     async def _start_idle_if_safe(self) -> None:
         if (
             not self._liveliness_enabled
+            or (self._waiting_presentation and self._ambient_face not in {"camera", "listening"})
             or self.distance_game.status()["state"] == "faulted"
             or self._idle_suppressed
             or self._closing
@@ -754,6 +770,7 @@ class RobotAssembly:
             self._foreground_behaviors = max(0, self._foreground_behaviors - 1)
             if self._foreground_behaviors == 0:
                 self._ambient_face = "idle"
+                await self.display.set_privacy_presentation(False)
         await self._start_idle_if_safe()
 
     async def _run_idle(self, definition: BehaviorDefinition) -> None:
@@ -844,10 +861,12 @@ class RobotAssembly:
         )
 
     async def _show_system_stopped(self) -> dict[str, Any]:
+        await self.display.set_safety_presentation(True)
         if not self.display.enabled:
             return {"display_skipped": "disabled by configuration"}
         if self.safety_state.read().reason not in {None, "operator_stop"}:
             return await self.display.show_text(
+                source="safety:warning",
                 text="PROTECTIVE STOP\nCHECK FAULT\nRESUME REQUIRED",
                 font_size=24,
                 foreground="#FFFFFF",
@@ -869,6 +888,7 @@ class RobotAssembly:
             )
             try:
                 result = await self.display.show_text(
+                    source="safety:warning",
                     text="EMERGENCY STOP\nRESUME REQUIRED",
                     font_size=28,
                     foreground="#FFFFFF",
@@ -893,6 +913,7 @@ class RobotAssembly:
         else:
             message = "POWER WARNING\nSTATUS UNAVAILABLE\nMOVEMENT CONTINUES"
         return await self.display.show_text(
+            source="safety:warning",
             text=message,
             font_size=18,
             foreground="#FFFFFF",

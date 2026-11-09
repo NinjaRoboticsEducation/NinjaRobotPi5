@@ -49,6 +49,7 @@
   "controls.movement": "移动控制",
   "controls.special": "特殊机器人控制",
   "document.title": "NinjaRobotAgent",
+  "error.pairingRequired": "需要配对。请扫描机器人当前的二维码重新连接。",
   "error.anotherController": "另一台设备正在控制 NinjaRobot。",
   "error.badData": "服务返回了格式错误的数据。",
   "error.browserMic": "浏览器麦克风错误：{error}",

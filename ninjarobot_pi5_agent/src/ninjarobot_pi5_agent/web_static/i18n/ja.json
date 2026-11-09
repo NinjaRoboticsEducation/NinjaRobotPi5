@@ -49,6 +49,7 @@
   "controls.movement": "移動操作",
   "controls.special": "ロボット特別操作",
   "document.title": "NinjaRobotAgent",
+  "error.pairingRequired": "ペアリングが必要です。ロボットの最新のQRコードを読み取って再接続してください。",
   "error.anotherController": "別の端末がNinjaRobotを操作中です。",
   "error.badData": "サービスから不正なデータが返されました。",
   "error.browserMic": "ブラウザマイクエラー：{error}",

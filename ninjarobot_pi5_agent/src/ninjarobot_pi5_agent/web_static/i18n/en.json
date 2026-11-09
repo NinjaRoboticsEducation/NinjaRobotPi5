@@ -49,6 +49,7 @@
   "controls.movement": "Movement controls",
   "controls.special": "Special robot controls",
   "document.title": "NinjaRobotAgent",
+  "error.pairingRequired": "Pairing is required. Scan the current QR code on the robot to reconnect.",
   "error.anotherController": "Another device currently controls NinjaRobot.",
   "error.badData": "The service returned malformed data.",
   "error.browserMic": "Browser microphone error: {error}",

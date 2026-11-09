@@ -160,6 +160,7 @@ class AgentRuntime:
         self._automatic_memory_notices: dict[str, set[str]] = {}
         self._execution_notices: dict[str, list[str]] = {}
         self._voice_input: VoiceInputServiceProtocol | None = None
+        self._voice_input_owner: str | None = None
         self.loop.set_active_user_provider(self._active_users.get)
         self.loop.set_memory_context_provider(
             self._memory_context_for_session if memory is not None else None
@@ -1871,19 +1872,34 @@ class AgentRuntime:
             raise RuntimeError("voice input service is already configured")
         self._voice_input = service
 
-    async def enable_voice_input(self) -> dict[str, object]:
+    async def enable_voice_input(self, *, lease_id: str | None = None) -> dict[str, object]:
         """Enable and persist always-on voice input deterministically."""
         self._ensure_started()
         if self._voice_input is None:
             raise RuntimeError("voice input is not configured")
-        return await self._voice_input.enable()
+        if lease_id is None or not self._voice_input.status().get("enabled"):
+            self._voice_input_owner = lease_id
+        try:
+            return await self._voice_input.enable()
+        except BaseException:
+            if self._voice_input_owner == lease_id:
+                self._voice_input_owner = None
+                await self._voice_input.disable(persist=False)
+            raise
 
-    async def disable_voice_input(self) -> dict[str, object]:
+    async def release_browser_voice(self, lease_id: str) -> None:
+        """A terminal/boot listener cannot be stopped by a departing browser."""
+        if self._voice_input_owner == lease_id:
+            self._voice_input_owner = None
+            await self.disable_voice_input(persist=False)
+
+    async def disable_voice_input(self, *, persist: bool = True) -> dict[str, object]:
         """Disable voice input and revoke its motion authorization."""
         self._ensure_started()
         if self._voice_input is None:
             raise RuntimeError("voice input is not configured")
-        return await self._voice_input.disable()
+        self._voice_input_owner = None
+        return await self._voice_input.disable(persist=persist)
 
     def voice_input_status(self) -> dict[str, object]:
         """Return voice state without probing microphone hardware."""

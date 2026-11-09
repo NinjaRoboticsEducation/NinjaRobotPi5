@@ -377,7 +377,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
     runtime.set_voice_input_service(voice_input)
     runtime.begin_startup_liveliness()
     web_controller = WebRobotController(runtime)
-    leases = ControllerLeaseManager(on_revoke=web_controller.lease_revoked)
+
     remote_header_secret = _release_secret_value(
         secrets,
         config.remote_access.remote_header_secret_env,
@@ -390,9 +390,47 @@ async def run_service(arguments: argparse.Namespace) -> None:
         session_lifetime_seconds=config.remote_access.session_lifetime_seconds,
     )
     remote_holder: dict[str, RemoteAccessService] = {}
+    remote_controller_lease: str | None = None
     onboarding_holder: dict[str, OnboardingCoordinator] = {}
 
+    async def quiesce_controller(lease_id: str, reason: str) -> None:
+        # Policy revocation is synchronous inside lease_revoked, before slow I/O.
+        web_controller.revoke_permissions(lease_id)
+
+        async def hold_waiting() -> None:
+            coordinator = onboarding_holder.get("coordinator")
+            if coordinator is not None and reason != "web_server_shutdown":
+                try:
+                    await coordinator.controller_waiting(reserved=True)
+                except Exception:
+                    LOGGER.exception("Waiting presentation unavailable; device cleanup continues.")
+
+        await asyncio.gather(web_controller.lease_revoked(lease_id, reason), hold_waiting())
+
+    async def controller_available(lease_id: str, reason: str) -> None:
+        service = remote_holder.get("service")
+        if service is not None:
+            await service.controller_disconnected()
+        coordinator = onboarding_holder.get("coordinator")
+        if coordinator is not None:
+            await coordinator.controller_waiting()
+
+    async def cleanup_fault(lease_id: str, reason: str) -> None:
+        await events.publish(
+            AgentEventType.ERROR,
+            "Browser cleanup failed; controller admission is blocked pending local recovery.",
+            data={"kind": "controller_cleanup_failed"},
+        )
+        await web_controller.emergency_stop(lease_id)
+
+    leases = ControllerLeaseManager(
+        on_revoke=quiesce_controller, on_available=controller_available, on_fault=cleanup_fault
+    )
+
     async def authenticated_controller(remote: bool, paired: bool) -> None:
+        nonlocal remote_controller_lease
+        if remote:
+            remote_controller_lease = await leases.current_lease_id()
         service = remote_holder.get("service")
         if service is not None:
             await service.controller_authenticated(remote)
@@ -404,7 +442,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
         """The owner-only Unix socket is an authenticated local controller."""
         coordinator = onboarding_holder.get("coordinator")
         if coordinator is not None:
-            await coordinator.controller_connected(paired=True, remote=False)
+            await coordinator.local_controller_connected()
 
     server_holder: dict[str, AgentIPCServer] = {}
 
@@ -469,6 +507,13 @@ async def run_service(arguments: argparse.Namespace) -> None:
         ),
     )
     remote_holder["service"] = remote_access
+
+    async def invalidate_remote_controller() -> None:
+        nonlocal remote_controller_lease
+        lease_id, remote_controller_lease = remote_controller_lease, None
+        if lease_id is not None:
+            await leases.release(lease_id, reason="remote_endpoint_changed")
+
     onboarding = OnboardingCoordinator(
         enabled=onboarding_enabled,
         local_origin=f"https://{mdns_hostname()}:{arguments.web_port}",
@@ -478,6 +523,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
         events=events,
         release_status=release_status,
         remote=remote_access,
+        invalidate_remote_controller=invalidate_remote_controller,
         start_local_fallback=web.start_local_fallback,
         activate_remote_access=web.activate_remote,
     )
@@ -499,8 +545,8 @@ async def run_service(arguments: argparse.Namespace) -> None:
     try:
         if onboarding_enabled:
             await web.start_local_fallback()
-            await onboarding.start(remote_enabled=config.remote_access.enabled)
-        else:
+        await onboarding.start(remote_enabled=config.remote_access.enabled)
+        if not onboarding_enabled:
             await _complete_startup_liveliness(ide=ide, runtime=runtime, events=events)
         try:
             await voice_input.start_configured()

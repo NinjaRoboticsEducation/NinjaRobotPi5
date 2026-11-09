@@ -71,6 +71,8 @@ def guided_check(step: int, diagnostics: Callable[[], dict[str, Any]] | None) ->
 
 
 class OnboardingIDE(Protocol):
+    async def set_waiting_presentation(self, generation: int, active: bool) -> bool: ...
+
     async def show_onboarding_qr(self, url: str) -> dict[str, Any]: ...
 
     async def show_onboarding_status(self, state: str) -> dict[str, Any]: ...
@@ -122,7 +124,9 @@ class OnboardingCoordinator:
         start_local_fallback: Callable[[], Awaitable[dict[str, Any]]] | None = None,
         activate_remote_access: Callable[[], Awaitable[dict[str, Any]]] | None = None,
         refresh_interval_seconds: float | None = None,
+        invalidate_remote_controller: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
+        self._invalidate_remote_controller = invalidate_remote_controller
         self._enabled = enabled
         self._local_origin = local_origin
         self._ide = ide
@@ -143,7 +147,10 @@ class OnboardingCoordinator:
         self._event_task: asyncio.Task[None] | None = None
         self._refresh_task: asyncio.Task[None] | None = None
         self._event_queue: asyncio.Queue[AgentEvent] | None = None
+        self._lifecycle_lock = asyncio.Lock()
         self._presentation_lock = asyncio.Lock()
+        self._presentation_generation = 0
+        self._controller_present = False
         self._greeting_lock = asyncio.Lock()
         self._greeting_attempted = False
         self._terminal_failure = False
@@ -153,8 +160,10 @@ class OnboardingCoordinator:
 
     async def start(self, *, remote_enabled: bool) -> None:
         """Begin display supervision before remote startup can publish an event."""
-        if not self._enabled:
+        if self._event_task is not None or self._closed:
             return
+        if not self._enabled:
+            self._greeting_attempted = True
         self._release_status.update("onboarding", ReleaseFeatureState.STARTING)
         self._event_queue = await self._events.subscribe()
         self._event_task = asyncio.create_task(
@@ -165,6 +174,8 @@ class OnboardingCoordinator:
             self._refresh_loop(),
             name="ninjarobot-onboarding-refresh",
         )
+        if not self._enabled:
+            return
         if remote_enabled:
             LOGGER.info("Startup onboarding is waiting for ngrok before displaying its pairing QR.")
             try:
@@ -186,9 +197,47 @@ class OnboardingCoordinator:
             if await self._enable_local_fallback():
                 await self._show_local_pairing()
 
+    async def _hold(self, active: bool) -> None:
+        self._presentation_generation += 1
+        await self._ide.set_waiting_presentation(self._presentation_generation, active)
+
+    async def controller_waiting(self, *, reserved: bool = False) -> None:
+        """Do not rotate credentials until reservation and cleanup are complete."""
+        async with self._lifecycle_lock:
+            if self._closed:
+                return
+            self._controller_present = False
+            if reserved:
+                await self._hold(True)
+                self._displayed_scope = None
+                self._post_startup_pairing_scope = None
+                await self._ide.show_onboarding_status("connecting")
+            elif self._remote.status().get("public_url"):
+                await self._show_remote_access()
+
+    async def local_controller_connected(self) -> None:
+        """Owner IPC can finish startup, but is not an exclusive browser lease."""
+        async with self._lifecycle_lock:
+            if self._closed or self._greeting_attempted:
+                return
+            await self._hold(False)
+            await self._controller_connected(paired=True, remote=False)
+
     async def controller_connected(self, *, paired: bool, remote: bool = False) -> None:
+        if not paired or self._closed:
+            return
+        self._controller_present = True
+        async with self._lifecycle_lock:
+            await self._hold(False)
+            await self._controller_connected(paired=paired, remote=remote)
+
+    async def show_remote_access(self) -> dict[str, object]:
+        async with self._lifecycle_lock:
+            return await self._show_remote_access()
+
+    async def _controller_connected(self, *, paired: bool, remote: bool = False) -> None:
         """Attempt Greeting once for the first authenticated controller."""
-        if not self._enabled or not paired or self._terminal_failure:
+        if not paired or self._terminal_failure or self._closed:
             return
         connection_scope = "remote" if remote else "local"
         if self._post_startup_pairing_scope == connection_scope:
@@ -228,14 +277,15 @@ class OnboardingCoordinator:
                 data={"kind": "onboarding_complete"},
             )
 
-    async def show_remote_access(self) -> dict[str, object]:
+    async def _show_remote_access(self) -> dict[str, object]:
         """Display a fresh non-revoking remote pairing QR after startup."""
-        if not self._enabled or self._terminal_failure:
+        if self._closed or self._terminal_failure:
             raise RuntimeError("remote QR display is unavailable")
         status = self._remote.status()
         public_url = status.get("public_url")
         if not isinstance(public_url, str) or not public_url:
             raise RuntimeError("ngrok Remote Access is not ready")
+        self._controller_present = False
         pairing_url = self._pairing.rotate(invalidate_sessions=False)
         self._post_startup_pairing_scope = "remote"
         self._displayed_scope = None
@@ -262,6 +312,8 @@ class OnboardingCoordinator:
         self._event_queue = None
         if queue is not None:
             await self._events.unsubscribe(queue)
+        async with self._lifecycle_lock:
+            await self._hold(False)
 
     async def _monitor_remote_events(self) -> None:
         queue = self._event_queue
@@ -271,22 +323,40 @@ class OnboardingCoordinator:
             event = await queue.get()
             if event.event_type is not AgentEventType.REMOTE_ACCESS:
                 continue
-            kind = event.data.get("kind")
-            if kind == "remote_ready":
-                if await self._activate_remote():
-                    if self._greeting_attempted:
-                        self._post_startup_pairing_scope = "remote"
-                    await self._show_remote_pairing()
-            elif kind == "remote_error":
-                if await self._enable_local_fallback():
-                    if self._greeting_attempted:
-                        self._post_startup_pairing_scope = "local"
-                    await self._show_local_pairing()
+            if event.data.get("kind") in {"remote_ready", "remote_error", "remote_disabled"}:
+                if self._invalidate_remote_controller is not None:
+                    await self._invalidate_remote_controller()
+            async with self._lifecycle_lock:
+                kind = event.data.get("kind")
+                try:
+                    if kind == "remote_disabled":
+                        self._displayed_scope = None
+                        self._post_startup_pairing_scope = None
+                        await self._hold(False)
+                        await self._ide.restore_idle_face()
+                    elif kind == "remote_ready" and not self._controller_present:
+                        if await self._activate_remote():
+                            if self._greeting_attempted:
+                                self._post_startup_pairing_scope = "remote"
+                            await self._show_remote_pairing()
+                    elif kind == "remote_error":
+                        self._controller_present = False
+                        self._displayed_scope = None
+                        await self._hold(False)
+                        if await self._enable_local_fallback():
+                            if self._greeting_attempted:
+                                self._post_startup_pairing_scope = "local"
+                            await self._show_local_pairing()
+                except Exception:
+                    LOGGER.exception("Pairing presentation transition failed.")
 
     async def _refresh_loop(self) -> None:
         while True:
             await asyncio.sleep(self._refresh_interval)
-            await self._refresh_pairing()
+            try:
+                await self._refresh_pairing()
+            except Exception:
+                LOGGER.exception("Pairing refresh failed; supervision remains active.")
 
     async def _show_remote_pairing(self) -> None:
         try:
@@ -298,6 +368,7 @@ class OnboardingCoordinator:
     async def _show_local_pairing(self) -> None:
         if (
             self._closed
+            or self._controller_present
             or self._terminal_failure
             or (self._greeting_attempted and self._post_startup_pairing_scope != "local")
         ):
@@ -311,11 +382,16 @@ class OnboardingCoordinator:
         await self._show_pairing(pairing_url, scope="local")
 
     async def _refresh_pairing(self) -> None:
+        async with self._lifecycle_lock:
+            await self._refresh_pairing_locked()
+
+    async def _refresh_pairing_locked(self) -> None:
         if (
             self._closed
+            or self._controller_present
             or self._terminal_failure
             or (self._greeting_attempted and self._post_startup_pairing_scope is None)
-            or self._displayed_scope is None
+            or (self._displayed_scope is None and self._post_startup_pairing_scope is None)
         ):
             return
         try:
@@ -323,18 +399,44 @@ class OnboardingCoordinator:
         except PairingError as exc:
             await self._fail("pairing_refresh_failed", exc)
             return
-        await self._show_pairing(pairing_url, scope=self._displayed_scope)
+        await self._show_pairing(
+            pairing_url, scope=self._displayed_scope or self._post_startup_pairing_scope or "remote"
+        )
 
     async def _show_pairing(self, pairing_url: str, *, scope: str) -> None:
         async with self._presentation_lock:
             if (
                 self._closed
+                or self._controller_present
                 or self._terminal_failure
                 or (self._greeting_attempted and self._post_startup_pairing_scope is None)
             ):
                 return
+            endpoint = self._remote.status().get("public_url") if scope == "remote" else None
+            if scope == "remote" and (
+                not endpoint or pairing_url.partition("/#pair=")[0] != str(endpoint).rstrip("/")
+            ):
+                return
             try:
-                await self._ide.show_onboarding_qr(pairing_url)
+                await self._hold(True)
+                result = await self._ide.show_onboarding_qr(pairing_url)
+                if result.get("suppressed"):
+                    await self._hold(False)
+                    self._displayed_scope = None
+                    self._release_status.update(
+                        "onboarding",
+                        ReleaseFeatureState.DEGRADED,
+                        detail="pairing_deferred_by_safety",
+                    )
+                    return
+                if (
+                    self._closed
+                    or self._controller_present
+                    or (scope == "remote" and endpoint != self._remote.status().get("public_url"))
+                ):
+                    await self._hold(False)
+                    await self._ide.restore_idle_face()
+                    return
             except Exception as exc:
                 await self._fail("onboarding_qr_failed", exc)
                 return

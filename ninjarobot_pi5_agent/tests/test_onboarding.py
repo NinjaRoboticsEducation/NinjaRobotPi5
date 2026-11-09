@@ -19,6 +19,9 @@ class _IDE:
         self.greeting_calls = 0
         self.idle_restores = 0
 
+    async def set_waiting_presentation(self, generation: int, active: bool) -> bool:
+        return True
+
     async def show_onboarding_qr(self, url: str) -> dict[str, Any]:
         if self.fail_qr:
             raise RuntimeError("display write failed")
@@ -361,5 +364,83 @@ def test_qr_or_greeting_failure_is_terminal_disarmed_and_shows_error() -> None:
         assert greeting_runtime.failed == ["greeting failed"]
         assert greeting_runtime.disarmed == 3
         await asyncio.wait_for(greeting_coordinator.close(), timeout=1.0)
+
+    asyncio.run(exercise())
+
+
+def test_automatic_waiting_rotates_consumed_qr_and_handoffs_do_not_repeat_greeting() -> None:
+    from ninjarobot_pi5_agent.web_control import ControllerLeaseManager
+
+    async def exercise() -> None:
+        coordinator, ide, runtime, remote, events = await _coordinator()
+        await coordinator.start(remote_enabled=False)
+        await coordinator.controller_connected(paired=True)
+        remote.public_url = "https://robot.example"
+        remote.state = "waiting_for_connection"
+        remote.pairing.set_remote_url(remote.public_url)
+        now = [0.0]
+
+        async def quiesce(lease_id: str, reason: str) -> None:
+            await coordinator.controller_waiting(reserved=True)
+
+        async def available(lease_id: str, reason: str) -> None:
+            await coordinator.controller_waiting()
+
+        manager = ControllerLeaseManager(
+            on_revoke=quiesce, on_available=available, clock=lambda: now[0]
+        )
+        for cycle in range(100):
+            lease = await manager.acquire()
+            await coordinator.controller_connected(paired=True, remote=True)
+            before = len(ide.urls)
+            await manager.disconnect(lease.lease_id, lease.generation)
+            assert len(ide.urls) == before  # no invitation during reservation
+            now[0] += 11
+            await manager._expire()
+            assert len(ide.urls) == before + 1
+            token = ide.urls[-1].split("#pair=", 1)[1]
+            remote.pairing.exchange(
+                token, origin=remote.public_url, host="robot.example", remote_marker="r" * 43
+            )
+            if cycle == 0:
+                # Pairing alone never clears QR; a consumed token without a socket is renewed.
+                before_refresh = len(ide.urls)
+                await coordinator._refresh_pairing()
+                assert len(ide.urls) == before_refresh + 1
+                assert ide.urls[-1].split("#pair=", 1)[1] != token
+        assert ide.greeting_calls == runtime.completed == 1
+        assert not any("#pair=" in event.model_dump_json() for event in await events.history())
+        await coordinator.close()
+        before = len(ide.urls)
+        await manager.close()
+        await coordinator.controller_waiting()
+        assert len(ide.urls) == before
+
+    asyncio.run(exercise())
+
+
+def test_runtime_remote_activation_and_disable_cancel_waiting_refresh() -> None:
+    async def exercise() -> None:
+        coordinator, ide, _runtime, remote, events = await _coordinator()
+        coordinator._enabled = False  # service started without startup onboarding
+        await coordinator.start(remote_enabled=False)
+        assert ide.urls == []
+        await coordinator.local_controller_connected()
+        assert not coordinator._controller_present
+        remote.public_url = "https://robot.example"
+        remote.state = "waiting_for_connection"
+        remote.pairing.set_remote_url(remote.public_url)
+        await events.publish(AgentEventType.REMOTE_ACCESS, "ready", data={"kind": "remote_ready"})
+        await _wait_until(lambda: len(ide.urls) == 1)
+        remote.public_url = None
+        remote.pairing.clear_remote_url()
+        await events.publish(
+            AgentEventType.REMOTE_ACCESS, "disabled", data={"kind": "remote_disabled"}
+        )
+        await _wait_until(lambda: ide.idle_restores == 1)
+        before = len(ide.urls)
+        await coordinator._refresh_pairing()
+        assert len(ide.urls) == before
+        await coordinator.close()
 
     asyncio.run(exercise())

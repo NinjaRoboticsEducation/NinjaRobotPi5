@@ -294,6 +294,12 @@ class RemoteAccessService:
         """Return a fragment-bearing URL only over the local owner IPC channel."""
         return self._pairing.pairing_url()
 
+    async def controller_disconnected(self) -> None:
+        """Update availability without reconnecting or replacing a healthy tunnel."""
+        if self._enabled and self._public_url:
+            self._release_status.update("remote_access", ReleaseFeatureState.WAITING_FOR_CONNECTION)
+            self._release_status.update("pairing", ReleaseFeatureState.PAIRING)
+
     async def rotate_pairing(self) -> dict[str, object]:
         url = self._pairing.rotate(invalidate_sessions=True)
         await self._events.publish(

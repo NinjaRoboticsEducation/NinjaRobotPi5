@@ -11,6 +11,11 @@ The owner confirmed both behavioral choices during preparation: stop
 browser-started movement, programs, audio, and capture while keeping the server
 running; preserve Pi5's existing 10-second reconnection window.
 
+Implementation follow-up (9 November): the repository implementation and actual
+validation results are recorded in [the reconnection validation report](../docs/validation/web_reconnection_261108.md).
+Planning statements below describe the original research snapshot; physical
+acceptance remains separate.
+
 ## Contents
 
 - [Scope and acceptance contract](#scope-and-acceptance-contract)

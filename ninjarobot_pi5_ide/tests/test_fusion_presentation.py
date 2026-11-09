@@ -11,6 +11,7 @@ def test_motion_latch_allows_silent_face_but_system_latch_does_not():
     async def exercise():
         robot = object.__new__(RobotAssembly)
         robot._liveliness_enabled = True
+        robot._waiting_presentation = False
         robot._idle_suppressed = False
         robot._closing = False
         robot._foreground_behaviors = 0

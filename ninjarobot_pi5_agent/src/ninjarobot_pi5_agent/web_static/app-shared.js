@@ -36,6 +36,9 @@ export const state = {
   reconnectToken: sessionStorage.getItem("ninjarobotReconnectToken"),
   browserChatId: persistentBrowserChatId(),
   heartbeatTimer: null,
+  reconnectTimer: null,
+  departed: false,
+  lockedRetries: 0,
   requestCounter: 0,
   pending: new Map(),
   activeAssistant: new Map(),
@@ -228,6 +231,9 @@ export function registerMessageHandlers(handlers = {}) {
 }
 
 export function connect() {
+  if (state.departed || (state.socket && state.socket.readyState < WebSocket.CLOSING)) return;
+  window.clearTimeout(state.reconnectTimer);
+  state.reconnectTimer = null;
   state.released = false;
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   const query = new URLSearchParams({ browser_chat_id: state.browserChatId });
@@ -238,8 +244,11 @@ export function connect() {
   state.socket = socket;
   setConnection("connection.connecting", "badge-wait");
 
-  socket.addEventListener("open", () => log(t("connection.opened")));
+  socket.addEventListener("open", () => {
+    if (state.socket === socket) log(t("connection.opened"));
+  });
   socket.addEventListener("message", (event) => {
+    if (state.socket !== socket || state.departed) return;
     let message;
     try {
       message = JSON.parse(event.data);
@@ -249,7 +258,11 @@ export function connect() {
     }
     handleMessage(message);
   });
-  socket.addEventListener("close", (event) => {
+  socket.addEventListener("close", async (event) => {
+    if (state.socket !== socket) return;
+    state.socket = null;
+    for (const pending of state.pending.values()) pending.reject(new Error("controller disconnected"));
+    state.pending.clear();
     window.clearInterval(state.heartbeatTimer);
     state.heartbeatTimer = null;
     state.leaseId = null;
@@ -266,11 +279,28 @@ export function connect() {
         : t("connection.closed"),
       event.code === 4423 ? "error" : "info",
     );
-    if (!state.released && event.code !== 4423) {
-      window.setTimeout(connect, 1500);
+    let pairingRequired = event.code === 4401;
+    if (event.code === 1006 && !state.departed) {
+      try {
+        const probe = await fetch("/health", { method: "HEAD", credentials: "same-origin",
+          cache: "no-store", signal: AbortSignal.timeout(3000) });
+        pairingRequired = probe.status === 401 || probe.status === 421;
+      } catch { /* Network loss stays retryable; server heartbeat remains authoritative. */ }
+    }
+    if (state.socket || state.departed) return;
+    if (pairingRequired) {
+      log(t("error.pairingRequired"), "error");
+      toast(t("error.pairingRequired"));
+      return;
+    }
+    if (event.code === 4423) state.lockedRetries += 1;
+    if (!state.released && !state.departed && event.code !== 4401 &&
+        (event.code !== 4423 || state.lockedRetries <= 3)) {
+      state.reconnectTimer = window.setTimeout(connect, event.code === 4423 ? 4000 : 1500);
     }
   });
   socket.addEventListener("error", () => {
+    if (state.socket !== socket || state.departed) return;
     log(t("error.https"), "error");
     if (!state.certificateHelpLogged) {
       state.certificateHelpLogged = true;
@@ -285,6 +315,7 @@ export function connect() {
 
 function handleMessage(message) {
   if (message.type === "lease") {
+    state.lockedRetries = 0;
     state.leaseId = message.lease_id;
     state.certificateHelpLogged = false;
     state.reconnectToken = message.reconnect_token;
@@ -645,7 +676,20 @@ export async function initShared({ pageName }) {
   window.visualViewport?.addEventListener("resize", syncViewportHeight);
 
   window.addEventListener("pagehide", () => {
+    state.departed = true;
+    window.clearTimeout(state.reconnectTimer);
+    state.reconnectTimer = null;
     window.clearInterval(state.heartbeatTimer);
+    state.heartbeatTimer = null;
+    messageHandlers.onClose?.({ code: 1001 });
+    for (const pending of state.pending.values()) pending.reject(new Error("page departed"));
+    state.pending.clear();
+    state.leaseId = null;
+    state.socket?.close(1000, "Page departed");
+  });
+  window.addEventListener("pageshow", () => {
+    state.departed = false;
+    if (state.controllerStarted) connect();
   });
 
   initSharedActions();

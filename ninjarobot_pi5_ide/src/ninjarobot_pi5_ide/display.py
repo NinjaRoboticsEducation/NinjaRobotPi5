@@ -116,6 +116,10 @@ class DisplayDevice:
             "height": height,
             "rotation": rotation,
         }
+        self._waiting_generation = -1
+        self._waiting = False
+        self._safety_presentation = False
+        self._privacy_presentation = False
         self._rotation = rotation
         self._initial_brightness = initial_brightness
         self._brightness = initial_brightness
@@ -154,6 +158,30 @@ class DisplayDevice:
         async with self._lock:
             await self._recover_locked(capability="system.resume")
 
+    async def set_waiting_presentation(self, generation: int, active: bool) -> bool:
+        """Reserve ordinary frames; safety/privacy frames retain precedence."""
+        async with self._lock:
+            if generation < self._waiting_generation:
+                return False
+            self._waiting_generation = generation
+            self._waiting = active
+            return True
+
+    async def set_privacy_presentation(self, active: bool) -> None:
+        async with self._lock:
+            self._privacy_presentation = active
+
+    async def set_safety_presentation(self, active: bool) -> None:
+        async with self._lock:
+            self._safety_presentation = active
+
+    def _frame_allowed(self, source: str) -> bool:
+        if self._safety_presentation and not source.startswith("safety:"):
+            return False
+        if self._privacy_presentation and not source.startswith(("safety:", "privacy:")):
+            return False
+        return not self._waiting or source.startswith(("phase-8-onboarding", "safety:", "privacy:"))
+
     async def show_text(
         self,
         *,
@@ -161,9 +189,12 @@ class DisplayDevice:
         font_size: int,
         foreground: str,
         background: str,
+        source: str = "text",
     ) -> dict[str, Any]:
         """Render centered multiline text and write one complete frame."""
         async with self._lock:
+            if not self._frame_allowed(source):
+                return {"suppressed": "waiting_presentation"}
             driver = await self._require_driver_locked("display.show_text")
             image = Image.new("RGB", (driver.width, driver.height), _rgb(background))
             draw = ImageDraw.Draw(image)
@@ -218,6 +249,8 @@ class DisplayDevice:
         if not source or len(source) > 128:
             raise ValueError("image source must contain 1 through 128 characters")
         async with self._lock:
+            if not self._frame_allowed(source):
+                return {"suppressed": "waiting_presentation"}
             driver = await self._require_driver_locked("display.show_image")
             if image.size != (driver.width, driver.height):
                 raise _invalid_arguments(
@@ -249,6 +282,8 @@ class DisplayDevice:
     async def clear(self, *, color: str) -> dict[str, Any]:
         """Fill the display with one bounded RGB color."""
         async with self._lock:
+            if self._waiting or self._safety_presentation:
+                return {"suppressed": "waiting_presentation"}
             await self._execute_with_recovery_locked(
                 lambda active: active.clear(_rgb(color)),
                 code="DISPLAY_CLEAR_FAILED",
