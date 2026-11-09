@@ -206,6 +206,7 @@ class RemoteAccessService:
         self._stop = asyncio.Event()
         self._first_attempt = asyncio.Event()
         self._public_url: str | None = None
+        self._endpoint_generation = 0
         self._last_error_code: str | None = None
         self._enabled = config.enabled
         self._lock = asyncio.Lock()
@@ -259,6 +260,7 @@ class RemoteAccessService:
             await asyncio.gather(task, return_exceptions=True)
         public_url = self._public_url
         self._public_url = None
+        self._endpoint_generation += 1
         await self._backend.close(public_url)
         self._pairing.clear_remote_url()
         if self._stop_web is not None:
@@ -270,7 +272,7 @@ class RemoteAccessService:
         await self._events.publish(
             AgentEventType.REMOTE_ACCESS,
             "Remote access was disabled and all remote browser sessions were revoked.",
-            data={"kind": "remote_disabled"},
+            data={"kind": "remote_disabled", "endpoint_generation": self._endpoint_generation},
         )
         return self.status()
 
@@ -293,6 +295,11 @@ class RemoteAccessService:
     def pairing_url(self) -> str:
         """Return a fragment-bearing URL only over the local owner IPC channel."""
         return self._pairing.pairing_url()
+
+    @property
+    def endpoint_generation(self) -> int:
+        """Identity changes even when a replacement tunnel reuses the same URL."""
+        return self._endpoint_generation
 
     async def controller_disconnected(self) -> None:
         """Update availability without reconnecting or replacing a healthy tunnel."""
@@ -344,6 +351,7 @@ class RemoteAccessService:
                 try:
                     public_url = await self._backend.connect()
                     self._public_url = public_url
+                    self._endpoint_generation += 1
                     self._last_error_code = None
                     self._pairing.set_remote_url(public_url)
                     if self._remote_ready is not None:
@@ -361,7 +369,10 @@ class RemoteAccessService:
                     await self._events.publish(
                         AgentEventType.REMOTE_ACCESS,
                         "Secure remote access is ready and waiting for a paired browser.",
-                        data={"kind": "remote_ready"},
+                        data={
+                            "kind": "remote_ready",
+                            "endpoint_generation": self._endpoint_generation,
+                        },
                     )
                     failures = 0
                     self._first_attempt.set()
@@ -385,6 +396,7 @@ class RemoteAccessService:
                     self._first_attempt.set()
                     lost_url: str | None = self._public_url
                     self._public_url = None
+                    self._endpoint_generation += 1
                     self._pairing.clear_remote_url()
                     await self._backend.close(lost_url)
                     if self._remote_unavailable is not None:
@@ -405,7 +417,11 @@ class RemoteAccessService:
                     await self._events.publish(
                         AgentEventType.REMOTE_ACCESS,
                         "Remote access is unavailable; local agent and web control remain ready.",
-                        data={"kind": "remote_error", "code": code},
+                        data={
+                            "kind": "remote_error",
+                            "code": code,
+                            "endpoint_generation": self._endpoint_generation,
+                        },
                     )
                     if code in PERMANENT_REMOTE_ERRORS:
                         return

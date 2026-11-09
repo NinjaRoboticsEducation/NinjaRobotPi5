@@ -508,6 +508,7 @@ def create_web_app(
         client_tasks: set[asyncio.Task[None]] = set()
         event_queue = None
         event_task = None
+        welcome_task: asyncio.Task[None] | None = None
         connection_task = asyncio.current_task()
         leaving = False
         close_code = 4400
@@ -538,6 +539,12 @@ def create_web_app(
             request_id = _request_id(message)
             try:
                 kind = _required_string(message, "type")
+                if welcome_task is not None and kind not in {
+                    "emergency_stop",
+                    "move_stop",
+                    "usb_microphone_stop",
+                }:
+                    await asyncio.shield(welcome_task)
                 await leases.validate(lease.lease_id, lease.generation)
                 if kind in {"emergency_stop", "move_stop", "usb_microphone_stop", "speech", "game"}:
                     data = await _dispatch_web_message(
@@ -594,8 +601,6 @@ def create_web_app(
                 await leases.release(lease.lease_id, generation=lease.generation)
                 # Detach has closed the failed attachment; keep setup exception-safe.
                 return
-            if on_authenticated_controller is not None:
-                await on_authenticated_controller(remote_connection, paired_connection)
             await leases.validate(lease.lease_id, lease.generation)
             event_queue = await runtime.events.subscribe()
             event_task = asyncio.create_task(forward_events(), name="web-event-forwarder")
@@ -624,6 +629,26 @@ def create_web_app(
             )
             for event in await runtime.events.history():
                 await send_event(event)
+            if on_authenticated_controller is not None:
+
+                async def welcome() -> None:
+                    await leases.validate(lease.lease_id, lease.generation)
+                    assert on_authenticated_controller is not None
+                    await on_authenticated_controller(remote_connection, paired_connection)
+
+                welcome_task = asyncio.create_task(welcome(), name="web-controller-welcome")
+                client_tasks.add(welcome_task)
+
+                def welcome_done(task: asyncio.Task[None]) -> None:
+                    request_done(task)
+                    if (
+                        not task.cancelled()
+                        and task.exception() is not None
+                        and connection_task is not None
+                    ):
+                        connection_task.cancel()
+
+                welcome_task.add_done_callback(welcome_done)
             while True:
                 raw = await websocket.receive_text()
                 if len(raw.encode("utf-8")) > MAX_WEB_MESSAGE_BYTES:

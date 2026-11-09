@@ -11,10 +11,10 @@ as Fusion HAT+ integration. They await owner manual acceptance, ingestion and
 semantic review. The document map and compiled wiki register the 4 November
 (`2026-11-04-03`) checkpoint; those originals remain preserved.
 
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-11-09/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-11-09/DevelopmentGuide.md)
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-11-09-02/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-11-09-02/DevelopmentGuide.md)
 - [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md) (unchanged public tools)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-11-09/DevelopmentLog.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-11-09-02/DevelopmentLog.md)
 - [Fusion agent integration audit and implementation plan](../docs/project-history/NinjaSunFounderIntegrationAudit_261104.md)
 - [Fusion implementation and manual acceptance](../docs/validation/fusion_implementation_261103.md)
 

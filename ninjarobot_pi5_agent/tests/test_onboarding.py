@@ -76,6 +76,8 @@ class _Runtime:
 
 
 class _Remote:
+    endpoint_generation = 0
+
     def __init__(self, pairing: PairingSessionManager) -> None:
         self.pairing = pairing
         self.public_url: str | None = None
@@ -241,7 +243,7 @@ def test_deployed_post_startup_remote_failure_shows_local_qr_then_idle() -> None
         assert ide.urls[-1].startswith("https://127.0.0.1:8443/#pair=")
 
         await coordinator.controller_connected(paired=True, remote=False)
-        assert ide.idle_restores == 1
+        assert ide.idle_restores == 2
         assert ide.greeting_calls == 1
         assert runtime.completed == 1
         await coordinator.close()
@@ -332,7 +334,7 @@ def test_show_remote_access_preserves_sessions_and_restores_idle_without_greetin
         )
         await coordinator.controller_connected(paired=True, remote=True)
 
-        assert ide.idle_restores == 1
+        assert ide.idle_restores == 2
         assert ide.greeting_calls == 1
         assert runtime.completed == 1
         await coordinator.close()
@@ -368,7 +370,7 @@ def test_qr_or_greeting_failure_is_terminal_disarmed_and_shows_error() -> None:
     asyncio.run(exercise())
 
 
-def test_automatic_waiting_rotates_consumed_qr_and_handoffs_do_not_repeat_greeting() -> None:
+def test_automatic_waiting_rotates_consumed_qr_and_each_handoff_gets_greeting() -> None:
     from ninjarobot_pi5_agent.web_control import ControllerLeaseManager
 
     async def exercise() -> None:
@@ -391,7 +393,9 @@ def test_automatic_waiting_rotates_consumed_qr_and_handoffs_do_not_repeat_greeti
         )
         for cycle in range(100):
             lease = await manager.acquire()
-            await coordinator.controller_connected(paired=True, remote=True)
+            await coordinator.controller_connected(
+                paired=True, remote=True, lease_id=lease.lease_id
+            )
             before = len(ide.urls)
             await manager.disconnect(lease.lease_id, lease.generation)
             assert len(ide.urls) == before  # no invitation during reservation
@@ -408,7 +412,8 @@ def test_automatic_waiting_rotates_consumed_qr_and_handoffs_do_not_repeat_greeti
                 await coordinator._refresh_pairing()
                 assert len(ide.urls) == before_refresh + 1
                 assert ide.urls[-1].split("#pair=", 1)[1] != token
-        assert ide.greeting_calls == runtime.completed == 1
+        assert ide.greeting_calls == 101
+        assert runtime.completed == 1
         assert not any("#pair=" in event.model_dump_json() for event in await events.history())
         await coordinator.close()
         before = len(ide.urls)
@@ -441,6 +446,98 @@ def test_runtime_remote_activation_and_disable_cancel_waiting_refresh() -> None:
         before = len(ide.urls)
         await coordinator._refresh_pairing()
         assert len(ide.urls) == before
+        await coordinator.close()
+
+    asyncio.run(exercise())
+
+
+def test_new_browser_is_welcomed_and_same_lease_reconnect_only_restores_idle() -> None:
+    async def exercise() -> None:
+        coordinator, ide, runtime, _remote, _events = await _coordinator()
+        await coordinator.start(remote_enabled=False)
+        await coordinator.controller_connected(paired=True, remote=True, lease_id="A")
+        assert ide.greeting_calls == 1 and ide.idle_restores == 1
+        await coordinator.controller_waiting(reserved=True)
+        await coordinator.controller_connected(paired=True, remote=True, lease_id="A")
+        assert ide.greeting_calls == 1 and ide.idle_restores == 2
+        assert coordinator._controller_present
+        await coordinator.controller_waiting(reserved=True)
+        await coordinator.controller_connected(paired=True, remote=True, lease_id="B")
+        assert ide.greeting_calls == 2 and ide.idle_restores == 3
+        await asyncio.gather(
+            *(
+                coordinator.controller_connected(paired=True, remote=True, lease_id="B")
+                for _ in range(8)
+            )
+        )
+        assert ide.greeting_calls == 2  # duplicate notifications cannot repeat welcome
+        assert runtime.completed == 1
+        assert coordinator._post_startup_pairing_scope is None
+        await coordinator.close()
+
+    asyncio.run(exercise())
+
+
+def test_disconnect_during_first_greeting_does_not_skip_startup_completion() -> None:
+    async def exercise() -> None:
+        entered = asyncio.Event()
+
+        class SlowIDE(_IDE):
+            async def start_liveliness(self) -> dict[str, Any]:
+                self.greeting_calls += 1
+                if self.greeting_calls == 1:
+                    entered.set()
+                    await asyncio.Event().wait()
+                return {"name": "greeting"}
+
+        coordinator, ide, runtime, _remote, _events = await _coordinator(ide=SlowIDE())
+        await coordinator.start(remote_enabled=False)
+        welcome = asyncio.create_task(
+            coordinator.controller_connected(paired=True, remote=True, lease_id="A")
+        )
+        await entered.wait()
+        welcome.cancel()
+        await asyncio.gather(welcome, return_exceptions=True)
+        assert runtime.completed == 0
+        await coordinator.controller_waiting(reserved=True)
+        await coordinator.controller_connected(paired=True, remote=True, lease_id="B")
+        assert runtime.completed == 1 and ide.greeting_calls == 2
+        assert coordinator._last_welcomed_lease == "B"
+        assert ide.idle_restores == 1
+        await coordinator.close()
+
+    asyncio.run(exercise())
+
+
+def test_delayed_old_tunnel_error_cannot_replace_a_connected_idle_face() -> None:
+    async def exercise() -> None:
+        coordinator, ide, _runtime, remote, events = await _coordinator()
+        await coordinator.start(remote_enabled=False)
+        remote.endpoint_generation = 2
+        remote.public_url = "https://current.example"
+        await coordinator.controller_connected(paired=True, remote=True, lease_id="B")
+        urls_before = list(ide.urls)
+        statuses_before = list(ide.statuses)
+        processed = asyncio.Event()
+
+        async def invalidation_marker() -> None:
+            processed.set()
+
+        coordinator._invalidate_remote_controller = invalidation_marker
+        await events.publish(
+            AgentEventType.REMOTE_ACCESS,
+            "old tunnel failed",
+            data={"kind": "remote_error", "endpoint_generation": 1},
+        )
+        await events.publish(
+            AgentEventType.REMOTE_ACCESS,
+            "current endpoint ready",
+            data={"kind": "remote_ready", "endpoint_generation": 2},
+        )
+        await asyncio.wait_for(processed.wait(), timeout=1)
+        assert coordinator._controller_present
+        assert ide.urls == urls_before and ide.statuses == statuses_before
+        assert ide.idle_restores == 1
         await coordinator.close()
 
     asyncio.run(exercise())

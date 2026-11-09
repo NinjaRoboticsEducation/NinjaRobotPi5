@@ -435,3 +435,42 @@ def test_browser_loss_does_not_replace_or_close_healthy_tunnel() -> None:
         await service.close()
 
     asyncio.run(exercise())
+
+
+def test_delayed_ready_preserves_current_controller_but_same_url_replacement_revokes() -> None:
+    from ninjarobot_pi5_agent.service_main import _revoke_stale_remote_controller
+    from ninjarobot_pi5_agent.web_control import ControllerLeaseManager
+
+    async def exercise() -> None:
+        backend = FakeBackend(["https://robot.example", "https://robot.example"])
+        service, _events, _release, _persisted, _web_starts, _transitions = build_service(backend)
+        revoked = []
+
+        async def revoke(lease_id: str, reason: str) -> None:
+            revoked.append(lease_id)
+
+        leases = ControllerLeaseManager(on_revoke=revoke)
+        await service.activate()
+        old_generation = service.endpoint_generation
+        first = await leases.acquire()
+        assert not await _revoke_stale_remote_controller(
+            leases, service, first.lease_id, old_generation
+        )
+        await leases.validate(first.lease_id)
+        assert not revoked
+        await service.deactivate()
+        assert await _revoke_stale_remote_controller(
+            leases, service, first.lease_id, old_generation
+        )
+        assert revoked == [first.lease_id]
+        await service.activate()
+        second = await leases.acquire()
+        assert service.endpoint_generation != old_generation
+        assert await _revoke_stale_remote_controller(
+            leases, service, second.lease_id, old_generation
+        )
+        assert len(revoked) == 2
+        await leases.close()
+        await service.close()
+
+    asyncio.run(exercise())

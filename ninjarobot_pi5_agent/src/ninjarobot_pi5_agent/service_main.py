@@ -391,6 +391,7 @@ async def run_service(arguments: argparse.Namespace) -> None:
     )
     remote_holder: dict[str, RemoteAccessService] = {}
     remote_controller_lease: str | None = None
+    remote_controller_generation: int | None = None
     onboarding_holder: dict[str, OnboardingCoordinator] = {}
 
     async def quiesce_controller(lease_id: str, reason: str) -> None:
@@ -428,7 +429,12 @@ async def run_service(arguments: argparse.Namespace) -> None:
     )
 
     async def authenticated_controller(remote: bool, paired: bool) -> None:
-        nonlocal remote_controller_lease
+        nonlocal remote_controller_lease, remote_controller_generation
+        service = remote_holder.get("service")
+        if remote:
+            remote_controller_generation = (
+                service.endpoint_generation if service is not None else None
+            )
         if remote:
             remote_controller_lease = await leases.current_lease_id()
         service = remote_holder.get("service")
@@ -436,7 +442,9 @@ async def run_service(arguments: argparse.Namespace) -> None:
             await service.controller_authenticated(remote)
         coordinator = onboarding_holder.get("coordinator")
         if coordinator is not None:
-            await coordinator.controller_connected(paired=paired, remote=remote)
+            await coordinator.controller_connected(
+                paired=paired, remote=remote, lease_id=await leases.current_lease_id()
+            )
 
     async def local_controller_connected() -> None:
         """The owner-only Unix socket is an authenticated local controller."""
@@ -510,9 +518,10 @@ async def run_service(arguments: argparse.Namespace) -> None:
 
     async def invalidate_remote_controller() -> None:
         nonlocal remote_controller_lease
-        lease_id, remote_controller_lease = remote_controller_lease, None
-        if lease_id is not None:
-            await leases.release(lease_id, reason="remote_endpoint_changed")
+        if await _revoke_stale_remote_controller(
+            leases, remote_access, remote_controller_lease, remote_controller_generation
+        ):
+            remote_controller_lease = None
 
     onboarding = OnboardingCoordinator(
         enabled=onboarding_enabled,
@@ -572,6 +581,21 @@ async def run_service(arguments: argparse.Namespace) -> None:
                 "Orderly power-off could not invoke the approved helper; "
                 "run `sudo systemctl poweroff` locally."
             )
+
+
+async def _revoke_stale_remote_controller(
+    leases: ControllerLeaseManager,
+    remote: RemoteAccessService,
+    lease_id: str | None,
+    attached_generation: int | None,
+) -> bool:
+    """A delayed ready event must not revoke a controller on the current endpoint."""
+    if lease_id is None or (
+        remote.status().get("public_url") and attached_generation == remote.endpoint_generation
+    ):
+        return False
+    await leases.release(lease_id, reason="remote_endpoint_changed")
+    return True
 
 
 def _release_secret_key(store: SecretStore, name: str) -> bytes:

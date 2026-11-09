@@ -1099,3 +1099,65 @@ def test_agent_interface_button_styles_and_initial_states() -> None:
     # 4. Verify CSS styling rules for media buttons (WEB/VOICE/SPEECH)
     assert "rgba(255, 255, 255, 0.5)" in css  # 50% opacity white border
     assert "rgba(0, 163, 255, 0.5)" in css  # 50% opacity blue border
+
+
+def test_heartbeats_continue_during_greeting_and_actions_wait_for_idle() -> None:
+    from threading import Event
+
+    now = [0.0]
+    started, finished = Event(), Event()
+    release = asyncio.Event()
+    ran = []
+
+    class Controller(_FakeController):
+        async def run_user_behavior(self, lease_id: str, name: str) -> dict[str, Any]:
+            ran.append(name)
+            return {"status": "succeeded"}
+
+    controller = Controller()
+    runtime = _FakeRuntime()
+    leases = ControllerLeaseManager(on_revoke=controller.lease_revoked, clock=lambda: now[0])
+
+    async def welcome(remote: bool, paired: bool) -> None:
+        started.set()
+        try:
+            # Bound the test if a regression moves this back in front of lease delivery.
+            await asyncio.wait_for(release.wait(), timeout=3)
+        finally:
+            finished.set()
+
+    app = create_web_app(
+        runtime=cast(AgentRuntime, runtime),
+        controller=cast(WebRobotController, controller),
+        leases=leases,
+        static_directory=Path(__file__).resolve().parents[1]
+        / "src/ninjarobot_pi5_agent/web_static",
+        on_authenticated_controller=welcome,
+    )
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws") as ws:
+            lease = ws.receive_json()
+            assert lease["type"] == "lease"
+            assert ws.receive_json()["type"] == "system_status"
+            assert ws.receive_json()["type"] == "conversation_history"
+            assert started.wait(1) and not finished.is_set()
+            ws.send_json(
+                {
+                    "type": "user_behavior_run",
+                    "request_id": "action",
+                    "lease_id": lease["lease_id"],
+                    "name": "my_dance",
+                }
+            )
+            now[0] = 14
+            ws.send_json({"type": "heartbeat", "request_id": "hb", "lease_id": lease["lease_id"]})
+            assert ws.receive_json()["type"] == "heartbeat"
+            assert ran == []
+            now[0] = 16
+            assert client.portal is not None
+            client.portal.call(leases._expire)
+            assert not controller.revoked and not finished.is_set()
+            client.portal.call(release.set)
+            assert ws.receive_json()["type"] == "result"
+            assert ran == ["my_dance"]
+        client.portal.call(leases.close)

@@ -102,13 +102,16 @@ class OnboardingRuntime(Protocol):
 
 
 class RemoteOnboardingSource(Protocol):
+    @property
+    def endpoint_generation(self) -> int: ...
+
     def status(self) -> dict[str, object]: ...
 
     def pairing_url(self) -> str: ...
 
 
 class OnboardingCoordinator:
-    """Display the current pairing endpoint and run Greeting at most once."""
+    """Display pairing and welcome each newly acquired exclusive controller."""
 
     def __init__(
         self,
@@ -153,6 +156,8 @@ class OnboardingCoordinator:
         self._controller_present = False
         self._greeting_lock = asyncio.Lock()
         self._greeting_attempted = False
+        self._startup_completed = False
+        self._last_welcomed_lease: str | None = None
         self._terminal_failure = False
         self._closed = False
         self._displayed_scope: str | None = None
@@ -164,6 +169,7 @@ class OnboardingCoordinator:
             return
         if not self._enabled:
             self._greeting_attempted = True
+            self._startup_completed = True
         self._release_status.update("onboarding", ReleaseFeatureState.STARTING)
         self._event_queue = await self._events.subscribe()
         self._event_task = asyncio.create_task(
@@ -218,63 +224,67 @@ class OnboardingCoordinator:
     async def local_controller_connected(self) -> None:
         """Owner IPC can finish startup, but is not an exclusive browser lease."""
         async with self._lifecycle_lock:
-            if self._closed or self._greeting_attempted:
+            if self._closed or self._startup_completed:
                 return
             await self._hold(False)
             await self._controller_connected(paired=True, remote=False)
 
-    async def controller_connected(self, *, paired: bool, remote: bool = False) -> None:
+    async def controller_connected(
+        self, *, paired: bool, remote: bool = False, lease_id: str | None = None
+    ) -> None:
         if not paired or self._closed:
             return
         self._controller_present = True
         async with self._lifecycle_lock:
             await self._hold(False)
-            await self._controller_connected(paired=paired, remote=remote)
+            await self._controller_connected(paired=paired, remote=remote, lease_id=lease_id)
 
     async def show_remote_access(self) -> dict[str, object]:
         async with self._lifecycle_lock:
             return await self._show_remote_access()
 
-    async def _controller_connected(self, *, paired: bool, remote: bool = False) -> None:
-        """Attempt Greeting once for the first authenticated controller."""
+    async def _controller_connected(
+        self, *, paired: bool, remote: bool = False, lease_id: str | None = None
+    ) -> None:
+        """Welcome a new lease; a navigation reconnect preserves the same welcome."""
         if not paired or self._terminal_failure or self._closed:
             return
         connection_scope = "remote" if remote else "local"
-        if self._post_startup_pairing_scope == connection_scope:
-            async with self._presentation_lock:
-                self._post_startup_pairing_scope = None
-                self._displayed_scope = None
-                try:
-                    await self._ide.restore_idle_face()
-                except Exception as exc:
-                    await self._fail("pairing_idle_restore_failed", exc)
-                    return
-            await self._events.publish(
-                AgentEventType.ONBOARDING,
-                "The additional browser paired; the QR was cleared and Idle restored.",
-                data={"kind": "pairing_qr_completed", "scope": connection_scope},
-            )
+        new_lease = lease_id is not None and lease_id != self._last_welcomed_lease
+        had_qr = self._post_startup_pairing_scope == connection_scope
+        self._post_startup_pairing_scope = None
+        self._displayed_scope = None
+        if self._startup_completed and not new_lease:
+            if had_qr or lease_id is not None:
+                await self._ide.restore_idle_face()
             return
         async with self._greeting_lock:
-            if self._greeting_attempted or self._terminal_failure:
-                return
+            startup = not self._startup_completed
             self._greeting_attempted = True
             self._release_status.update("onboarding", ReleaseFeatureState.CONNECTED)
             self._runtime.disarm_voice_motion()
             try:
                 await self._ide.prepare_onboarding_greeting()
                 await self._ide.start_liveliness()
+                await self._ide.restore_idle_face()
             except Exception as exc:
-                await self._fail("startup_greeting_failed", exc)
+                await self._fail(
+                    "startup_greeting_failed" if startup else "controller_greeting_failed", exc
+                )
                 return
-            self._runtime.complete_startup_liveliness()
+            self._last_welcomed_lease = lease_id
+            if startup:
+                self._runtime.complete_startup_liveliness()
+                self._startup_completed = True
             self._release_status.update("onboarding", ReleaseFeatureState.READY)
-            LOGGER.info("Startup Greeting completed; the robot is now Idle.")
+            LOGGER.info("Controller Greeting completed; the robot is now Idle.")
             await self._events.publish(
                 AgentEventType.ONBOARDING,
-                "The first authenticated controller connected; Greeting completed "
-                "and Idle is active.",
-                data={"kind": "onboarding_complete"},
+                "Controller connected. Greeting completed and Idle is active.",
+                data={
+                    "kind": "onboarding_complete" if startup else "controller_welcomed",
+                    "scope": connection_scope,
+                },
             )
 
     async def _show_remote_access(self) -> dict[str, object]:
@@ -323,10 +333,15 @@ class OnboardingCoordinator:
             event = await queue.get()
             if event.event_type is not AgentEventType.REMOTE_ACCESS:
                 continue
+            generation = event.data.get("endpoint_generation")
+            if generation is not None and generation != self._remote.endpoint_generation:
+                continue
             if event.data.get("kind") in {"remote_ready", "remote_error", "remote_disabled"}:
                 if self._invalidate_remote_controller is not None:
                     await self._invalidate_remote_controller()
             async with self._lifecycle_lock:
+                if generation is not None and generation != self._remote.endpoint_generation:
+                    continue
                 kind = event.data.get("kind")
                 try:
                     if kind == "remote_disabled":
