@@ -633,11 +633,6 @@ Expected: structural/hash/link checks pass; review gaps reported honestly.
 Run strict lint once sourced-page reviews are current. Query remote reconnection
 after ingestion and verify new behavior is retrievable.
 
-No Education PlatformWiki changes are required: no Education route/contract
-changes. Do not edit Librarian mirror directly. Any requested sync is separate.
-Planning-only impact: this proposal records future work; canonical wiki remains
-unchanged to avoid presenting planned functionality as implemented.
-
 ### Rollout and recovery
 
 1. Review coherent Agent/IDE/browser patch and successful gates.
