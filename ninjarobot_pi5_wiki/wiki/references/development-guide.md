@@ -9,10 +9,10 @@ generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20261104-developmentguide
-  resource: urn:llmwiki:source:src-20261104-developmentguide
+- id: src-20261109-developmentguide
+  resource: urn:llmwiki:source:src-20261109-developmentguide
   title: DevelopmentGuide.md
-  content_hash: sha256:6d4574560831e69657ce128f16f972a885ba6fbf98c463a433a38a2459b41f4b
+  content_hash: sha256:075a560ad59fcc46cbed6118928c0d1a342f86eda4464221beafde76138ca221
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -20,7 +20,7 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-11-04T00:00:00Z'
+  performed_at: '2026-11-09T00:00:00Z'
   result: passed
   checks:
     source_support: passed
@@ -29,18 +29,18 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered 4 November SunFounder Fusion HAT+ agent
-    integration remediation, web microphone lifecycle repair, and documentation reconciliation
-    evidence; no human verification is claimed.
+  - Reviewed this page against registered 9 November browser reconnection, controller
+    handoff, and connected welcome/idle refinement evidence (development guide); no
+    human verification is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
     and note pending physical acceptance, live third-party accounts, and monetary
     spending caps.
-  target_hash: sha256:76a5c6fb70a7bcaef0abb818a5ec897a1286500bf216fd830afac3e820db43b5
+  target_hash: sha256:05b202de605256c6eb35af924cd14a0e7e359766d8a431ad1fede83b21ba3aa7
 ---
 
 # Development guide
 
-The full guide describes architecture, managed drivers, configuration, safety, the behavior system, external tools, memory, web access, and development checks.[^src-20261104-developmentguide]
+The full guide describes architecture, managed drivers, configuration, safety, the behavior system, external tools, memory, web access, and development checks.[^src-20261109-developmentguide]
 
 Use the source identifier below to resolve the complete manual through the raw
 source catalog. The outer wiki README also links directly to the current full
@@ -49,10 +49,10 @@ Read the relevant full section before acting on an abbreviated explanation.[^src
 
 [Return to project overview](/overview.md).
 
-## Current checkpoint: Fusion agent integration remediation and documentation reconciliation
+## Current checkpoint: Browser reconnection, controller handoff, and welcome/idle refinement
 
-The 4 November 2026 revision (`2026-11-04-03`) documents safety latch timestamp diagnostics and Level 1 motion-only resume (`safety.py`, `servo.py`, `robot.py`, `runtime.py`, `service_main.py`, `prompts.py`); live `speech_output` state in LLM turns and Piper TTS provisioning; memory turn filtering in `agent_loop.py`; standalone power-off helper installation and LAN session authorization (`deployment.py`, `agent_cli.py`, `web_app.py`); and web microphone lifecycle retention until `onend` with 48 kHz I2S voice input resilience (`app-agent.js`, `microphone.py`, `voice_input.py`, `audio_process.py`); alongside `FusionHatPlusBackend` sysfs PWM ownership (`1.1.0-ninja1`, fixed 50 Hz across 3 shared timer groups, class-level lock); `fusion.py` sysfs interface validation and telemetry parsing; `calib.py` in-memory draft staging (stage Min/Max/Center in any order with Enter/Space, atomic commit with F requiring `500 <= Min < Center < Max <= 2500` microseconds, discard with Q, clean exit without centering); `hardware_setup.py` non-moving prerequisite readiness; `scripts/fusion_hat_setup.py` prepare/preview/install tool; alongside 2 November runtime remediation (`proxy_headers=False`, distinct `battery_undervoltage` cutoff with persisted measured voltage and cutoff details, non-finite telemetry safeguards, completed transient full stop presentation clearance, embedded audio Fusion kernel speaker node, ALSA/PipeWire readiness aligned, config import explicit servo role preservation, and route-persisting local/cloud Ollama selection), 25 October Multi-HAT expansion backends, 23 September onboarding wizard refinements, Mac Calendar SSH forwarding, 22 September guided onboarding, 18 September web controller dual views, 17 September calendar setup and unified CONFIRM authorization, 15–16 September distance game and servo repairs, Phase 4 information services, Phase 4 foundations, and system clock access.[^src-20261104-developmentguide]
+The 9 November 2026 revision (`2026-11-09-02`) documents browser disconnect, reconnect, and controller handoff architecture along with connected welcome and idle refinement: serialized lease cleanup, attachment generations, immediate revocation, automatic non-revoking pairing QR redisplay, durable waiting display reservation, endpoint invalidation, and browser departure/Back-Forward recovery across `onboarding.py`, `remote_access.py`, `runtime.py`, `service_main.py`, `web_app.py`, `web_control.py`, `app-shared.js`, `app-agent.js`, `display.py`, `integrated.py`, and `behavior_runtime.py`. On connection loss, active commands, movement, speech, and capture are cancelled; browser-enabled robot voice listening stops without changing saved preferences; and saved conversations, reminders, and future tasks are retained without replaying interrupted actions. Clean disconnect reserves the lease for up to 10 seconds or until heartbeat deadline, allowing same-browser reconnect with existing token and chat identity while locking others. Unannounced loss is detected via 15-second heartbeat deadline and watchdog polling (<= 1s) with a 5-second cancellation budget. Each newly acquired exclusive browser controller lease runs Greeting through the IDE and transitions to repeating silent Idle; reconnecting the same lease during grace restores Idle without replaying Greeting; lease delivery and heartbeats continue during the cancellable welcome task while normal interactions wait for completion; and delayed ngrok ready events check endpoint generation before revoking live controllers. Consolidates 4 November safety latch timestamp diagnostics and Level 1 motion-only resume (`safety.py`, `servo.py`, `robot.py`, `runtime.py`, `service_main.py`, `prompts.py`), live `speech_output` state, automated Piper TTS provisioning, standalone power-off helper installation, and web microphone lifecycle retention until `onend`, alongside 3 November Fusion HAT+ sysfs PWM ownership (`1.1.0-ninja1`, fixed 50 Hz, class-level lock), in-memory calibration draft staging, and earlier checkpoints.[^src-20261109-developmentguide]
 
 
-[^src-20261104-developmentguide]: DevelopmentGuide.md, source version `fusion-agent-remediation-261104`; registered source `src-20261104-developmentguide`.
+[^src-20261109-developmentguide]: DevelopmentGuide.md; registered source `src-20261109-developmentguide`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

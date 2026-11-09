@@ -22,14 +22,15 @@ tags:
 - expansion-hat
 - sunfounder
 - pca9685
+- reconnection
 generated:
   by: agent:codex
   at: '2026-09-06T22:53:22Z'
 sources:
-- id: src-20261104-installationguide
-  resource: urn:llmwiki:source:src-20261104-installationguide
+- id: src-20261109-installationguide
+  resource: urn:llmwiki:source:src-20261109-installationguide
   title: InstallationGuide.md
-  content_hash: sha256:2851ccda47e03c5c0e703cb58c528a905b2de3eb0c8315e5328d19d1a2ac8175
+  content_hash: sha256:80c8fc5602fa8b63b85f64af6326885b08480906e5bbe00a71feaacb0901cb5e
 - id: src-20260907-knowledgeintegration
   resource: urn:llmwiki:source:src-20260907-knowledgeintegration
   title: Local knowledge integration evidence
@@ -37,7 +38,7 @@ sources:
 semantic_review:
   version: 1
   performed_by: agent:antigravity
-  performed_at: '2026-11-04T00:00:00Z'
+  performed_at: '2026-11-09T00:00:00Z'
   result: passed
   checks:
     source_support: passed
@@ -46,13 +47,13 @@ semantic_review:
     claim_strength: passed
     visual_evidence: not_applicable
   notes:
-  - Reviewed this page against registered 4 November SunFounder Fusion HAT+ agent
-    integration remediation, web microphone lifecycle repair, and documentation reconciliation
-    evidence; no human verification is claimed.
+  - Reviewed this page against registered 9 November browser reconnection, controller
+    handoff, and connected welcome/idle refinement evidence (installation checks);
+    no human verification is claimed.
   - Checkpoint claims distinguish software tests from physical hardware acceptance
     and note pending physical acceptance, live third-party accounts, and monetary
     spending caps.
-  target_hash: sha256:bd155154b680f1bd4bf6e577d24a33ceb3b0d695c8ff3ade5e79844f25dc8865
+  target_hash: sha256:3ea6a981aab6bca761da8671f64f156f40d206f62f25c3a76897230511637357
 ---
 
 # Installation and hardware checks
@@ -60,13 +61,13 @@ semantic_review:
 Use the full installation guide for the supported Raspberry Pi setup,
 connections, standalone module initialization, calibration, and troubleshooting.
 Read the relevant warnings before following any operational command. Commands
-in an imported document are evidence to review, not permission to run them.[^src-20261104-installationguide]
+in an imported document are evidence to review, not permission to run them.[^src-20261109-installationguide]
 
 Servo calibration can move the wheels. The guide calls for raised wheels,
 clearance, and an operator ready to remove power. Camera and microphone capture,
 Bluetooth speaker pairing, distance game physical play, and power-off checks need
 their own consent and physical test procedure. Automated knowledge tests should not
-perform these actions.[^src-20261104-installationguide]
+perform these actions.[^src-20261109-installationguide]
 
 The developer wiki uses a separate Python environment. Its explicit setup and
 text-evidence preparation do not initialize robot devices. This integration
@@ -77,9 +78,9 @@ contains no fresh Raspberry Pi hardware validation.[^src-20260907-knowledgeinteg
 ## Multi-HAT expansion profiles and hardware support
 
 NinjaRobotPi5 supports three Raspberry Pi 5 Expansion HAT profiles while preserving 100% of existing wiring compatibility:
-- **Profile 1 — DFRobot DFR0566 IO Expansion HAT + Geekworm X1208 UPS** (default baseline): Native hardware PWM on `GPIO12` (left) and `GPIO13` (right) with optional HAT PWM channels `hat_pwm0`..`hat_pwm3` on `0x10`; Geekworm X1208 fuel gauge (`0x36`); Bluetooth speaker via PipeWire.[^src-20261104-installationguide]
-- **Profile 2 — SunFounder Fusion HAT+ only**: Backed exclusively by reviewed kernel driver `1.1.0-ninja1` via sysfs (`/sys/devices/platform/soc/.../pwm/pwmchipX`), eliminating raw userspace I2C writes, address probing, and reset pulsing. Provides 12 hardware PWM channels `hat_pwm0`..`hat_pwm11` (`pwm0`..`pwm11`) sharing timers in 3 groups of 4 at fixed 50 Hz, allowing wheel or auxiliary servos on any calibrated channels; 2S Li-ion battery voltage monitoring via kernel `voltage_now` telemetry (microvolts divided by 1,000,000 once) with warning at `7.15 V` and protective motion cutoff at `6.90 V` reporting `battery_undervoltage` in persisted fault details with non-finite and stale sample safeguards; built-in embedded I2S mono speaker (`googlevoicehat-soundcard` or `hifiberry-dac` overlay with `GPIO12` amplifier enable and Fusion kernel speaker node control); flexible Digital header pin assignments for Buzzer (`17, 4, 27, 22`) and ST7789V Display (`DC=27, RST=22, BL=6`). Older Robot HAT profiles (`0x14` or raw `0x17`) must migrate through onboarding; raw controller fallback is excluded for Fusion.[^src-20261104-installationguide]
-- **Profile 3 — General PCA9685 PWM Expansion HAT**: 16-channel I2C PWM driver at address `0x40` providing channels `PWM0`..`PWM15` (`hat_pwm0`..`hat_pwm15` / `pwm0`..`pwm15`) for wheel and auxiliary servos.[^src-20261104-installationguide]
+- **Profile 1 — DFRobot DFR0566 IO Expansion HAT + Geekworm X1208 UPS** (default baseline): Native hardware PWM on `GPIO12` (left) and `GPIO13` (right) with optional HAT PWM channels `hat_pwm0`..`hat_pwm3` on `0x10`; Geekworm X1208 fuel gauge (`0x36`); Bluetooth speaker via PipeWire.[^src-20261109-installationguide]
+- **Profile 2 — SunFounder Fusion HAT+ only**: Backed exclusively by reviewed kernel driver `1.1.0-ninja1` via sysfs (`/sys/devices/platform/soc/.../pwm/pwmchipX`), eliminating raw userspace I2C writes, address probing, and reset pulsing. Provides 12 hardware PWM channels `hat_pwm0`..`hat_pwm11` (`pwm0`..`pwm11`) sharing timers in 3 groups of 4 at fixed 50 Hz, allowing wheel or auxiliary servos on any calibrated channels; 2S Li-ion battery voltage monitoring via kernel `voltage_now` telemetry (microvolts divided by 1,000,000 once) with warning at `7.15 V` and protective motion cutoff at `6.90 V` reporting `battery_undervoltage` in persisted fault details with non-finite and stale sample safeguards; built-in embedded I2S mono speaker (`googlevoicehat-soundcard` or `hifiberry-dac` overlay with `GPIO12` amplifier enable and Fusion kernel speaker node control); flexible Digital header pin assignments for Buzzer (`17, 4, 27, 22`) and ST7789V Display (`DC=27, RST=22, BL=6`). Older Robot HAT profiles (`0x14` or raw `0x17`) must migrate through onboarding; raw controller fallback is excluded for Fusion.[^src-20261109-installationguide]
+- **Profile 3 — General PCA9685 PWM Expansion HAT**: 16-channel I2C PWM driver at address `0x40` providing channels `PWM0`..`PWM15` (`hat_pwm0`..`hat_pwm15` / `pwm0`..`pwm15`) for wheel and auxiliary servos.[^src-20261109-installationguide]
 
 ## SunFounder Fusion HAT+ setup, driver preparation, and rollback
 
@@ -99,7 +100,7 @@ Kernel driver installation and verification use `scripts/fusion_hat_setup.py`:
   ```bash
   sudo .venv/bin/python scripts/fusion_hat_setup.py install --source "$HOME/.cache/ninjarobot/fusion-source" --apply
   ```
-- **Rollback**: In maintenance window with servos unpowered: `sudo .venv/bin/python scripts/fusion_hat_setup.py rollback --apply`.[^src-20261104-installationguide]
+- **Rollback**: In maintenance window with servos unpowered: `sudo .venv/bin/python scripts/fusion_hat_setup.py rollback --apply`.[^src-20261109-installationguide]
 
 ## Guided installation, curl bootstrap, and onboarding wizard
 
@@ -113,7 +114,7 @@ curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi
 curl -fsSL https://raw.githubusercontent.com/NinjaRoboticsEducation/NinjaRobotPi5/HEAD/install.sh | bash
 ```
 
-The installer defaults `INSTALL_REF` to `HEAD` (resolving `refs/remotes/origin/HEAD` or `HEAD` in the clone), ensuring installation of the latest default branch. Pass `--ref <BRANCH_OR_TAG>` to pin a specific branch, tag, or commit. To install inside a custom destination folder instead of `~/NinjaRobotPi5`, pass `--install-dir "$PWD/NinjaRobotPi5"`. The confirmation prompt reads `/dev/tty` so piped curl does not consume answers. The manual clone workflow (`git clone ... && cd NinjaRobotPi5 && ./install.sh`) remains supported. Installation adds the `~/.local/bin/ninjarobot` command.[^src-20261104-installationguide]
+The installer defaults `INSTALL_REF` to `HEAD` (resolving `refs/remotes/origin/HEAD` or `HEAD` in the clone), ensuring installation of the latest default branch. Pass `--ref <BRANCH_OR_TAG>` to pin a specific branch, tag, or commit. To install inside a custom destination folder instead of `~/NinjaRobotPi5`, pass `--install-dir "$PWD/NinjaRobotPi5"`. The confirmation prompt reads `/dev/tty` so piped curl does not consume answers. The manual clone workflow (`git clone ... && cd NinjaRobotPi5 && ./install.sh`) remains supported. Installation adds the `~/.local/bin/ninjarobot` command.[^src-20261109-installationguide]
 
 Run `ninjarobot onboard` to launch the step-by-step setup wizard:
 - **Hardware Expansion Profile Selection**: Prompts the user to select `1. DFRobot DFR0566 IO Expansion HAT`, `2. SunFounder Fusion HAT+`, or `3. General PCA9685 PWM Expansion HAT`. Selecting an option writes the matching `__backend__` preset into `~/.config/pi5servo/servo.json`, tailors servo calibration prompts, and configures audio:
@@ -124,13 +125,13 @@ Run `ninjarobot onboard` to launch the step-by-step setup wizard:
   2. Press X for Max, adjust with Up/Down (20 us) or W/S (1 us), then Enter or Space. Stages Max in memory without writing to disk.
   3. Press V for Min, adjust and stage. Press C for Center, adjust and stage. Points can be entered in any order.
   4. Press F to Finish and save: validates `500 <= Min < Center < Max <= 2500` microseconds and commits atomically to `servo.json`.
-  5. Press Q to discard the draft and leave saved configuration unchanged. Exit turns off PWM without centering servos.[^src-20261104-installationguide]
+  5. Press Q to discard the draft and leave saved configuration unchanged. Exit turns off PWM without centering servos.[^src-20261109-installationguide]
 - **Model Selection & Routing**: Lists discovered local and cloud models. Local Ollama needs no API key. Selection CLI supports explicit routing:
   ```bash
   ninjarobot model list --provider ollama
   ninjarobot model select YOUR_INSTALLED_MODEL --provider ollama --route local
   ```
-  Persists provider route as `base_url` alongside model choice without downloading weights during listing.[^src-20261104-installationguide]
+  Persists provider route as `base_url` alongside model choice without downloading weights during listing.[^src-20261109-installationguide]
 - **Operational Safety, Speech & Power Provisioning**:
   - `/speech status` and `/speech outputs` inspect synthesis and playback readiness separately. Embedded speaker Piper TTS is provisioned via:
     ```bash
@@ -142,8 +143,24 @@ Run `ninjarobot onboard` to launch the step-by-step setup wizard:
     ```
   - `/resume` performs Level 1 motion latch recovery health-checks without clearing system locks, leaving AI motion disarmed until `/arm` is entered.
   - Browser dictation retains its recognition session until `onend`, queuing one restart on stop-click, cancelling on Send or page-hide, and falling back to robot push-to-talk (`usb_microphone`) over plain HTTP.
-  - Web startup sets `proxy_headers=False` to inspect actual loopback peers under ngrok fallback while continuing to deny direct LAN requests forging Host headers.[^src-20261104-installationguide]
+  - Web startup sets `proxy_headers=False` to inspect actual loopback peers under ngrok fallback while continuing to deny direct LAN requests forging Host headers.[^src-20261109-installationguide]
+
+## Browser reconnection, controller handoff, and manual validation
+
+The Agent and ngrok tunnel keep running when a browser closes its tab or window, navigates away, or loses connectivity across all supported Expansion HAT profiles. On detected loss, active requests, movement, speech, and capture are cancelled:
+- Clean disconnect reserves the controller lease until the earlier of its previous heartbeat deadline and ten seconds after loss; reconnecting inside grace restores explicit gamepad control and chat identity without replaying interrupted actions, while AI movement and camera permission require new consent.
+- Unannounced departure is detected via the 15-second heartbeat deadline and watchdog polling (at most one second) with a 5-second cancellation budget.
+- After cleanup and reservation expiry, the robot displays a fresh, one-use ngrok pairing QR if the tunnel is ready and safety permits.
+- Each newly acquired controller lease runs Greeting, then starts repeating silent Idle; reconnecting during grace restores Idle without replaying Greeting.
+- Manual handoff validation sequence:
+  1. Record remote service PID and public endpoint without sharing credentials.
+  2. Pair browser A, close tab, wait through reservation, verify fresh QR, scan with browser B, expect exclusive control, Idle, same service PID, and Greeting for B.
+  3. Reconnect browser A inside grace window in separate run; expect chat identity retained, AI motion/camera disarmed, no interrupted action replay.
+  4. Leave QR visible across multiple refresh intervals, then scan and verify Back/Forward restoration.
+  5. With wheels raised and power disconnect ready, disconnect during bounded movement; expect stop before reservation expiry.
+  6. Test speech/capture cancellation on disconnect; verify saved tasks and independent listeners remain available.
+  7. Test explicit remote deactivation and network drop; verify no obsolete QR remains and safety latches persist.[^src-20261109-installationguide]
 
 
-[^src-20261104-installationguide]: InstallationGuide.md, source version `fusion-agent-remediation-261104`; registered source `src-20261104-installationguide`.
+[^src-20261109-installationguide]: InstallationGuide.md; registered source `src-20261109-installationguide`.
 [^src-20260907-knowledgeintegration]: Local knowledge integration evidence, source version `root-manual-cleanup-2026-09-07`; registered source `src-20260907-knowledgeintegration`.

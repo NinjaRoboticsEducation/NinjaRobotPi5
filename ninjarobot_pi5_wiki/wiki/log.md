@@ -1,5 +1,9 @@
 # Wiki Update Log
 
+## 2026-11-09
+
+* **Update**: Applied plan `web-reconnection-261109` — Ingest 2026-11-09-02 browser disconnect, reconnect, and controller handoff and connected welcome/idle refinement manuals; update ten knowledge pages with serialized lease cleanup, attachment generations, immediate revocation, automatic pairing QR redisplay, durable waiting display reservation, endpoint invalidation, browser departure/Back-Forward recovery, and per-controller welcome and idle refinement.. Sources: `src-20261109-installationguide`, `src-20261109-developmentguide`, `src-20261109-developmentlog`, `src-20260907-knowledgeintegration`, `src-20261027-ninjarobot-mcp-skill`.
+
 ## 2026-11-04
 
 * **Update**: Applied plan `fusion-agent-remediation-261104` — Ingest 2026-11-04-03 SunFounder Fusion HAT+ agent integration remediation, web microphone lifecycle repair, and documentation reconciliation manuals; update ten knowledge pages with safety latch timestamp diagnostics, Level 1 /resume dispatch, /arm and /disarm commands, signed -90..90 single-servo routing, live speech_output prompt awareness and Piper TTS provisioning, standalone web power-off helper, browser microphone lifecycle retention until onend with HTTP push-to-talk fallback, and 48 kHz I2S voice input resilience.. Sources: `src-20261104-installationguide`, `src-20261104-developmentguide`, `src-20261104-developmentlog`, `src-20260907-knowledgeintegration`, `src-20261027-ninjarobot-mcp-skill`.
