@@ -114,8 +114,6 @@ export function updateAiMotion(armed) {
   const button = elements.armAi;
   if (!button) return;
   button.dataset.armed = String(armed);
-  const span = button.querySelector("span");
-  if (span) span.textContent = armed ? t("motion.disarm") : t("motion.arm");
   button.setAttribute("aria-pressed", String(armed));
 }
 
@@ -141,8 +139,6 @@ export function updateAiCamera(granted) {
   const button = elements.armAiCamera;
   if (!button) return;
   button.dataset.granted = String(granted);
-  const span = button.querySelector("span");
-  if (span) span.textContent = granted ? t("camera.armed") : t("camera.arm");
   button.setAttribute("aria-pressed", String(granted));
 }
 
@@ -247,15 +243,6 @@ export function updateVoiceInput(status = {}) {
   elements.voiceInput.dataset.enabled = String(enabled);
   elements.voiceInput.setAttribute("aria-pressed", String(enabled));
   elements.voiceInput.classList.toggle("recording", enabled);
-  const strong = elements.voiceInput.querySelector("strong");
-  if (strong) {
-    strong.textContent = enabled ? t("voice.titleOn") : t("voice.title");
-  }
-  const stateLabel = typeof status.state === "string" ? status.state : "disabled";
-  const small = elements.voiceInput.querySelector("small");
-  if (small) {
-    small.textContent = t("voice.status", { state: stateLabel });
-  }
 }
 
 if (elements.voiceInput) {
@@ -477,8 +464,6 @@ export function showSpeechState(result) {
   if (elements.speechOn) {
     elements.speechOn.setAttribute("aria-pressed", String(enabled));
     elements.speechOn.dataset.speech = enabled ? "on" : "off";
-    const detail = elements.speechOn.querySelector("small");
-    if (detail) detail.textContent = enabled ? t("speech.enabled") : t("speech.disabled");
   }
   const resultEl = document.querySelector("#speechResult");
   if (resultEl) {

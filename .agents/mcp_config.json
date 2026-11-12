@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "gemini-notebook": {
+            "command": "/bin/bash",
+            "args": [
+                "-c",
+                "TOKEN=$(gcloud auth application-default print-access-token) && npx -y mcp-remote https://notebook.googleapis.com/mcp --header \"Authorization: Bearer $TOKEN\""
+            ]
+        }
+    }
+}

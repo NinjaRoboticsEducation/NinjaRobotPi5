@@ -329,15 +329,22 @@ h2 {
 }
 
 /* ── Agent Interface Action Buttons (Toggle State) ────── */
+.agent-controls-section .action-pad {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .agent-controls-section .action-button {
+  padding-inline: 3px;
+  text-align: center;
   color: black;
   border: 2px solid black;
   outline: none;
 }
 
-.agent-controls-section .action-button strong,
 .agent-controls-section .action-button span {
-  color: inherit;
+  font-size: clamp(0.66rem, 3vw, 1.05rem);
+  line-height: 1.12;
+  overflow-wrap: anywhere;
 }
 
 .agent-controls-section .action-button[aria-pressed="true"],
@@ -369,28 +376,32 @@ h2 {
 
 .audio-controls {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
 
-/* Media buttons: WEB MICROPHONE, VOICE INPUT, SPEECH ON */
 /* Disabled style (default / OFF): White font color with 50% opacity white border */
 .media-button {
   min-height: 45px;
   border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 12px;
   padding: 7px 9px;
-  text-align: left;
+  text-align: center;
   background: rgba(3, 12, 21, 0.93);
   display: grid;
+  place-content: center;
   gap: 2px;
   color: #ffffff;
   transition: color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 60ms ease;
 }
 
+.media-button[hidden] {
+  display: none;
+}
+
 .media-button strong {
   color: #ffffff;
-  font-size: clamp(0.58rem, 2.3vw, 0.72rem);
+  font-size: clamp(0.88rem, 3.7vw, 1.35rem);
 }
 
 .media-button small {
