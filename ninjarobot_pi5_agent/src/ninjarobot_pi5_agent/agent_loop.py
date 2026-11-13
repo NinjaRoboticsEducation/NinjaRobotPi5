@@ -12,7 +12,9 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from .cloud_common import CloudProviderError
 from .events import CURRENT_LIFECYCLE, AgentEventType, EventBroker, begin_lifecycle, log_lifecycle
+from .model_selection import ModelSelectionError
 from .models import (
     FinishReason,
     MessageRole,
@@ -27,6 +29,7 @@ from .models import (
     ToolExecutionStatus,
     ToolInvocation,
 )
+from .ollama import OllamaUnavailableError
 from .persistence import ConversationStore
 from .policy import PolicyContext, PolicyEngine
 from .presentation import (
@@ -291,6 +294,7 @@ class AgentLoop:
 
         spoken_summary: str | None = None
         completed_tool_calls = 0
+        executed_results: list[ToolExecutionResult] = []
         seen_call_ids: set[str] = set()
         for model_turn_number in range(1, max_model_turns + 1):
             if token.cancelled:
@@ -316,11 +320,43 @@ class AgentLoop:
                 allow_provider_fallback=(model_turn_number == 1 and completed_tool_calls == 0),
             )
             log_lifecycle("thinking", reason="model_requested")
-            turn = await self._model_turn(
-                request,
-                on_text_delta=on_text_delta,
-                session_id=session_id,
-            )
+            emitted_text = False
+
+            async def forward_text(text: str) -> None:
+                nonlocal emitted_text
+                emitted_text = emitted_text or bool(text)
+                if on_text_delta is not None:
+                    await on_text_delta(text)
+
+            try:
+                turn = await self._model_turn(
+                    request,
+                    on_text_delta=forward_text if on_text_delta is not None else None,
+                    session_id=session_id,
+                )
+            except (CloudProviderError, OllamaUnavailableError, ModelSelectionError) as exc:
+                if not executed_results:
+                    raise
+                if token.cancelled:
+                    raise asyncio.CancelledError from exc
+                await self._events.publish(
+                    AgentEventType.ERROR,
+                    "Model follow-up unavailable; reporting recorded tool outcomes.",
+                    session_id=session_id,
+                    correlation_id=request_id,
+                    data={"error_type": type(exc).__name__},
+                )
+                fallback_text = _format_post_tool_fallback_reply(executed_results)
+                if emitted_text and on_text_delta is not None:
+                    await on_text_delta("\n\n")
+                return await self._direct_reply(
+                    session_id=session_id,
+                    text=fallback_text,
+                    tool_calls=completed_tool_calls,
+                    on_text_delta=on_text_delta,
+                    model_turns=model_turn_number,
+                    spoken_summary=spoken_summary,
+                )
             await self._events.publish(
                 AgentEventType.CHAT,
                 "Model turn completed.",
@@ -379,6 +415,7 @@ class AgentLoop:
                     summary = (result.data or {}).get("spoken_summary")
                     if isinstance(summary, str):
                         spoken_summary = summary[:500]
+                executed_results.append(result)
                 seen_call_ids.add(call.call_id)
                 await self._append(
                     session_id,
@@ -577,8 +614,10 @@ class AgentLoop:
         text: str,
         tool_calls: int,
         on_text_delta: TextDeltaHandler | None,
+        model_turns: int = 0,
+        spoken_summary: str | None = None,
     ) -> AgentReply:
-        """Persist and stream a deterministic response without a model turn."""
+        """Persist and stream a deterministic response with accurate turn accounting."""
         await self._present(
             "responding",
             self._presentation.responding,
@@ -593,7 +632,8 @@ class AgentLoop:
         return AgentReply(
             session_id=session_id,
             text=text,
-            model_turns=0,
+            model_turns=model_turns,
+            spoken_summary=spoken_summary,
             tool_calls=tool_calls,
         )
 
@@ -625,17 +665,22 @@ class AgentLoop:
         )
         final: ModelTurn | None = None
         stream = self._provider.stream(request).__aiter__()
-        while True:
-            try:
-                async with asyncio.timeout(request.timeout_seconds):
-                    event = await anext(stream)
-            except StopAsyncIteration:
-                break
-            final = await self._consume_stream_event(
-                event,
-                final=final,
-                on_text_delta=stream_filter.feed,
-            )
+        try:
+            while True:
+                try:
+                    async with asyncio.timeout(request.timeout_seconds):
+                        event = await anext(stream)
+                except StopAsyncIteration:
+                    break
+                final = await self._consume_stream_event(
+                    event,
+                    final=final,
+                    on_text_delta=stream_filter.feed,
+                )
+        finally:
+            close_stream = getattr(stream, "aclose", None)
+            if close_stream is not None:
+                await close_stream()
         if final is None:
             raise AgentLoopError("provider stream ended without a final turn")
         face, visible = extract_presentation_directive(final.text)
@@ -996,3 +1041,32 @@ def _is_normalized_camera_preview_rejection(normalized: str) -> bool:
         negation in normalized for negation in _JAPANESE_CAPTURE_NEGATIONS
     )
     return english_rejection or japanese_rejection
+
+
+def _format_post_tool_fallback_reply(results: list[ToolExecutionResult]) -> str:
+    """Report authoritative outcomes without exposing arbitrary tool data or errors."""
+    notice = "The AI model could not complete its follow-up. Recorded tool outcomes: "
+    lines: list[str] = []
+    # Reserve room for the safety notice and omitted-result count.
+    budget = 3200
+    for result in results:
+        line = f"{result.tool_name}: {result.status.value}."
+        if result.status is not ToolExecutionStatus.SUCCEEDED:
+            line += (
+                " Not executed."
+                if result.definitely_not_executed
+                else " Execution may have occurred; completion is not confirmed."
+            )
+        if len(line) + 1 > budget:
+            break
+        lines.append(line)
+        budget -= len(line) + 1
+    if len(lines) < len(results):
+        lines.append(f"{len(results) - len(lines)} further outcomes are in the tool history.")
+    return (
+        notice
+        + "\n"
+        + "\n".join(lines)
+        + "\nDetails remain in the tool history. Do not repeat a physical action that "
+        "succeeded or may have executed; check its status first."
+    )

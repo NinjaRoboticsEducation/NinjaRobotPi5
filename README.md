@@ -27,14 +27,26 @@
 ## Current implementation and manuals
 
 Fusion HAT+ uses the reviewed kernel driver for all twelve servo channels and
-embedded audio. The latest manuals below also describe browser reconnection and
-handoff. The registered wiki map points to the 4 November (`2026-11-04-03`)
-checkpoint; the 9 November raw successors await owner validation, ingestion and
-review. Physical acceptance remains pending. Follow the
-[Fusion installation and manual validation](docs/validation/fusion_implementation_261103.md)
-and [reconnection validation](docs/validation/web_reconnection_261108.md).
+embedded audio. The latest raw manuals also cover browser reconnection and
+Gemini tool-calling resilience. The knowledge map and compiled wiki reference
+the 9 November (`2026-11-09-02`) sources. The new 14 November raw successors await
+owner manual testing, registration, ingestion, and semantic review. Physical
+acceptance remains pending. Follow the
+[Fusion validation](docs/validation/fusion_implementation_261103.md),
+[reconnection validation](docs/validation/web_reconnection_261108.md), and
+[Gemini acceptance steps](docs/validation/gemini_tool_calling_261114.md).
 
-Registered predecessor sources:
+Gemini now retries transient HTTP 429/502/503/504 failures with bounded backoff
+and request pacing. HTTP 402 reports billing guidance without retrying. When a
+model follow-up fails after tools have returned, the Agent reports recorded tool
+outcomes without repeating those actions. Upstream outages can still occur.
+
+Registered 9 November sources:
+[InstallationGuide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-09-02/InstallationGuide.md),
+[DevelopmentGuide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-09-02/DevelopmentGuide.md), and
+[DevelopmentLog](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-09-02/DevelopmentLog.md).
+
+Earlier predecessor sources:
 [InstallationGuide (2026-11-04-03)](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-04-03/InstallationGuide.md),
 [DevelopmentGuide (2026-11-04-03)](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-04-03/DevelopmentGuide.md),
 [DevelopmentLog (2026-11-04-03)](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-04-03/DevelopmentLog.md),
@@ -197,7 +209,7 @@ Use the tables below as the recommended default electronic module pin wiring ref
 | | `GND` | `Pin06/GND` (RaspberryPi) |
 | | Servo 1–16 | `pwm0`–`pwm15` (on PCA9685) |
 
-> **Safety:** Power off before changing wiring. Fusion reserves GPIO16/18/19/20/21; use the reviewed kernel installer, not legacy GPIO12 amplifier or GPIO5 reset instructions. Verify servo supply and grounding against the board documentation. See the [Fusion manual](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-09-02/InstallationGuide.md#fusion-installation-and-onboarding).
+> **Safety:** Power off before changing wiring. Fusion reserves GPIO16/18/19/20/21; use the reviewed kernel installer, not legacy GPIO12 amplifier or GPIO5 reset instructions. Verify servo supply and grounding against the board documentation. See the [Fusion manual](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-14/InstallationGuide.md#fusion-installation-and-onboarding).
 
 ### 2.3 Raspberry Pi OS Installation
 
@@ -378,7 +390,7 @@ Use these commands from your installed checkout as the normal robot user.
 The module was build-tested for `6.12.109+rpt-rpi-2712`; other kernels require
 qualification. Installation is per kernel, with no automatic rebuild after an OS
 upgrade. For replacement and rollback, follow the
-[full Fusion installation guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-09-02/InstallationGuide.md#explicit-operating-system-installation).
+[full Fusion installation guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-14/InstallationGuide.md#explicit-operating-system-installation).
 
 ### 2.5 Onboarding — Set Up Your Robot
 
@@ -560,7 +572,7 @@ without replaying actions. After bounded lock retries, reload to retry; if pairi
 expired, scan the current QR. No new boot service or HAT driver installation is
 needed for this feature.
 
-See the [handoff test steps](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-09-02/InstallationGuide.md#manual-handoff-validation)
+See the [handoff test steps](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-14/InstallationGuide.md#manual-handoff-validation)
 and [validation record](docs/validation/web_reconnection_261108.md). Test harmless
 browser handoffs before supervised movement/capture tests.
 
@@ -1055,10 +1067,10 @@ The principal `/` commands are listed below; `/help` is the current in-app refer
 
 | Document | Description |
 |---|---|
-| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-09-02/InstallationGuide.md) ([2026-11-03-04](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/InstallationGuide.md), [2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-09-02/InstallationGuide.md)) | Complete step-by-step guide from blank Pi to running robot |
-| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-09-02/DevelopmentGuide.md) ([2026-11-03-04](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/DevelopmentGuide.md), [2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/DevelopmentGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md)) | Architecture, API reference, and developer workflow |
+| [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-14/InstallationGuide.md) ([2026-11-03-04](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/InstallationGuide.md), [2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/InstallationGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/InstallationGuide.md)) | Complete step-by-step guide from blank Pi to running robot |
+| [Development Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-14/DevelopmentGuide.md) ([2026-11-03-04](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-03-04/DevelopmentGuide.md), [2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/DevelopmentGuide.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/DevelopmentGuide.md)) | Architecture, API reference, and developer workflow |
 | [MCP and Skills Tutorial](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md) ([2026-09-23-02](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-09-23-02/NinjaRobot_MCP_Skill.md)) | Beginner guide to external tools and reusable Skills |
-| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-09-02/DevelopmentLog.md) ([2026-11-03-04](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-03-04/DevelopmentLog.md), [2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md)) | Implementation history and decisions |
+| [Development Log](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-14/DevelopmentLog.md) ([2026-11-03-04](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-11-03-04/DevelopmentLog.md), [2026-10-25 Multi-HAT](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-10-25/DevelopmentLog.md), [2026-09-23-02](ninjarobot_pi5_wiki/raw/notes/ninjarobotpi5/2026-09-23-02/DevelopmentLog.md)) | Implementation history and decisions |
 | [Hardware Profile](docs/hardware/hardware-profile.md) | Confirmed wiring and electrical records |
 | [Documentation Index](docs/README.md) | Index of all project documents |
 | [v1.0.0 Support Matrix](docs/architecture/v1.0.0-support-matrix.md) | Historical release baseline; see current manuals for later additions such as speech output |
@@ -1218,7 +1230,7 @@ ask “What is on my calendar today?” in chat. The native `/info calendar.conn
 command lists native connections, not this MCP server.
 
 For reviewed event creation or modification, follow the separate native Calendar
-section of the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-09-02/InstallationGuide.md).
+section of the [Installation Guide](ninjarobot_pi5_wiki/raw/articles/ninjarobotpi5/2026-11-14/InstallationGuide.md).
 For Mac forwarding, retry steps, and expected feedback, see the
 [Calendar walkthrough](docs/validation/onboarding_refinement_walkthrough_260923.md#google-calendar-mcp-mac-browser-over-ssh).
 Google’s [official Calendar quickstart](https://developers.google.com/workspace/calendar/api/quickstart/python)

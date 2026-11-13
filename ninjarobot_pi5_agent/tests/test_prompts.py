@@ -64,3 +64,12 @@ def test_prompt_order_keeps_safety_before_skill_and_conversation(tmp_path) -> No
     assert "0 is center (neutral)" in messages[1].content
     assert "subordinate workflow" in messages[3].content
     assert messages[-1] == conversation[0]
+
+
+def test_clock_guidance_uses_injected_host_time_without_redundant_tool() -> None:
+    messages = PromptComposer().compose(runtime_state={}, conversation=())
+    text = "\n".join(message.content for message in messages)
+    assert "Use runtime_state.system_time directly" in text
+    assert "without calling system.time.get" in text
+    assert "new timestamp after executing another tool" in text
+    assert '"system_time":' in text

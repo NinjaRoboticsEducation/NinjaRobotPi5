@@ -1486,3 +1486,210 @@ def test_game_start_instruction_precedes_blocking_tool_result(tmp_path):
             await store.close()
 
     asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("error_kind", ["cloud", "ollama", "selection"])
+@pytest.mark.parametrize("streaming", [False, True])
+@pytest.mark.parametrize("denied", [False, True])
+def test_post_tool_provider_failure_reports_outcome_once(
+    tmp_path, error_kind, streaming, denied
+) -> None:
+    from ninjarobot_pi5_agent.cloud_common import CloudUnavailableError
+    from ninjarobot_pi5_agent.model_selection import ModelSelectionError
+    from ninjarobot_pi5_agent.ollama import OllamaUnavailableError
+
+    async def exercise() -> None:
+        error_type = {
+            "cloud": CloudUnavailableError,
+            "ollama": OllamaUnavailableError,
+            "selection": ModelSelectionError,
+        }[error_kind]
+
+        class FailingFollowup(FakeProvider):
+            @property
+            def capabilities(self):
+                return super().capabilities.model_copy(update={"streaming": streaming})
+
+            async def generate(self, request):
+                self.requests.append(request)
+                if len(self.requests) > 1:
+                    raise error_type("private-provider-detail")
+                return ModelTurn(
+                    request_id=request.request_id,
+                    finish_reason=FinishReason.TOOL_CALLS,
+                    tool_calls=(
+                        ToolCall(call_id="call-1", name="robot.distance.read", arguments={}),
+                    ),
+                )
+
+            async def stream(self, request):
+                if self.requests:
+                    yield ModelStreamEvent(
+                        request_id=request.request_id,
+                        event=StreamEventType.TEXT_DELTA,
+                        text="Partial answer. ",
+                    )
+                turn = await self.generate(request)
+                yield ModelStreamEvent(
+                    request_id=request.request_id, event=StreamEventType.DONE, turn=turn
+                )
+
+        loop, store, registry, ide = await build_loop(
+            tmp_path, [], risk=RiskLevel.MOTION if denied else RiskLevel.READ_ONLY
+        )
+        provider = FailingFollowup(())
+        loop._provider = provider
+        deltas = []
+
+        async def on_delta(text):
+            deltas.append(text)
+
+        reply = await loop.chat(
+            session_id="session-1",
+            text="Check distance",
+            on_text_delta=on_delta if streaming else None,
+        )
+        assert reply.model_turns == 2
+        assert reply.tool_calls == 1
+        assert f"robot.distance.read: {'denied' if denied else 'succeeded'}" in reply.text
+        assert "private-provider-detail" not in reply.text
+        assert len(ide.requests) == (0 if denied else 1)
+        assert len(provider.requests) == 2
+        assert provider.requests[0].allow_provider_fallback
+        assert not provider.requests[1].allow_provider_fallback
+        messages = await store.messages("session-1")
+        assert messages[-1].message.role is MessageRole.ASSISTANT
+        assert messages[-1].message.content == reply.text
+        assert len([m for m in messages if m.message.role is MessageRole.TOOL]) == 1
+        if streaming:
+            assert "\n\n" in deltas
+            assert deltas[-1] == reply.text
+        await registry.close()
+        await store.close()
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("error_kind", ["cloud", "ollama", "selection", "cancel", "bug"])
+def test_provider_failure_before_tools_is_not_converted_to_success(tmp_path, error_kind) -> None:
+    from ninjarobot_pi5_agent.cloud_common import CloudUnavailableError
+    from ninjarobot_pi5_agent.model_selection import ModelSelectionError
+    from ninjarobot_pi5_agent.ollama import OllamaUnavailableError
+
+    async def exercise() -> None:
+        error_type = {
+            "cloud": CloudUnavailableError,
+            "ollama": OllamaUnavailableError,
+            "selection": ModelSelectionError,
+            "cancel": asyncio.CancelledError,
+            "bug": ValueError,
+        }[error_kind]
+
+        class FailingProvider(FakeProvider):
+            async def generate(self, request):
+                raise error_type("failure")
+
+        loop, store, registry, ide = await build_loop(tmp_path, [])
+        loop._provider = FailingProvider(())
+        with pytest.raises(error_type):
+            await loop.chat(session_id="session-1", text="Check distance")
+        assert not ide.requests
+        assert all(
+            m.message.role is not MessageRole.ASSISTANT for m in await store.messages("session-1")
+        )
+        await registry.close()
+        await store.close()
+
+    asyncio.run(exercise())
+
+
+def test_direct_outcome_summary_bounds_output_and_omits_untrusted_data() -> None:
+    from ninjarobot_pi5_agent.agent_loop import _format_post_tool_fallback_reply
+    from ninjarobot_pi5_agent.models import ToolExecutionResult, ToolExecutionStatus
+
+    uncertain = ToolExecutionResult(
+        call_id="call-1",
+        tool_name="mcp.external.action",
+        status=ToolExecutionStatus.TIMED_OUT,
+        error="private-token",
+        data={"secret": "private-data"},
+    )
+    denied = ToolExecutionResult(
+        call_id="call-2",
+        tool_name="robot.action",
+        status=ToolExecutionStatus.DENIED,
+        error="private-denial",
+        definitely_not_executed=True,
+    )
+    text = _format_post_tool_fallback_reply([uncertain, denied])
+    assert "timed_out" in text
+    assert "Execution may have occurred" in text
+    assert "Not executed" in text
+    assert "private" not in text
+    assert len(_format_post_tool_fallback_reply([uncertain] * 200)) < 4000
+
+
+@pytest.mark.parametrize("failure", [ValueError, asyncio.CancelledError])
+def test_post_tool_recovery_preserves_cancellation_and_programming_errors(
+    tmp_path, failure
+) -> None:
+    async def exercise() -> None:
+        class InterruptedFollowup(FakeProvider):
+            async def generate(self, request):
+                if self.requests:
+                    raise failure("interrupted")
+                self.requests.append(request)
+                return ModelTurn(
+                    request_id=request.request_id,
+                    finish_reason=FinishReason.TOOL_CALLS,
+                    tool_calls=(
+                        ToolCall(call_id="call-1", name="robot.distance.read", arguments={}),
+                    ),
+                )
+
+        loop, store, registry, ide = await build_loop(tmp_path, [])
+        loop._provider = InterruptedFollowup(())
+        with pytest.raises(failure):
+            await loop.chat(session_id="session-1", text="Check distance")
+        assert len(ide.requests) == 1
+        assert (await store.messages("session-1"))[-1].message.role is MessageRole.TOOL
+        await registry.close()
+        await store.close()
+
+    asyncio.run(exercise())
+
+
+def test_stream_is_closed_when_visible_text_callback_fails(tmp_path) -> None:
+    async def exercise() -> None:
+        class OpenStream(FakeProvider):
+            closed_stream = False
+
+            @property
+            def capabilities(self):
+                return super().capabilities.model_copy(update={"streaming": True})
+
+            async def stream(self, request):
+                try:
+                    yield ModelStreamEvent(
+                        request_id=request.request_id,
+                        event=StreamEventType.TEXT_DELTA,
+                        text="Hello! " * 30,
+                    )
+                    raise AssertionError("consumer should have stopped")
+                finally:
+                    self.closed_stream = True
+
+        loop, store, registry, _ = await build_loop(tmp_path, [])
+        provider = OpenStream(())
+        loop._provider = provider
+
+        async def broken_callback(text):
+            raise ValueError("consumer disconnected")
+
+        with pytest.raises(ValueError, match="consumer disconnected"):
+            await loop.chat(session_id="session-1", text="Hello", on_text_delta=broken_callback)
+        assert provider.closed_stream
+        await registry.close()
+        await store.close()
+
+    asyncio.run(exercise())

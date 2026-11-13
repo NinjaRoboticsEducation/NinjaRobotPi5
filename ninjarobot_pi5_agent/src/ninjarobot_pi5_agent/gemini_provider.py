@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import random
+import time
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Any
 
@@ -48,8 +51,9 @@ class GeminiConfig(BaseModel):
     base_url: HttpUrl = HttpUrl("https://generativelanguage.googleapis.com/v1beta")
     project_id: str | None = None
     max_output_tokens: int = Field(default=2048, ge=1, le=32768)
-    max_rate_limit_retries: int = Field(default=2, ge=0, le=3)
+    max_rate_limit_retries: int = Field(default=3, ge=0, le=5)
     max_rate_limit_retry_delay_seconds: float = Field(default=10.0, ge=0.1, le=30.0)
+    min_request_interval_seconds: float = Field(default=0.35, ge=0.0, le=5.0)
 
     @field_validator("base_url")
     @classmethod
@@ -78,6 +82,8 @@ class GeminiProvider:
         self._client = client or httpx.AsyncClient(base_url=str(config.base_url).rstrip("/"))
         self._owns_client = client is None
         self._closed = False
+        self._request_lock = asyncio.Lock()
+        self._last_request_completed_at: float | None = None
 
     @property
     def capabilities(self) -> ProviderCapabilities:
@@ -113,41 +119,42 @@ class GeminiProvider:
         tool_names = wire_tool_map(tuple(tool.name for tool in request.tools))
         for attempt in range(self.config.max_rate_limit_retries + 1):
             try:
-                async with self._client.stream(
-                    "POST",
-                    self._model_path("streamGenerateContent"),
-                    params={"alt": "sse"},
-                    headers=await self._headers(),
-                    json=self._payload(request),
-                    timeout=request.timeout_seconds,
-                ) as response:
-                    if response.status_code >= 400:
-                        await response.aread()
-                        await checked_json(response, provider="Gemini")
-                    async for _event_name, payload in iter_sse_json(
-                        response,
-                        provider="Gemini",
-                    ):
-                        chunk_text, chunk_calls, chunk_finish, chunk_usage = _response_parts(
-                            request.request_id,
-                            payload,
-                            tool_names,
-                            call_offset=len(calls),
-                        )
-                        if chunk_text:
-                            text.append(chunk_text)
-                            yield ModelStreamEvent(
-                                request_id=request.request_id,
-                                event=StreamEventType.TEXT_DELTA,
-                                text=chunk_text,
+                async with self._request_slot():
+                    async with self._client.stream(
+                        "POST",
+                        self._model_path("streamGenerateContent"),
+                        params={"alt": "sse"},
+                        headers=await self._headers(),
+                        json=self._payload(request),
+                        timeout=request.timeout_seconds,
+                    ) as response:
+                        if response.status_code >= 400:
+                            await response.aread()
+                            await checked_json(response, provider="Gemini")
+                        async for _event_name, payload in iter_sse_json(
+                            response,
+                            provider="Gemini",
+                        ):
+                            chunk_text, chunk_calls, chunk_finish, chunk_usage = _response_parts(
+                                request.request_id,
+                                payload,
+                                tool_names,
+                                call_offset=len(calls),
                             )
-                        calls.extend(chunk_calls)
-                        finish_reason = chunk_finish or finish_reason
-                        if chunk_usage:
-                            usage = chunk_usage
+                            if chunk_text:
+                                text.append(chunk_text)
+                                yield ModelStreamEvent(
+                                    request_id=request.request_id,
+                                    event=StreamEventType.TEXT_DELTA,
+                                    text=chunk_text,
+                                )
+                            calls.extend(chunk_calls)
+                            finish_reason = chunk_finish or finish_reason
+                            if chunk_usage:
+                                usage = chunk_usage
                 break
             except CloudRateLimitError as exc:
-                if attempt >= self.config.max_rate_limit_retries:
+                if text or calls or attempt >= self.config.max_rate_limit_retries:
                     raise
                 await self._wait_rate_limit_retry(exc, attempt)
             except httpx.HTTPError as exc:
@@ -242,13 +249,14 @@ class GeminiProvider:
     async def _generate_with_retry(self, request: ModelRequest) -> dict[str, Any]:
         for attempt in range(self.config.max_rate_limit_retries + 1):
             try:
-                response = await self._client.post(
-                    self._model_path("generateContent"),
-                    headers=await self._headers(),
-                    json=self._payload(request),
-                    timeout=request.timeout_seconds,
-                )
-                return await checked_json(response, provider="Gemini")
+                async with self._request_slot():
+                    response = await self._client.post(
+                        self._model_path("generateContent"),
+                        headers=await self._headers(),
+                        json=self._payload(request),
+                        timeout=request.timeout_seconds,
+                    )
+                    return await checked_json(response, provider="Gemini")
             except CloudRateLimitError as exc:
                 if attempt >= self.config.max_rate_limit_retries:
                     raise
@@ -257,10 +265,27 @@ class GeminiProvider:
                 raise CloudUnavailableError(f"Gemini request failed: {type(exc).__name__}") from exc
         raise AssertionError("bounded Gemini retry loop did not return or raise")
 
+    @asynccontextmanager
+    async def _request_slot(self) -> AsyncIterator[None]:
+        """Serialize generation requests and pace from the previous completion."""
+        async with self._request_lock:
+            if self._last_request_completed_at is not None:
+                remaining = self.config.min_request_interval_seconds - (
+                    time.monotonic() - self._last_request_completed_at
+                )
+                if remaining > 0:
+                    await asyncio.sleep(remaining)
+            self._ensure_open()
+            try:
+                yield
+            finally:
+                self._last_request_completed_at = time.monotonic()
+
     async def _wait_rate_limit_retry(self, error: CloudRateLimitError, attempt: int) -> None:
         delay = error.retry_after_seconds
         if delay is None:
-            delay = float(2**attempt)
+            base = float(2**attempt)
+            delay = base + random.uniform(0.0, min(0.25, base * 0.1))
         await asyncio.sleep(min(delay, self.config.max_rate_limit_retry_delay_seconds))
 
     async def _headers(self) -> dict[str, str]:

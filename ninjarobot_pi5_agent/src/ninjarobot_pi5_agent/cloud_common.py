@@ -27,14 +27,28 @@ class CloudUnavailableError(CloudProviderError):
 
 
 class CloudRateLimitError(CloudUnavailableError):
-    """The provider requested a bounded retry after rate limiting."""
+    """The provider requested a bounded retry after rate limiting or overload."""
 
-    def __init__(self, provider: str, retry_after_seconds: float | None) -> None:
+    def __init__(
+        self,
+        provider: str,
+        retry_after_seconds: float | None,
+        *,
+        status_code: int = 429,
+        error_status: str | None = None,
+    ) -> None:
+        self.status_code = status_code
+        self.error_status = error_status
         self.retry_after_seconds = retry_after_seconds
         detail = ""
         if retry_after_seconds is not None:
             detail = f"; retry after {retry_after_seconds:g} seconds"
-        super().__init__(f"{provider} rate limit or account quota was reached{detail}")
+        if status_code in {502, 503, 504}:
+            category = f" ({error_status})" if error_status else ""
+            message = f"{provider} temporarily unavailable: HTTP {status_code}{category}{detail}"
+        else:
+            message = f"{provider} rate limit or account quota was reached{detail}"
+        super().__init__(message)
 
 
 class CloudProtocolError(CloudProviderError):
@@ -87,6 +101,24 @@ async def checked_json(response: httpx.Response, *, provider: str) -> dict[str, 
             raise CloudAuthenticationError(
                 f"{provider} rejected the configured credentials"
             ) from exc
+        if response.status_code == 402:
+            hint = "Check the provider billing account or credits."
+            if provider == "Gemini":
+                hint = (
+                    "Check Google AI Studio Prepay credits or use an API key from an "
+                    "unbilled Free Tier project with an eligible model."
+                )
+            raise CloudUnavailableError(
+                f"{provider} request failed with HTTP 402 "
+                f"({_safe_error_status(response, default='PAYMENT_REQUIRED')}): {hint}"
+            ) from exc
+        if response.status_code in {502, 503, 504}:
+            raise CloudRateLimitError(
+                provider,
+                _retry_after_seconds(response),
+                status_code=response.status_code,
+                error_status=_safe_error_status(response, default="UNAVAILABLE"),
+            ) from exc
         if response.status_code == 429:
             raise CloudRateLimitError(
                 provider,
@@ -120,21 +152,21 @@ def _retry_after_seconds(response: httpx.Response) -> float | None:
     return value if 0 <= value <= 120 else None
 
 
-def _safe_error_status(response: httpx.Response) -> str:
+def _safe_error_status(response: httpx.Response, *, default: str = "BAD_REQUEST") -> str:
     """Return only a provider error category, never its potentially sensitive text."""
     try:
         payload = response.json()
     except json.JSONDecodeError:
-        return "BAD_REQUEST"
+        return default
     if not isinstance(payload, dict):
-        return "BAD_REQUEST"
+        return default
     error = payload.get("error")
     if not isinstance(error, dict):
-        return "BAD_REQUEST"
+        return default
     status = error.get("status")
     if isinstance(status, str) and re.fullmatch(r"[A-Z_]{1,64}", status):
         return status
-    return "BAD_REQUEST"
+    return default
 
 
 async def iter_sse_json(

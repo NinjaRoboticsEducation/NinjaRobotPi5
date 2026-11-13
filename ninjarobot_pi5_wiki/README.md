@@ -4,19 +4,26 @@ Start here for project documentation, architecture, development history, and
 AI-assisted development. Open this folder in your coding tool for wiki questions,
 or open the parent project for development and implementation verification.
 
-## Current full manuals — Fusion HAT+ implementation
+## Current full manuals — Gemini tool-calling resilience
 
-The 9 November raw successors include browser reconnection and handoff as well
-as Fusion HAT+ integration. They await owner manual acceptance, ingestion and
-semantic review. The document map and compiled wiki register the 4 November
-(`2026-11-04-03`) checkpoint; those originals remain preserved.
+The 14 November raw successors preserve the Fusion HAT+ and browser reconnection
+manuals and add bounded Gemini retries, pacing, billing diagnostics, and direct
+post-tool outcome replies. They await owner manual testing, source registration,
+ingestion, and semantic review. The document map and compiled wiki still refer
+to the registered 9 November (`2026-11-09-02`) sources, which remain unchanged.
 
-- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-11-09-02/InstallationGuide.md)
-- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-11-09-02/DevelopmentGuide.md)
+- [InstallationGuide.md](raw/articles/ninjarobotpi5/2026-11-14/InstallationGuide.md)
+- [DevelopmentGuide.md](raw/articles/ninjarobotpi5/2026-11-14/DevelopmentGuide.md)
+- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-11-14/DevelopmentLog.md)
 - [NinjaRobot_MCP_Skill.md](raw/articles/ninjarobotpi5/2026-10-25/NinjaRobot_MCP_Skill.md) (unchanged public tools)
-- [DevelopmentLog.md](raw/notes/ninjarobotpi5/2026-11-09-02/DevelopmentLog.md)
-- [Fusion agent integration audit and implementation plan](../docs/project-history/NinjaSunFounderIntegrationAudit_261104.md)
-- [Fusion implementation and manual acceptance](../docs/validation/fusion_implementation_261103.md)
+- [Gemini validation and manual acceptance](../docs/validation/gemini_tool_calling_261114.md)
+- [Fusion integration plan](../docs/project-history/NinjaSunFounderIntegrationAudit_261104.md)
+- [Fusion manual acceptance](../docs/validation/fusion_implementation_261103.md)
+
+Registered 9 November predecessors:
+[InstallationGuide](raw/articles/ninjarobotpi5/2026-11-09-02/InstallationGuide.md),
+[DevelopmentGuide](raw/articles/ninjarobotpi5/2026-11-09-02/DevelopmentGuide.md), and
+[DevelopmentLog](raw/notes/ninjarobotpi5/2026-11-09-02/DevelopmentLog.md).
 
 Original registered predecessor sources are preserved:
 [InstallationGuide (2026-11-04-03)](raw/articles/ninjarobotpi5/2026-11-04-03/InstallationGuide.md),
@@ -29,7 +36,7 @@ Original registered predecessor sources are preserved:
 [DevelopmentGuide (2026-11-02)](raw/articles/ninjarobotpi5/2026-11-02/DevelopmentGuide.md), and
 [DevelopmentLog (2026-11-02)](raw/notes/ninjarobotpi5/2026-11-02/DevelopmentLog.md). Ingestion and
 semantic review of `2026-11-03-04` passed with 100% sourced-page coverage; ingestion
-and review of `2026-11-09` are deferred to the owner after manual validation.
+and review of `2026-11-14` are deferred to the owner after manual validation.
 
 - [Multi-HAT runtime remediation validation](../docs/validation/sunfounder_runtime_remediation_261102.md)
 - [Onboarding refinement and Mac Calendar tests](../docs/validation/onboarding_refinement_walkthrough_260923.md)

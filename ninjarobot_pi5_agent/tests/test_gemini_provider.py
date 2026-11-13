@@ -519,3 +519,211 @@ def test_gemini_catalog_filters_models_without_generate_content(tmp_path) -> Non
         await client.aclose()
 
     asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("status", [502, 503, 504])
+@pytest.mark.parametrize("streaming", [False, True])
+@pytest.mark.parametrize("recover", [False, True])
+def test_gemini_transient_retries_are_bounded(tmp_path, status, streaming, recover) -> None:
+    from ninjarobot_pi5_agent.cloud_common import CloudRateLimitError
+
+    async def exercise() -> None:
+        attempts = 0
+
+        def handler(_request: httpx.Request) -> httpx.Response:
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1 or not recover:
+                return httpx.Response(
+                    status,
+                    headers={"Retry-After": "0"},
+                    json={"error": {"status": "UNAVAILABLE", "message": "private-response"}},
+                )
+            payload = {
+                "candidates": [
+                    {"content": {"parts": [{"text": "Recovered"}]}, "finishReason": "STOP"}
+                ]
+            }
+            return (
+                httpx.Response(200, content=f"data: {json.dumps(payload)}\n\n")
+                if streaming
+                else httpx.Response(200, json=payload)
+            )
+
+        store = SecretStore(tmp_path / "secrets.env")
+        store.set("GEMINI_API_KEY", "test-key")
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            base_url="https://generativelanguage.googleapis.com/v1beta",
+        ) as client:
+            provider = GeminiProvider(
+                GeminiConfig(max_rate_limit_retries=1, min_request_interval_seconds=0.0),
+                APIKeyCredential(store, "GEMINI_API_KEY", "x-goog-api-key"),
+                client=client,
+            )
+
+            async def run() -> str:
+                if streaming:
+                    events = [event async for event in provider.stream(_request())]
+                    return events[-1].turn.text
+                return (await provider.generate(_request())).text
+
+            if recover:
+                assert await run() == "Recovered"
+            else:
+                with pytest.raises(CloudRateLimitError, match=f"HTTP {status}") as caught:
+                    await run()
+                assert "private-response" not in str(caught.value)
+            assert attempts == 2
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("streaming", [False, True])
+def test_gemini_payment_failure_is_safe_and_not_retried(tmp_path, streaming) -> None:
+    async def exercise() -> None:
+        attempts = 0
+
+        def handler(_request: httpx.Request) -> httpx.Response:
+            nonlocal attempts
+            attempts += 1
+            return httpx.Response(
+                402, json={"error": {"status": "RESOURCE_EXHAUSTED", "message": "private-response"}}
+            )
+
+        store = SecretStore(tmp_path / "secrets.env")
+        store.set("GEMINI_API_KEY", "test-key")
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            base_url="https://generativelanguage.googleapis.com/v1beta",
+        ) as client:
+            provider = GeminiProvider(
+                GeminiConfig(),
+                APIKeyCredential(store, "GEMINI_API_KEY", "x-goog-api-key"),
+                client=client,
+            )
+            with pytest.raises(CloudUnavailableError, match="HTTP 402") as caught:
+                if streaming:
+                    _ = [event async for event in provider.stream(_request())]
+                else:
+                    await provider.generate(_request())
+            assert "Prepay" in str(caught.value)
+            assert "Free Tier" in str(caught.value)
+            assert "private-response" not in str(caught.value)
+            assert attempts == 1
+
+    asyncio.run(exercise())
+
+
+def test_gemini_paces_concurrent_generation_from_completion(tmp_path, monkeypatch) -> None:
+    import ninjarobot_pi5_agent.gemini_provider as module
+
+    async def exercise() -> None:
+        clock = [100.0]
+        starts = []
+        sleeps = []
+
+        async def sleep(delay):
+            sleeps.append(delay)
+            clock[0] += delay
+
+        monkeypatch.setattr(module.time, "monotonic", lambda: clock[0])
+        monkeypatch.setattr(module.asyncio, "sleep", sleep)
+
+        def handler(_request):
+            starts.append(clock[0])
+            clock[0] += 0.1
+            return httpx.Response(
+                200,
+                json={
+                    "candidates": [{"content": {"parts": [{"text": "OK"}]}, "finishReason": "STOP"}]
+                },
+            )
+
+        store = SecretStore(tmp_path / "secrets.env")
+        store.set("GEMINI_API_KEY", "test-key")
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            base_url="https://generativelanguage.googleapis.com/v1beta",
+        ) as client:
+            provider = GeminiProvider(
+                GeminiConfig(),
+                APIKeyCredential(store, "GEMINI_API_KEY", "x-goog-api-key"),
+                client=client,
+            )
+            await asyncio.gather(provider.generate(_request()), provider.generate(_request()))
+        assert starts == pytest.approx([100.0, 100.45])
+        assert sleeps == pytest.approx([0.35])
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("tool_call", [False, True])
+def test_gemini_never_retries_after_receiving_stream_content(
+    tmp_path, monkeypatch, tool_call
+) -> None:
+    import ninjarobot_pi5_agent.gemini_provider as module
+    from ninjarobot_pi5_agent.cloud_common import CloudRateLimitError, wire_tool_name
+
+    async def exercise() -> None:
+        attempts = 0
+
+        def handler(_request):
+            nonlocal attempts
+            attempts += 1
+            return httpx.Response(200)
+
+        async def chunks(*args, **kwargs):
+            part = (
+                {"functionCall": {"name": wire_tool_name("mcp.tavily.tavily-search"), "args": {}}}
+                if tool_call
+                else {"text": "Already visible"}
+            )
+            yield None, {"candidates": [{"content": {"parts": [part]}}]}
+            raise CloudRateLimitError("Gemini", 0.0, status_code=503)
+
+        monkeypatch.setattr(module, "iter_sse_json", chunks)
+        store = SecretStore(tmp_path / "secrets.env")
+        store.set("GEMINI_API_KEY", "test-key")
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            base_url="https://generativelanguage.googleapis.com/v1beta",
+        ) as client:
+            provider = GeminiProvider(
+                GeminiConfig(),
+                APIKeyCredential(store, "GEMINI_API_KEY", "x-goog-api-key"),
+                client=client,
+            )
+            with pytest.raises(CloudRateLimitError):
+                _ = [event async for event in provider.stream(_request())]
+            assert attempts == 1
+
+    asyncio.run(exercise())
+
+
+def test_gemini_retry_delays_have_bounded_jitter_and_retry_after(tmp_path, monkeypatch) -> None:
+    import ninjarobot_pi5_agent.gemini_provider as module
+    from ninjarobot_pi5_agent.cloud_common import CloudRateLimitError
+
+    async def exercise() -> None:
+        sleeps = []
+
+        async def sleep(delay):
+            sleeps.append(delay)
+
+        monkeypatch.setattr(module.asyncio, "sleep", sleep)
+        monkeypatch.setattr(module.random, "uniform", lambda low, high: high)
+        store = SecretStore(tmp_path / "secrets.env")
+        async with httpx.AsyncClient() as client:
+            provider = GeminiProvider(
+                GeminiConfig(),
+                APIKeyCredential(store, "GEMINI_API_KEY", "x-goog-api-key"),
+                client=client,
+            )
+            for attempt in [0, 1, 2, 5]:
+                await provider._wait_rate_limit_retry(CloudRateLimitError("Gemini", None), attempt)
+            await provider._wait_rate_limit_retry(CloudRateLimitError("Gemini", 120.0), 0)
+            await provider._wait_rate_limit_retry(CloudRateLimitError("Gemini", 0.0), 0)
+        assert sleeps == pytest.approx([1.1, 2.2, 4.25, 10.0, 10.0, 0.0])
+
+    asyncio.run(exercise())
